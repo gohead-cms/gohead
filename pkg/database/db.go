@@ -16,5 +16,9 @@ func InitDatabase() error {
 		return err
 	}
 	// Migrate the schema
-	return DB.AutoMigrate(&models.ContentItem{}, &models.User{})
+	return DB.AutoMigrate(
+		&models.ContentItem{},
+		&models.User{},
+		&models.ContentRelation{},
+	)
 }

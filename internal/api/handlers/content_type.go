@@ -16,6 +16,12 @@ func CreateContentType(c *gin.Context) {
 		return
 	}
 
+	// Validate content type fields
+	if err := models.ValidateContentType(ct); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	// Save the content type
 	storage.SaveContentType(ct)
 

@@ -12,12 +12,6 @@ func SaveContentItem(item *models.ContentItem) error {
 	return database.DB.Create(item).Error
 }
 
-func GetContentItems(contentTypeName string) ([]models.ContentItem, error) {
-	var items []models.ContentItem
-	err := database.DB.Where("content_type = ?", contentTypeName).Find(&items).Error
-	return items, err
-}
-
 func GetContentItemByID(contentTypeName string, id uint) (*models.ContentItem, error) {
 	var item models.ContentItem
 	err := database.DB.Where("content_type = ? AND id = ?", contentTypeName, id).First(&item).Error
@@ -27,17 +21,45 @@ func GetContentItemByID(contentTypeName string, id uint) (*models.ContentItem, e
 	return &item, nil
 }
 
-func UpdateContentItem(contentTypeName string, id uint, data map[string]interface{}) error {
+func GetContentItems(contentTypeName string) ([]models.ContentItem, error) {
+	var items []models.ContentItem
+	err := database.DB.Where("content_type = ?", contentTypeName).Find(&items).Error
+	return items, err
+}
+
+func UpdateContentItem(ct models.ContentType, id uint, data models.JSONMap) error {
 	var item models.ContentItem
-	err := database.DB.Where("content_type = ? AND id = ?", contentTypeName, id).First(&item).Error
+	err := database.DB.Where("content_type = ? AND id = ?", ct.Name, id).First(&item).Error
 	if err != nil {
 		return fmt.Errorf("content item not found")
 	}
 
 	item.Data = data
-	return database.DB.Save(&item).Error
+	if err := database.DB.Save(&item).Error; err != nil {
+		return err
+	}
+
+	// Update relationships
+	if err := database.DB.Where("content_type = ? AND content_item_id = ?", ct.Name, id).Delete(&models.ContentRelation{}).Error; err != nil {
+		return err
+	}
+
+	if err := SaveContentRelations(ct, id, data); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func DeleteContentItem(contentTypeName string, id uint) error {
-	return database.DB.Where("content_type = ? AND id = ?", contentTypeName, id).Delete(&models.ContentItem{}).Error
+func DeleteContentItem(ct models.ContentType, id uint) error {
+	if err := database.DB.Where("content_type = ? AND id = ?", ct.Name, id).Delete(&models.ContentItem{}).Error; err != nil {
+		return err
+	}
+
+	// Delete relationships
+	if err := database.DB.Where("content_type = ? AND content_item_id = ?", ct.Name, id).Delete(&models.ContentRelation{}).Error; err != nil {
+		return err
+	}
+
+	return nil
 }

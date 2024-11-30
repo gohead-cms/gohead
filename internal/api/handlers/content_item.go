@@ -10,6 +10,7 @@ import (
 	"gitlab.com/sudo.bngz/gohead/pkg/storage"
 )
 
+// internal/api/handlers/content_item.go
 func CreateContentItem(ct models.ContentType) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var itemData map[string]interface{}
@@ -18,7 +19,7 @@ func CreateContentItem(ct models.ContentType) gin.HandlerFunc {
 			return
 		}
 
-		// Validate item fields based on ct.Fields
+		// Validate item data, including relationships
 		if err := models.ValidateItemData(ct, itemData); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -27,10 +28,16 @@ func CreateContentItem(ct models.ContentType) gin.HandlerFunc {
 		// Create the content item
 		item := models.ContentItem{
 			ContentType: ct.Name,
-			Data:        itemData,
+			Data:        models.JSONMap(itemData),
 		}
 
 		if err := storage.SaveContentItem(&item); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Save relationships (if any)
+		if err := storage.SaveContentRelations(ct, item.ID, itemData); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -51,6 +58,7 @@ func GetContentItems(ct models.ContentType) gin.HandlerFunc {
 	}
 }
 
+// internal/api/handlers/content_item.go
 func GetContentItemByID(ct models.ContentType) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		idStr := c.Param("id")
@@ -64,6 +72,25 @@ func GetContentItemByID(ct models.ContentType) gin.HandlerFunc {
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
+		}
+
+		// Fetch relationships
+		relations, err := storage.GetContentRelations(ct.Name, item.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Add related items to the response
+		for _, rel := range relations {
+			relatedItem, err := storage.GetContentItemByID(rel.RelatedType, rel.RelatedItemID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			// Overwrite the field in item.Data
+			item.Data[rel.FieldName] = relatedItem.Data
 		}
 
 		c.JSON(http.StatusOK, item)
@@ -85,14 +112,14 @@ func UpdateContentItem(ct models.ContentType) gin.HandlerFunc {
 			return
 		}
 
-		// Validate item fields based on ct.Fields
+		// Validate item data, including relationships
 		if err := models.ValidateItemData(ct, itemData); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
 		// Update the content item
-		if err := storage.UpdateContentItem(ct.Name, uint(id), itemData); err != nil {
+		if err := storage.UpdateContentItem(ct, uint(id), models.JSONMap(itemData)); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -110,7 +137,7 @@ func DeleteContentItem(ct models.ContentType) gin.HandlerFunc {
 			return
 		}
 
-		if err := storage.DeleteContentItem(ct.Name, uint(id)); err != nil {
+		if err := storage.DeleteContentItem(ct, uint(id)); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
