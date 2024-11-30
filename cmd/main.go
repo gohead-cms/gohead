@@ -15,14 +15,25 @@ func main() {
 	}
 
 	router := gin.Default()
-	router.Use(middleware.AuthMiddleware())
 
-	// Route to create content types
-	router.POST("/content-types", handlers.CreateContentType)
+	// Public routes
+	authRoutes := router.Group("/auth")
+	{
+		authRoutes.POST("/register", handlers.Register)
+		authRoutes.POST("/login", handlers.Login)
+	}
 
-	// Dynamic route for content items
-	router.Any("/:contentType", handlers.DynamicContentHandler)
-	router.Any("/:contentType/:id", handlers.DynamicContentHandler)
+	// Protected routes
+	protected := router.Group("/")
+	protected.Use(middleware.AuthMiddleware())
+	{
+		// Content Types
+		protected.POST("/content-types", handlers.CreateContentType)
+
+		// Dynamic Content Routes
+		protected.Any("/:contentType", handlers.DynamicContentHandler)
+		protected.Any("/:contentType/:id", handlers.DynamicContentHandler)
+	}
 
 	// Start the server
 	router.Run(":8080")
