@@ -10,11 +10,16 @@ import (
 	"gitlab.com/sudo.bngz/gohead/internal/models"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gitlab.com/sudo.bngz/gohead/pkg/storage"
+	"go.opentelemetry.io/otel"
 )
 
 // internal/api/handlers/content_item.go
 func CreateContentItem(ct models.ContentType) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		ctx := c.Request.Context()
+		tracer := otel.Tracer("gohead")
+		ctx, span := tracer.Start(ctx, "CreateContentItem")
+		defer span.End()
 		var itemData map[string]interface{}
 		if err := c.ShouldBindJSON(&itemData); err != nil {
 			logger.Log.Warn("Item: Bad Request", err)
