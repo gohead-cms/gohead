@@ -30,8 +30,9 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Store username in context for use in handlers
+		// Store username and role in context
 		c.Set("username", claims.Username)
+		c.Set("role", claims.Role)
 		c.Next()
 	}
 }

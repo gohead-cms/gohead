@@ -7,17 +7,19 @@ import (
 	"github.com/dgrijalva/jwt-go"
 )
 
-var jwtKey = []byte("your-secret-key") // Use a secure key from env variables in production
+var jwtKey = []byte("your-secret-key")
 
 type Claims struct {
 	Username string `json:"username"`
+	Role     string `json:"role"`
 	jwt.StandardClaims
 }
 
-func GenerateJWT(username string) (string, error) {
+func GenerateJWT(username, role string) (string, error) {
 	expirationTime := time.Now().Add(72 * time.Hour)
 	claims := &Claims{
 		Username: username,
+		Role:     role,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: expirationTime.Unix(),
 			IssuedAt:  time.Now().Unix(),

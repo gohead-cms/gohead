@@ -27,16 +27,13 @@ func main() {
 	protected := router.Group("/")
 	protected.Use(middleware.AuthMiddleware())
 	{
-		// Content Types
-		protected.POST("/content-types", handlers.CreateContentType)
+		// Content Types - Only Admins
+		protected.POST("/content-types", middleware.AuthorizeRole("admin"), handlers.CreateContentType)
 
-		// Dynamic Content Routes
+		// Content Items
 		protected.Any("/:contentType", handlers.DynamicContentHandler)
 		protected.Any("/:contentType/:id", handlers.DynamicContentHandler)
 	}
-
-	// Start the server
-	router.Run(":8080")
 
 	// Start the server
 	router.Run(":8080")

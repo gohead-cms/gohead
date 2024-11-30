@@ -8,6 +8,7 @@ import (
 	"gitlab.com/sudo.bngz/gohead/pkg/storage"
 )
 
+// internal/api/handlers/dynamic_content.go
 func DynamicContentHandler(c *gin.Context) {
 	contentTypeName := c.Param("contentType")
 	id := c.Param("id")
@@ -19,22 +20,42 @@ func DynamicContentHandler(c *gin.Context) {
 		return
 	}
 
+	// Get user role from context
+	role, _ := c.Get("role")
+	userRole := role.(string)
+
 	switch c.Request.Method {
 	case http.MethodPost:
+		if !hasPermission(userRole, "create") {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
+		}
 		CreateContentItem(ct)(c)
 	case http.MethodGet:
+		if !hasPermission(userRole, "read") {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
+		}
 		if id == "" {
 			GetContentItems(ct)(c)
 		} else {
 			GetContentItemByID(ct)(c)
 		}
 	case http.MethodPut:
+		if !hasPermission(userRole, "update") {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
+		}
 		if id != "" {
 			UpdateContentItem(ct)(c)
 		} else {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "ID is required for update"})
 		}
 	case http.MethodDelete:
+		if !hasPermission(userRole, "delete") {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
+		}
 		if id != "" {
 			DeleteContentItem(ct)(c)
 		} else {

@@ -11,7 +11,11 @@ import (
 )
 
 func Register(c *gin.Context) {
-	var input models.User
+	var input struct {
+		Username string `json:"username" binding:"required"`
+		Password string `json:"password" binding:"required"`
+		Role     string `json:"role"` // Optional
+	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -24,9 +28,23 @@ func Register(c *gin.Context) {
 		return
 	}
 
+	// Set default role if none provided
+	role := input.Role
+	if role == "" {
+		role = "viewer"
+	}
+
+	// Validate role
+	validRoles := []string{"admin", "editor", "viewer"}
+	if !contains(validRoles, role) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role"})
+		return
+	}
+
 	user := models.User{
 		Username: input.Username,
 		Password: string(hashedPassword),
+		Role:     role,
 	}
 
 	// Save the user
@@ -38,8 +56,20 @@ func Register(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "User registered successfully"})
 }
 
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
 func Login(c *gin.Context) {
-	var input models.User
+	var input struct {
+		Username string `json:"username" binding:"required"`
+		Password string `json:"password" binding:"required"`
+	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -51,14 +81,13 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// Compare the stored hashed password with the provided password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
 		return
 	}
 
-	// Generate JWT token
-	tokenString, err := auth.GenerateJWT(user.Username)
+	// Generate JWT token with role
+	tokenString, err := auth.GenerateJWT(user.Username, user.Role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
