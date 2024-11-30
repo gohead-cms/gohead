@@ -1,6 +1,10 @@
+// pkg/database/db.go
 package database
 
 import (
+	"fmt"
+	"strings"
+
 	"gitlab.com/sudo.bngz/gohead/internal/models"
 
 	"gorm.io/driver/sqlite"
@@ -9,9 +13,18 @@ import (
 
 var DB *gorm.DB
 
-func InitDatabase() error {
+func InitDatabase(databaseURL string) error {
 	var err error
-	DB, err = gorm.Open(sqlite.Open("cms.db"), &gorm.Config{})
+
+	// Parse the database URL
+	if strings.HasPrefix(databaseURL, "sqlite://") {
+		// Remove the 'sqlite://' prefix
+		dbPath := strings.TrimPrefix(databaseURL, "sqlite://")
+		DB, err = gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+	} else {
+		return fmt.Errorf("unsupported database type")
+	}
+
 	if err != nil {
 		return err
 	}

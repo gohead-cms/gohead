@@ -12,6 +12,8 @@ cms.db
 # Output of the `go build` command
 /build/
 
+/config.yaml
+
 # Temporary files
 *.out
 *.log

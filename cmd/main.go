@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -10,6 +11,8 @@ import (
 	ginlogrus "github.com/toorop/gin-logrus"
 	"gitlab.com/sudo.bngz/gohead/internal/api/handlers"
 	"gitlab.com/sudo.bngz/gohead/internal/api/middleware"
+	"gitlab.com/sudo.bngz/gohead/pkg/auth"
+	"gitlab.com/sudo.bngz/gohead/pkg/config"
 	"gitlab.com/sudo.bngz/gohead/pkg/database"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gitlab.com/sudo.bngz/gohead/pkg/metrics"
@@ -18,25 +21,35 @@ import (
 )
 
 func main() {
-	// Initialize the logger
-	logger.InitLogger()
+	// Parse command-line flags
+	configPath := flag.String("config", "config.yaml", "path to config file")
+	flag.Parse()
+
+	// Load configuration
+	cfg, err := config.LoadConfig(*configPath)
+	if err != nil {
+		panic(err)
+	}
+	// Initialize the logger with the configured log level
+	logger.InitLogger(cfg.LogLevel)
 
 	// Initialize metrics
 	metrics.InitMetrics()
 
-	// Initialize tracing
-	tracerProvider, err := tracing.InitTracer()
-	if err != nil {
-		logger.Log.Fatal("Failed to initialize tracer:", err)
-	}
-	defer func() {
-		if err := tracerProvider.Shutdown(context.Background()); err != nil {
-			logger.Log.Error("Error shutting down tracer provider:", err)
+	if cfg.TelemetryEnabled {
+		tracerProvider, err := tracing.InitTracer()
+		if err != nil {
+			logger.Log.Fatal("Failed to initialize tracer:", err)
 		}
-	}()
+		defer func() {
+			if err := tracerProvider.Shutdown(context.Background()); err != nil {
+				logger.Log.Error("Error shutting down tracer provider:", err)
+			}
+		}()
+	}
 
-	// Initialize the database
-	if err := database.InitDatabase(); err != nil {
+	// Initialize the database with the configured database URL
+	if err := database.InitDatabase(cfg.DatabaseURL); err != nil {
 		logger.Log.Fatal("Failed to connect to database!", err)
 	}
 
@@ -58,6 +71,8 @@ func main() {
 		authRoutes.POST("/register", handlers.Register)
 		authRoutes.POST("/login", handlers.Login)
 	}
+	// Initialize JWT with the secret from config
+	auth.InitializeJWT(cfg.JWTSecret)
 
 	// Protected routes
 	protected := router.Group("/")
@@ -69,6 +84,6 @@ func main() {
 	}
 
 	// Start the server
-	logger.Log.Info("Starting server on port 8080")
-	router.Run(":8080")
+	logger.Log.Infof("Starting server on port %s", cfg.ServerPort)
+	router.Run(":" + cfg.ServerPort)
 }
