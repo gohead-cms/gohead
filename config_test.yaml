@@ -1,0 +1,5 @@
+log_level: "debug"
+telemetry_enabled: false
+jwt_secret: "test-secret"
+database_url: "sqlite://:memory:" # In-memory SQLite database for tests
+server_port: "8080"

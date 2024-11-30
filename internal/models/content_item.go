@@ -1,4 +1,3 @@
-// internal/models/content_item.go
 package models
 
 import "gorm.io/gorm"

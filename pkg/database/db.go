@@ -5,33 +5,26 @@ import (
 	"fmt"
 	"strings"
 
-	"gitlab.com/sudo.bngz/gohead/internal/models"
-
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 var DB *gorm.DB
 
-func InitDatabase(databaseURL string) error {
+// InitDatabase initializes the database connection.
+func InitDatabase(databaseURL string) (*gorm.DB, error) {
 	var err error
 
-	// Parse the database URL
 	if strings.HasPrefix(databaseURL, "sqlite://") {
-		// Remove the 'sqlite://' prefix
 		dbPath := strings.TrimPrefix(databaseURL, "sqlite://")
 		DB, err = gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	} else {
-		return fmt.Errorf("unsupported database type")
+		return nil, fmt.Errorf("unsupported database type: %s", databaseURL)
 	}
 
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
-	// Migrate the schema
-	return DB.AutoMigrate(
-		&models.ContentItem{},
-		&models.User{},
-		&models.ContentRelation{},
-	)
+
+	return DB, nil
 }

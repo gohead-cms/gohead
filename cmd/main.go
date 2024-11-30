@@ -1,9 +1,9 @@
-// cmd/main.go
 package main
 
 import (
 	"context"
 	"flag"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -16,20 +16,19 @@ import (
 	"gitlab.com/sudo.bngz/gohead/pkg/database"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gitlab.com/sudo.bngz/gohead/pkg/metrics"
+	"gitlab.com/sudo.bngz/gohead/pkg/migrations"
 	"gitlab.com/sudo.bngz/gohead/pkg/tracing"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
-func main() {
-	// Parse command-line flags
-	configPath := flag.String("config", "config.yaml", "path to config file")
-	flag.Parse()
-
+// InitializeServer initializes the Gin server and all dependencies
+func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	// Load configuration
-	cfg, err := config.LoadConfig(*configPath)
+	cfg, err := config.LoadConfig(cfgPath)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
+
 	// Initialize the logger with the configured log level
 	logger.InitLogger(cfg.LogLevel)
 
@@ -39,7 +38,7 @@ func main() {
 	if cfg.TelemetryEnabled {
 		tracerProvider, err := tracing.InitTracer()
 		if err != nil {
-			logger.Log.Fatal("Failed to initialize tracer:", err)
+			return nil, err
 		}
 		defer func() {
 			if err := tracerProvider.Shutdown(context.Background()); err != nil {
@@ -48,19 +47,31 @@ func main() {
 		}()
 	}
 
-	// Initialize the database with the configured database URL
-	if err := database.InitDatabase(cfg.DatabaseURL); err != nil {
-		logger.Log.Fatal("Failed to connect to database!", err)
+	// Initialize the database
+	db, err := database.InitDatabase(cfg.DatabaseURL)
+	if err != nil {
+		return nil, err
 	}
 
+	// Apply migrations
+	if err := migrations.MigrateDatabase(db); err != nil {
+		return nil, err
+	}
+
+	// Initialize JWT with the secret from config
+	auth.InitializeJWT(cfg.JWTSecret)
+
+	// Create the router
 	router := gin.New()
-	router.Use(ginlogrus.Logger(logger.Log), gin.Recovery(), middleware.MetricsMiddleware())
+	router.Use(ginlogrus.Logger(logger.Log))
+	router.Use(gin.Recovery())
+	router.Use(middleware.MetricsMiddleware())
 	router.Use(otelgin.Middleware("gohead"))
 
 	// Monitoring
 	router.GET("/_metrics", gin.WrapH(promhttp.Handler()))
 
-	// healthcheck
+	// Healthcheck
 	router.GET("/_health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
@@ -71,8 +82,6 @@ func main() {
 		authRoutes.POST("/register", handlers.Register)
 		authRoutes.POST("/login", handlers.Login)
 	}
-	// Initialize JWT with the secret from config
-	auth.InitializeJWT(cfg.JWTSecret)
 
 	// Protected routes
 	protected := router.Group("/")
@@ -83,7 +92,22 @@ func main() {
 		protected.Any("/:contentType/:id", handlers.DynamicContentHandler)
 	}
 
+	return router, nil
+}
+
+func main() {
+	// Parse command-line flags
+	configPath := flag.String("config", "config.yaml", "path to config file")
+	flag.Parse()
+
+	// Initialize the server
+	router, err := InitializeServer(*configPath)
+	if err != nil {
+		log.Fatalf("Failed to initialize server: %v", err)
+	}
+
 	// Start the server
+	cfg, _ := config.LoadConfig(*configPath) // Reload config to get ServerPort
 	logger.Log.Infof("Starting server on port %s", cfg.ServerPort)
 	router.Run(":" + cfg.ServerPort)
 }

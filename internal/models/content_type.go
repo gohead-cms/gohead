@@ -106,9 +106,6 @@ func ValidateItemData(ct ContentType, data map[string]interface{}) error {
 		}
 	}
 
-	// Validate relationships as before
-	// ...
-
 	return nil
 }
 

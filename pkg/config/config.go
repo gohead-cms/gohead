@@ -3,9 +3,11 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
@@ -26,18 +28,19 @@ func LoadConfig(configPath string) (Config, error) {
 	viper.SetDefault("database_url", "sqlite://cms.db")
 	viper.SetDefault("server_port", "8080")
 
-	// Set the path to look for the config file
+	// Set the config file path
 	viper.SetConfigFile(configPath)
 
 	// Read the config file
 	if err := viper.ReadInConfig(); err != nil {
-		return cfg, fmt.Errorf("failed to read config file: %w", err)
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return cfg, fmt.Errorf("failed to read config file: %w", err)
+		}
 	}
 
 	// Override with environment variables
 	viper.AutomaticEnv()
 	viper.SetEnvPrefix("CMS")
-	// Replace dots with underscores in env vars
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	// Unmarshal the config into the struct
@@ -46,4 +49,27 @@ func LoadConfig(configPath string) (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func LoadTestConfig() (Config, error) {
+	return LoadConfig("//Users/nbo/go/src/gohead/config_test.yaml")
+}
+
+// SaveConfig writes the provided Config struct to a YAML file.
+func SaveConfig(cfg *Config, filePath string) error {
+	// Create or truncate the file
+	file, err := os.Create(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to create config file: %w", err)
+	}
+	defer file.Close()
+
+	// Marshal the config into YAML format
+	encoder := yaml.NewEncoder(file)
+	encoder.SetIndent(2)
+	if err := encoder.Encode(cfg); err != nil {
+		return fmt.Errorf("failed to encode config to YAML: %w", err)
+	}
+
+	return nil
 }

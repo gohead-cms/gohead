@@ -8,6 +8,7 @@ cms.db
 
 # Test binary
 *.test
+coverage.html
 
 # Output of the `go build` command
 /build/

@@ -3,4 +3,4 @@ log_level: "info"
 telemetry_enabled: true
 jwt_secret: "your-secret-key"
 database_url: "sqlite://cms.db"
-server_port: "8080"
+server_port: "8081"
