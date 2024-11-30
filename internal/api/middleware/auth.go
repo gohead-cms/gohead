@@ -6,8 +6,10 @@ import (
 	"strings"
 
 	"gitlab.com/sudo.bngz/gohead/pkg/auth"
+	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func AuthMiddleware() gin.HandlerFunc {
@@ -30,7 +32,13 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Store username and role in context
+		logger.Log.WithFields(logrus.Fields{
+			"username": claims.Username,
+			"role":     claims.Role,
+			"path":     c.Request.URL.Path,
+			"method":   c.Request.Method,
+		}).Info("Authenticated request")
+
 		c.Set("username", claims.Username)
 		c.Set("role", claims.Role)
 		c.Next()
