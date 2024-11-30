@@ -3,6 +3,7 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	ginlogrus "github.com/toorop/gin-logrus"
 	"gitlab.com/sudo.bngz/gohead/internal/api/handlers"
 	"gitlab.com/sudo.bngz/gohead/internal/api/middleware"
@@ -20,7 +21,10 @@ func main() {
 	}
 
 	router := gin.New()
-	router.Use(ginlogrus.Logger(logger.Log), gin.Recovery())
+	router.Use(ginlogrus.Logger(logger.Log), gin.Recovery(), middleware.MetricsMiddleware())
+
+	// Monitoring
+	router.GET("/_metrics", gin.WrapH(promhttp.Handler()))
 
 	// Public routes
 	authRoutes := router.Group("/auth")
