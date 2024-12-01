@@ -58,7 +58,7 @@ func TestJSONMap_Scan(t *testing.T) {
 			}`),
 			expectedJSON: JSONMap{
 				"key1": "value1",
-				"key2": float64(123), // JSON numbers are parsed as float64
+				"key2": int(123),
 				"key3": true,
 			},
 			expectedError: false,

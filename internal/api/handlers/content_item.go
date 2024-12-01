@@ -57,7 +57,7 @@ func CreateContentItem(ct models.ContentType) gin.HandlerFunc {
 			"item_id": item.ID,
 		}).Info("Item content created successfully")
 
-		c.JSON(http.StatusCreated, item)
+		c.JSON(201, item)
 	}
 }
 

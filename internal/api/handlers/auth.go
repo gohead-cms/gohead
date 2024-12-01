@@ -9,6 +9,7 @@ import (
 	"gitlab.com/sudo.bngz/gohead/pkg/auth"
 	"gitlab.com/sudo.bngz/gohead/pkg/database"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
+	"gitlab.com/sudo.bngz/gohead/pkg/storage"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -16,10 +17,10 @@ func Register(c *gin.Context) {
 	var input struct {
 		Username string `json:"username" binding:"required"`
 		Password string `json:"password" binding:"required"`
-		Role     string `json:"role"` // Optional
+		Email    string `json:"email" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		logger.Log.Warn("Register: Invalid input", err)
+		logger.Log.WithError(err).Warn("Register: Invalid input")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -27,52 +28,56 @@ func Register(c *gin.Context) {
 	// Hash the password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
+		logger.Log.WithError(err).Error("Register: Failed to hash password")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
 		return
 	}
 
-	// Set default role if none provided
-	role := input.Role
-	if role == "" {
-		role = "viewer"
+	role := "viewer"
+
+	// Validate the user role
+	userRole := models.UserRole{
+		Name:        role,
+		Description: "Default user role",
+		Permissions: models.JSONMap{"perms": "read"}, // Example default permissions
 	}
 
-	// Validate role
-	validRoles := []string{"admin", "editor", "viewer"}
-	if !contains(validRoles, role) {
-		logger.Log.Warn("Register: Invalid role", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role"})
+	if err := models.ValidateUserRole(userRole); err != nil {
+		logger.Log.WithFields(logrus.Fields{
+			"role": role,
+		}).Warn("Register: Invalid role", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Create user instance
 	user := models.User{
 		Username: input.Username,
 		Password: string(hashedPassword),
-		Role:     role,
+		Role:     userRole,
+		Email:    input.Email,
+	}
+
+	// Validate user
+	if err := models.ValidateUser(user); err != nil {
+		logger.Log.WithError(err).Warn("Register: User validation failed")
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
 	// Save the user
-	if err := database.DB.Create(&user).Error; err != nil {
-		logger.Log.Warn("Register: Username already exists", err)
+	if err := storage.SaveUser(&user); err != nil {
+		logger.Log.WithError(err).Warn("Register: Username already exists")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Username already exists"})
 		return
 	}
 
 	logger.Log.WithFields(logrus.Fields{
 		"username": user.Username,
-		"role":     user.Role,
+		"role":     user.Role.Name,
 	}).Info("User registered successfully")
 
 	c.JSON(http.StatusCreated, gin.H{"message": "User registered successfully"})
-}
-
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
 }
 
 func Login(c *gin.Context) {
@@ -100,7 +105,7 @@ func Login(c *gin.Context) {
 	}
 
 	// Generate JWT token with role
-	tokenString, err := auth.GenerateJWT(user.Username, user.Role)
+	tokenString, err := auth.GenerateJWT(user.Username, user.Role.Name)
 	if err != nil {
 		logger.Log.Warn("Login: Failed to generate token", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})

@@ -29,5 +29,5 @@ func CreateContentType(c *gin.Context) {
 	storage.SaveContentType(ct)
 
 	logger.Log.Info("Content Type created successfully")
-	c.JSON(http.StatusOK, gin.H{"message": "Content type created"})
+	c.JSON(http.StatusCreated, gin.H{"message": "Content type created"})
 }

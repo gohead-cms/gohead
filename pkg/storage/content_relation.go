@@ -49,7 +49,6 @@ func SaveContentRelations(ct models.ContentType, itemID uint, itemData map[strin
 	return nil
 }
 
-// pkg/storage/content_relation.go
 func GetContentRelations(contentType string, itemID uint) ([]models.ContentRelation, error) {
 	var relations []models.ContentRelation
 	err := database.DB.Where("content_type = ? AND content_item_id = ?", contentType, itemID).Find(&relations).Error

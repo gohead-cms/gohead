@@ -9,35 +9,42 @@ import (
 	"testing"
 
 	"gitlab.com/sudo.bngz/gohead/internal/models"
-	"gitlab.com/sudo.bngz/gohead/pkg/database"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
+	"gitlab.com/sudo.bngz/gohead/pkg/testutils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRegister(t *testing.T) {
+// Initialize logger for testing
+func init() {
+	// Configure logger to write logs to a buffer for testing
+	var buffer bytes.Buffer
 	logger.InitLogger("debug")
+	logger.Log.SetOutput(&buffer)
+	logger.Log.SetFormatter(&logrus.TextFormatter{})
+}
+
+func TestRegister(t *testing.T) {
 	// Initialize in-memory test database
-	db, err := database.InitDatabase("sqlite://:memory:")
-	assert.NoError(t, err, "Failed to initialize in-memory database")
-	database.DB = db
+	router, db := testutils.SetupTestServer()
 
 	// Apply migrations
-	err = db.AutoMigrate(&models.User{})
+	err := db.AutoMigrate(&models.User{})
 	assert.NoError(t, err, "Failed to apply migrations")
 
 	// Set Gin to Test Mode
 	gin.SetMode(gin.TestMode)
 
 	// Create a Gin router and register the route
-	router := gin.Default()
 	router.POST("/auth/register", Register)
 
 	// Define test user data
 	testUser := map[string]string{
 		"username": "testuser",
 		"password": "testpass",
+		"email":    "joe@foo.com",
 	}
 	body, _ := json.Marshal(testUser)
 

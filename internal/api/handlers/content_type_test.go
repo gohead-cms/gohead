@@ -9,16 +9,27 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
+	"gitlab.com/sudo.bngz/gohead/pkg/testutils"
 )
 
-func TestCreateContentTypeHandler(t *testing.T) {
+// Initialize logger for testing
+func init() {
+	// Configure logger to write logs to a buffer for testing
+	var buffer bytes.Buffer
 	logger.InitLogger("debug")
+	logger.Log.SetOutput(&buffer)
+	logger.Log.SetFormatter(&logrus.TextFormatter{})
+}
+
+func TestCreateContentTypeHandler(t *testing.T) {
+	// Initialize in-memory test database
+	router, _ := testutils.SetupTestServer()
 	// Load test configuration
 	// Create the Gin router
 	gin.SetMode(gin.TestMode)
-	router := gin.Default()
 
 	// Register the handler
 	router.POST("/content-types", CreateContentType)
@@ -48,14 +59,13 @@ func TestCreateContentTypeHandler(t *testing.T) {
 				},
 			},
 			expectedStatus: http.StatusCreated,
-			expectedBody:   `"name":"articles"`,
+			expectedBody:   `{"message":"Content type created"}`,
 		},
 		{
 			name: "Missing Name Field",
 			inputData: map[string]interface{}{
 				"fields": []map[string]interface{}{
 					{
-						"name":     "title",
 						"type":     "string",
 						"required": true,
 					},

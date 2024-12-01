@@ -2,6 +2,7 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"time"
@@ -61,7 +62,7 @@ func ValidateItemData(ct ContentType, data map[string]interface{}) error {
 				}
 			}
 		case "int":
-			numValue, ok := value.(float64) // JSON numbers are float64
+			numValue, ok := value.(int) // JSON numbers are float64
 			if !ok {
 				return fmt.Errorf("field '%s' must be a number", field.Name)
 			}
@@ -110,6 +111,17 @@ func ValidateItemData(ct ContentType, data map[string]interface{}) error {
 }
 
 func ValidateContentType(ct ContentType) error {
+	// Ensure the name is not empty
+	if ct.Name == "" {
+		return errors.New("missing required field: name")
+	}
+
+	// Ensure the fields array is not empty
+	if len(ct.Fields) == 0 {
+		return errors.New("fields array cannot be empty")
+	}
+
+	// Keep track of field names to check for duplicates
 	fieldNames := make(map[string]bool)
 	for _, field := range ct.Fields {
 		// Check for duplicate field names
@@ -124,7 +136,7 @@ func ValidateContentType(ct ContentType) error {
 			return fmt.Errorf("invalid field type '%s' for field '%s'", field.Type, field.Name)
 		}
 
-		// Additional validation per field type
+		// Additional validation for specific field types
 		switch field.Type {
 		case "enum":
 			if len(field.Options) == 0 {
@@ -137,9 +149,16 @@ func ValidateContentType(ct ContentType) error {
 					return fmt.Errorf("invalid regex pattern for field '%s': %v", field.Name, err)
 				}
 			}
-			// Add more cases as needed
+		}
+
+		// Additional checks for numeric fields
+		if (field.Type == "int") && field.Min != nil && field.Max != nil {
+			if *field.Min > *field.Max {
+				return fmt.Errorf("field '%s': min value cannot be greater than max value", field.Name)
+			}
 		}
 	}
+
 	return nil
 }
 

@@ -2,12 +2,24 @@
 package models
 
 import (
+	"bytes"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
+
+// Initialize logger for testing
+func init() {
+	// Configure logger to write logs to a buffer for testing
+	var buffer bytes.Buffer
+	logger.InitLogger("debug")
+	logger.Log.SetOutput(&buffer)
+	logger.Log.SetFormatter(&logrus.TextFormatter{})
+}
 
 func TestContentRelationCRUD(t *testing.T) {
 	// Initialize an in-memory SQLite database

@@ -8,6 +8,9 @@ import (
 )
 
 func TestValidateItemData(t *testing.T) {
+
+	min := intPtr(18)
+	max := intPtr(99)
 	// Define the content type for testing
 	ct := ContentType{
 		Name: "users",
@@ -21,8 +24,8 @@ func TestValidateItemData(t *testing.T) {
 				Name:     "age",
 				Type:     "int",
 				Required: true,
-				Min:      intPtr(18),
-				Max:      intPtr(99),
+				Min:      min,
+				Max:      max,
 			},
 		},
 	}
@@ -31,7 +34,7 @@ func TestValidateItemData(t *testing.T) {
 	testCases := []struct {
 		name     string
 		data     map[string]interface{}
-		expected string // Expected error message, empty if no error
+		expected string
 	}{
 		{
 			name: "Valid Data",

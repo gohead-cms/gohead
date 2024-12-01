@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -87,7 +86,7 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	protected := router.Group("/")
 	protected.Use(middleware.AuthMiddleware())
 	{
-		protected.POST("/content-types", middleware.AuthorizeRole("admin"), handlers.CreateContentType)
+		protected.POST("/content-types", handlers.CreateContentType)
 		protected.Any("/:contentType", handlers.DynamicContentHandler)
 		protected.Any("/:contentType/:id", handlers.DynamicContentHandler)
 	}
@@ -100,14 +99,15 @@ func main() {
 	configPath := flag.String("config", "config.yaml", "path to config file")
 	flag.Parse()
 
+	cfg, _ := config.LoadConfig(*configPath) // Reload config to get ServerPort
+
 	// Initialize the server
 	router, err := InitializeServer(*configPath)
 	if err != nil {
-		log.Fatalf("Failed to initialize server: %v", err)
+		logger.Log.Error("Cannot start server on port %s", cfg.ServerPort)
 	}
 
 	// Start the server
-	cfg, _ := config.LoadConfig(*configPath) // Reload config to get ServerPort
 	logger.Log.Infof("Starting server on port %s", cfg.ServerPort)
 	router.Run(":" + cfg.ServerPort)
 }

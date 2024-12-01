@@ -9,22 +9,29 @@ import (
 	"testing"
 
 	"gitlab.com/sudo.bngz/gohead/internal/models"
-	"gitlab.com/sudo.bngz/gohead/pkg/database"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
+	"gitlab.com/sudo.bngz/gohead/pkg/testutils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCreateContentItemIntegration(t *testing.T) {
+// Initialize logger for testing
+func init() {
+	// Configure logger to write logs to a buffer for testing
+	var buffer bytes.Buffer
 	logger.InitLogger("debug")
+	logger.Log.SetOutput(&buffer)
+	logger.Log.SetFormatter(&logrus.TextFormatter{})
+}
 
+func TestCreateContentItemIntegration(t *testing.T) {
 	// Initialize in-memory test database
-	db, err := database.InitDatabase("sqlite://:memory:")
-	assert.NoError(t, err, "Failed to initialize in-memory database")
+	router, db := testutils.SetupTestServer()
 
 	// Apply migrations for all necessary models
-	err = db.AutoMigrate(&models.ContentItem{})
+	err := db.AutoMigrate(&models.ContentItem{})
 	assert.NoError(t, err, "Failed to apply migrations for ContentItem")
 
 	// Create a test content type
@@ -47,8 +54,6 @@ func TestCreateContentItemIntegration(t *testing.T) {
 
 	// Prepare the Gin router
 	gin.SetMode(gin.TestMode)
-	router := gin.Default()
-
 	router.POST("/articles", CreateContentItem(ct))
 
 	// Prepare the test request

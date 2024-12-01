@@ -14,12 +14,20 @@ import (
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestDynamicContentHandler(t *testing.T) {
+// Initialize logger for testing
+func init() {
+	// Configure logger to write logs to a buffer for testing
+	var buffer bytes.Buffer
 	logger.InitLogger("debug")
+	logger.Log.SetOutput(&buffer)
+	logger.Log.SetFormatter(&logrus.TextFormatter{})
+}
 
+func TestDynamicContentHandler(t *testing.T) {
 	// Initialize in-memory test database
 	db, err := database.InitDatabase("sqlite://:memory:")
 	assert.NoError(t, err, "Failed to initialize in-memory database")
