@@ -47,7 +47,7 @@ func CreateContentItem(ct models.ContentType) gin.HandlerFunc {
 		}
 
 		// Save relationships (if any)
-		if err := storage.SaveContentRelations(ct, item.ID, itemData); err != nil {
+		if err := storage.SaveContentRelations(&ct, item.ID, itemData); err != nil {
 			logger.Log.Warn("Item: cannot save item relationship", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return

@@ -44,7 +44,7 @@ func UpdateContentItem(ct models.ContentType, id uint, data models.JSONMap) erro
 		return err
 	}
 
-	if err := SaveContentRelations(ct, id, data); err != nil {
+	if err := SaveContentRelations(&ct, id, data); err != nil {
 		return err
 	}
 

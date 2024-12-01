@@ -41,7 +41,7 @@ func TestSaveContentRelations(t *testing.T) {
 	}
 
 	// Save content relations
-	err := SaveContentRelations(ct, itemID, itemData)
+	err := SaveContentRelations(&ct, itemID, itemData)
 	assert.NoError(t, err)
 
 	// Verify one-to-one relation
