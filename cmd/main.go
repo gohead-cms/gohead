@@ -16,6 +16,7 @@ import (
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gitlab.com/sudo.bngz/gohead/pkg/metrics"
 	"gitlab.com/sudo.bngz/gohead/pkg/migrations"
+	"gitlab.com/sudo.bngz/gohead/pkg/seed"
 	"gitlab.com/sudo.bngz/gohead/pkg/tracing"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
@@ -56,6 +57,9 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	if err := migrations.MigrateDatabase(db); err != nil {
 		return nil, err
 	}
+
+	// Seed default roles
+	seed.SeedRoles()
 
 	// Initialize JWT with the secret from config
 	auth.InitializeJWT(cfg.JWTSecret)

@@ -17,16 +17,14 @@ type UserRole struct {
 	Description string  `json:"description"`                  // Role description
 	Permissions JSONMap `json:"permissions" gorm:"type:json"` // Permissions associated with the role
 }
-
-// User defines the structure of a user in the system
 type User struct {
 	gorm.Model
-	Username  string `json:"username"` // Unique username
-	Email     string `json:"email"`    // Email address
-	Password  string `json:"password"` // Hashed password
-	RoleRefer int
-	Role      UserRole  `gorm:"foreignKey:RoleRefer"`
-	CreatedAt time.Time `json:"created_at,omitempty"`
+	Username  string    `json:"username" gorm:"uniqueIndex"`      // Unique username
+	Email     string    `json:"email" gorm:"uniqueIndex"`         // Unique email address
+	Password  string    `json:"password"`                         // Hashed password
+	RoleRefer int       `json:"-"`                                // Foreign key reference (not exposed in JSON)
+	Role      UserRole  `json:"role" gorm:"foreignKey:RoleRefer"` // Associated role
+	CreatedAt time.Time `json:"created_at,omitempty"`             // Auto-managed timestamp
 }
 
 // ValidateUser validates the user data
@@ -48,10 +46,11 @@ func ValidateUser(user User) error {
 	}
 
 	// Check if role is provided
-	if user.Role.Name == "" {
+	if user.RoleRefer == 0 {
 		logger.Log.WithFields(logrus.Fields{
-			"role": user.Role.Name,
-		}).Warn("Validation failed: missing role")
+			"username": user.Username,
+			"role_id":  user.Role.ID,
+		}).Warn("Validation failed: invalid role")
 		return fmt.Errorf("role is required")
 	}
 

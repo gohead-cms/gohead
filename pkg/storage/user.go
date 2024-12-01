@@ -2,17 +2,32 @@ package storage
 
 import (
 	"fmt"
+	"strings"
 
 	"gitlab.com/sudo.bngz/gohead/internal/models"
 	"gitlab.com/sudo.bngz/gohead/pkg/database"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 )
 
-// SaveUser creates a new user in the database.
 func SaveUser(user *models.User) error {
-	if err := database.DB.Create(user).Error; err != nil {
-		logger.Log.Warn("Failed to save user", err)
+	err := database.DB.Create(user).Error
+	if err != nil {
+		// Check for unique constraint violations
+		if strings.Contains(err.Error(), "UNIQUE constraint failed: users.email") {
+			logger.Log.WithError(err).Warn("Duplicate entry for user email")
+			return &DuplicateEntryError{Field: "email"}
+		}
+		if strings.Contains(err.Error(), "UNIQUE constraint failed: users.username") {
+			logger.Log.WithError(err).Warn("Duplicate entry for user username")
+			return &DuplicateEntryError{Field: "username"}
+		}
+
+		// General database error
+		logger.Log.WithError(err).Error("Failed to save user")
+		return &GeneralDatabaseError{Message: err.Error()}
 	}
+
+	logger.Log.WithField("username", user.Username).Info("User saved successfully")
 	return nil
 }
 

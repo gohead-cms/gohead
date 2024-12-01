@@ -7,40 +7,45 @@ import (
 
 	"gitlab.com/sudo.bngz/gohead/pkg/auth"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
+	"gitlab.com/sudo.bngz/gohead/pkg/storage"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 )
 
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Extract the Authorization header
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
 			return
 		}
 
+		// Parse Bearer token
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 		if tokenString == authHeader {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Bearer token required"})
 			return
 		}
 
+		// Parse JWT and extract claims
 		claims, err := auth.ParseJWT(tokenString)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			return
 		}
 
-		logger.Log.WithFields(logrus.Fields{
-			"username": claims.Username,
-			"role":     claims.Role,
-			"path":     c.Request.URL.Path,
-			"method":   c.Request.Method,
-		}).Info("Authenticated request")
+		// Retrieve the role using the storage abstraction
+		role, err := storage.GetRoleByName(claims.Role)
+		if err != nil {
+			logger.Log.Warnf("Role '%s' not found", claims.Role)
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Invalid role"})
+			return
+		}
 
+		// Attach user details to the context
 		c.Set("username", claims.Username)
-		c.Set("role", claims.Role)
+		c.Set("role", role.Name)
 		c.Next()
 	}
 }
