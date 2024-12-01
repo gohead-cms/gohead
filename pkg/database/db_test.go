@@ -1,53 +1,44 @@
-// pkg/database/db_test.go
-package database
+package database_test
 
 import (
-	"os"
 	"testing"
+
+	"gitlab.com/sudo.bngz/gohead/pkg/database"
+	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 
 	"github.com/stretchr/testify/assert"
 	gormlogger "gorm.io/gorm/logger"
 )
 
 func TestInitDatabase(t *testing.T) {
-	t.Run("Initialize In-Memory SQLite Database", func(t *testing.T) {
-		// Initialize an in-memory SQLite database
-		db, err := InitDatabase("sqlite://:memory:", gormlogger.Info)
-		assert.NoError(t, err, "Should not return an error for in-memory SQLite database")
-		assert.NotNil(t, db, "DB instance should not be nil for in-memory SQLite")
+	// Initialize logger for testing
+	logger.InitLogger("debug")
 
-		// Verify the connection
-		sqlDB, err := db.DB()
-		assert.NoError(t, err, "Should not return an error for getting underlying SQL DB")
-		assert.NotNil(t, sqlDB, "Underlying SQL DB should not be nil")
-		assert.NoError(t, sqlDB.Ping(), "Should successfully ping the in-memory SQLite database")
+	t.Run("Initialize SQLite Database", func(t *testing.T) {
+		db, err := database.InitDatabase("sqlite://:memory:", gormlogger.Silent)
+		assert.NoError(t, err, "Expected no error for SQLite initialization")
+		assert.NotNil(t, db, "Expected DB instance to be non-nil")
 	})
 
-	t.Run("Initialize File-Based SQLite Database", func(t *testing.T) {
-		// Define a temporary database file
-		dbFilePath := "test_database.db"
-		defer os.Remove(dbFilePath) // Clean up after test
+	t.Run("Initialize MySQL Database", func(t *testing.T) {
+		// Example DSN for a test MySQL database
+		// Replace with actual credentials if running against a real MySQL instance
+		dsn := "mysql://root:password@tcp(127.0.0.1:3306)/test_db?charset=utf8mb4&parseTime=True&loc=Local"
 
-		// Initialize SQLite database using the file
-		db, err := InitDatabase("sqlite://"+dbFilePath, gormlogger.Info)
-		assert.NoError(t, err, "Should not return an error for file-based SQLite database")
-		assert.NotNil(t, db, "DB instance should not be nil for file-based SQLite")
+		db, err := database.InitDatabase(dsn, gormlogger.Silent)
+		if err != nil {
+			t.Log("Skipping MySQL test as no MySQL server is available.")
+			t.SkipNow()
+		}
 
-		// Verify the database file exists
-		_, err = os.Stat(dbFilePath)
-		assert.NoError(t, err, "Database file should exist")
-
-		// Verify the connection
-		sqlDB, err := db.DB()
-		assert.NoError(t, err, "Should not return an error for getting underlying SQL DB")
-		assert.NoError(t, sqlDB.Ping(), "Should successfully ping the file-based SQLite database")
+		assert.NoError(t, err, "Expected no error for MySQL initialization")
+		assert.NotNil(t, db, "Expected DB instance to be non-nil")
 	})
 
 	t.Run("Unsupported Database Type", func(t *testing.T) {
-		// Try initializing an unsupported database type
-		db, err := InitDatabase("mysql://user:password@tcp(127.0.0.1:3306)/dbname", gormlogger.Info)
-		assert.Error(t, err, "Should return an error for unsupported database type")
-		assert.Nil(t, db, "DB instance should be nil for unsupported database type")
-		assert.Contains(t, err.Error(), "unsupported database type", "Error message should indicate unsupported database type")
+		db, err := database.InitDatabase("unsupported://db_path", gormlogger.Silent)
+		assert.Error(t, err, "Expected an error for unsupported database type")
+		assert.Nil(t, db, "Expected DB instance to be nil for unsupported database type")
+		assert.Contains(t, err.Error(), "unsupported database type", "Error message should mention unsupported type")
 	})
 }

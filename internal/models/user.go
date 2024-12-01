@@ -19,12 +19,12 @@ type UserRole struct {
 }
 type User struct {
 	gorm.Model
-	Username  string    `json:"username" gorm:"uniqueIndex"`      // Unique username
-	Email     string    `json:"email" gorm:"uniqueIndex"`         // Unique email address
-	Password  string    `json:"password"`                         // Hashed password
-	RoleRefer int       `json:"-"`                                // Foreign key reference (not exposed in JSON)
-	Role      UserRole  `json:"role" gorm:"foreignKey:RoleRefer"` // Associated role
-	CreatedAt time.Time `json:"created_at,omitempty"`             // Auto-managed timestamp
+	Username  string    `json:"username" gorm:"uniqueIndex;size:191"` // Unique username with length limit for MySQL compatibility
+	Email     string    `json:"email" gorm:"uniqueIndex;size:191"`    // Unique email with length limit for MySQL compatibility
+	Password  string    `json:"password"`                             // Hashed password
+	RoleRefer int       `json:"-"`                                    // Foreign key reference (not exposed in JSON)
+	Role      UserRole  `json:"role" gorm:"foreignKey:RoleRefer"`     // Associated role
+	CreatedAt time.Time `json:"created_at,omitempty"`                 // Auto-managed timestamp
 }
 
 // ValidateUser validates the user data

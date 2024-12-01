@@ -1,4 +1,3 @@
-// pkg/database/db.go
 package database
 
 import (
@@ -6,6 +5,7 @@ import (
 	"strings"
 
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
+	"gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
@@ -22,9 +22,17 @@ func InitDatabase(databaseURL string, logLevel gormlogger.LogLevel) (*gorm.DB, e
 	var db *gorm.DB
 	var err error
 
+	// Check database type from the URL prefix
 	if strings.HasPrefix(databaseURL, "sqlite://") {
+		// SQLite configuration
 		dbPath := strings.TrimPrefix(databaseURL, "sqlite://")
 		db, err = gorm.Open(sqlite.Open(dbPath), &gorm.Config{
+			Logger: gormLogger,
+		})
+	} else if strings.HasPrefix(databaseURL, "mysql://") {
+		// MySQL configuration
+		dsn := strings.TrimPrefix(databaseURL, "mysql://") // Remove the prefix to extract the DSN
+		db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{
 			Logger: gormLogger,
 		})
 	} else {
