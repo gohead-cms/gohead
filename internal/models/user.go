@@ -13,9 +13,9 @@ import (
 // UserRole defines the role of a user
 type UserRole struct {
 	ID          int     `json:"id"`
-	Name        string  `json:"name"`                         // Role name (e.g., admin, editor, viewer)
-	Description string  `json:"description"`                  // Role description
-	Permissions JSONMap `json:"permissions" gorm:"type:json"` // Permissions associated with the role
+	Name        string  `json:"name"`                                                // Role name (e.g., admin, editor, viewer)
+	Description string  `json:"description"`                                         // Role description
+	Permissions JSONMap `json:"permissions" gorm:"type:jsonb;default:'[]';not null"` // Use 'jsonb' for PostgreSQL // Permissions associated with the role
 }
 type User struct {
 	gorm.Model

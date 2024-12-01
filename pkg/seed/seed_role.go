@@ -18,7 +18,7 @@ func SeedRoles() {
 		if err := database.DB.FirstOrCreate(&models.UserRole{}, role).Error; err != nil {
 			logger.Log.WithFields(logrus.Fields{
 				"role": role.Name,
-			}).Warn("Failed to seed role", err)
+			}).Warn("Failed to seed role : ", err)
 		}
 	}
 	logger.Log.Info("Default roles seeded successfully.")

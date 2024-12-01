@@ -67,6 +67,7 @@ func Register(c *gin.Context) {
 			"role":     role.Name,
 		}).Info("User registered successfully")
 		c.JSON(http.StatusCreated, gin.H{"message": "User registered successfully"})
+		return
 	case *storage.DuplicateEntryError:
 		logger.Log.WithError(err).Warn("Register: Duplicate entry")
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s", e.Error())})
@@ -80,13 +81,6 @@ func Register(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "An unknown error occurred"})
 		return
 	}
-
-	logger.Log.WithFields(logrus.Fields{
-		"username": user.Username,
-		"role":     role.Name,
-	}).Info("User registered successfully")
-
-	c.JSON(http.StatusCreated, gin.H{"message": "User registered successfully"})
 }
 
 func Login(c *gin.Context) {

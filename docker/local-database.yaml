@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:14
+    container_name: gohead-postgres
+    environment:
+      POSTGRES_USER: gohead_user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: gohead
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - test-network
+
+  mysql:
+    image: mysql:8.0
+    container_name: gohead-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_USER: gohead_user
+      MYSQL_PASSWORD: pass
+      MYSQL_DATABASE: gohead
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - test-network
+
+volumes:
+  postgres-data:
+  mysql-data:
+
+networks:
+  test-network:
