@@ -12,6 +12,7 @@ import (
 
 type Config struct {
 	LogLevel         string `mapstructure:"log_level"`
+	Mode             string `yaml:"gin_log_level"` // For Gin framework logging
 	TelemetryEnabled bool   `mapstructure:"telemetry_enabled"`
 	JWTSecret        string `mapstructure:"jwt_secret"`
 	DatabaseURL      string `mapstructure:"database_url"`

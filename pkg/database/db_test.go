@@ -6,12 +6,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	gormlogger "gorm.io/gorm/logger"
 )
 
 func TestInitDatabase(t *testing.T) {
 	t.Run("Initialize In-Memory SQLite Database", func(t *testing.T) {
 		// Initialize an in-memory SQLite database
-		db, err := InitDatabase("sqlite://:memory:")
+		db, err := InitDatabase("sqlite://:memory:", gormlogger.Info)
 		assert.NoError(t, err, "Should not return an error for in-memory SQLite database")
 		assert.NotNil(t, db, "DB instance should not be nil for in-memory SQLite")
 
@@ -28,7 +29,7 @@ func TestInitDatabase(t *testing.T) {
 		defer os.Remove(dbFilePath) // Clean up after test
 
 		// Initialize SQLite database using the file
-		db, err := InitDatabase("sqlite://" + dbFilePath)
+		db, err := InitDatabase("sqlite://"+dbFilePath, gormlogger.Info)
 		assert.NoError(t, err, "Should not return an error for file-based SQLite database")
 		assert.NotNil(t, db, "DB instance should not be nil for file-based SQLite")
 
@@ -44,7 +45,7 @@ func TestInitDatabase(t *testing.T) {
 
 	t.Run("Unsupported Database Type", func(t *testing.T) {
 		// Try initializing an unsupported database type
-		db, err := InitDatabase("mysql://user:password@tcp(127.0.0.1:3306)/dbname")
+		db, err := InitDatabase("mysql://user:password@tcp(127.0.0.1:3306)/dbname", gormlogger.Info)
 		assert.Error(t, err, "Should return an error for unsupported database type")
 		assert.Nil(t, db, "DB instance should be nil for unsupported database type")
 		assert.Contains(t, err.Error(), "unsupported database type", "Error message should indicate unsupported database type")

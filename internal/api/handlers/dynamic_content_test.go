@@ -16,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	gormlogger "gorm.io/gorm/logger"
 )
 
 // Initialize logger for testing
@@ -29,7 +30,7 @@ func init() {
 
 func TestDynamicContentHandler(t *testing.T) {
 	// Initialize in-memory test database
-	db, err := database.InitDatabase("sqlite://:memory:")
+	db, err := database.InitDatabase("sqlite://:memory:", gormlogger.Info)
 	assert.NoError(t, err, "Failed to initialize in-memory database")
 
 	// Apply migrations for all necessary models

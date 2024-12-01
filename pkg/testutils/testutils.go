@@ -6,12 +6,13 @@ import (
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 )
 
 // setupTestServer initializes a Gin router and database for testing.
 func SetupTestServer() (*gin.Engine, *gorm.DB) {
 	// Initialize in-memory test database
-	db, err := database.InitDatabase("sqlite://:memory:")
+	db, err := database.InitDatabase("sqlite://:memory:", gormlogger.Info)
 	if err != nil {
 		panic("Failed to initialize in-memory database: " + err.Error())
 	}
