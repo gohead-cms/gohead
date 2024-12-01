@@ -43,8 +43,13 @@ func GetUserByID(id uint) (*models.User, error) {
 // GetUserByUsername retrieves a user by their username.
 func GetUserByUsername(username string) (*models.User, error) {
 	var user models.User
-	if err := database.DB.Where("username = ?", username).First(&user).Error; err != nil {
-		return nil, fmt.Errorf("user not found: %w", err)
+	if err := database.DB.Preload("Role").Where("username = ?", username).First(&user).Error; err != nil {
+		if err.Error() == "record not found" {
+			logger.Log.WithField("username", username).Warn("User not found")
+			return nil, fmt.Errorf("user not found")
+		}
+		logger.Log.WithField("username", username).Error("Failed to fetch user: ", err)
+		return nil, fmt.Errorf("failed to fetch user: %w", err)
 	}
 	return &user, nil
 }

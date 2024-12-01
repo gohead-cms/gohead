@@ -8,7 +8,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"gitlab.com/sudo.bngz/gohead/internal/models"
 	"gitlab.com/sudo.bngz/gohead/pkg/auth"
-	"gitlab.com/sudo.bngz/gohead/pkg/database"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gitlab.com/sudo.bngz/gohead/pkg/storage"
 	"golang.org/x/crypto/bcrypt"
@@ -27,10 +26,10 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	// Fetch the 'viewer' role
+	// Fetch the 'admin' role
 	role, err := storage.GetRoleByName("admin")
 	if err != nil {
-		logger.Log.WithError(err).Error("Register: Failed to fetch 'viewer' role")
+		logger.Log.WithError(err).Error("Register: Failed to fetch 'admin' role")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch default role"})
 		return
 	}
@@ -89,35 +88,44 @@ func Login(c *gin.Context) {
 		Password string `json:"password" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		logger.Log.Warn("Login: Error bad request ", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		logger.Log.WithError(err).Warn("Login: Invalid input")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		return
 	}
 
-	var user models.User
-	if err := database.DB.Where("username = ?", input.Username).First(&user).Error; err != nil {
-		logger.Log.Warn("Login: Invalid username or password", err)
+	// Fetch the user with their role
+	user, err := storage.GetUserByUsername(input.Username)
+	if err != nil {
+		logger.Log.WithError(err).Warn("Login: Invalid username or password")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
 		return
 	}
 
+	// Compare the hashed password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
-		logger.Log.Warn("Login: Invalid username or password", err)
+		logger.Log.WithError(err).Warn("Login: Invalid username or password")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
 		return
 	}
 
-	// Generate JWT token with role
+	// Validate the Role
+	if user.Role.Name == "" {
+		logger.Log.WithField("username", user.Username).Warn("Login: User role is not assigned")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User role is not assigned"})
+		return
+	}
+
+	// Generate JWT token with the user's role
 	tokenString, err := auth.GenerateJWT(user.Username, user.Role.Name)
 	if err != nil {
-		logger.Log.Warn("Login: Failed to generate token", err)
+		logger.Log.WithError(err).Error("Login: Failed to generate token")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
 	}
 
 	logger.Log.WithFields(logrus.Fields{
 		"username": user.Username,
-		"role":     user.Role,
+		"role":     user.Role.Name,
 	}).Info("User logged in successfully")
 
 	c.JSON(http.StatusOK, gin.H{"token": tokenString})

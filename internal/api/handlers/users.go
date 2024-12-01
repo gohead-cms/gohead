@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"gitlab.com/sudo.bngz/gohead/internal/models"
+	"gitlab.com/sudo.bngz/gohead/pkg/database"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gitlab.com/sudo.bngz/gohead/pkg/storage"
 )
@@ -54,6 +56,20 @@ func GetAllUsers(c *gin.Context) {
 
 	logger.Log.Info("Fetched all users successfully")
 	c.JSON(http.StatusOK, gin.H{"users": users})
+}
+
+// GetUserByUsername fetches a user by their username, including their associated role.
+func GetUserByUsername(username string) (*models.User, error) {
+	var user models.User
+	if err := database.DB.Preload("Role").Where("username = ?", username).First(&user).Error; err != nil {
+		if err.Error() == "record not found" {
+			logger.Log.WithField("username", username).Warn("User not found")
+			return nil, fmt.Errorf("user not found")
+		}
+		logger.Log.WithField("username", username).Error("Failed to fetch user: ", err)
+		return nil, fmt.Errorf("failed to fetch user: %w", err)
+	}
+	return &user, nil
 }
 
 // GetUser handles fetching a single user by ID.
