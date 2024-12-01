@@ -1,4 +1,3 @@
-// internal/api/handlers/dynamic_content.go
 package handlers
 
 import (
@@ -10,97 +9,104 @@ import (
 	"gitlab.com/sudo.bngz/gohead/pkg/storage"
 )
 
-// internal/api/handlers/dynamic_content.go
+// DynamicContentHandler handles CRUD operations for dynamic content types.
 func DynamicContentHandler(c *gin.Context) {
 	contentTypeName := c.Param("contentType")
 	id := c.Param("id")
 
-	// Retrieve the ContentType
-	ct, exists := storage.GetContentType(contentTypeName)
-	if !exists {
-		logger.Log.Warn("Dynamic Content Type: Content Type not found")
+	// Retrieve the ContentType from storage
+	ct, err := storage.GetContentType(contentTypeName)
+	if err != nil {
+		logger.Log.WithFields(logrus.Fields{
+			"content_type": contentTypeName,
+		}).Warn("DynamicContentHandler: Content type not found")
 		c.JSON(http.StatusNotFound, gin.H{"error": "Content type not found"})
 		return
 	}
 
 	// Get user role from context
 	role, _ := c.Get("role")
-	userRole := role.(string)
+	userRole, ok := role.(string)
+	if !ok || userRole == "" {
+		logger.Log.Warn("DynamicContentHandler: Missing or invalid user role in context")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	logger.Log.WithFields(logrus.Fields{
+		"user_role":      userRole,
+		"content_type":   contentTypeName,
+		"content_item":   id,
+		"request_method": c.Request.Method,
+	}).Info("Processing dynamic content request")
 
 	switch c.Request.Method {
 	case http.MethodPost:
 		if !hasPermission(userRole, "create") {
 			logger.Log.WithFields(logrus.Fields{
-				"user_id":      id,
+				"user_role":    userRole,
 				"content_type": contentTypeName,
-			}).Warn("Create denied")
+			}).Warn("Create permission denied")
 			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 			return
 		}
-		CreateContentItem(ct)(c)
+		CreateContentItem(*ct)(c)
+
 	case http.MethodGet:
 		if !hasPermission(userRole, "read") {
 			logger.Log.WithFields(logrus.Fields{
-				"user_id":      id,
+				"user_role":    userRole,
 				"content_type": contentTypeName,
-			}).Warn("Read denied")
+			}).Warn("Read permission denied")
 			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 			return
 		}
 		if id == "" {
-			GetContentItems(ct)(c)
+			GetContentItems(*ct)(c)
 		} else {
-			GetContentItemByID(ct)(c)
+			GetContentItemByID(*ct)(c)
 		}
+
 	case http.MethodPut:
 		if !hasPermission(userRole, "update") {
 			logger.Log.WithFields(logrus.Fields{
-				"user_id":      id,
+				"user_role":    userRole,
 				"content_type": contentTypeName,
-			}).Warn("Update denied")
+				"content_item": id,
+			}).Warn("Update permission denied")
 			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 			return
 		}
 		if id != "" {
-			logger.Log.WithFields(logrus.Fields{
-				"user_id":      id,
-				"content_type": contentTypeName,
-			}).Info("Content Type updated successfully")
-			UpdateContentItem(ct)(c)
+			UpdateContentItem(*ct)(c)
 		} else {
-			logger.Log.WithFields(logrus.Fields{
-				"user_id":      id,
-				"content_type": contentTypeName,
-			}).Warn("ID is required for update")
+			logger.Log.Warn("Update operation requires a valid ID")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "ID is required for update"})
 		}
+
 	case http.MethodDelete:
 		if !hasPermission(userRole, "delete") {
 			logger.Log.WithFields(logrus.Fields{
-				"user_id":      id,
+				"user_role":    userRole,
 				"content_type": contentTypeName,
-			}).Warn("Delete denied")
+				"content_item": id,
+			}).Warn("Delete permission denied")
 			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 			return
 		}
 		if id != "" {
-			logger.Log.WithFields(logrus.Fields{
-				"user_id":      id,
-				"content_type": contentTypeName,
-			}).Info("Content Type delete successfully")
-			DeleteContentItem(ct)(c)
+			DeleteContentItem(*ct)(c)
 		} else {
-			logger.Log.WithFields(logrus.Fields{
-				"user_id":      id,
-				"content_type": contentTypeName,
-			}).Warn("ID is required for deletion")
+			logger.Log.Warn("Delete operation requires a valid ID")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "ID is required for deletion"})
 		}
+
 	default:
 		logger.Log.WithFields(logrus.Fields{
-			"user_id":      id,
-			"content_type": contentTypeName,
-		}).Warn("Method not allowed")
+			"user_role":      userRole,
+			"content_type":   contentTypeName,
+			"request_method": c.Request.Method,
+		}).Warn("Unsupported HTTP method")
 		c.JSON(http.StatusMethodNotAllowed, gin.H{"error": "Method not allowed"})
 	}
 }

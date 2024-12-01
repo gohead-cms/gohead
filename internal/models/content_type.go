@@ -1,4 +1,3 @@
-// internal/models/content_type.go
 package models
 
 import (
@@ -6,167 +5,183 @@ import (
 	"fmt"
 	"regexp"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type Relationship struct {
-	FieldName    string `json:"field_name"`
-	RelatedType  string `json:"related_type"`
-	RelationType string `json:"relation_type"` // "one-to-one", "one-to-many", "many-to-many"
-}
-
-type ContentType struct {
-	Name          string         `json:"name"`
-	Fields        []Field        `json:"fields"`
-	Relationships []Relationship `json:"relationships"`
+	gorm.Model
+	FieldName     string `json:"field_name"`
+	RelatedType   string `json:"related_type"`
+	RelationType  string `json:"relation_type"`
+	ContentTypeID uint   `json:"-"` // Foreign key to associate with ContentType
 }
 
 type Field struct {
-	Name         string            `json:"name"`
-	Type         string            `json:"type"` // e.g., "string", "int", "bool", "date", "richtext", "enum"
-	Required     bool              `json:"required"`
-	Options      []string          `json:"options,omitempty"`       // For enums
-	Min          *int              `json:"min,omitempty"`           // For numeric fields
-	Max          *int              `json:"max,omitempty"`           // For numeric fields
-	Pattern      string            `json:"pattern,omitempty"`       // For regex validation
-	CustomErrors map[string]string `json:"custom_errors,omitempty"` // Custom error messages
+	gorm.Model
+	Name          string            `json:"name"`
+	Type          string            `json:"type"` // e.g., "string", "int", "bool", "date", "richtext", "enum"
+	Required      bool              `json:"required"`
+	Options       []string          `gorm:"type:json" json:"options,omitempty"`
+	Min           *int              `json:"min,omitempty"`
+	Max           *int              `json:"max,omitempty"`
+	Pattern       string            `json:"pattern,omitempty"`
+	CustomErrors  map[string]string `gorm:"type:json" json:"custom_errors,omitempty"`
+	ContentTypeID uint              `json:"-"` // Foreign key to associate with ContentType
 }
 
-// ValidateItemData validates the item data against the content type's schema
+type ContentType struct {
+	gorm.Model
+	Name          string         `json:"name" gorm:"uniqueIndex"`
+	Fields        []Field        `json:"fields" gorm:"constraint:OnDelete:CASCADE;"`
+	Relationships []Relationship `json:"relationships" gorm:"constraint:OnDelete:CASCADE;"`
+}
+
+// ValidateItemData validates the item data against the content type's schema.
 func ValidateItemData(ct ContentType, data map[string]interface{}) error {
 	for _, field := range ct.Fields {
 		value, exists := data[field.Name]
 
 		// Check if field is required
 		if field.Required && !exists {
-			return fmt.Errorf("missing required field: %s", field.Name)
+			return fmt.Errorf("missing required field: '%s'", field.Name)
 		}
 
+		// Skip validation for non-required fields that are not present
 		if !exists {
-			continue // Skip validation for non-required fields that are not present
+			continue
 		}
 
 		// Validate based on field type
-		switch field.Type {
-		case "string":
-			strValue, ok := value.(string)
-			if !ok {
-				return fmt.Errorf("field '%s' must be a string", field.Name)
-			}
-			if field.Pattern != "" {
-				matched, err := regexp.MatchString(field.Pattern, strValue)
-				if err != nil {
-					return fmt.Errorf("invalid regex pattern for field '%s': %v", field.Name, err)
-				}
-				if !matched {
-					return fmt.Errorf("field '%s' does not match required pattern", field.Name)
-				}
-			}
-		case "int":
-			numValue, ok := value.(int) // JSON numbers are float64
-			if !ok {
-				return fmt.Errorf("field '%s' must be a number", field.Name)
-			}
-			intValue := int(numValue)
-			if field.Min != nil && intValue < *field.Min {
-				return fmt.Errorf("field '%s' must be at least %d", field.Name, *field.Min)
-			}
-			if field.Max != nil && intValue > *field.Max {
-				return fmt.Errorf("field '%s' must be at most %d", field.Name, *field.Max)
-			}
-		case "bool":
-			_, ok := value.(bool)
-			if !ok {
-				return fmt.Errorf("field '%s' must be a boolean", field.Name)
-			}
-		case "date":
-			strValue, ok := value.(string)
-			if !ok {
-				return fmt.Errorf("field '%s' must be a string in date format", field.Name)
-			}
-			// Validate date format, e.g., YYYY-MM-DD
-			if _, err := time.Parse("2006-01-02", strValue); err != nil {
-				return fmt.Errorf("field '%s' must be a valid date (YYYY-MM-DD)", field.Name)
-			}
-		case "enum":
-			strValue, ok := value.(string)
-			if !ok {
-				return fmt.Errorf("field '%s' must be a string", field.Name)
-			}
-			if !contains(field.Options, strValue) {
-				return fmt.Errorf("field '%s' must be one of %v", field.Name, field.Options)
-			}
-		case "richtext":
-			// Assuming richtext is stored as a string (e.g., HTML or Markdown)
-			_, ok := value.(string)
-			if !ok {
-				return fmt.Errorf("field '%s' must be a string", field.Name)
-			}
-			// Additional validation can be added here
-		default:
-			return fmt.Errorf("unsupported field type: %s", field.Type)
+		if err := validateFieldValue(field, value); err != nil {
+			return err
 		}
 	}
 
 	return nil
 }
 
+// ValidateContentType validates the schema of a content type.
 func ValidateContentType(ct ContentType) error {
-	// Ensure the name is not empty
 	if ct.Name == "" {
-		return errors.New("missing required field: name")
+		return errors.New("missing required field: 'name'")
 	}
 
-	// Ensure the fields array is not empty
 	if len(ct.Fields) == 0 {
 		return errors.New("fields array cannot be empty")
 	}
 
-	// Keep track of field names to check for duplicates
 	fieldNames := make(map[string]bool)
 	for _, field := range ct.Fields {
-		// Check for duplicate field names
-		if _, exists := fieldNames[field.Name]; exists {
-			return fmt.Errorf("duplicate field name: %s", field.Name)
+		if fieldNames[field.Name] {
+			return fmt.Errorf("duplicate field name: '%s'", field.Name)
 		}
 		fieldNames[field.Name] = true
 
-		// Validate field type
-		validTypes := []string{"string", "int", "bool", "date", "richtext", "enum"}
-		if !contains(validTypes, field.Type) {
-			return fmt.Errorf("invalid field type '%s' for field '%s'", field.Type, field.Name)
+		if err := validateField(field); err != nil {
+			return err
 		}
+	}
 
-		// Additional validation for specific field types
-		switch field.Type {
-		case "enum":
-			if len(field.Options) == 0 {
-				return fmt.Errorf("field '%s' of type 'enum' must have options", field.Name)
-			}
-		case "string":
-			if field.Pattern != "" {
-				// Validate the regex pattern
-				if _, err := regexp.Compile(field.Pattern); err != nil {
-					return fmt.Errorf("invalid regex pattern for field '%s': %v", field.Name, err)
-				}
-			}
-		}
-
-		// Additional checks for numeric fields
-		if (field.Type == "int") && field.Min != nil && field.Max != nil {
-			if *field.Min > *field.Max {
-				return fmt.Errorf("field '%s': min value cannot be greater than max value", field.Name)
-			}
+	for _, rel := range ct.Relationships {
+		if rel.FieldName == "" || rel.RelatedType == "" || rel.RelationType == "" {
+			return fmt.Errorf("invalid relationship: all fields must be defined (fieldName, relatedType, relationType)")
 		}
 	}
 
 	return nil
 }
 
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
+// validateFieldValue checks the value of a field against its type and constraints.
+func validateFieldValue(field Field, value interface{}) error {
+	switch field.Type {
+	case "string":
+		str, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("field '%s' must be a string", field.Name)
+		}
+		if field.Pattern != "" {
+			if matched, err := regexp.MatchString(field.Pattern, str); err != nil || !matched {
+				return fmt.Errorf("field '%s' does not match required pattern", field.Name)
+			}
+		}
+	case "int":
+		num, ok := value.(float64) // JSON numbers are parsed as float64
+		if !ok {
+			return fmt.Errorf("field '%s' must be a number", field.Name)
+		}
+		intValue := int(num)
+		if field.Min != nil && intValue < *field.Min {
+			return fmt.Errorf("field '%s' must be at least %d", field.Name, *field.Min)
+		}
+		if field.Max != nil && intValue > *field.Max {
+			return fmt.Errorf("field '%s' must be at most %d", field.Name, *field.Max)
+		}
+	case "bool":
+		if _, ok := value.(bool); !ok {
+			return fmt.Errorf("field '%s' must be a boolean", field.Name)
+		}
+	case "date":
+		str, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("field '%s' must be a string in date format", field.Name)
+		}
+		if _, err := time.Parse("2006-01-02", str); err != nil {
+			return fmt.Errorf("field '%s' must be a valid date (YYYY-MM-DD)", field.Name)
+		}
+	case "enum":
+		str, ok := value.(string)
+		if !ok || !containsMap(field.Options, str) {
+			return fmt.Errorf("field '%s' must be one of %v", field.Name, field.Options)
+		}
+	case "richtext":
+		if _, ok := value.(string); !ok {
+			return fmt.Errorf("field '%s' must be a string", field.Name)
+		}
+	default:
+		return fmt.Errorf("unsupported field type: '%s'", field.Type)
+	}
+	return nil
+}
+
+// validateField checks the field schema for constraints and valid types.
+func validateField(field Field) error {
+	validTypes := map[string]struct{}{
+		"string":   {},
+		"int":      {},
+		"bool":     {},
+		"date":     {},
+		"richtext": {},
+		"enum":     {},
+	}
+
+	if _, valid := validTypes[field.Type]; !valid {
+		return fmt.Errorf("invalid field type '%s' for field '%s'", field.Type, field.Name)
+	}
+
+	if field.Type == "enum" && len(field.Options) == 0 {
+		return fmt.Errorf("field '%s' of type 'enum' must have options", field.Name)
+	}
+
+	if field.Type == "int" && field.Min != nil && field.Max != nil && *field.Min > *field.Max {
+		return fmt.Errorf("field '%s': min value cannot be greater than max value", field.Name)
+	}
+
+	if field.Type == "string" && field.Pattern != "" {
+		if _, err := regexp.Compile(field.Pattern); err != nil {
+			return fmt.Errorf("invalid regex pattern for field '%s': %v", field.Name, err)
 		}
 	}
-	return false
+
+	return nil
+}
+
+// containsMap checks if a string exists in a slice using a map for O(1) lookups.
+func containsMap(slice []string, item string) bool {
+	set := make(map[string]struct{}, len(slice))
+	for _, s := range slice {
+		set[s] = struct{}{}
+	}
+	_, exists := set[item]
+	return exists
 }

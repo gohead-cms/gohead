@@ -1,26 +1,61 @@
-// pkg/storage/content_type.go
 package storage
 
 import (
-	"sync"
+	"fmt"
 
 	"gitlab.com/sudo.bngz/gohead/internal/models"
+	"gitlab.com/sudo.bngz/gohead/pkg/database"
 )
 
-var (
-	contentTypes = make(map[string]models.ContentType)
-	ctMutex      sync.RWMutex
-)
-
-func SaveContentType(ct models.ContentType) {
-	ctMutex.Lock()
-	defer ctMutex.Unlock()
-	contentTypes[ct.Name] = ct
+// SaveContentType persists a ContentType to the database.
+func SaveContentType(ct *models.ContentType) error {
+	if err := database.DB.Create(ct).Error; err != nil {
+		return fmt.Errorf("failed to save content type: %w", err)
+	}
+	return nil
 }
 
-func GetContentType(name string) (models.ContentType, bool) {
-	ctMutex.RLock()
-	defer ctMutex.RUnlock()
-	ct, exists := contentTypes[name]
-	return ct, exists
+// GetContentType retrieves a ContentType by name.
+func GetContentType(name string) (*models.ContentType, error) {
+	var ct models.ContentType
+	if err := database.DB.Preload("Fields").Preload("Relationships").
+		Where("name = ?", name).First(&ct).Error; err != nil {
+		return nil, fmt.Errorf("content type not found: %w", err)
+	}
+	return &ct, nil
+}
+
+// GetAllContentTypes retrieves all ContentTypes.
+func GetAllContentTypes() ([]models.ContentType, error) {
+	var cts []models.ContentType
+	if err := database.DB.Preload("Fields").Preload("Relationships").Find(&cts).Error; err != nil {
+		return nil, fmt.Errorf("failed to fetch content types: %w", err)
+	}
+	return cts, nil
+}
+
+// UpdateContentType updates an existing ContentType.
+func UpdateContentType(name string, updated *models.ContentType) error {
+	var ct models.ContentType
+	if err := database.DB.Where("name = ?", name).First(&ct).Error; err != nil {
+		return fmt.Errorf("content type not found: %w", err)
+	}
+
+	// Update fields
+	ct.Name = updated.Name
+	ct.Fields = updated.Fields
+	ct.Relationships = updated.Relationships
+
+	if err := database.DB.Save(&ct).Error; err != nil {
+		return fmt.Errorf("failed to update content type: %w", err)
+	}
+	return nil
+}
+
+// DeleteContentType deletes a ContentType by name.
+func DeleteContentType(name string) error {
+	if err := database.DB.Where("name = ?", name).Delete(&models.ContentType{}).Error; err != nil {
+		return fmt.Errorf("failed to delete content type: %w", err)
+	}
+	return nil
 }
