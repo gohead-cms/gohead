@@ -63,55 +63,28 @@ func CreateContentType(c *gin.Context) {
 	})
 }
 
-// DeleteContentType handles deleting a content type along with its fields, items, and related data.
+// DeleteContentTypeHandler handles deleting a content type by its name.
 func DeleteContentType(c *gin.Context) {
 	contentTypeName := c.Param("name")
 
-	// Check if the user is an admin
-	role, exists := c.Get("role")
-	if !exists || role != "admin" {
-		logger.Log.Warn("Unauthorized attempt to delete content type")
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
-		return
-	}
-
-	// Validate content type existence
-	contentType, err := storage.GetContentType(contentTypeName)
+	// Fetch the content type by its name
+	contentType, err := storage.GetContentTypeByName(contentTypeName)
 	if err != nil {
-		logger.Log.WithField("content_type", contentTypeName).Warn("Content type not found")
+		logger.Log.WithError(err).Warn("DeleteContentTypeHandler: Content type not found")
 		c.JSON(http.StatusNotFound, gin.H{"error": "Content type not found"})
 		return
 	}
 
-	// Delete content items and related data
-	if err := storage.DeleteContentItemsByType(contentType.Name); err != nil {
-		logger.Log.WithFields(logrus.Fields{
-			"content_type": contentType.Name,
-		}).Error("Failed to delete content items for content type")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete content items for content type"})
-		return
-	}
-
-	// Delete fields for the content type
-	if err := storage.DeleteFieldsByContentType(contentType.Name); err != nil {
-		logger.Log.WithFields(logrus.Fields{
-			"content_type": contentType.Name,
-		}).Error("Failed to delete fields for content type")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete fields for content type"})
-		return
-	}
-
-	// Delete the content type
-	if err := storage.DeleteContentType(contentType.Name); err != nil {
-		logger.Log.WithFields(logrus.Fields{
-			"content_type": contentType.Name,
-		}).Error("Failed to delete content type")
+	// Call the storage function to delete the content type
+	if err := storage.DeleteContentType(contentType.ID); err != nil {
+		logger.Log.WithError(err).Error("DeleteContentTypeHandler: Failed to delete content type")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete content type"})
 		return
 	}
 
 	logger.Log.WithFields(logrus.Fields{
-		"content_type": contentType.Name,
+		"content_type": contentTypeName,
 	}).Info("Content type deleted successfully")
+
 	c.JSON(http.StatusOK, gin.H{"message": "Content type deleted successfully"})
 }

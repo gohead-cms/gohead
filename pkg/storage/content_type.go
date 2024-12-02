@@ -5,6 +5,7 @@ import (
 
 	"gitlab.com/sudo.bngz/gohead/internal/models"
 	"gitlab.com/sudo.bngz/gohead/pkg/database"
+	"gorm.io/gorm"
 )
 
 // SaveContentType persists a ContentType to the database.
@@ -23,6 +24,21 @@ func GetContentType(name string) (*models.ContentType, error) {
 		return nil, fmt.Errorf("content type not found: %w", err)
 	}
 	return &ct, nil
+}
+
+// GetContentTypeByName retrieves a content type by its name.
+func GetContentTypeByName(name string) (*models.ContentType, error) {
+	var contentType models.ContentType
+	// Query the database for the content type by name
+	if err := database.DB.Where("name = ?", name).First(&contentType).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			// Handle case where the content type does not exist
+			return nil, fmt.Errorf("content type '%s' not found", name)
+		}
+		// Handle general database errors
+		return nil, fmt.Errorf("failed to retrieve content type: %w", err)
+	}
+	return &contentType, nil
 }
 
 // GetAllContentTypes retrieves all ContentTypes.
@@ -52,20 +68,53 @@ func UpdateContentType(name string, updated *models.ContentType) error {
 	return nil
 }
 
-// DeleteContentType deletes a ContentType by name.
-func DeleteContentType(name string) error {
-	if err := database.DB.Where("name = ?", name).Delete(&models.ContentType{}).Error; err != nil {
-		return fmt.Errorf("failed to delete content type: %w", err)
+// DeleteContentType deletes a content type and all associated data by its ID.
+func DeleteContentType(contentTypeID uint) error {
+	// Begin a transaction for cascading deletion
+	tx := database.DB.Begin()
+
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+			panic(r)
+		}
+	}()
+
+	// Retrieve the content type
+	var contentType models.ContentType
+	if err := tx.Where("id = ?", contentTypeID).First(&contentType).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			tx.Rollback()
+			return fmt.Errorf("content type with ID '%d' not found", contentTypeID)
+		}
+		tx.Rollback()
+		return fmt.Errorf("failed to retrieve content type: %w", err)
 	}
-	return nil
-}
 
-// DeleteContentItemsByType deletes all content items for a given content type.
-func DeleteContentItemsByType(contentTypeName string) error {
-	return database.DB.Where("content_type = ?", contentTypeName).Delete(&models.ContentItem{}).Error
-}
+	// Delete associated fields
+	if err := tx.Where("content_type_id = ?", contentTypeID).Delete(&models.Field{}).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete fields for content type ID '%d': %w", contentTypeID, err)
+	}
 
-// DeleteFieldsByContentType deletes all fields associated with a given content type.
-func DeleteFieldsByContentType(contentTypeName string) error {
-	return database.DB.Where("content_type_name = ?", contentTypeName).Delete(&models.Field{}).Error
+	// Delete associated relationships
+	if err := tx.Where("content_type_id = ?", contentTypeID).Delete(&models.Relationship{}).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete relationships for content type ID '%d': %w", contentTypeID, err)
+	}
+
+	// Delete associated content items
+	if err := tx.Where("content_type = ?", contentType.Name).Delete(&models.ContentItem{}).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete content items for content type '%s': %w", contentType.Name, err)
+	}
+
+	// Delete the content type itself
+	if err := tx.Delete(&contentType).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete content type with ID '%d': %w", contentTypeID, err)
+	}
+
+	// Commit the transaction
+	return tx.Commit().Error
 }
