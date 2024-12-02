@@ -1,0 +1,226 @@
+{
+  "info": {
+    "name": "Dynamic Content Management - With Assertions",
+    "description": "Tests for dynamic content creation, validation, and relationships.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Login to Retrieve JWT",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/auth/login",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["auth", "login"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"username\": \"testuser\", \"password\": \"password123\"}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Login successful and token received\", function () {",
+              "    pm.response.to.have.status(200);",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.token).to.be.a(\"string\");",
+              "    pm.environment.set(\"jwt_token\", jsonData.token);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "Content Type Creation - Duplicate Field Names",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/content-types",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["content-types"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"articles\", \"fields\": [{\"name\": \"title\", \"type\": \"string\", \"required\": true}, {\"name\": \"title\", \"type\": \"int\", \"required\": false}]}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 400 for duplicate field names\", function () {",
+              "    pm.response.to.have.status(400);",
+              "});",
+              "pm.test(\"Response contains validation error message\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.error).to.contain(\"duplicate field name\");",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "Content Type Creation - Invalid Field Type",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/content-types",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["content-types"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"articles\", \"fields\": [{\"name\": \"title\", \"type\": \"invalidtype\", \"required\": true}]}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 400 for invalid field type\", function () {",
+              "    pm.response.to.have.status(400);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "",
+              "// Validate response structure",
+              "pm.test(\"Error field is 'Validation failed'\", function () {",
+              "    pm.expect(jsonData.error).to.eql(\"Validation failed\");",
+              "});",
+              "",
+              "pm.test(\"Details field specifies invalid field type\", function () {",
+              "    pm.expect(jsonData.details).to.eql(\"invalid field type 'invalidtype' for field 'title'\");",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "Create Content with Relationships",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/posts",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["posts"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\": \"My First Post\", \"body\": \"This is a test post.\", \"comments\": [{\"content\": \"Great post!\", \"author\": \"John Doe\"}, {\"content\": \"Thanks for sharing.\", \"author\": \"Jane Smith\"}]}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 201 for content creation\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test(\"Response contains created content ID\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.id).to.be.a(\"number\");",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "Retrieve Content by ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/posts/1",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["posts", "1"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200 for retrieving content by ID\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Response contains correct content data\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.title).to.eql(\"My First Post\");",
+              "    pm.expect(jsonData.body).to.eql(\"This is a test post.\");",
+              "    pm.expect(jsonData.comments).to.be.an(\"array\").that.has.lengthOf(2);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "response": []
+    }
+  ]
+}
