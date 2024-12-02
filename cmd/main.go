@@ -122,6 +122,8 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	protected.Use(middleware.AuthMiddleware())
 	{
 		protected.POST("/content-types", handlers.CreateContentType)
+		protected.GET("/content-types/:name", handlers.GetContentType) // Optional route to fetch content type details
+		protected.DELETE("/content-types/:name", handlers.DeleteContentType)
 		protected.Any("/:contentType", handlers.DynamicContentHandler)
 		protected.Any("/:contentType/:id", handlers.DynamicContentHandler)
 	}

@@ -59,3 +59,13 @@ func DeleteContentType(name string) error {
 	}
 	return nil
 }
+
+// DeleteContentItemsByType deletes all content items for a given content type.
+func DeleteContentItemsByType(contentTypeName string) error {
+	return database.DB.Where("content_type = ?", contentTypeName).Delete(&models.ContentItem{}).Error
+}
+
+// DeleteFieldsByContentType deletes all fields associated with a given content type.
+func DeleteFieldsByContentType(contentTypeName string) error {
+	return database.DB.Where("content_type_name = ?", contentTypeName).Delete(&models.Field{}).Error
+}
