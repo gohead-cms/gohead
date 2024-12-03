@@ -47,7 +47,7 @@ func TestContentTypeStorage(t *testing.T) {
 	})
 
 	t.Run("GetContentType", func(t *testing.T) {
-		ct, err := storage.GetContentType("articles")
+		ct, err := storage.GetContentTypeByName("articles")
 		assert.NoError(t, err, "Expected no error when retrieving content type")
 		assert.Equal(t, "articles", ct.Name, "Content type name mismatch")
 		assert.Equal(t, 2, len(ct.Fields), "Expected 2 fields")
@@ -78,7 +78,7 @@ func TestContentTypeStorage(t *testing.T) {
 		err := storage.UpdateContentType("articles", updatedContentType)
 		assert.NoError(t, err, "Failed to update content type")
 
-		ct, err := storage.GetContentType("articles")
+		ct, err := storage.GetContentTypeByName("articles")
 		assert.NoError(t, err, "Expected no error when retrieving updated content type")
 		assert.Equal(t, 2, len(ct.Fields), "Expected 2 fields after update")
 		assert.Equal(t, "summary", ct.Fields[1].Name, "Expected updated field name")
@@ -88,7 +88,7 @@ func TestContentTypeStorage(t *testing.T) {
 		err := storage.DeleteContentType(testContentType.ID)
 		assert.NoError(t, err, "Failed to delete content type")
 
-		_, err = storage.GetContentType("articles")
+		_, err = storage.GetContentTypeByName("articles")
 		assert.Error(t, err, "Expected error when fetching deleted content type")
 		assert.Contains(t, err.Error(), "content type not found", "Error message mismatch")
 	})

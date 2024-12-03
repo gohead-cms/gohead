@@ -2,43 +2,90 @@ package storage
 
 import (
 	"fmt"
+	"time"
 
 	"gitlab.com/sudo.bngz/gohead/internal/models"
 	"gitlab.com/sudo.bngz/gohead/pkg/database"
+	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gorm.io/gorm"
 )
 
 // SaveContentType persists a ContentType to the database.
 func SaveContentType(ct *models.ContentType) error {
-	if err := database.DB.Create(ct).Error; err != nil {
-		return fmt.Errorf("failed to save content type: %w", err)
-	}
-	return nil
-}
+	var existing models.ContentType
 
-// GetContentType retrieves a ContentType by name.
-func GetContentType(name string) (*models.ContentType, error) {
-	var ct models.ContentType
-	if err := database.DB.Preload("Fields").Preload("Relationships").
-		Where("name = ?", name).First(&ct).Error; err != nil {
-		return nil, fmt.Errorf("content type not found: %w", err)
+	logger.Log.WithField("content_type", ct.Name).Info("Attempting to save content type")
+
+	// Check if a record with the same name already exists (including soft-deleted records)
+	err := database.DB.Unscoped().Where("name = ?", ct.Name).First(&existing).Error
+	if err == nil {
+		// If an existing record is found
+		if !existing.DeletedAt.Valid {
+			logger.Log.WithField("content_type", ct.Name).Warn("Content type with the same name already exists")
+			return fmt.Errorf("a content type with the name '%s' already exists", ct.Name)
+		}
+
+		// If the record is soft-deleted, restore it along with its associations
+		logger.Log.WithField("content_type", ct.Name).Info("Found soft-deleted content type, restoring")
+
+		// Restore the content type
+		existing.DeletedAt.Time = time.Time{} // Clear the deleted_at timestamp
+		existing.DeletedAt.Valid = false
+
+		if saveErr := database.DB.Save(&existing).Error; saveErr != nil {
+			logger.Log.WithError(saveErr).WithField("content_type", ct.Name).Error("Failed to restore existing content type")
+			return fmt.Errorf("failed to restore existing content type: %w", saveErr)
+		}
+
+		// Restore associated fields
+		if err := database.DB.Unscoped().Model(&models.Field{}).
+			Where("content_type_id = ?", existing.ID).Update("deleted_at", nil).Error; err != nil {
+			logger.Log.WithError(err).WithField("content_type", ct.Name).Error("Failed to restore associated fields")
+			return fmt.Errorf("failed to restore associated fields: %w", err)
+		}
+
+		// Restore associated relationships
+		if err := database.DB.Unscoped().Model(&models.Relationship{}).
+			Where("content_type_id = ?", existing.ID).Update("deleted_at", nil).Error; err != nil {
+			logger.Log.WithError(err).WithField("content_type", ct.Name).Error("Failed to restore associated relationships")
+			return fmt.Errorf("failed to restore associated relationships: %w", err)
+		}
+
+		logger.Log.WithField("content_type", ct.Name).Info("Content type restored successfully")
+		return nil
+	} else if err != gorm.ErrRecordNotFound {
+		// Log database error
+		logger.Log.WithError(err).WithField("content_type", ct.Name).Error("Failed to check for existing content type")
+		return fmt.Errorf("failed to check for existing content type: %w", err)
 	}
-	return &ct, nil
+
+	// No conflict, create a new record
+	logger.Log.WithField("content_type", ct.Name).Info("Creating new content type")
+	if createErr := database.DB.Create(ct).Error; createErr != nil {
+		logger.Log.WithError(createErr).WithField("content_type", ct.Name).Error("Failed to create content type")
+		return fmt.Errorf("failed to save content type: %w", createErr)
+	}
+
+	logger.Log.WithField("content_type", ct.Name).Info("Content type created successfully")
+	return nil
 }
 
 // GetContentTypeByName retrieves a content type by its name.
 func GetContentTypeByName(name string) (*models.ContentType, error) {
-	var contentType models.ContentType
-	// Query the database for the content type by name
-	if err := database.DB.Where("name = ?", name).First(&contentType).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			// Handle case where the content type does not exist
+	var ct models.ContentType
+
+	// Load the ContentType, including its fields and relationships
+	if err := database.DB.Preload("Fields").Preload("Relationships").
+		Where("name = ?", name).First(&ct).Error; err != nil {
+		if err.Error() == "record not found" {
+			logger.Log.WithField("name", name).Warn("Content type not found")
 			return nil, fmt.Errorf("content type '%s' not found", name)
 		}
-		// Handle general database errors
-		return nil, fmt.Errorf("failed to retrieve content type: %w", err)
+		logger.Log.WithField("name", name).Error("Failed to fetch content type", err)
+		return nil, fmt.Errorf("failed to fetch content type '%s': %w", name, err)
 	}
-	return &contentType, nil
+	logger.Log.WithField("content_type", ct.Name).Info("Content type fetch successfully")
+	return &ct, nil
 }
 
 // GetAllContentTypes retrieves all ContentTypes.
@@ -50,21 +97,34 @@ func GetAllContentTypes() ([]models.ContentType, error) {
 	return cts, nil
 }
 
-// UpdateContentType updates an existing ContentType.
 func UpdateContentType(name string, updated *models.ContentType) error {
-	var ct models.ContentType
-	if err := database.DB.Where("name = ?", name).First(&ct).Error; err != nil {
-		return fmt.Errorf("content type not found: %w", err)
+	var existing models.ContentType
+
+	logger.Log.WithField("content_type", name).Info("Attempting to update content type")
+
+	// Check if the content type exists
+	err := database.DB.Where("name = ?", name).First(&existing).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			logger.Log.WithField("content_type", name).Warn("Content type not found for update")
+			return fmt.Errorf("content type '%s' not found", name)
+		}
+		logger.Log.WithError(err).WithField("content_type", name).Error("Failed to fetch content type for update")
+		return fmt.Errorf("failed to fetch content type: %w", err)
 	}
 
-	// Update fields
-	ct.Name = updated.Name
-	ct.Fields = updated.Fields
-	ct.Relationships = updated.Relationships
+	// Perform the update
+	logger.Log.WithField("content_type", name).Info("Updating content type details")
+	existing.Name = updated.Name
+	existing.Fields = updated.Fields
+	existing.Relationships = updated.Relationships
 
-	if err := database.DB.Save(&ct).Error; err != nil {
-		return fmt.Errorf("failed to update content type: %w", err)
+	if saveErr := database.DB.Save(&existing).Error; saveErr != nil {
+		logger.Log.WithError(saveErr).WithField("content_type", name).Error("Failed to update content type")
+		return fmt.Errorf("failed to update content type: %w", saveErr)
 	}
+
+	logger.Log.WithField("content_type", name).Info("Content type updated successfully")
 	return nil
 }
 

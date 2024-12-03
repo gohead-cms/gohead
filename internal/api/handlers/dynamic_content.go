@@ -15,7 +15,7 @@ func DynamicContentHandler(c *gin.Context) {
 	id := c.Param("id")
 
 	// Retrieve the ContentType from storage
-	ct, err := storage.GetContentType(contentTypeName)
+	ct, err := storage.GetContentTypeByName(contentTypeName)
 	if err != nil {
 		logger.Log.WithFields(logrus.Fields{
 			"content_type": contentTypeName,

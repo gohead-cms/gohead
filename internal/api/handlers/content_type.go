@@ -12,23 +12,25 @@ import (
 
 // GetContentType retrieves a specific content type by its name.
 func GetContentType(c *gin.Context) {
-	// Extract content type name from the URL parameters
-	contentTypeName := c.Param("name")
+	name := c.Param("name")
 
-	// Fetch the content type from storage
-	contentType, err := storage.GetContentType(contentTypeName)
+	// Retrieve content type from storage
+	ct, err := storage.GetContentTypeByName(name)
 	if err != nil {
-		logger.Log.WithFields(logrus.Fields{
-			"content_type_name": contentTypeName,
-		}).Warn("Content type not found")
-		c.JSON(http.StatusNotFound, gin.H{"error": "Content type not found"})
+		logger.Log.WithField("name", name).Warn("GetContentType: Content type not found")
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 
-	logger.Log.WithFields(logrus.Fields{
-		"content_type_name": contentTypeName,
-	}).Info("Content type retrieved successfully")
-	c.JSON(http.StatusOK, gin.H{"content_type": contentType})
+	// Flatten the response
+	response := map[string]interface{}{
+		"name":          ct.Name,
+		"fields":        ct.Fields,
+		"relationships": ct.Relationships,
+	}
+
+	logger.Log.WithField("name", name).Info("GetContentType: Content type retrieved successfully")
+	c.JSON(http.StatusOK, response)
 }
 
 // CreateContentType handles the creation of a new content type.
@@ -52,7 +54,7 @@ func CreateContentType(c *gin.Context) {
 	// Save the ContentType to the database
 	if err := storage.SaveContentType(&input); err != nil {
 		logger.Log.WithError(err).Error("CreateContentType: Failed to save content type")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save content type", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to save content type", "details": err.Error()})
 		return
 	}
 
