@@ -9,27 +9,27 @@ import (
 	"gitlab.com/sudo.bngz/gohead/pkg/testutils"
 )
 
-func TestContentTypeStorage(t *testing.T) {
+func TestCollectionStorage(t *testing.T) {
 	// Set up the test database
 	db := testutils.SetupTestDB()
 	defer testutils.CleanupTestDB()
 
 	// Seed initial data
-	testContentType := &models.ContentType{
+	testCollection := &models.Collection{
 		Name: "articles",
 		Fields: []models.Field{
 			{Name: "title", Type: "string", Required: true},
 			{Name: "content", Type: "text", Required: true},
 		},
 		Relationships: []models.Relationship{
-			{FieldName: "author", RelatedType: "users", RelationType: "one-to-one"},
+			{FieldName: "author", RelatedCollection: 1, RelationType: "one-to-one"},
 		},
 	}
 
-	assert.NoError(t, db.Create(testContentType).Error, "Failed to seed initial content type")
+	assert.NoError(t, db.Create(testCollection).Error, "Failed to seed initial content type")
 
-	t.Run("SaveContentType", func(t *testing.T) {
-		newContentType := &models.ContentType{
+	t.Run("SaveCollection", func(t *testing.T) {
+		newCollection := &models.Collection{
 			Name: "products",
 			Fields: []models.Field{
 				{Name: "name", Type: "string", Required: true},
@@ -37,37 +37,37 @@ func TestContentTypeStorage(t *testing.T) {
 			},
 		}
 
-		err := storage.SaveContentType(newContentType)
+		err := storage.SaveCollection(newCollection)
 		assert.NoError(t, err, "Failed to save content type")
 
-		var fetched models.ContentType
+		var fetched models.Collection
 		err = db.Where("name = ?", "products").First(&fetched).Error
 		assert.NoError(t, err, "Failed to fetch saved content type")
 		assert.Equal(t, "products", fetched.Name, "Content type name mismatch")
 	})
 
-	t.Run("GetContentType", func(t *testing.T) {
-		ct, err := storage.GetContentTypeByName("articles")
+	t.Run("GetCollection", func(t *testing.T) {
+		ct, err := storage.GetCollectionByName("articles")
 		assert.NoError(t, err, "Expected no error when retrieving content type")
 		assert.Equal(t, "articles", ct.Name, "Content type name mismatch")
 		assert.Equal(t, 2, len(ct.Fields), "Expected 2 fields")
 		assert.Equal(t, 1, len(ct.Relationships), "Expected 1 relationship")
 	})
 
-	t.Run("GetContentTypeByName", func(t *testing.T) {
-		ct, err := storage.GetContentTypeByName("articles")
+	t.Run("GetCollectionByName", func(t *testing.T) {
+		ct, err := storage.GetCollectionByName("articles")
 		assert.NoError(t, err, "Expected no error when retrieving content type by name")
 		assert.Equal(t, "articles", ct.Name, "Content type name mismatch")
 	})
 
-	t.Run("GetAllContentTypes", func(t *testing.T) {
-		cts, err := storage.GetAllContentTypes()
+	t.Run("GetAllCollections", func(t *testing.T) {
+		cts, err := storage.GetAllCollections()
 		assert.NoError(t, err, "Expected no error when retrieving all content types")
 		assert.GreaterOrEqual(t, len(cts), 1, "Expected at least one content type")
 	})
 
-	t.Run("UpdateContentType", func(t *testing.T) {
-		updatedContentType := &models.ContentType{
+	t.Run("UpdateCollection", func(t *testing.T) {
+		updatedCollection := &models.Collection{
 			Name: "articles",
 			Fields: []models.Field{
 				{Name: "title", Type: "string", Required: true},
@@ -75,20 +75,20 @@ func TestContentTypeStorage(t *testing.T) {
 			},
 		}
 
-		err := storage.UpdateContentType("articles", updatedContentType)
+		err := storage.UpdateCollection("articles", updatedCollection)
 		assert.NoError(t, err, "Failed to update content type")
 
-		ct, err := storage.GetContentTypeByName("articles")
+		ct, err := storage.GetCollectionByName("articles")
 		assert.NoError(t, err, "Expected no error when retrieving updated content type")
 		assert.Equal(t, 2, len(ct.Fields), "Expected 2 fields after update")
 		assert.Equal(t, "summary", ct.Fields[1].Name, "Expected updated field name")
 	})
 
-	t.Run("DeleteContentType", func(t *testing.T) {
-		err := storage.DeleteContentType(testContentType.ID)
+	t.Run("DeleteCollection", func(t *testing.T) {
+		err := storage.DeleteCollection(testCollection.ID)
 		assert.NoError(t, err, "Failed to delete content type")
 
-		_, err = storage.GetContentTypeByName("articles")
+		_, err = storage.GetCollectionByName("articles")
 		assert.Error(t, err, "Expected error when fetching deleted content type")
 		assert.Contains(t, err.Error(), "content type not found", "Error message mismatch")
 	})

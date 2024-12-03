@@ -24,7 +24,7 @@ func init() {
 	logger.Log.SetFormatter(&logrus.TextFormatter{})
 }
 
-func TestCreateContentTypeHandler(t *testing.T) {
+func TestCreateCollectionHandler(t *testing.T) {
 	// Initialize in-memory test database
 	router, _ := testutils.SetupTestServer()
 	// Load test configuration
@@ -32,7 +32,7 @@ func TestCreateContentTypeHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	// Register the handler
-	router.POST("/content-types", CreateContentType)
+	router.POST("/content-types", CreateCollection)
 
 	// Define test cases
 	testCases := []struct {

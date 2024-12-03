@@ -14,58 +14,63 @@ import (
 )
 
 // internal/api/handlers/content_item.go
-func CreateContentItem(ct models.ContentType) gin.HandlerFunc {
+func CreateItem(ct models.Collection) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 		tracer := otel.Tracer("gohead")
-		ctx, span := tracer.Start(ctx, "CreateContentItem")
+		ctx, span := tracer.Start(ctx, "CreateItem")
 		defer span.End()
+
 		var itemData map[string]interface{}
 		if err := c.ShouldBindJSON(&itemData); err != nil {
-			logger.Log.Warn("Item: Bad Request", err)
+			logger.Log.WithError(err).Warn("Item: Bad Request")
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
 		// Validate item data, including relationships
 		if err := models.ValidateItemData(ct, itemData); err != nil {
-			logger.Log.Warn("Item: Error during validate", err)
+			logger.Log.WithError(err).Warn("Item: Error during validation")
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
 		// Create the content item
-		item := models.ContentItem{
-			ContentType: ct.Name,
-			Data:        models.JSONMap(itemData),
+		item := models.Item{
+			CollectionID: ct.ID,
+			Data:         models.JSONMap(itemData),
 		}
 
-		if err := storage.SaveContentItem(&item); err != nil {
-			logger.Log.Warn("Item: cannot save item", err)
+		if err := storage.SaveItem(&item); err != nil {
+			logger.Log.WithError(err).Warn("Item: Cannot save item")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
 		// Save relationships (if any)
-		if err := storage.SaveContentRelations(&ct, item.ID, itemData); err != nil {
-			logger.Log.Warn("Item: cannot save item relationship", err)
+		if err := storage.SaveRelationship(&ct, item.ID, itemData); err != nil {
+			logger.Log.WithError(err).Warn("Item: Cannot save item relationship")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
 		logger.Log.WithFields(logrus.Fields{
-			"item_id": item.ID,
+			"item_id":       item.ID,
+			"collection_id": ct.ID,
 		}).Info("Item content created successfully")
 
-		c.JSON(201, item)
+		c.JSON(http.StatusCreated, gin.H{
+			"message": "Item created successfully",
+			"item":    item,
+		})
 	}
 }
 
-func GetContentItems(ct models.ContentType) gin.HandlerFunc {
+func GetItems(ct models.Collection) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		items, err := storage.GetContentItems(ct.Name)
+		items, err := storage.GetItems(ct.Name)
 		if err != nil {
-			logger.Log.Warn("Item: cannot get content items", err)
+			logger.Log.Warn("Item: cannot get items", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -75,8 +80,7 @@ func GetContentItems(ct models.ContentType) gin.HandlerFunc {
 	}
 }
 
-// internal/api/handlers/content_item.go
-func GetContentItemByID(ct models.ContentType) gin.HandlerFunc {
+func GetItemByID(ct models.Collection) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		idStr := c.Param("id")
 		id, err := strconv.Atoi(idStr)
@@ -88,7 +92,7 @@ func GetContentItemByID(ct models.ContentType) gin.HandlerFunc {
 			return
 		}
 
-		item, err := storage.GetContentItemByID(ct.Name, uint(id))
+		item, err := storage.GetItemByID(uint(id))
 		if err != nil {
 			logger.Log.WithFields(logrus.Fields{
 				"item_id": id,
@@ -98,7 +102,7 @@ func GetContentItemByID(ct models.ContentType) gin.HandlerFunc {
 		}
 
 		// Fetch relationships
-		relations, err := storage.GetContentRelations(ct.Name, item.ID)
+		relations, err := storage.GetRelationships(ct.Name, item.ID)
 		if err != nil {
 			logger.Log.WithFields(logrus.Fields{
 				"item_id": id,
@@ -109,7 +113,7 @@ func GetContentItemByID(ct models.ContentType) gin.HandlerFunc {
 
 		// Add related items to the response
 		for _, rel := range relations {
-			relatedItem, err := storage.GetContentItemByID(rel.RelatedType, rel.RelatedItemID)
+			relatedItem, err := storage.GetItemByID(rel.RelatedItemID)
 			if err != nil {
 				logger.Log.WithFields(logrus.Fields{
 					"item_id": id,
@@ -128,7 +132,7 @@ func GetContentItemByID(ct models.ContentType) gin.HandlerFunc {
 	}
 }
 
-func UpdateContentItem(ct models.ContentType) gin.HandlerFunc {
+func UpdateItem(ct models.Collection) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		idStr := c.Param("id")
 		id, err := strconv.Atoi(idStr)
@@ -159,7 +163,7 @@ func UpdateContentItem(ct models.ContentType) gin.HandlerFunc {
 		}
 
 		// Update the content item
-		if err := storage.UpdateContentItem(ct, uint(id), models.JSONMap(itemData)); err != nil {
+		if err := storage.UpdateItem(ct, uint(id), models.JSONMap(itemData)); err != nil {
 			logger.Log.WithFields(logrus.Fields{
 				"item_id": id,
 			}).Warn("Item Update: Error during update", err)
@@ -174,7 +178,7 @@ func UpdateContentItem(ct models.ContentType) gin.HandlerFunc {
 	}
 }
 
-func DeleteContentItem(ct models.ContentType) gin.HandlerFunc {
+func DeleteItem(ct models.Collection) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		idStr := c.Param("id")
 		id, err := strconv.Atoi(idStr)
@@ -186,7 +190,7 @@ func DeleteContentItem(ct models.ContentType) gin.HandlerFunc {
 			return
 		}
 
-		if err := storage.DeleteContentItem(ct, uint(id)); err != nil {
+		if err := storage.DeleteItem(ct, uint(id)); err != nil {
 			logger.Log.WithFields(logrus.Fields{
 				"item_id": id,
 			}).Warn("Item delete: Internal server error", err)

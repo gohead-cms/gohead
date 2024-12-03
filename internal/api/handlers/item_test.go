@@ -26,16 +26,16 @@ func init() {
 	logger.Log.SetFormatter(&logrus.TextFormatter{})
 }
 
-func TestCreateContentItemIntegration(t *testing.T) {
+func TestCreateItemIntegration(t *testing.T) {
 	// Initialize in-memory test database
 	router, db := testutils.SetupTestServer()
 
 	// Apply migrations for all necessary models
-	err := db.AutoMigrate(&models.ContentItem{})
-	assert.NoError(t, err, "Failed to apply migrations for ContentItem")
+	err := db.AutoMigrate(&models.Item{})
+	assert.NoError(t, err, "Failed to apply migrations for Item")
 
 	// Create a test content type
-	ct := models.ContentType{
+	ct := models.Collection{
 		Name: "articles",
 		Fields: []models.Field{
 			{
@@ -54,7 +54,7 @@ func TestCreateContentItemIntegration(t *testing.T) {
 
 	// Prepare the Gin router
 	gin.SetMode(gin.TestMode)
-	router.POST("/articles", CreateContentItem(ct))
+	router.POST("/articles", CreateItem(ct))
 
 	// Prepare the test request
 	itemData := map[string]interface{}{
@@ -73,7 +73,7 @@ func TestCreateContentItemIntegration(t *testing.T) {
 
 	// Check the response
 	assert.Equal(t, http.StatusCreated, rr.Code)
-	var response models.ContentItem
+	var response models.Item
 	err = json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.Equal(t, "Test Article", response.Data["title"])

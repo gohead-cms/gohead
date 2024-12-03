@@ -121,11 +121,12 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	protected := router.Group("/")
 	protected.Use(middleware.AuthMiddleware())
 	{
-		protected.POST("/content-types", handlers.CreateContentType)
-		protected.GET("/content-types/:name", handlers.GetContentType) // Optional route to fetch content type details
-		protected.DELETE("/content-types/:name", handlers.DeleteContentType)
-		protected.Any("/:contentType", handlers.DynamicContentHandler)
-		protected.Any("/:contentType/:id", handlers.DynamicContentHandler)
+		protected.POST("/collections", handlers.CreateCollection)
+		protected.GET("/collections/:name", handlers.GetCollection)    // Optional route to fetch content type details
+		protected.PUT("/collections/:name", handlers.UpdateCollection) // Optional route to fetch content type details
+		protected.DELETE("/collections/:name", handlers.DeleteCollection)
+		protected.Any("/:collection", handlers.DynamicCollectionHandler)
+		protected.Any("/:collection/:id", handlers.DynamicCollectionHandler)
 	}
 
 	return router, nil

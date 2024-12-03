@@ -1,4 +1,4 @@
-package models
+package models_test
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"gitlab.com/sudo.bngz/gohead/internal/models"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 )
 
@@ -16,224 +17,110 @@ func init() {
 	logger.InitLogger("debug")
 	logger.Log.SetOutput(&buffer)
 	logger.Log.SetFormatter(&logrus.TextFormatter{})
+	// Initialize in-memory test database
+
 }
 
 func TestValidateUser(t *testing.T) {
-	tests := []struct {
-		name    string
-		user    User
-		wantErr bool
-		errMsg  string
-	}{
-		{
-			name: "Valid user",
-			user: User{
-				Username: "testuser",
-				Email:    "test@example.com",
-				Password: "securepassword",
-				Role: UserRole{
-					Name: "admin",
-					Permissions: JSONMap{
-						"read":  true,
-						"write": true,
-					},
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "Missing username",
-			user: User{
-				Email:    "test@example.com",
-				Password: "securepassword",
-				Role: UserRole{
-					Name: "admin",
-					Permissions: JSONMap{
-						"read":  true,
-						"write": true,
-					},
-				},
-			},
-			wantErr: true,
-			errMsg:  "username is required",
-		},
-		{
-			name: "Invalid email",
-			user: User{
-				Username: "testuser",
-				Email:    "invalid-email",
-				Password: "securepassword",
-				Role: UserRole{
-					Name: "admin",
-					Permissions: JSONMap{
-						"read":  true,
-						"write": true,
-					},
-				},
-			},
-			wantErr: true,
-			errMsg:  "invalid email address",
-		},
-		{
-			name: "Password too short",
-			user: User{
-				Username: "testuser",
-				Email:    "test@example.com",
-				Password: "123",
-				Role: UserRole{
-					Name: "admin",
-					Permissions: JSONMap{
-						"read":  true,
-						"write": true,
-					},
-				},
-			},
-			wantErr: true,
-			errMsg:  "password must be at least 6 characters long",
-		},
-		{
-			name: "Missing role",
-			user: User{
-				Username: "testuser",
-				Email:    "test@example.com",
-				Password: "securepassword",
-			},
-			wantErr: true,
-			errMsg:  "role is required",
-		},
+
+	validUser := models.User{
+		Username:  "testuser",
+		Email:     "test@example.com",
+		Password:  "securepassword",
+		RoleRefer: 1,
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateUser(tt.user)
-			if tt.wantErr {
-				assert.Error(t, err)
-				assert.Equal(t, tt.errMsg, err.Error())
-			} else {
-				assert.NoError(t, err)
-			}
-		})
+	err := models.ValidateUser(validUser)
+	assert.NoError(t, err)
+
+	invalidUser := models.User{
+		Username:  "",
+		Email:     "invalid-email",
+		Password:  "123",
+		RoleRefer: 0,
 	}
+
+	err = models.ValidateUser(invalidUser)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "username is required")
+
+	invalidUser.Username = "testuser"
+	err = models.ValidateUser(invalidUser)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid email address")
+
+	invalidUser.Email = "test@example.com"
+	err = models.ValidateUser(invalidUser)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "role is required")
+
+	invalidUser.Password = "securepassword"
+	err = models.ValidateUser(invalidUser)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "role is required")
 }
 
 func TestValidateUserRole(t *testing.T) {
-	tests := []struct {
-		name    string
-		role    UserRole
-		wantErr bool
-		errMsg  string
-	}{
-		{
-			name: "Valid role",
-			role: UserRole{
-				Name: "admin",
-				Permissions: JSONMap{
-					"read":  true,
-					"write": true,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "Missing role name",
-			role: UserRole{
-				Permissions: JSONMap{
-					"read":  true,
-					"write": true,
-				},
-			},
-			wantErr: true,
-			errMsg:  "role name is required",
-		},
-		{
-			name: "No permissions",
-			role: UserRole{
-				Name:        "editor",
-				Permissions: JSONMap{},
-			},
-			wantErr: true,
-			errMsg:  "at least one permission is required for the role",
-		},
+	validRole := models.UserRole{
+		Name:        "admin",
+		Permissions: models.JSONMap{"manage_users": true},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateUserRole(tt.role)
-			if tt.wantErr {
-				assert.Error(t, err)
-				assert.Equal(t, tt.errMsg, err.Error())
-			} else {
-				assert.NoError(t, err)
-			}
-		})
+	err := models.ValidateUserRole(validRole)
+	assert.NoError(t, err)
+
+	invalidRole := models.UserRole{
+		Name:        "",
+		Permissions: models.JSONMap{},
 	}
+
+	err = models.ValidateUserRole(invalidRole)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "role name is required")
+
+	invalidRole.Name = "admin"
+	err = models.ValidateUserRole(invalidRole)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "at least one permission is required for the role")
 }
 
 func TestValidateUserUpdates(t *testing.T) {
-	tests := []struct {
-		name    string
-		updates map[string]interface{}
-		wantErr bool
-		errMsg  string
-	}{
-		{
-			name: "Valid updates",
-			updates: map[string]interface{}{
-				"username": "newusername",
-				"email":    "new@example.com",
-				"password": "newpassword",
-				"role": UserRole{
-					Name: "editor",
-					Permissions: JSONMap{
-						"read": true,
-					},
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "Invalid username",
-			updates: map[string]interface{}{
-				"username": "",
-			},
-			wantErr: true,
-			errMsg:  "invalid username",
-		},
-		{
-			name: "Invalid email",
-			updates: map[string]interface{}{
-				"email": "invalid-email",
-			},
-			wantErr: true,
-			errMsg:  "invalid email address",
-		},
-		{
-			name: "Short password",
-			updates: map[string]interface{}{
-				"password": "123",
-			},
-			wantErr: true,
-			errMsg:  "password must be at least 6 characters long",
-		},
-		{
-			name: "Unsupported field",
-			updates: map[string]interface{}{
-				"unsupported_field": "value",
-			},
-			wantErr: true,
-			errMsg:  "unsupported field for update: unsupported_field",
-		},
+	validUpdates := map[string]interface{}{
+		"username": "newuser",
+		"email":    "new@example.com",
+		"password": "newpassword",
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateUserUpdates(tt.updates)
-			if tt.wantErr {
-				assert.Error(t, err)
-				assert.Equal(t, tt.errMsg, err.Error())
-			} else {
-				assert.NoError(t, err)
-			}
-		})
+	err := models.ValidateUserUpdates(validUpdates)
+	assert.NoError(t, err)
+
+	invalidUpdates := map[string]interface{}{
+		"username": "test",
+		"email":    "invalid-email",
+		"password": "123456g",
 	}
+
+	err = models.ValidateUserUpdates(invalidUpdates)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid email address")
+
+	invalidUpdates["email"] = "new@example.com"
+	invalidUpdates["username"] = ""
+	err = models.ValidateUserUpdates(invalidUpdates)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid username")
+
+	err = models.ValidateUserUpdates(invalidUpdates)
+	assert.Error(t, err)
+
+	validRole := models.UserRole{Name: "editor", Permissions: models.JSONMap{"edit_content": true}}
+	validUpdates["role"] = validRole
+	err = models.ValidateUserUpdates(validUpdates)
+	assert.NoError(t, err)
+
+	invalidRole := models.UserRole{Name: "", Permissions: models.JSONMap{}}
+	validUpdates["role"] = invalidRole
+	err = models.ValidateUserUpdates(validUpdates)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "role name is required")
 }

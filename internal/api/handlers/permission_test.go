@@ -30,7 +30,7 @@ func TestProtectedHandlerWithPermissions(t *testing.T) {
 	auth.InitializeJWT(cfg.JWTSecret)
 
 	// Set up a test content type
-	contentType := models.ContentType{
+	contentType := models.Collection{
 		Name: "protected_items",
 		Fields: []models.Field{
 			{
@@ -54,7 +54,7 @@ func TestProtectedHandlerWithPermissions(t *testing.T) {
 	router := gin.New()
 
 	// Register the handler with AuthMiddleware and Role Authorization
-	router.POST("/:contentType", middleware.AuthMiddleware(), middleware.AuthorizeRole("admin"), CreateContentItem(contentType))
+	router.POST("/:contentType", middleware.AuthMiddleware(), middleware.AuthorizeRole("admin"), CreateItem(contentType))
 
 	// Generate tokens for different roles
 	adminToken, err := auth.GenerateJWT("admin_user", "admin")

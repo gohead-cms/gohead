@@ -9,18 +9,18 @@ import (
 	"gitlab.com/sudo.bngz/gohead/pkg/storage"
 )
 
-// DynamicContentHandler handles CRUD operations for dynamic content types.
-func DynamicContentHandler(c *gin.Context) {
-	contentTypeName := c.Param("contentType")
+// DynamicContentHandler handles CRUD operations for dynamic collections.
+func DynamicCollectionHandler(c *gin.Context) {
+	CollectionName := c.Param("Collection")
 	id := c.Param("id")
 
-	// Retrieve the ContentType from storage
-	ct, err := storage.GetContentTypeByName(contentTypeName)
+	// Retrieve the Collection from storage
+	ct, err := storage.GetCollectionByName(CollectionName)
 	if err != nil {
 		logger.Log.WithFields(logrus.Fields{
-			"content_type": contentTypeName,
-		}).Warn("DynamicContentHandler: Content type not found")
-		c.JSON(http.StatusNotFound, gin.H{"error": "Content type not found"})
+			"collection": CollectionName,
+		}).Warn("DynamicContentHandler: collection not found")
+		c.JSON(http.StatusNotFound, gin.H{"error": "collection not found"})
 		return
 	}
 
@@ -35,8 +35,8 @@ func DynamicContentHandler(c *gin.Context) {
 
 	logger.Log.WithFields(logrus.Fields{
 		"user_role":      userRole,
-		"content_type":   contentTypeName,
-		"content_item":   id,
+		"collection":     CollectionName,
+		"item":           id,
 		"request_method": c.Request.Method,
 	}).Info("Processing dynamic content request")
 
@@ -44,41 +44,41 @@ func DynamicContentHandler(c *gin.Context) {
 	case http.MethodPost:
 		if !hasPermission(userRole, "create") {
 			logger.Log.WithFields(logrus.Fields{
-				"user_role":    userRole,
-				"content_type": contentTypeName,
+				"user_role":  userRole,
+				"collection": CollectionName,
 			}).Warn("Create permission denied")
 			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 			return
 		}
-		CreateContentItem(*ct)(c)
+		CreateItem(*ct)(c)
 
 	case http.MethodGet:
 		if !hasPermission(userRole, "read") {
 			logger.Log.WithFields(logrus.Fields{
-				"user_role":    userRole,
-				"content_type": contentTypeName,
+				"user_role":  userRole,
+				"collection": CollectionName,
 			}).Warn("Read permission denied")
 			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 			return
 		}
 		if id == "" {
-			GetContentItems(*ct)(c)
+			GetItems(*ct)(c)
 		} else {
-			GetContentItemByID(*ct)(c)
+			GetItemByID(*ct)(c)
 		}
 
 	case http.MethodPut:
 		if !hasPermission(userRole, "update") {
 			logger.Log.WithFields(logrus.Fields{
-				"user_role":    userRole,
-				"content_type": contentTypeName,
-				"content_item": id,
+				"user_role":  userRole,
+				"collection": CollectionName,
+				"item":       id,
 			}).Warn("Update permission denied")
 			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 			return
 		}
 		if id != "" {
-			UpdateContentItem(*ct)(c)
+			UpdateItem(*ct)(c)
 		} else {
 			logger.Log.Warn("Update operation requires a valid ID")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "ID is required for update"})
@@ -87,15 +87,15 @@ func DynamicContentHandler(c *gin.Context) {
 	case http.MethodDelete:
 		if !hasPermission(userRole, "delete") {
 			logger.Log.WithFields(logrus.Fields{
-				"user_role":    userRole,
-				"content_type": contentTypeName,
-				"content_item": id,
+				"user_role":  userRole,
+				"collection": CollectionName,
+				"item":       id,
 			}).Warn("Delete permission denied")
 			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 			return
 		}
 		if id != "" {
-			DeleteContentItem(*ct)(c)
+			DeleteItem(*ct)(c)
 		} else {
 			logger.Log.Warn("Delete operation requires a valid ID")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "ID is required for deletion"})
@@ -104,7 +104,7 @@ func DynamicContentHandler(c *gin.Context) {
 	default:
 		logger.Log.WithFields(logrus.Fields{
 			"user_role":      userRole,
-			"content_type":   contentTypeName,
+			"collection":     CollectionName,
 			"request_method": c.Request.Method,
 		}).Warn("Unsupported HTTP method")
 		c.JSON(http.StatusMethodNotAllowed, gin.H{"error": "Method not allowed"})

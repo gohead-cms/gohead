@@ -34,11 +34,11 @@ func TestDynamicContentHandler(t *testing.T) {
 	assert.NoError(t, err, "Failed to initialize in-memory database")
 
 	// Apply migrations for all necessary models
-	err = db.AutoMigrate(&models.ContentItem{})
+	err = db.AutoMigrate(&models.Item{})
 	assert.NoError(t, err, "Failed to apply migrations for ContentItem")
 
 	// Define a test content type
-	contentType := models.ContentType{
+	collection := models.Collection{
 		Name: "articles",
 		Fields: []models.Field{
 			{
@@ -53,7 +53,7 @@ func TestDynamicContentHandler(t *testing.T) {
 			},
 		},
 	}
-	if err := db.Create(&contentType).Error; err != nil {
+	if err := db.Create(&collection).Error; err != nil {
 		t.Fatalf("Failed to create content type: %v", err)
 	}
 
@@ -62,8 +62,8 @@ func TestDynamicContentHandler(t *testing.T) {
 	router := gin.Default()
 
 	// Register the dynamic handler
-	router.POST("/:contentType", DynamicContentHandler)
-	router.GET("/:contentType/:id", DynamicContentHandler)
+	router.POST("/:collection", DynamicCollectionHandler)
+	router.GET("/:collection/:id", DynamicCollectionHandler)
 
 	// Define test cases
 	t.Run("Create Content Item", func(t *testing.T) {
@@ -103,15 +103,23 @@ func testCreateContentItem(router *gin.Engine, t *testing.T) {
 	assert.Equal(t, "This is the content of the test article.", response["data"].(map[string]interface{})["content"])
 
 	// Check that the item is stored in the database
-	var item models.ContentItem
+	var item models.Item
 	err = database.DB.Where("content_type = ? AND data ->> 'title' = ?", "articles", "Test Article").First(&item).Error
 	assert.NoError(t, err)
 }
 
 func testRetrieveContentItem(router *gin.Engine, t *testing.T) {
+	// Prepare a collection
+	collection := models.Collection{
+		Name: "articles",
+	}
+	if err := database.DB.Create(&collection).Error; err != nil {
+		t.Fatalf("Failed to create collection: %v", err)
+	}
+
 	// Prepare a content item to retrieve
-	contentItem := models.ContentItem{
-		ContentType: "articles",
+	contentItem := models.Item{
+		CollectionID: collection.ID, // Use CollectionID instead of Collection
 		Data: models.JSONMap{
 			"title":   "Existing Article",
 			"content": "This is an existing article.",
@@ -122,7 +130,7 @@ func testRetrieveContentItem(router *gin.Engine, t *testing.T) {
 	}
 
 	// Send a GET request to retrieve the content item
-	url := fmt.Sprintf("/articles/%d", contentItem.ID)
+	url := fmt.Sprintf("/articles/%d", contentItem.ID) // Use the collection name in the URL
 	req, _ := http.NewRequest(http.MethodGet, url, nil)
 
 	// Create a response recorder
