@@ -1,8 +1,10 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -12,74 +14,105 @@ import (
 
 // UserRole defines the role of a user
 type UserRole struct {
-	ID          int     `json:"id"`
+	ID          uint    `json:"id"`
 	Name        string  `json:"name"`                                                // Role name (e.g., admin, editor, viewer)
 	Description string  `json:"description"`                                         // Role description
 	Permissions JSONMap `json:"permissions" gorm:"type:jsonb;default:'[]';not null"` // Use 'jsonb' for PostgreSQL // Permissions associated with the role
 }
+
+// User represents a user in the system with extended profile information.
 type User struct {
 	gorm.Model
-	Username  string    `json:"username" gorm:"uniqueIndex;size:191"` // Unique username with length limit for MySQL compatibility
-	Email     string    `json:"email" gorm:"uniqueIndex;size:191"`    // Unique email with length limit for MySQL compatibility
-	Password  string    `json:"password"`                             // Hashed password
-	RoleRefer int       `json:"-"`                                    // Foreign key reference (not exposed in JSON)
-	Role      UserRole  `json:"role" gorm:"foreignKey:RoleRefer"`     // Associated role
-	CreatedAt time.Time `json:"created_at,omitempty"`                 // Auto-managed timestamp
+	Username        string    `json:"username" gorm:"uniqueIndex;size:191"` // Unique username with length limit for MySQL compatibility
+	Email           string    `json:"email" gorm:"uniqueIndex;size:191"`    // Unique email with length limit for MySQL compatibility
+	Password        string    `json:"password"`                             // Hashed password
+	UserRoleID      int       `json:"-"`                                    // Foreign key reference (not exposed in JSON)
+	Role            UserRole  `json:"role" gorm:"foreignKey:UserRoleID"`    // Associated role
+	Slug            string    `json:"slug" gorm:"uniqueIndex"`              // Unique slug for the user
+	ProfileImage    string    `json:"profile_image"`                        // URL to the user's profile image
+	CoverImage      *string   `json:"cover_image"`                          // URL to the user's cover image (optional)
+	Bio             string    `json:"bio"`                                  // Short biography
+	Website         string    `json:"website"`                              // Personal or professional website
+	Location        string    `json:"location"`                             // User's location
+	Facebook        string    `json:"facebook"`                             // Facebook username or handle
+	Twitter         string    `json:"twitter"`                              // Twitter handle
+	MetaTitle       *string   `json:"meta_title"`                           // SEO meta title (optional)
+	MetaDescription *string   `json:"meta_description"`                     // SEO meta description (optional)
+	URL             string    `json:"url"`                                  // Full URL to the user's profile
+	CreatedAt       time.Time `json:"created_at,omitempty"`                 // Auto-managed timestamp
 }
 
-// ValidateUser validates the user data
 func ValidateUser(user User) error {
-	// Check if username is provided
-	if user.Username == "" {
+	// Check if username is provided and valid
+	if strings.TrimSpace(user.Username) == "" {
 		logger.Log.WithFields(logrus.Fields{
-			"username": user.Username,
+			"field": "username",
 		}).Warn("Validation failed: missing username")
-		return fmt.Errorf("username is required")
+		return errors.New("username is required")
 	}
 
-	// Validate email
+	// Validate email format
 	if !isValidEmail(user.Email) {
 		logger.Log.WithFields(logrus.Fields{
-			"email": user.Email,
+			"field": "email",
+			"value": user.Email,
 		}).Warn("Validation failed: invalid email address")
-		return fmt.Errorf("invalid email address")
+		return errors.New("invalid email address")
 	}
 
-	// Check if role is provided
-	if user.RoleRefer == 0 {
+	// Validate password length
+	minPasswordLength := 6
+	if len(user.Password) < minPasswordLength {
 		logger.Log.WithFields(logrus.Fields{
-			"username": user.Username,
-			"role_id":  user.Role.ID,
-		}).Warn("Validation failed: invalid role")
-		return fmt.Errorf("role is required")
-	}
-
-	// Additional password checks (e.g., length)
-	if len(user.Password) < 6 {
-		logger.Log.WithFields(logrus.Fields{
-			"username": user.Username,
+			"field":   "password",
+			"length":  len(user.Password),
+			"minimum": minPasswordLength,
 		}).Warn("Validation failed: password too short")
-		return fmt.Errorf("password must be at least 6 characters long")
+		return fmt.Errorf("password must be at least %d characters long", minPasswordLength)
+	}
+
+	// Check if slug is unique and provided
+	if strings.TrimSpace(user.Slug) == "" {
+		logger.Log.WithFields(logrus.Fields{
+			"field": "slug",
+		}).Warn("Validation failed: missing slug")
+		return errors.New("slug is required")
+	}
+
+	// Validate profile image (if provided)
+	if user.ProfileImage != "" && !isValidURL(user.ProfileImage) {
+		logger.Log.WithFields(logrus.Fields{
+			"field": "profile_image",
+			"value": user.ProfileImage,
+		}).Warn("Validation failed: invalid profile image URL")
+		return errors.New("invalid profile image URL")
+	}
+
+	// Validate website (if provided)
+	if user.Website != "" && !isValidURL(user.Website) {
+		logger.Log.WithFields(logrus.Fields{
+			"field": "website",
+			"value": user.Website,
+		}).Warn("Validation failed: invalid website URL")
+		return errors.New("invalid website URL")
 	}
 
 	logger.Log.WithFields(logrus.Fields{
 		"username": user.Username,
-		"role":     user.Role.Name,
 	}).Info("User validation passed")
 	return nil
 }
 
-// isValidEmail checks if the given email address is valid
+// isValidEmail checks if the given email is valid
 func isValidEmail(email string) bool {
-	regex := `^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$`
-	re := regexp.MustCompile(regex)
-	if !re.MatchString(email) {
-		logger.Log.WithFields(logrus.Fields{
-			"email": email,
-		}).Warn("Validation failed: email does not match regex")
-		return false
-	}
-	return true
+	re := regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+	return re.MatchString(email)
+}
+
+// isValidURL checks if the given URL is valid
+func isValidURL(url string) bool {
+	re := regexp.MustCompile(`^https?://[^\s/$.?#].[^\s]*$`)
+	return re.MatchString(url)
 }
 
 // ValidateUserRole validates the user role data

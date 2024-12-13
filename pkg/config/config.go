@@ -11,12 +11,13 @@ import (
 )
 
 type Config struct {
-	LogLevel         string `mapstructure:"log_level"`
-	Mode             string `yaml:"gin_log_level"` // For Gin framework logging
-	TelemetryEnabled bool   `mapstructure:"telemetry_enabled"`
-	JWTSecret        string `mapstructure:"jwt_secret"`
-	DatabaseURL      string `mapstructure:"database_url"`
-	ServerPort       string `mapstructure:"server_port"`
+	LogLevel          string `mapstructure:"log_level"`
+	Mode              string `yaml:"gin_log_level"` // For Gin framework logging
+	TelemetryEnabled  bool   `mapstructure:"telemetry_enabled"`
+	JWTSecret         string `mapstructure:"jwt_secret"`
+	DatabaseURL       string `mapstructure:"database_url"`
+	ServerPort        string `mapstructure:"server_port"`
+	MinPasswordLength int    `json:"min_password_length" yaml:"min_password_length"`
 }
 
 func LoadConfig(configPath string) (Config, error) {
@@ -26,8 +27,9 @@ func LoadConfig(configPath string) (Config, error) {
 	viper.SetDefault("log_level", "info")
 	viper.SetDefault("telemetry_enabled", true)
 	viper.SetDefault("jwt_secret", "your-secret-key")
-	viper.SetDefault("database_url", "sqlite://cms.db")
+	viper.SetDefault("database_url", "sqlite://gohead-cms.db")
 	viper.SetDefault("server_port", "8080")
+	viper.SetDefault("min_password_length", 6)
 
 	// Set the config file path
 	viper.SetConfigFile(configPath)
@@ -41,7 +43,7 @@ func LoadConfig(configPath string) (Config, error) {
 
 	// Override with environment variables
 	viper.AutomaticEnv()
-	viper.SetEnvPrefix("CMS")
+	viper.SetEnvPrefix("GOHEAD")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	// Unmarshal the config into the struct

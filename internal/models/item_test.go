@@ -1,64 +1,83 @@
-// internal/models/content_item_test.go
 package models
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 )
 
-func TestItemCRUD(t *testing.T) {
-	// Initialize an in-memory SQLite database
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	assert.NoError(t, err)
-
-	// Create a Item
-	Item1 := Item{
-		CollectionID: 1,
-		Data: JSONMap{
-			"title":   "Test Article",
-			"content": "This is the content of the test article.",
+func TestValidateItem(t *testing.T) {
+	// Sample collection schema
+	collection := Collection{
+		Name: "articles",
+		Fields: []Field{
+			{Name: "title", Type: "string", Required: true},
+			{Name: "content", Type: "string", Required: true},
+			{Name: "published", Type: "bool", Required: false},
 		},
 	}
 
-	// Auto-migrate the Item model
-	err = db.AutoMigrate(&Item{})
-	assert.NoError(t, err)
+	t.Run("Valid Item", func(t *testing.T) {
+		item := Item{
+			CollectionID: 1,
+			Data: JSONMap{
+				"title":     "Test Article",
+				"content":   "This is a test article.",
+				"published": true,
+			},
+		}
 
-	err = db.Create(&Item1).Error
-	assert.NoError(t, err)
-	assert.NotZero(t, Item1.ID, "Item ID should be set after creation")
+		err := ValidateItem(item, collection)
+		assert.NoError(t, err)
+	})
 
-	// Retrieve the Item
-	var retrievedItem Item
-	err = db.First(&retrievedItem, Item1.ID).Error
-	assert.NoError(t, err)
-	assert.Equal(t, "articles", retrievedItem.CollectionID)
-	assert.Equal(t, "Test Article", retrievedItem.Data["title"])
-	assert.Equal(t, "This is the content of the test article.", retrievedItem.Data["content"])
+	t.Run("Missing CollectionID", func(t *testing.T) {
+		item := Item{
+			CollectionID: 0,
+			Data: JSONMap{
+				"title":   "Test Article",
+				"content": "This is a test article.",
+			},
+		}
 
-	// Update the Item
-	err = db.Model(&retrievedItem).Update("Data", JSONMap{
-		"title":   "Updated Title",
-		"content": "Updated content.",
-	}).Error
-	assert.NoError(t, err)
+		err := ValidateItem(item, collection)
+		assert.EqualError(t, err, "CollectionID is required")
+	})
 
-	// Verify the update
-	var updatedItem Item
-	err = db.First(&updatedItem, Item1.ID).Error
-	assert.NoError(t, err)
-	assert.Equal(t, "Updated Title", updatedItem.Data["title"])
-	assert.Equal(t, "Updated content.", updatedItem.Data["content"])
+	t.Run("Empty Data", func(t *testing.T) {
+		item := Item{
+			CollectionID: 1,
+			Data:         JSONMap{},
+		}
 
-	// Delete the Item
-	err = db.Delete(&Item{}, Item1.ID).Error
-	assert.NoError(t, err)
+		err := ValidateItem(item, collection)
+		assert.EqualError(t, err, "Data cannot be empty")
+	})
 
-	// Verify deletion
-	var deletedItem Item
-	err = db.First(&deletedItem, Item1.ID).Error
-	assert.Error(t, err, "Record should not be found after deletion")
+	t.Run("Missing Required Field", func(t *testing.T) {
+		item := Item{
+			CollectionID: 1,
+			Data: JSONMap{
+				"content": "This is a test article.",
+			},
+		}
+
+		err := ValidateItem(item, collection)
+		assert.EqualError(t, err, "missing required field: 'title'")
+	})
+
+	t.Run("Invalid Field Type", func(t *testing.T) {
+		item := Item{
+			CollectionID: 1,
+			Data: JSONMap{
+				"title":     "Test Article",
+				"content":   "This is a test article.",
+				"published": "not-a-boolean",
+			},
+		}
+
+		err := ValidateItem(item, collection)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid boolean format for value: not-a-boolean")
+	})
 }

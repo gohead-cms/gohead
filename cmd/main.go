@@ -20,7 +20,7 @@ import (
 	"gitlab.com/sudo.bngz/gohead/pkg/seed"
 	"gitlab.com/sudo.bngz/gohead/pkg/tracing"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
-	gormlogger "gorm.io/gorm/logger" // Import GORM logger
+	gormlogger "gorm.io/gorm/logger"
 )
 
 // InitializeServer initializes the Gin server and all dependencies
@@ -117,13 +117,20 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 		authRoutes.POST("/login", handlers.Login)
 	}
 
+	// Admin routes
+	adminRoutes := router.Group("/admin")
+	adminRoutes.Use(middleware.AdminOnly())
+	{
+		adminRoutes.POST("/register", handlers.Register)
+	}
+
 	// Protected routes
 	protected := router.Group("/")
 	protected.Use(middleware.AuthMiddleware())
 	{
 		protected.POST("/collections", handlers.CreateCollection)
-		protected.GET("/collections/:name", handlers.GetCollection)    // Optional route to fetch content type details
-		protected.PUT("/collections/:name", handlers.UpdateCollection) // Optional route to fetch content type details
+		protected.GET("/collections/:name", handlers.GetCollection)
+		protected.PUT("/collections/:name", handlers.UpdateCollection)
 		protected.DELETE("/collections/:name", handlers.DeleteCollection)
 		protected.Any("/:collection", handlers.DynamicCollectionHandler)
 		protected.Any("/:collection/:id", handlers.DynamicCollectionHandler)

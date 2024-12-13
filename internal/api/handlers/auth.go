@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -10,7 +11,9 @@ import (
 	"gitlab.com/sudo.bngz/gohead/pkg/auth"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gitlab.com/sudo.bngz/gohead/pkg/storage"
+	"gitlab.com/sudo.bngz/gohead/pkg/utils"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 func Register(c *gin.Context) {
@@ -19,6 +22,7 @@ func Register(c *gin.Context) {
 		Username string `json:"username" binding:"required"`
 		Password string `json:"password" binding:"required"`
 		Email    string `json:"email" binding:"required"`
+		RoleName string `json:"role_name" binding:"required"` // Role provided by the client
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		logger.Log.WithError(err).Warn("Register: Invalid input")
@@ -26,11 +30,16 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	// Fetch the 'admin' role
-	role, err := storage.GetRoleByName("admin")
+	// Fetch the role
+	role, err := storage.GetRoleByName(input.RoleName)
 	if err != nil {
-		logger.Log.WithError(err).Error("Register: Failed to fetch 'admin' role")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch default role"})
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			logger.Log.WithField("role_name", input.RoleName).Warn("Register: Role not found")
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Role '%s' does not exist", input.RoleName)})
+			return
+		}
+		logger.Log.WithError(err).Error("Register: Failed to fetch role")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch role"})
 		return
 	}
 
@@ -42,12 +51,17 @@ func Register(c *gin.Context) {
 		return
 	}
 
+	// Generate slug for the user
+	slug := utils.GenerateSlug(input.Username)
+
 	// Create user instance
 	user := models.User{
-		Username:  input.Username,
-		Password:  string(hashedPassword),
-		RoleRefer: role.ID,
-		Email:     input.Email,
+		Username:     input.Username,
+		Password:     string(hashedPassword),
+		Role:         *role,
+		Email:        input.Email,
+		Slug:         slug,
+		ProfileImage: "", // Default profile image can be set if needed
 	}
 
 	// Validate user
@@ -69,7 +83,7 @@ func Register(c *gin.Context) {
 		return
 	case *storage.DuplicateEntryError:
 		logger.Log.WithError(err).Warn("Register: Duplicate entry")
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s", e.Error())})
+		c.JSON(http.StatusBadRequest, gin.H{"error": e.Error()})
 		return
 	case *storage.GeneralDatabaseError:
 		logger.Log.WithError(err).Error("Register: General database error")

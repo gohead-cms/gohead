@@ -1,18 +1,37 @@
 package storage_test
 
 import (
+	"bytes"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/sudo.bngz/gohead/internal/models"
+	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gitlab.com/sudo.bngz/gohead/pkg/storage"
 	"gitlab.com/sudo.bngz/gohead/pkg/testutils"
 )
+
+func init() {
+	// Configure logger to write logs to a buffer for testing
+	var buffer bytes.Buffer
+	logger.InitLogger("debug")
+	logger.Log.SetOutput(&buffer)
+	logger.Log.SetFormatter(&logrus.TextFormatter{})
+}
 
 func TestCollectionStorage(t *testing.T) {
 	// Set up the test database
 	db := testutils.SetupTestDB()
 	defer testutils.CleanupTestDB()
+
+	// Apply migrations
+	err := db.AutoMigrate(&models.Collection{},
+		&models.Field{},
+		&models.Relationship{},
+		&models.Item{},
+	)
+	assert.NoError(t, err, "Failed to apply migrations")
 
 	// Seed initial data
 	testCollection := &models.Collection{
@@ -22,7 +41,7 @@ func TestCollectionStorage(t *testing.T) {
 			{Name: "content", Type: "text", Required: true},
 		},
 		Relationships: []models.Relationship{
-			{FieldName: "author", RelatedCollection: 1, RelationType: "one-to-one"},
+			{Field: "author", CollectionID: 1, RelationType: "one-to-one"},
 		},
 	}
 
@@ -90,6 +109,6 @@ func TestCollectionStorage(t *testing.T) {
 
 		_, err = storage.GetCollectionByName("articles")
 		assert.Error(t, err, "Expected error when fetching deleted content type")
-		assert.Contains(t, err.Error(), "content type not found", "Error message mismatch")
+		assert.Contains(t, err.Error(), "content type 'articles' not found", "Error message mismatch")
 	})
 }

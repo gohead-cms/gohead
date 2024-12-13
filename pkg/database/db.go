@@ -28,13 +28,15 @@ func InitDatabase(databaseURL string, logLevel gormlogger.LogLevel) (*gorm.DB, e
 		// SQLite configuration
 		dbPath := strings.TrimPrefix(databaseURL, "sqlite://")
 		db, err = gorm.Open(sqlite.Open(dbPath), &gorm.Config{
-			Logger: gormLogger,
+			Logger:         gormLogger,
+			TranslateError: true,
 		})
 	} else if strings.HasPrefix(databaseURL, "mysql://") {
 		// MySQL configuration
 		dsn := strings.TrimPrefix(databaseURL, "mysql://")
 		db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{
-			Logger: gormLogger,
+			Logger:         gormLogger,
+			TranslateError: true,
 		})
 	} else if strings.HasPrefix(databaseURL, "postgres://") {
 		// Parse the PostgreSQL URL
@@ -45,7 +47,8 @@ func InitDatabase(databaseURL string, logLevel gormlogger.LogLevel) (*gorm.DB, e
 
 		// PostgreSQL configuration
 		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
-			Logger: gormLogger,
+			Logger:         gormLogger,
+			TranslateError: true,
 		})
 	} else {
 		return nil, fmt.Errorf("unsupported database type: %s", databaseURL)

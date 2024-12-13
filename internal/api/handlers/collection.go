@@ -44,8 +44,10 @@ func CreateCollection(c *gin.Context) {
 		return
 	}
 
+	logger.Log.WithField("name", input).Info("CreateCollection")
+
 	// Validate the Collection
-	if err := models.ValidateCollection(input); err != nil {
+	if err := models.ValidateCollectionSchema(input); err != nil {
 		logger.Log.WithError(err).Warn("CreateCollection: Validation failed")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Validation failed", "details": err.Error()})
 		return
@@ -78,10 +80,8 @@ func UpdateCollection(c *gin.Context) {
 		return
 	}
 
-	logger.Log.WithField("collection", CollectionName).Info("Attempting to update collection")
-
 	// Validate the input collection
-	if err := models.ValidateCollection(input); err != nil {
+	if err := models.ValidateCollectionSchema(input); err != nil {
 		logger.Log.WithError(err).Warn("UpdateCollection: Validation failed")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Validation failed: " + err.Error()})
 		return

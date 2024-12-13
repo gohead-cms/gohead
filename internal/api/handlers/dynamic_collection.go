@@ -11,7 +11,17 @@ import (
 
 // DynamicContentHandler handles CRUD operations for dynamic collections.
 func DynamicCollectionHandler(c *gin.Context) {
-	CollectionName := c.Param("Collection")
+
+	// Get user role from context
+	role, _ := c.Get("role")
+	userRole, ok := role.(string)
+	if !ok || userRole == "" {
+		logger.Log.Warn("DynamicContentHandler: Missing or invalid user role in context")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	CollectionName := c.Param("collection")
 	id := c.Param("id")
 
 	// Retrieve the Collection from storage
@@ -21,15 +31,6 @@ func DynamicCollectionHandler(c *gin.Context) {
 			"collection": CollectionName,
 		}).Warn("DynamicContentHandler: collection not found")
 		c.JSON(http.StatusNotFound, gin.H{"error": "collection not found"})
-		return
-	}
-
-	// Get user role from context
-	role, _ := c.Get("role")
-	userRole, ok := role.(string)
-	if !ok || userRole == "" {
-		logger.Log.Warn("DynamicContentHandler: Missing or invalid user role in context")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
 

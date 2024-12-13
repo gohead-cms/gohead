@@ -2,7 +2,6 @@ package storage
 
 import (
 	"fmt"
-	"time"
 
 	"gitlab.com/sudo.bngz/gohead/internal/models"
 	"gitlab.com/sudo.bngz/gohead/pkg/database"
@@ -10,89 +9,94 @@ import (
 	"gorm.io/gorm"
 )
 
-// SaveCollection persists a Collection to the database.
+// SaveCollection persists a Collection to the database, handling both new and soft-deleted records.
 func SaveCollection(ct *models.Collection) error {
 	var existing models.Collection
 
-	logger.Log.WithField("content_type", ct.Name).Info("Attempting to save content type")
+	logger.Log.WithField("collection", ct.Name).Info("Attempting to save collection")
 
-	// Check if a record with the same name already exists (including soft-deleted records)
+	// Check if a record with the same name already exists, including soft-deleted records
 	err := database.DB.Unscoped().Where("name = ?", ct.Name).First(&existing).Error
 	if err == nil {
-		// If an existing record is found
+		// Collection with the same name exists
 		if !existing.DeletedAt.Valid {
-			logger.Log.WithField("content_type", ct.Name).Warn("Content type with the same name already exists")
-			return fmt.Errorf("a content type with the name '%s' already exists", ct.Name)
+			// The collection is not soft-deleted, so it's a conflict
+			logger.Log.WithField("collection", ct.Name).Warn("Collection with the same name already exists")
+			return fmt.Errorf("a collection with the name '%s' already exists", ct.Name)
 		}
 
-		// If the record is soft-deleted, restore it along with its associations
-		logger.Log.WithField("content_type", ct.Name).Info("Found soft-deleted content type, restoring")
+		// The collection is soft-deleted; restore it
+		logger.Log.WithField("collection", ct.Name).Info("Found soft-deleted collection, restoring")
 
-		// Restore the content type
-		existing.DeletedAt.Time = time.Time{} // Clear the deleted_at timestamp
-		existing.DeletedAt.Valid = false
-
-		if saveErr := database.DB.Save(&existing).Error; saveErr != nil {
-			logger.Log.WithError(saveErr).WithField("content_type", ct.Name).Error("Failed to restore existing content type")
-			return fmt.Errorf("failed to restore existing content type: %w", saveErr)
+		// Restore the collection
+		existing.DeletedAt.Valid = false // Clear the deleted_at flag
+		if err := database.DB.Unscoped().Save(&existing).Error; err != nil {
+			logger.Log.WithError(err).WithField("collection", ct.Name).Error("Failed to restore collection")
+			return fmt.Errorf("failed to restore collection: %w", err)
 		}
 
 		// Restore associated fields
-		if err := database.DB.Unscoped().Model(&models.Field{}).
-			Where("content_type_id = ?", existing.ID).Update("deleted_at", nil).Error; err != nil {
-			logger.Log.WithError(err).WithField("content_type", ct.Name).Error("Failed to restore associated fields")
+		if err := restoreAssociatedRecords(&models.Field{}, existing.ID); err != nil {
+			logger.Log.WithError(err).WithField("collection", ct.Name).Error("Failed to restore associated fields")
 			return fmt.Errorf("failed to restore associated fields: %w", err)
 		}
 
 		// Restore associated relationships
-		if err := database.DB.Unscoped().Model(&models.Relationship{}).
-			Where("content_type_id = ?", existing.ID).Update("deleted_at", nil).Error; err != nil {
-			logger.Log.WithError(err).WithField("content_type", ct.Name).Error("Failed to restore associated relationships")
+		if err := restoreAssociatedRecords(&models.Relationship{}, existing.ID); err != nil {
+			logger.Log.WithError(err).WithField("collection", ct.Name).Error("Failed to restore associated relationships")
 			return fmt.Errorf("failed to restore associated relationships: %w", err)
 		}
 
-		logger.Log.WithField("content_type", ct.Name).Info("Content type restored successfully")
+		logger.Log.WithField("collection", ct.Name).Info("Collection restored successfully")
 		return nil
 	} else if err != gorm.ErrRecordNotFound {
-		// Log database error
-		logger.Log.WithError(err).WithField("content_type", ct.Name).Error("Failed to check for existing content type")
-		return fmt.Errorf("failed to check for existing content type: %w", err)
+		// An error occurred while checking for existing collections
+		logger.Log.WithError(err).WithField("collection", ct.Name).Error("Failed to check for existing collection")
+		return fmt.Errorf("failed to check for existing collection: %w", err)
 	}
 
-	// No conflict, create a new record
-	logger.Log.WithField("content_type", ct.Name).Info("Creating new content type")
-	if createErr := database.DB.Create(ct).Error; createErr != nil {
-		logger.Log.WithError(createErr).WithField("content_type", ct.Name).Error("Failed to create content type")
-		return fmt.Errorf("failed to save content type: %w", createErr)
+	// No conflict, create a new collection
+	logger.Log.WithField("collection", ct.Name).Info("Creating new collection")
+	if err := database.DB.Create(ct).Error; err != nil {
+		logger.Log.WithError(err).WithField("collection", ct.Name).Error("Failed to create collection")
+		return fmt.Errorf("failed to save collection: %w", err)
 	}
 
-	logger.Log.WithField("content_type", ct.Name).Info("Content type created successfully")
+	logger.Log.WithField("collection", ct.Name).Info("Collection created successfully")
 	return nil
 }
 
-// GetCollectionByName retrieves a content type by its name.
+// restoreAssociatedRecords restores soft-deleted associated records (fields, relationships, etc.).
+func restoreAssociatedRecords(model interface{}, collectionID uint) error {
+	return database.DB.Unscoped().
+		Model(model).
+		Where("collection_id = ?", collectionID).
+		Update("deleted_at", nil).Error
+}
+
+// GetCollectionByName retrieves a collection by its name.
 func GetCollectionByName(name string) (*models.Collection, error) {
 	var ct models.Collection
 
 	// Load the Collection, including its fields and relationships
-	if err := database.DB.Preload("CollectionField").Preload("Relationships").
+	if err := database.DB.Preload("Fields").Preload("Relationships").
 		Where("name = ?", name).First(&ct).Error; err != nil {
 		if err.Error() == "record not found" {
-			logger.Log.WithField("name", name).Warn("Content type not found")
-			return nil, fmt.Errorf("content type '%s' not found", name)
+			logger.Log.WithField("name", name).Warn("collection not found")
+			return nil, fmt.Errorf("collection '%s' not found", name)
 		}
-		logger.Log.WithField("name", name).Error("Failed to fetch content type", err)
-		return nil, fmt.Errorf("failed to fetch content type '%s': %w", name, err)
+		logger.Log.WithField("name", name).Error("Failed to fetch collection", err)
+		return nil, fmt.Errorf("failed to fetch collection '%s': %w", name, err)
 	}
-	logger.Log.WithField("content_type", ct.Name).Info("Content type fetch successfully")
+	logger.Log.WithField("collection", ct.Name).Info("collection fetch successfully")
 	return &ct, nil
 }
 
 // GetAllCollections retrieves all Collections.
 func GetAllCollections() ([]models.Collection, error) {
 	var cts []models.Collection
-	if err := database.DB.Preload("CollectionFields").Preload("Relationships").Find(&cts).Error; err != nil {
-		return nil, fmt.Errorf("failed to fetch content types: %w", err)
+	if err := database.DB.Preload("Fields").Preload("Relationships").Find(&cts).Error; err != nil {
+		return nil, fmt.Errorf("failed to fetch collections: %w", err)
 	}
 	return cts, nil
 }
@@ -101,24 +105,25 @@ func GetAllCollections() ([]models.Collection, error) {
 func UpdateCollection(name string, updated *models.Collection) error {
 	var existing models.Collection
 
-	logger.Log.WithField("content_type", name).Info("Attempting to update content type")
+	logger.Log.WithField("collection", name).Info("Attempting to update collection in database")
 
-	// Find the existing content type by name
-	if err := database.DB.Preload("CollectionFields").Preload("Relationships").
+	// Find the existing collection by name
+	if err := database.DB.Preload("Fields").Preload("Relationships").
 		Where("name = ?", name).First(&existing).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			logger.Log.WithField("content_type", name).Warn("Content type not found for update")
-			return fmt.Errorf("content type '%s' not found", name)
+			logger.Log.WithField("collection", name).Warn("Collection not found for update")
+			return fmt.Errorf("collection '%s' not found", name)
 		}
-		logger.Log.WithError(err).WithField("content_type", name).Error("Failed to retrieve content type for update")
-		return fmt.Errorf("failed to retrieve content type: %w", err)
+		logger.Log.WithError(err).WithField("collection", name).Error("Failed to retrieve collection for update")
+		return fmt.Errorf("failed to retrieve collection: %w", err)
 	}
 
-	// Update the basic fields of the content type
+	// Update the basic fields of the collection
 	existing.Name = updated.Name
 
 	// Start a transaction for updating associated fields and relationships
 	tx := database.DB.Begin()
+	logger.Log.WithField("collection", name).Info("Begin transaction to update collection in database")
 	defer func() {
 		if r := recover(); r != nil {
 			tx.Rollback()
@@ -128,38 +133,39 @@ func UpdateCollection(name string, updated *models.Collection) error {
 
 	// Update fields
 	if err := updateAssociatedFields(tx, existing.ID, updated.Fields); err != nil {
+		logger.Log.WithField("collection", name).Error("Rollback failed to updated fields")
 		tx.Rollback()
 		return fmt.Errorf("failed to update fields: %w", err)
 	}
 
 	// Update relationships
 	if err := updateAssociatedRelationships(tx, existing.ID, updated.Relationships); err != nil {
+		logger.Log.WithField("collection", name).Error("Rollback failed to updated relationships")
 		tx.Rollback()
 		return fmt.Errorf("failed to update relationships: %w", err)
 	}
 
-	// Save the updated content type
+	// Save the updated collection
 	if err := tx.Save(&existing).Error; err != nil {
+		logger.Log.WithError(err).WithField("collection", name).Error("Failed to save updated collection")
 		tx.Rollback()
-		logger.Log.WithError(err).WithField("content_type", name).Error("Failed to save updated content type")
-		return fmt.Errorf("failed to save updated content type: %w", err)
+		return fmt.Errorf("failed to save updated collection: %w", err)
 	}
 
 	// Commit the transaction
 	if err := tx.Commit().Error; err != nil {
-		logger.Log.WithError(err).WithField("content_type", name).Error("Failed to commit transaction for content type update")
+		logger.Log.WithError(err).WithField("collection", name).Error("Failed to commit transaction for collection update")
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	logger.Log.WithField("content_type", name).Info("Content type updated successfully")
 	return nil
 }
 
-// updateAssociatedFields updates or creates fields for a content type.
+// updateAssociatedFields updates or creates fields for a collection.
 func updateAssociatedFields(tx *gorm.DB, CollectionID uint, fields []models.Field) error {
 	// Soft-delete existing fields
-	if err := tx.Where("content_type_id = ?", CollectionID).Delete(&models.Field{}).Error; err != nil {
-		logger.Log.WithError(err).WithField("content_type_id", CollectionID).Error("Failed to soft-delete fields")
+	if err := tx.Where("collection_id = ?", CollectionID).Delete(&models.Field{}).Error; err != nil {
+		logger.Log.WithError(err).WithField("collection_id", CollectionID).Error("Failed to soft-delete fields")
 		return fmt.Errorf("failed to soft-delete fields: %w", err)
 	}
 
@@ -172,32 +178,34 @@ func updateAssociatedFields(tx *gorm.DB, CollectionID uint, fields []models.Fiel
 		}
 	}
 
-	logger.Log.WithField("content_type_id", CollectionID).Info("Fields updated successfully")
+	logger.Log.WithField("collection_id", CollectionID).Info("Fields updated successfully")
 	return nil
 }
 
-// updateAssociatedRelationships updates or creates relationships for a content type.
+// updateAssociatedRelationships updates or creates relationships for a collection.
 func updateAssociatedRelationships(tx *gorm.DB, CollectionID uint, relationships []models.Relationship) error {
 	// Soft-delete existing relationships
-	if err := tx.Where("content_type_id = ?", CollectionID).Delete(&models.Relationship{}).Error; err != nil {
-		logger.Log.WithError(err).WithField("content_type_id", CollectionID).Error("Failed to soft-delete relationships")
+	if err := tx.Where("collection_id = ?", CollectionID).Delete(&models.Relationship{}).Error; err != nil {
+		logger.Log.WithError(err).WithField("collection_id", CollectionID).Error("Failed to soft-delete relationships")
 		return fmt.Errorf("failed to soft-delete relationships: %w", err)
+	} else {
+		logger.Log.WithField("collection", CollectionID).Error("Soft-delete relationships successfully")
 	}
 
 	// Save the new relationships
 	for _, relationship := range relationships {
-		relationship.ID = CollectionID
+		relationship.CollectionID = CollectionID
 		if err := tx.Save(&relationship).Error; err != nil {
-			logger.Log.WithError(err).WithField("field_name", relationship.FieldName).Error("Failed to save relationship")
-			return fmt.Errorf("failed to save relationship '%s': %w", relationship.FieldName, err)
+			logger.Log.WithError(err).WithField("field_name", relationship.Field).Error("Failed to save relationship")
+			return fmt.Errorf("failed to save relationship '%s': %w", relationship.Field, err)
 		}
 	}
 
-	logger.Log.WithField("content_type_id", CollectionID).Info("Relationships updated successfully")
+	logger.Log.WithField("collection_id", CollectionID).Info("Relationships updated successfully")
 	return nil
 }
 
-// DeleteCollection deletes a content type and all associated data by its ID.
+// DeleteCollection deletes a collection and all associated data by its ID.
 func DeleteCollection(CollectionID uint) error {
 	// Begin a transaction for cascading deletion
 	tx := database.DB.Begin()
@@ -209,39 +217,39 @@ func DeleteCollection(CollectionID uint) error {
 		}
 	}()
 
-	// Retrieve the content type
+	// Retrieve the collection
 	var Collection models.Collection
 	if err := tx.Where("id = ?", CollectionID).First(&Collection).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			tx.Rollback()
-			return fmt.Errorf("content type with ID '%d' not found", CollectionID)
+			return fmt.Errorf("collection with ID '%d' not found", CollectionID)
 		}
 		tx.Rollback()
-		return fmt.Errorf("failed to retrieve content type: %w", err)
+		return fmt.Errorf("failed to retrieve collection: %w", err)
 	}
 
 	// Delete associated fields
-	if err := tx.Where("content_type_id = ?", CollectionID).Delete(&models.Field{}).Error; err != nil {
+	if err := tx.Where("collection_id = ?", CollectionID).Delete(&models.Field{}).Error; err != nil {
 		tx.Rollback()
-		return fmt.Errorf("failed to delete fields for content type ID '%d': %w", CollectionID, err)
+		return fmt.Errorf("failed to delete fields for collection ID '%d': %w", CollectionID, err)
 	}
 
 	// Delete associated relationships
-	if err := tx.Where("content_type_id = ?", CollectionID).Delete(&models.Relationship{}).Error; err != nil {
+	if err := tx.Where("collection_id = ?", CollectionID).Delete(&models.Relationship{}).Error; err != nil {
 		tx.Rollback()
-		return fmt.Errorf("failed to delete relationships for content type ID '%d': %w", CollectionID, err)
+		return fmt.Errorf("failed to delete relationships for collection ID '%d': %w", CollectionID, err)
 	}
 
 	// Delete associated content items
-	if err := tx.Where("content_type = ?", Collection.Name).Delete(&models.Item{}).Error; err != nil {
+	if err := tx.Where("collection_id = ?", Collection.Name).Delete(&models.Item{}).Error; err != nil {
 		tx.Rollback()
-		return fmt.Errorf("failed to delete content items for content type '%s': %w", Collection.Name, err)
+		return fmt.Errorf("failed to delete content items for collection '%s': %w", Collection.Name, err)
 	}
 
-	// Delete the content type itself
+	// Delete the collection itself
 	if err := tx.Delete(&Collection).Error; err != nil {
 		tx.Rollback()
-		return fmt.Errorf("failed to delete content type with ID '%d': %w", CollectionID, err)
+		return fmt.Errorf("failed to delete collection with ID '%d': %w", CollectionID, err)
 	}
 
 	// Commit the transaction

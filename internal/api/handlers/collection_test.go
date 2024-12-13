@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"gitlab.com/sudo.bngz/gohead/internal/models"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gitlab.com/sudo.bngz/gohead/pkg/testutils"
 )
@@ -25,14 +26,29 @@ func init() {
 }
 
 func TestCreateCollectionHandler(t *testing.T) {
+	// Setup the test database
 	// Initialize in-memory test database
-	router, _ := testutils.SetupTestServer()
+	db := testutils.SetupTestDB()
+	defer testutils.CleanupTestDB()
+
+	// Apply migrations
+	assert.NoError(t, db.AutoMigrate(&models.User{}, &models.UserRole{}, &models.Collection{}, &models.Field{}, &models.Relationship{}))
+
+	// Seed roles
+	adminRole := models.UserRole{Name: "admin", Description: "Administrator", Permissions: models.JSONMap{"manage_users": true}}
+	readerRole := models.UserRole{Name: "reader", Description: "Reader", Permissions: models.JSONMap{"read_content": true}}
+	assert.NoError(t, db.Create(&adminRole).Error)
+	assert.NoError(t, db.Create(&readerRole).Error)
+
+	// Initialize the router and attach the handler
+	router := setupTestRouter()
+	router.POST("/auth/register", Register)
 	// Load test configuration
 	// Create the Gin router
 	gin.SetMode(gin.TestMode)
 
 	// Register the handler
-	router.POST("/content-types", CreateCollection)
+	router.POST("/collections", CreateCollection)
 
 	// Define test cases
 	testCases := []struct {
@@ -59,7 +75,7 @@ func TestCreateCollectionHandler(t *testing.T) {
 				},
 			},
 			expectedStatus: http.StatusCreated,
-			expectedBody:   `{"message":"Content type created"}`,
+			expectedBody:   `collection created successfully`,
 		},
 		{
 			name: "Missing Name Field",
@@ -72,7 +88,7 @@ func TestCreateCollectionHandler(t *testing.T) {
 				},
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedBody:   `"error":"missing required field: name"`,
+			expectedBody:   `missing required field: 'name'`,
 		},
 		{
 			name: "Empty Fields Array",
@@ -81,7 +97,7 @@ func TestCreateCollectionHandler(t *testing.T) {
 				"fields": []map[string]interface{}{},
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedBody:   `"error":"fields array cannot be empty"`,
+			expectedBody:   `fields array cannot be empty`,
 		},
 	}
 
@@ -90,7 +106,7 @@ func TestCreateCollectionHandler(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Prepare request body
 			body, _ := json.Marshal(tc.inputData)
-			req, _ := http.NewRequest(http.MethodPost, "/content-types", bytes.NewBuffer(body))
+			req, _ := http.NewRequest(http.MethodPost, "/collections", bytes.NewBuffer(body))
 			req.Header.Set("Content-Type", "application/json")
 
 			// Create a response recorder

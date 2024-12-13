@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gorm.io/gorm"
 )
@@ -32,204 +31,14 @@ type Collection struct {
 	Relationships []Relationship `json:"relationships" gorm:"constraint:OnDelete:CASCADE;"`
 }
 
-// ValidateItemData validates the item data against the content type's schema.
-func ValidateItemData(ct Collection, data map[string]interface{}) error {
-	for _, field := range ct.Fields {
-		value, exists := data[field.Name]
-
-		// Check if the field is required
-		if field.Required && !exists {
-			logger.Log.WithField("field", field.Name).Warn("Validation failed: missing required field")
-			return fmt.Errorf("missing required field: '%s'", field.Name)
-		}
-
-		// Skip validation for non-required fields that are not present
-		if !exists {
-			continue
-		}
-
-		// Validate based on field type
-		if err := validateFieldValue(field, value); err != nil {
-			logger.Log.WithFields(logrus.Fields{
-				"field": field.Name,
-				"type":  field.Type,
-				"value": value,
-			}).Warn("Validation failed for field")
-			return fmt.Errorf("validation failed for field '%s': %w", field.Name, err)
-		}
-	}
-
-	// Additional validation for unknown fields
-	for key := range data {
-		isValidField := false
-		for _, field := range ct.Fields {
-			if key == field.Name {
-				isValidField = true
-				break
-			}
-		}
-		if !isValidField {
-			logger.Log.WithField("field", key).Warn("Validation failed: unknown field")
-			return fmt.Errorf("unknown field: '%s'", key)
-		}
-	}
-
-	logger.Log.WithField("collection", ct.Name).Info("Item data validation passed")
-	return nil
-}
-
-func validateFieldValue(field Field, value interface{}) error {
-	switch field.Type {
-	case "string":
-		strValue, err := convertToType(value, "string")
-		if err != nil {
-			logger.Log.WithField("field", field.Name).WithError(err).Warn("String validation failed")
-			return err
-		}
-		if field.Pattern != "" {
-			if matched, err := regexp.MatchString(field.Pattern, strValue.(string)); err != nil || !matched {
-				logger.Log.WithFields(logrus.Fields{
-					"field":   field.Name,
-					"pattern": field.Pattern,
-				}).Warn("String pattern validation failed")
-				return fmt.Errorf("field '%s' does not match required pattern", field.Name)
-			}
-		}
-
-	case "int":
-		intValue, err := convertToType(value, "int")
-		if err != nil {
-			logger.Log.WithField("field", field.Name).WithError(err).Warn("Integer validation failed")
-			return err
-		}
-		if field.Min != nil && intValue.(int) < *field.Min {
-			logger.Log.WithFields(logrus.Fields{
-				"field": field.Name,
-				"min":   *field.Min,
-			}).Warn("Integer value below minimum")
-			return fmt.Errorf("field '%s' must be at least %d", field.Name, *field.Min)
-		}
-		if field.Max != nil && intValue.(int) > *field.Max {
-			logger.Log.WithFields(logrus.Fields{
-				"field": field.Name,
-				"max":   *field.Max,
-			}).Warn("Integer value above maximum")
-			return fmt.Errorf("field '%s' must be at most %d", field.Name, *field.Max)
-		}
-
-	case "bool":
-		if _, err := convertToType(value, "bool"); err != nil {
-			logger.Log.WithField("field", field.Name).WithError(err).Warn("Boolean validation failed")
-			return err
-		}
-
-	case "date":
-		if _, err := convertToType(value, "date"); err != nil {
-			logger.Log.WithField("field", field.Name).WithError(err).Warn("Date validation failed")
-			return err
-		}
-
-	case "enum":
-		strValue, err := convertToType(value, "string")
-		if err != nil {
-			logger.Log.WithField("field", field.Name).WithError(err).Warn("Enum validation failed")
-			return err
-		}
-		if !contains(field.Options, strValue.(string)) {
-			logger.Log.WithFields(logrus.Fields{
-				"field":    field.Name,
-				"expected": field.Options,
-			}).Warn("Enum value not in options")
-			return fmt.Errorf("field '%s' must be one of %v", field.Name, field.Options)
-		}
-
-	default:
-		logger.Log.WithField("field", field.Name).Error("Unsupported field type")
-		return fmt.Errorf("unsupported field type: '%s'", field.Type)
-	}
-	logger.Log.WithField("field", field.Name).Info("Field validated successfully")
-	return nil
-}
-
-// contains checks if a string exists in a slice.
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
-}
-
-// convertToType attempts to reliably determine and convert the input value to the desired type.
-func convertToType(value interface{}, targetType string) (interface{}, error) {
-	switch targetType {
-	case "string":
-		if str, ok := value.(string); ok {
-			return str, nil
-		}
-		logger.Log.WithField("value", value).Info("Converting to string")
-		return fmt.Sprintf("%v", value), nil
-
-	case "int":
-		switch v := value.(type) {
-		case int:
-			return v, nil
-		case float64:
-			return int(v), nil
-		case string:
-			if intValue, err := strconv.Atoi(v); err == nil {
-				return intValue, nil
-			}
-		}
-		logger.Log.WithField("value", value).Warn("Failed to convert to int")
-		return nil, fmt.Errorf("invalid number format for value: %v", value)
-
-	case "float":
-		switch v := value.(type) {
-		case float64:
-			return v, nil
-		case int:
-			return float64(v), nil
-		case string:
-			if floatValue, err := strconv.ParseFloat(v, 64); err == nil {
-				return floatValue, nil
-			}
-		}
-		logger.Log.WithField("value", value).Warn("Failed to convert to float")
-		return nil, fmt.Errorf("invalid float format for value: %v", value)
-
-	case "bool":
-		if boolValue, ok := value.(bool); ok {
-			return boolValue, nil
-		}
-		if str, ok := value.(string); ok {
-			if str == "true" {
-				return true, nil
-			} else if str == "false" {
-				return false, nil
-			}
-		}
-		logger.Log.WithField("value", value).Warn("Failed to convert to bool")
-		return nil, fmt.Errorf("invalid boolean format for value: %v", value)
-
-	case "date":
-		if str, ok := value.(string); ok {
-			if dateValue, err := time.Parse("2006-01-02", str); err == nil {
-				return dateValue, nil
-			}
-		}
-		logger.Log.WithField("value", value).Warn("Failed to convert to date")
-		return nil, fmt.Errorf("invalid date format for value: %v", value)
-
-	default:
-		logger.Log.WithField("targetType", targetType).Error("Unsupported target type")
-		return nil, fmt.Errorf("unsupported target type: %s", targetType)
-	}
-}
+//
+//
+// -------------------- Schema validators
+//
+//
 
 // ValidateCollection validates the schema of a content type.
-func ValidateCollection(ct Collection) error {
+func ValidateCollectionSchema(ct Collection) error {
 	if ct.Name == "" {
 		return errors.New("missing required field: 'name'")
 	}
@@ -244,15 +53,16 @@ func ValidateCollection(ct Collection) error {
 			return fmt.Errorf("duplicate field name: '%s'", field.Name)
 		}
 		fieldNames[field.Name] = true
-
-		if err := validateField(field); err != nil {
+		//logger.Log.WithField("field", field).Info("Validate field type")
+		if err := validateFieldType(field); err != nil {
 			return err
 		}
 	}
 
 	for _, rel := range ct.Relationships {
-		if rel.FieldName == "" || rel.RelatedCollection == 0 || rel.RelationType == "" {
-			return fmt.Errorf("invalid relationship: all fields must be defined (fieldName, relatedType, relationType)")
+		logger.Log.WithField("field", rel).Info("Test field")
+		if rel.Field == "" || rel.RelationType == "" {
+			return fmt.Errorf("invalid relationship: all fields must be defined (field, collection, relation_type)")
 		}
 	}
 
@@ -260,7 +70,7 @@ func ValidateCollection(ct Collection) error {
 }
 
 // validateField checks the field schema for constraints and valid types.
-func validateField(field Field) error {
+func validateFieldType(field Field) error {
 	validTypes := map[string]struct{}{
 		"string":   {},
 		"int":      {},
@@ -291,12 +101,150 @@ func validateField(field Field) error {
 	return nil
 }
 
-// containsMap checks if a string exists in a slice using a map for O(1) lookups.
-func containsMap(slice []string, item string) bool {
-	set := make(map[string]struct{}, len(slice))
-	for _, s := range slice {
-		set[s] = struct{}{}
+// GetFieldType returns whether a given fieldName is a "field", "relationship", or unknown.
+func (c *Collection) GetFieldType(fieldName string) (string, error) {
+	for _, field := range c.Fields {
+		if field.Name == fieldName {
+			return "field", nil
+		}
 	}
-	_, exists := set[item]
-	return exists
+	for _, rel := range c.Relationships {
+		if rel.Field == fieldName {
+			return "relationship", nil
+		}
+	}
+	logger.Log.WithField("field", fieldName).Warn("Unknown field or relationship")
+	return "", fmt.Errorf("unknown field or relationship: '%s'", fieldName)
+}
+
+// validateFieldValue handles validation logic for a single field’s value.
+func validateFieldValue(field Field, value interface{}) error {
+	switch field.Type {
+	case "string", "richtext":
+		strValue, err := convertToType(value, "string")
+		if err != nil {
+			return err
+		}
+		// Pattern match if specified
+		if field.Pattern != "" {
+			matched, err := regexp.MatchString(field.Pattern, strValue.(string))
+			if err != nil {
+				return fmt.Errorf("invalid regex pattern for field '%s': %v", field.Name, err)
+			}
+			if !matched {
+				return fmt.Errorf("field '%s' does not match required pattern", field.Name)
+			}
+		}
+
+	case "int":
+		intValue, err := convertToType(value, "int")
+		if err != nil {
+			return err
+		}
+		iv := intValue.(int)
+		if field.Min != nil && iv < *field.Min {
+			return fmt.Errorf("field '%s' must be at least %d", field.Name, *field.Min)
+		}
+		if field.Max != nil && iv > *field.Max {
+			return fmt.Errorf("field '%s' must be at most %d", field.Name, *field.Max)
+		}
+
+	case "bool":
+		if _, err := convertToType(value, "bool"); err != nil {
+			return err
+		}
+
+	case "date":
+		if _, err := convertToType(value, "date"); err != nil {
+			return err
+		}
+
+	case "enum":
+		strValue, err := convertToType(value, "string")
+		if err != nil {
+			return err
+		}
+		if !sliceContains(field.Options, strValue.(string)) {
+			return fmt.Errorf("field '%s' must be one of %v", field.Name, field.Options)
+		}
+
+	default:
+		return fmt.Errorf("unsupported field type: '%s'", field.Type)
+	}
+
+	logger.Log.WithField("field", field.Name).Info("Field validated successfully")
+	return nil
+}
+
+// convertToType attempts to convert 'value' to the desired 'targetType'.
+func convertToType(value interface{}, targetType string) (interface{}, error) {
+	switch targetType {
+	case "string":
+		if str, ok := value.(string); ok {
+			return str, nil
+		}
+		// Fallback: format with %v
+		return fmt.Sprintf("%v", value), nil
+
+	case "int":
+		switch v := value.(type) {
+		case int:
+			return v, nil
+		case float64:
+			return int(v), nil
+		case string:
+			if intValue, err := strconv.Atoi(v); err == nil {
+				return intValue, nil
+			}
+		}
+		return nil, fmt.Errorf("invalid number format for value: %v", value)
+
+	case "float":
+		switch v := value.(type) {
+		case float64:
+			return v, nil
+		case int:
+			return float64(v), nil
+		case string:
+			if floatValue, err := strconv.ParseFloat(v, 64); err == nil {
+				return floatValue, nil
+			}
+		}
+		return nil, fmt.Errorf("invalid float format for value: %v", value)
+
+	case "bool":
+		if boolVal, ok := value.(bool); ok {
+			return boolVal, nil
+		}
+		if str, ok := value.(string); ok {
+			if str == "true" {
+				return true, nil
+			} else if str == "false" {
+				return false, nil
+			}
+		}
+		return nil, fmt.Errorf("invalid boolean format for value: %v", value)
+
+	case "date":
+		// Adjust the format to match your needs: "2006-01-02" is YYYY-MM-DD
+		if str, ok := value.(string); ok {
+			if dateValue, err := time.Parse("2006-01-02", str); err == nil {
+				return dateValue, nil
+			}
+		}
+		return nil, fmt.Errorf("invalid date format for value: %v", value)
+
+	default:
+		return nil, fmt.Errorf("unsupported target type: %s", targetType)
+	}
+}
+
+// sliceContains checks if 'item' exists in 'slice'.
+func sliceContains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }

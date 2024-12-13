@@ -27,12 +27,22 @@ func init() {
 }
 
 func TestCreateItemIntegration(t *testing.T) {
+	// Setup the test database
 	// Initialize in-memory test database
-	router, db := testutils.SetupTestServer()
+	db := testutils.SetupTestDB()
+	defer testutils.CleanupTestDB()
 
-	// Apply migrations for all necessary models
-	err := db.AutoMigrate(&models.Item{})
-	assert.NoError(t, err, "Failed to apply migrations for Item")
+	// Apply migrations
+	assert.NoError(t, db.AutoMigrate(&models.User{}, &models.UserRole{}, &models.Collection{}, &models.Field{}, &models.Relationship{}))
+
+	// Seed roles
+	adminRole := models.UserRole{Name: "admin", Description: "Administrator", Permissions: models.JSONMap{"manage_users": true}}
+	readerRole := models.UserRole{Name: "reader", Description: "Reader", Permissions: models.JSONMap{"read_content": true}}
+	assert.NoError(t, db.Create(&adminRole).Error)
+	assert.NoError(t, db.Create(&readerRole).Error)
+
+	// Initialize the router and attach the handler
+	router := setupTestRouter()
 
 	// Create a test content type
 	ct := models.Collection{
@@ -50,7 +60,7 @@ func TestCreateItemIntegration(t *testing.T) {
 			},
 		},
 	}
-	db.Create(&ct)
+	assert.NoError(t, db.Create(&ct).Error)
 
 	// Prepare the Gin router
 	gin.SetMode(gin.TestMode)
@@ -74,7 +84,7 @@ func TestCreateItemIntegration(t *testing.T) {
 	// Check the response
 	assert.Equal(t, http.StatusCreated, rr.Code)
 	var response models.Item
-	err = json.Unmarshal(rr.Body.Bytes(), &response)
+	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.Equal(t, "Test Article", response.Data["title"])
 }

@@ -9,8 +9,10 @@ import (
 	"testing"
 
 	"gitlab.com/sudo.bngz/gohead/internal/models"
+	"gitlab.com/sudo.bngz/gohead/pkg/database"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gitlab.com/sudo.bngz/gohead/pkg/testutils"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -26,49 +28,131 @@ func init() {
 	logger.Log.SetFormatter(&logrus.TextFormatter{})
 }
 
+func setupTestRouter() *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	router := gin.Default()
+	return router
+}
+
 func TestRegister(t *testing.T) {
+	// Setup the test database
 	// Initialize in-memory test database
-	router, db := testutils.SetupTestServer()
+	db := testutils.SetupTestDB()
+	defer testutils.CleanupTestDB()
 
 	// Apply migrations
-	err := db.AutoMigrate(&models.User{})
-	assert.NoError(t, err, "Failed to apply migrations")
+	assert.NoError(t, db.AutoMigrate(&models.User{}, &models.UserRole{}))
 
-	// Set Gin to Test Mode
-	gin.SetMode(gin.TestMode)
+	// Seed roles
+	adminRole := models.UserRole{Name: "admin", Description: "Administrator", Permissions: models.JSONMap{"manage_users": true}}
+	readerRole := models.UserRole{Name: "reader", Description: "Reader", Permissions: models.JSONMap{"read_content": true}}
+	assert.NoError(t, db.Create(&adminRole).Error)
+	assert.NoError(t, db.Create(&readerRole).Error)
 
-	// Create a Gin router and register the route
+	// Initialize the router and attach the handler
+	router := setupTestRouter()
 	router.POST("/auth/register", Register)
 
-	// Define test user data
-	testUser := map[string]string{
-		"username": "testuser",
-		"password": "testpass",
-		"email":    "joe@foo.com",
+	// Test valid registration with default role (reader)
+	payload := map[string]string{
+		"username":  "testreader",
+		"password":  "securepassword",
+		"email":     "testreader@example.com",
+		"role_name": "reader",
 	}
-	body, _ := json.Marshal(testUser)
+	body, _ := json.Marshal(payload)
 
-	// Create a new HTTP request
-	req, err := http.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
-	assert.NoError(t, err, "Failed to create HTTP request")
+	req, _ := http.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
-
-	// Create a ResponseRecorder to record the response
 	rr := httptest.NewRecorder()
 
-	// Serve the HTTP request
 	router.ServeHTTP(rr, req)
 
-	// Validate the response
-	assert.Equal(t, http.StatusCreated, rr.Code, "Expected HTTP 201 Created")
-	var response map[string]string
-	err = json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err, "Failed to unmarshal response body")
+	assert.Equal(t, http.StatusCreated, rr.Code)
+
+	var response map[string]interface{}
+	err := json.Unmarshal(rr.Body.Bytes(), &response)
+	assert.NoError(t, err)
 	assert.Equal(t, "User registered successfully", response["message"])
 
-	// Validate the user is stored in the database
-	var user models.User
-	err = db.First(&user, "username = ?", "testuser").Error
-	assert.NoError(t, err, "User should exist in the database")
-	assert.Equal(t, "testuser", user.Username, "Stored username should match test user")
+	// Test registration with an invalid role
+	payload["role_name"] = "invalid_role"
+	body, _ = json.Marshal(payload)
+
+	req, _ = http.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr = httptest.NewRecorder()
+
+	router.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	err = json.Unmarshal(rr.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Contains(t, response["error"], "Role 'invalid_role' does not exist")
+
+	// Test registration with duplicate username
+	payload["role_name"] = "reader"
+	body, _ = json.Marshal(payload)
+
+	req, _ = http.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr = httptest.NewRecorder()
+
+	router.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	err = json.Unmarshal(rr.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Contains(t, response["error"], "duplicate entry for field: username")
+}
+
+func TestLogin(t *testing.T) {
+	// Setup the test database
+	db := testutils.SetupTestDB()
+	defer testutils.CleanupTestDB()
+
+	// Apply migrations
+	assert.NoError(t, db.AutoMigrate(&models.User{}, &models.UserRole{}))
+
+	// Seed roles
+	adminRole := models.UserRole{Name: "admin", Description: "Administrator", Permissions: models.JSONMap{"manage_users": true}}
+	assert.NoError(t, db.Create(&adminRole).Error)
+
+	// Seed a user with a hashed password
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
+	user := models.User{
+		Username: "testadmin",
+		Password: string(hashedPassword), // Use the hashed password
+		Email:    "testadmin@example.com",
+		Role:     adminRole,
+		Slug:     "testadmin",
+	}
+	assert.NoError(t, db.Create(&user).Error)
+
+	// Ensure the test database is used globally
+	database.DB = db
+
+	// Initialize the router and attach the handler
+	router := setupTestRouter()
+	router.POST("/auth/login", Login)
+
+	// Test valid login
+	payload := map[string]string{
+		"username": "testadmin",
+		"password": "password123",
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest(http.MethodPost, "/auth/login", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	router.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+
+	var response map[string]interface{}
+	err := json.Unmarshal(rr.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, response["token"])
 }
