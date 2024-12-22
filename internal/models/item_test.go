@@ -27,7 +27,7 @@ func TestValidateItem(t *testing.T) {
 			},
 		}
 
-		err := ValidateItem(item, collection)
+		err := ValidateItemModel(item, collection)
 		assert.NoError(t, err)
 	})
 
@@ -40,7 +40,7 @@ func TestValidateItem(t *testing.T) {
 			},
 		}
 
-		err := ValidateItem(item, collection)
+		err := ValidateItemModel(item, collection)
 		assert.EqualError(t, err, "CollectionID is required")
 	})
 
@@ -50,7 +50,7 @@ func TestValidateItem(t *testing.T) {
 			Data:         JSONMap{},
 		}
 
-		err := ValidateItem(item, collection)
+		err := ValidateItemModel(item, collection)
 		assert.EqualError(t, err, "Data cannot be empty")
 	})
 
@@ -62,7 +62,7 @@ func TestValidateItem(t *testing.T) {
 			},
 		}
 
-		err := ValidateItem(item, collection)
+		err := ValidateItemModel(item, collection)
 		assert.EqualError(t, err, "missing required field: 'title'")
 	})
 
@@ -76,7 +76,7 @@ func TestValidateItem(t *testing.T) {
 			},
 		}
 
-		err := ValidateItem(item, collection)
+		err := ValidateItemModel(item, collection)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid boolean format for value: not-a-boolean")
 	})

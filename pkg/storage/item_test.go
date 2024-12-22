@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/sudo.bngz/gohead/internal/models"
 	"gitlab.com/sudo.bngz/gohead/pkg/testutils"
+	"gitlab.com/sudo.bngz/gohead/pkg/validation"
 )
 
 func TestSaveItem(t *testing.T) {
@@ -182,4 +183,47 @@ func TestDeleteItem(t *testing.T) {
 	err = db.Where("source_item_id = ?", item.ID).Find(&deletedRelationships).Error
 	assert.NoError(t, err)
 	assert.Len(t, deletedRelationships, 0)
+}
+
+func TestCheckFieldUniqueness(t *testing.T) {
+	// Setup the test database
+	db := testutils.SetupTestDB()
+	defer testutils.CleanupTestDB()
+
+	err := db.AutoMigrate(&models.Collection{},
+		&models.Field{},
+		&models.Relationship{},
+		&models.Item{},
+	)
+	assert.NoError(t, err)
+
+	// Insert test data
+	assert.NoError(t, db.Exec(`
+		INSERT INTO items (collection_id, data) VALUES
+		(1, '{"email": "existing@example.com"}'),
+		(1, '{"email": "duplicate@example.com"}'),
+		(2, '{"email": "unique@example.com"}');
+	`).Error)
+
+	// Test cases
+	t.Run("Unique Value in Collection", func(t *testing.T) {
+		err := validation.CheckFieldUniqueness(1, "email", "new@example.com")
+		assert.NoError(t, err, "Expected no error for unique value")
+	})
+
+	t.Run("Duplicate Value in Same Collection", func(t *testing.T) {
+		err := validation.CheckFieldUniqueness(1, "email", "duplicate@example.com")
+		assert.Error(t, err, "Expected an error for duplicate value")
+		assert.Equal(t, "value for field 'email' must be unique", err.Error())
+	})
+
+	t.Run("Duplicate Value in Different Collection", func(t *testing.T) {
+		err := validation.CheckFieldUniqueness(2, "email", "duplicate@example.com")
+		assert.NoError(t, err, "Expected no error for duplicate value in a different collection")
+	})
+
+	t.Run("Non-Existent Field", func(t *testing.T) {
+		err := validation.CheckFieldUniqueness(1, "nonexistent_field", "value")
+		assert.NoError(t, err, "Expected no error for non-existent field")
+	})
 }

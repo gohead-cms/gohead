@@ -5,6 +5,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
+	"gitlab.com/sudo.bngz/gohead/pkg/validation"
 	"gorm.io/gorm"
 )
 
@@ -15,7 +16,7 @@ type Item struct {
 }
 
 // ValidateItem validates the Item model.
-func ValidateItem(item Item, collection Collection) error {
+func ValidateItemModel(item Item, collection Collection) error {
 	// Check if CollectionID is set
 	if item.CollectionID == 0 {
 		logger.Log.WithField("item", item).Warn("Validation failed: missing CollectionID")
@@ -63,9 +64,17 @@ func ValidateItemData(ct Collection, data map[string]interface{}) error {
 			return fmt.Errorf("missing required field: '%s'", field.Name)
 		}
 		if !exists {
-			// Not required, not provided => skip checks
 			continue
 		}
+
+		logger.Log.WithField("item", value).Info("Validation: check uniqueness")
+		if field.Unique {
+			logger.Log.WithField("item", value).Info("Validation: check uniqueness")
+			if err := validation.CheckFieldUniqueness(ct.ID, field.Name, value); err != nil {
+				return err
+			}
+		}
+
 		// Validate field's value
 		if err := validateFieldValue(field, value); err != nil {
 			logger.Log.WithFields(logrus.Fields{

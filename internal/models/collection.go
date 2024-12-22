@@ -16,6 +16,7 @@ type Field struct {
 	Name         string   `json:"name"`
 	Type         string   `json:"type"` // e.g., "string", "int", "bool", "date", "richtext", "enum"
 	Required     bool     `json:"required"`
+	Unique       bool     `json:"unique,omitempty"`
 	Options      []string `gorm:"type:json" json:"options,omitempty"`
 	Min          *int     `json:"min,omitempty"`
 	Max          *int     `json:"max,omitempty"`
