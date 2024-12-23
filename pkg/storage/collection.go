@@ -36,9 +36,9 @@ func SaveCollection(ct *models.Collection) error {
 		}
 
 		// Restore associated fields
-		if err := restoreAssociatedRecords(&models.Field{}, existing.ID); err != nil {
-			logger.Log.WithError(err).WithField("collection", ct.Name).Error("Failed to restore associated fields")
-			return fmt.Errorf("failed to restore associated fields: %w", err)
+		if err := restoreAssociatedRecords(&models.Attribute{}, existing.ID); err != nil {
+			logger.Log.WithError(err).WithField("collection", ct.Name).Error("Failed to restore associated attributes")
+			return fmt.Errorf("failed to restore associated attributes: %w", err)
 		}
 
 		// Restore associated relationships
@@ -66,7 +66,7 @@ func SaveCollection(ct *models.Collection) error {
 	return nil
 }
 
-// restoreAssociatedRecords restores soft-deleted associated records (fields, relationships, etc.).
+// restoreAssociatedRecords restores soft-deleted associated records (attributes, relationships, etc.).
 func restoreAssociatedRecords(model interface{}, collectionID uint) error {
 	return database.DB.Unscoped().
 		Model(model).
@@ -79,7 +79,7 @@ func GetCollectionByName(name string) (*models.Collection, error) {
 	var ct models.Collection
 
 	// Load the Collection, including its fields and relationships
-	if err := database.DB.Preload("Fields").Preload("Relationships").
+	if err := database.DB.Preload("attributes").Preload("relationships").
 		Where("name = ?", name).First(&ct).Error; err != nil {
 		if err.Error() == "record not found" {
 			logger.Log.WithField("name", name).Warn("collection not found")
@@ -95,7 +95,7 @@ func GetCollectionByName(name string) (*models.Collection, error) {
 // GetAllCollections retrieves all Collections.
 func GetAllCollections() ([]models.Collection, error) {
 	var cts []models.Collection
-	if err := database.DB.Preload("Fields").Preload("Relationships").Find(&cts).Error; err != nil {
+	if err := database.DB.Preload("attributes").Preload("Relationships").Find(&cts).Error; err != nil {
 		return nil, fmt.Errorf("failed to fetch collections: %w", err)
 	}
 	return cts, nil
@@ -118,10 +118,10 @@ func UpdateCollection(name string, updated *models.Collection) error {
 		return fmt.Errorf("failed to retrieve collection: %w", err)
 	}
 
-	// Update the basic fields of the collection
+	// Update the basic attributes of the collection
 	existing.Name = updated.Name
 
-	// Start a transaction for updating associated fields and relationships
+	// Start a transaction for updating associated attributes and relationships
 	tx := database.DB.Begin()
 	logger.Log.WithField("collection", name).Info("Begin transaction to update collection in database")
 	defer func() {
@@ -132,18 +132,18 @@ func UpdateCollection(name string, updated *models.Collection) error {
 	}()
 
 	// Update fields
-	if err := updateAssociatedFields(tx, existing.ID, updated.Fields); err != nil {
+	if err := updateAssociatedFields(tx, existing.ID, updated.Attributes); err != nil {
 		logger.Log.WithField("collection", name).Error("Rollback failed to updated fields")
 		tx.Rollback()
 		return fmt.Errorf("failed to update fields: %w", err)
 	}
 
 	// Update relationships
-	if err := updateAssociatedRelationships(tx, existing.ID, updated.Relationships); err != nil {
-		logger.Log.WithField("collection", name).Error("Rollback failed to updated relationships")
-		tx.Rollback()
-		return fmt.Errorf("failed to update relationships: %w", err)
-	}
+	// if err := updateAssociatedRelationships(tx, existing.ID, updated.Relationships); err != nil {
+	// 	logger.Log.WithField("collection", name).Error("Rollback failed to updated relationships")
+	// 	tx.Rollback()
+	// 	return fmt.Errorf("failed to update relationships: %w", err)
+	// }
 
 	// Save the updated collection
 	if err := tx.Save(&existing).Error; err != nil {
@@ -162,9 +162,9 @@ func UpdateCollection(name string, updated *models.Collection) error {
 }
 
 // updateAssociatedFields updates or creates fields for a collection.
-func updateAssociatedFields(tx *gorm.DB, CollectionID uint, fields []models.Field) error {
+func updateAssociatedFields(tx *gorm.DB, CollectionID uint, fields []models.Attribute) error {
 	// Soft-delete existing fields
-	if err := tx.Where("collection_id = ?", CollectionID).Delete(&models.Field{}).Error; err != nil {
+	if err := tx.Where("collection_id = ?", CollectionID).Delete(&models.Attribute{}).Error; err != nil {
 		logger.Log.WithError(err).WithField("collection_id", CollectionID).Error("Failed to soft-delete fields")
 		return fmt.Errorf("failed to soft-delete fields: %w", err)
 	}
@@ -183,27 +183,27 @@ func updateAssociatedFields(tx *gorm.DB, CollectionID uint, fields []models.Fiel
 }
 
 // updateAssociatedRelationships updates or creates relationships for a collection.
-func updateAssociatedRelationships(tx *gorm.DB, CollectionID uint, relationships []models.Relationship) error {
-	// Soft-delete existing relationships
-	if err := tx.Where("collection_id = ?", CollectionID).Delete(&models.Relationship{}).Error; err != nil {
-		logger.Log.WithError(err).WithField("collection_id", CollectionID).Error("Failed to soft-delete relationships")
-		return fmt.Errorf("failed to soft-delete relationships: %w", err)
-	} else {
-		logger.Log.WithField("collection", CollectionID).Error("Soft-delete relationships successfully")
-	}
+// func updateAssociatedRelationships(tx *gorm.DB, CollectionID uint, relationships []models.Relationship) error {
+// 	// Soft-delete existing relationships
+// 	if err := tx.Where("collection_id = ?", CollectionID).Delete(&models.Relationship{}).Error; err != nil {
+// 		logger.Log.WithError(err).WithField("collection_id", CollectionID).Error("Failed to soft-delete relationships")
+// 		return fmt.Errorf("failed to soft-delete relationships: %w", err)
+// 	} else {
+// 		logger.Log.WithField("collection", CollectionID).Error("Soft-delete relationships successfully")
+// 	}
 
-	// Save the new relationships
-	for _, relationship := range relationships {
-		relationship.CollectionID = CollectionID
-		if err := tx.Save(&relationship).Error; err != nil {
-			logger.Log.WithError(err).WithField("field_name", relationship.Field).Error("Failed to save relationship")
-			return fmt.Errorf("failed to save relationship '%s': %w", relationship.Field, err)
-		}
-	}
+// 	// Save the new relationships
+// 	for _, relationship := range relationships {
+// 		relationship.CollectionID = CollectionID
+// 		if err := tx.Save(&relationship).Error; err != nil {
+// 			logger.Log.WithError(err).WithField("field_name", relationship.Field).Error("Failed to save relationship")
+// 			return fmt.Errorf("failed to save relationship '%s': %w", relationship.Field, err)
+// 		}
+// 	}
 
-	logger.Log.WithField("collection_id", CollectionID).Info("Relationships updated successfully")
-	return nil
-}
+// 	logger.Log.WithField("collection_id", CollectionID).Info("Relationships updated successfully")
+// 	return nil
+// }
 
 // DeleteCollection deletes a collection and all associated data by its ID.
 func DeleteCollection(CollectionID uint) error {
@@ -231,7 +231,7 @@ func DeleteCollection(CollectionID uint) error {
 	logger.Log.WithField("collection", Collection).Info("DeleteCollection: successfully retrieve collection")
 
 	// Delete associated fields
-	if err := tx.Where("collection_id = ?", CollectionID).Delete(&models.Field{}).Error; err != nil {
+	if err := tx.Where("collection_id = ?", CollectionID).Delete(&models.Attribute{}).Error; err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to delete fields for collection ID '%d': %w", CollectionID, err)
 	}

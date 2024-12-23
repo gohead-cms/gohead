@@ -19,16 +19,16 @@ func TestSaveRelationships(t *testing.T) {
 	// Prepare a collection with relationships
 	collection := models.Collection{
 		Name: "articles",
-		Relationships: []models.Relationship{
-			{
-				Field:        "author",
-				RelationType: "one-to-one",
-			},
-			{
-				Field:        "tags",
-				RelationType: "many-to-many",
-			},
-		},
+		// Relationships: []models.Relationship{
+		// 	{
+		// 		Field:        "author",
+		// 		RelationType: "one-to-one",
+		// 	},
+		// 	{
+		// 		Field:        "tags",
+		// 		RelationType: "many-to-many",
+		// 	},
+		// },
 	}
 	assert.NoError(t, db.Create(&collection).Error)
 
@@ -76,19 +76,19 @@ func TestGetRelationships(t *testing.T) {
 			CollectionID: 1,
 			SourceItemID: &source_item_id,
 			RelationType: "one-to-one",
-			Field:        "author",
+			Attribute:    "author",
 		},
 		{
 			CollectionID: 1,
 			SourceItemID: &source_item_id,
 			RelationType: "many-to-many",
-			Field:        "tags",
+			Attribute:    "tags",
 		},
 		{
 			CollectionID: 1,
 			SourceItemID: &source_item_id,
 			RelationType: "many-to-many",
-			Field:        "tags",
+			Attribute:    "tags",
 		},
 	}
 	assert.NoError(t, db.Create(&relations).Error)

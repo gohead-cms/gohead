@@ -45,15 +45,15 @@ func CreateItem(ct models.Collection) gin.HandlerFunc {
 		// If you have a separate function to validate relationships, pass the same itemData
 		// or extract a nested "relationships" key if your JSON is structured that way.
 		// Adjust as needed based on how your relationships are actually represented.
-		if err := models.ValidateRelationships(&ct, itemData); err != nil {
-			logger.Log.
-				WithError(err).
-				WithField("collection_id", ct.ID).
-				Warn("CreateItem: Validation failed for relationships")
+		// if err := models.ValidateRelationships(&ct, itemData); err != nil {
+		// 	logger.Log.
+		// 		WithError(err).
+		// 		WithField("collection_id", ct.ID).
+		// 		Warn("CreateItem: Validation failed for relationships")
 
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
+		// 	c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		// 	return
+		// }
 
 		item := models.Item{
 			CollectionID: ct.ID,
@@ -163,7 +163,7 @@ func GetItemByID(ct models.Collection) gin.HandlerFunc {
 				return
 			}
 			// Attach the related item’s data under the relationship’s field key:
-			item.Data[rel.Field] = relatedItem.Data
+			item.Data[rel.Attribute] = relatedItem.Data
 		}
 
 		logger.Log.WithField("item_id", id).Info("GetItemByID: Success")
@@ -208,15 +208,15 @@ func UpdateItem(ct models.Collection) gin.HandlerFunc {
 		}
 
 		// Optionally validate relationships again
-		if err := models.ValidateRelationships(&ct, itemData); err != nil {
-			logger.Log.
-				WithError(err).
-				WithField("item_id", id).
-				Warn("UpdateItem: Relationship validation failed")
+		// if err := models.ValidateRelationships(&ct, itemData); err != nil {
+		// 	logger.Log.
+		// 		WithError(err).
+		// 		WithField("item_id", id).
+		// 		Warn("UpdateItem: Relationship validation failed")
 
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
+		// 	c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		// 	return
+		// }
 
 		if err := storage.UpdateItem(&ct, uint(id), models.JSONMap(itemData)); err != nil {
 			logger.Log.

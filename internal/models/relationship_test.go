@@ -58,7 +58,7 @@ func TestRelationshipCRUD(t *testing.T) {
 
 	// Create a Relationship
 	relationship := Relationship{
-		Field:        "comments",
+		Attribute:    "comments",
 		RelationType: "one-to-many",
 		CollectionID: collection1.ID,
 		SourceItemID: &item1.ID,
@@ -72,7 +72,7 @@ func TestRelationshipCRUD(t *testing.T) {
 	err = db.Preload("SourceItem").Preload("TargetItem").First(&retrievedRelation, relationship.ID).Error
 	assert.NoError(t, err)
 	assert.Equal(t, relationship.RelationType, retrievedRelation.RelationType)
-	assert.Equal(t, relationship.Field, retrievedRelation.Field)
+	assert.Equal(t, relationship.Attribute, retrievedRelation.Attribute)
 	assert.Equal(t, item1.ID, retrievedRelation.SourceItem.ID)
 
 	// Verify the associated Items

@@ -24,9 +24,9 @@ func GetCollection(c *gin.Context) {
 
 	// Flatten the response
 	response := map[string]interface{}{
-		"name":          ct.Name,
-		"fields":        ct.Fields,
-		"relationships": ct.Relationships,
+		"name":       ct.Name,
+		"attributes": ct.Attributes,
+		//"relationships": ct.Relationships,
 	}
 
 	logger.Log.WithField("name", name).Info("GetCollection: collection retrieved successfully")
@@ -35,32 +35,36 @@ func GetCollection(c *gin.Context) {
 
 // CreateCollection handles the creation of a new collection.
 func CreateCollection(c *gin.Context) {
-	var input models.Collection
-
-	// Bind the JSON payload to the Collection model
+	// Parse the JSON input into a map
+	var input map[string]interface{}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		logger.Log.WithError(err).Warn("CreateCollection: Invalid input")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON input"})
+		return
+	}
+	logger.Log.WithField("name", input).Info("CreateCollection")
+
+	// Transform the map into a Collection struct
+	collection, err := models.ParseCollectionInput(input)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	logger.Log.WithField("name", input).Info("CreateCollection")
-
 	// Validate the Collection
-	if err := models.ValidateCollectionSchema(input); err != nil {
+	if err := models.ValidateCollectionSchema(collection); err != nil {
 		logger.Log.WithError(err).Warn("CreateCollection: Validation failed")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Validation failed", "details": err.Error()})
 		return
 	}
 
 	// Save the Collection to the database
-	if err := storage.SaveCollection(&input); err != nil {
+	if err := storage.SaveCollection(&collection); err != nil {
 		logger.Log.WithError(err).Error("CreateCollection: Failed to save collection")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to save collection", "details": err.Error()})
 		return
 	}
 
-	logger.Log.WithField("collection", input.Name).Info("collection created successfully")
+	logger.Log.WithField("collection", collection.Name).Info("collection created successfully")
 	c.JSON(http.StatusCreated, gin.H{
 		"message":    "collection created successfully",
 		"collection": input,
@@ -72,23 +76,29 @@ func UpdateCollection(c *gin.Context) {
 	// Extract the collection name from the path
 	CollectionName := c.Param("name")
 
-	// Parse the incoming request body into a Collection model
-	var input models.Collection
+	// Parse the JSON input into a map
+	var input map[string]interface{}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		logger.Log.WithError(err).Warn("UpdateCollection: Invalid input")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON input"})
+		return
+	}
+
+	// Transform the map into a Collection struct
+	collection, err := models.ParseCollectionInput(input)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	// Validate the input collection
-	if err := models.ValidateCollectionSchema(input); err != nil {
+	if err := models.ValidateCollectionSchema(collection); err != nil {
 		logger.Log.WithError(err).Warn("UpdateCollection: Validation failed")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Validation failed: " + err.Error()})
 		return
 	}
 
 	// Attempt to update the collection
-	if err := storage.UpdateCollection(CollectionName, &input); err != nil {
+	if err := storage.UpdateCollection(CollectionName, &collection); err != nil {
 		logger.Log.WithError(err).WithField("collection", CollectionName).Error("UpdateCollection: Failed to update collection")
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "Failed to update collection",

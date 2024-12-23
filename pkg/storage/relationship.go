@@ -11,27 +11,27 @@ import (
 // SaveRelationship handles saving relationships for an item.
 // SaveRelationship handles saving relationships for an item.
 func SaveRelationship(ct *models.Collection, sourceItemID uint, itemData models.JSONMap) error {
-	for _, rel := range ct.Relationships {
-		value, exists := itemData[rel.Field]
-		if !exists {
-			logger.Log.WithField("field", rel.Field).Info("Skipping missing field for relationship")
-			continue
-		}
+	// for _, rel := range ct.Relationships {
+	// 	value, exists := itemData[rel.Field]
+	// 	if !exists {
+	// 		logger.Log.WithField("field", rel.Field).Info("Skipping missing field for relationship")
+	// 		continue
+	// 	}
 
-		switch rel.RelationType {
-		case "one-to-one", "one-to-many":
-			if err := saveOneToManyRelationship(ct.ID, rel, &sourceItemID, value); err != nil {
-				return err
-			}
-		case "many-to-many":
-			if err := saveManyToManyRelationship(ct.ID, rel, &sourceItemID, value); err != nil {
-				return err
-			}
-		default:
-			logger.Log.WithField("relation_type", rel.RelationType).Error("Unsupported relationship type")
-			return fmt.Errorf("unsupported relationship type: %s", rel.RelationType)
-		}
-	}
+	// 	switch rel.RelationType {
+	// 	case "one-to-one", "one-to-many":
+	// 		if err := saveOneToManyRelationship(ct.ID, rel, &sourceItemID, value); err != nil {
+	// 			return err
+	// 		}
+	// 	case "many-to-many":
+	// 		if err := saveManyToManyRelationship(ct.ID, rel, &sourceItemID, value); err != nil {
+	// 			return err
+	// 		}
+	// 	default:
+	// 		logger.Log.WithField("relation_type", rel.RelationType).Error("Unsupported relationship type")
+	// 		return fmt.Errorf("unsupported relationship type: %s", rel.RelationType)
+	// 	}
+	// }
 	return nil
 }
 
@@ -45,7 +45,7 @@ func saveOneToManyRelationship(collectionID uint, rel models.Relationship, sourc
 			Data:         models.JSONMap(v),
 		}
 		if err := SaveItem(&nestedItem); err != nil {
-			logger.Log.WithField("field", rel.Field).WithError(err).Error("Failed to save nested content item")
+			logger.Log.WithField("field", rel.Attribute).WithError(err).Error("Failed to save nested content item")
 			return err
 		}
 
@@ -54,10 +54,10 @@ func saveOneToManyRelationship(collectionID uint, rel models.Relationship, sourc
 			CollectionID: collectionID,
 			SourceItemID: sourceItemID,
 			RelationType: rel.RelationType,
-			Field:        rel.Field,
+			Attribute:    rel.Attribute,
 		}
 		if err := database.DB.Create(&relation).Error; err != nil {
-			logger.Log.WithField("field", rel.Field).WithError(err).Error("Failed to save content relation")
+			logger.Log.WithField("field", rel.Attribute).WithError(err).Error("Failed to save content relation")
 			return err
 		}
 	case float64:
@@ -66,15 +66,15 @@ func saveOneToManyRelationship(collectionID uint, rel models.Relationship, sourc
 			CollectionID: collectionID,
 			SourceItemID: sourceItemID,
 			RelationType: rel.RelationType,
-			Field:        rel.Field,
+			Attribute:    rel.Attribute,
 		}
 		if err := database.DB.Create(&relation).Error; err != nil {
-			logger.Log.WithField("field", rel.Field).WithError(err).Error("Failed to save relation")
+			logger.Log.WithField("field", rel.Attribute).WithError(err).Error("Failed to save relation")
 			return err
 		}
 	default:
-		logger.Log.WithField("field", rel.Field).Warn("Invalid type for field; expected map or float64")
-		return fmt.Errorf("invalid type for field '%s': expected map[string]interface{} or float64", rel.Field)
+		logger.Log.WithField("field", rel.Attribute).Warn("Invalid type for attribute; expected map or float64")
+		return fmt.Errorf("invalid type for field '%s': expected map[string]interface{} or float64", rel.Attribute)
 	}
 	return nil
 }
@@ -83,8 +83,8 @@ func saveOneToManyRelationship(collectionID uint, rel models.Relationship, sourc
 func saveManyToManyRelationship(collectionID uint, rel models.Relationship, sourceItemID *uint, value interface{}) error {
 	nestedArray, ok := value.([]interface{})
 	if !ok {
-		logger.Log.WithField("field", rel.Field).Warn("Invalid type for field; expected array")
-		return fmt.Errorf("invalid type for field '%s': expected array", rel.Field)
+		logger.Log.WithField("field", rel.Attribute).Warn("Invalid type for field; expected array")
+		return fmt.Errorf("invalid type for field '%s': expected array", rel.Attribute)
 	}
 
 	for _, element := range nestedArray {
@@ -96,7 +96,7 @@ func saveManyToManyRelationship(collectionID uint, rel models.Relationship, sour
 				Data:         models.JSONMap(e),
 			}
 			if err := SaveItem(&nestedItem); err != nil {
-				logger.Log.WithField("field", rel.Field).WithError(err).Error("Failed to save nested content item")
+				logger.Log.WithField("field", rel.Attribute).WithError(err).Error("Failed to save nested content item")
 				return err
 			}
 
@@ -105,10 +105,10 @@ func saveManyToManyRelationship(collectionID uint, rel models.Relationship, sour
 				CollectionID: collectionID,
 				SourceItemID: sourceItemID,
 				RelationType: rel.RelationType,
-				Field:        rel.Field,
+				Attribute:    rel.Attribute,
 			}
 			if err := database.DB.Create(&relation).Error; err != nil {
-				logger.Log.WithField("field", rel.Field).WithError(err).Error("Failed to save relation")
+				logger.Log.WithField("field", rel.Attribute).WithError(err).Error("Failed to save relation")
 				return err
 			}
 		case float64:
@@ -117,15 +117,15 @@ func saveManyToManyRelationship(collectionID uint, rel models.Relationship, sour
 				CollectionID: collectionID,
 				SourceItemID: sourceItemID,
 				RelationType: rel.RelationType,
-				Field:        rel.Field,
+				Attribute:    rel.Attribute,
 			}
 			if err := database.DB.Create(&relation).Error; err != nil {
-				logger.Log.WithField("field", rel.Field).WithError(err).Error("Failed to save relation")
+				logger.Log.WithField("field", rel.Attribute).WithError(err).Error("Failed to save relation")
 				return err
 			}
 		default:
-			logger.Log.WithField("field", rel.Field).Warn("Invalid type for array element; expected map or float64")
-			return fmt.Errorf("invalid type for array element in field '%s': expected map[string]interface{} or float64", rel.Field)
+			logger.Log.WithField("field", rel.Attribute).Warn("Invalid type for array element; expected map or float64")
+			return fmt.Errorf("invalid type for array element in field '%s': expected map[string]interface{} or float64", rel.Attribute)
 		}
 	}
 	return nil

@@ -119,15 +119,15 @@ func TestUpdateItem(t *testing.T) {
 	relationship := &models.Relationship{
 		SourceItemID: &item.ID,
 		RelationType: "one-to-one",
-		Field:        "related_field",
+		Attribute:    "related_attribute",
 	}
 	assert.NoError(t, db.Create(relationship).Error)
 
 	// Update the content item
 	updatedData := models.JSONMap{
-		"title":         "New Title",
-		"content":       "New Content",
-		"related_field": map[string]interface{}{"title": "Nested Title"},
+		"title":             "New Title",
+		"content":           "New Content",
+		"related_attribute": map[string]interface{}{"title": "Nested Title"},
 	}
 	err := UpdateItem(collection, item.ID, updatedData)
 	assert.NoError(t, err)
@@ -142,7 +142,7 @@ func TestUpdateItem(t *testing.T) {
 	var updatedRelationships []models.Relationship
 	assert.NoError(t, db.Where("source_item_id = ?", item.ID).Find(&updatedRelationships).Error)
 	assert.Len(t, updatedRelationships, 1)
-	assert.Equal(t, "related_field", updatedRelationships[0].Field)
+	assert.Equal(t, "related_field", updatedRelationships[0].Attribute)
 
 	// Verify nested item creation
 	var nestedItem models.Item
@@ -191,7 +191,7 @@ func TestCheckFieldUniqueness(t *testing.T) {
 	defer testutils.CleanupTestDB()
 
 	err := db.AutoMigrate(&models.Collection{},
-		&models.Field{},
+		&models.Attribute{},
 		&models.Relationship{},
 		&models.Item{},
 	)

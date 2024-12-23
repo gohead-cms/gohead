@@ -10,7 +10,7 @@ func TestValidateItem(t *testing.T) {
 	// Sample collection schema
 	collection := Collection{
 		Name: "articles",
-		Fields: []Field{
+		Attributes: []Attribute{
 			{Name: "title", Type: "string", Required: true},
 			{Name: "content", Type: "string", Required: true},
 			{Name: "published", Type: "bool", Required: false},

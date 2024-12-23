@@ -7,36 +7,105 @@ import (
 	"strconv"
 	"time"
 
-	"gitlab.com/sudo.bngz/gohead/pkg/database"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gorm.io/gorm"
 )
 
-type Field struct {
-	gorm.Model
-	Name         string   `json:"name"`
-	Type         string   `json:"type"` // e.g., "string", "int", "bool", "date", "richtext", "enum"
-	Required     bool     `json:"required"`
-	Unique       bool     `json:"unique,omitempty"`
-	Options      []string `gorm:"type:json" json:"options,omitempty"`
-	Min          *int     `json:"min,omitempty"`
-	Max          *int     `json:"max,omitempty"`
-	Pattern      string   `json:"pattern,omitempty"`
-	CustomErrors JSONMap  `gorm:"type:json" json:"custom_errors,omitempty"`
-	CollectionID uint     `json:"-"` // Foreign key to associate with Collection
-}
-
 type Collection struct {
 	gorm.Model
-	Name          string         `json:"name" gorm:"uniqueIndex"`
-	Fields        []Field        `json:"fields" gorm:"constraint:OnDelete:CASCADE;"`
-	Relationships []Relationship `json:"relationships" gorm:"constraint:OnDelete:CASCADE;"`
+	Name        string      `json:"name" gorm:"uniqueIndex"`
+	Kind        string      `json:"kind" gorm:"type:varchar(50);not null"`
+	Description string      `json:"description"`
+	Attributes  []Attribute `json:"attributes" gorm:"constraint:OnDelete:CASCADE;"`
 }
 
 var allowedRelationTypes = map[string]bool{
 	"oneToOne":   true,
 	"oneToMany":  true,
 	"manyToMany": true,
+}
+
+func ParseCollectionInput(input map[string]interface{}) (Collection, error) {
+	// Initialize a Collection struct
+	var collection Collection
+
+	// Extract basic fields
+	if name, ok := input["name"].(string); ok {
+		collection.Name = name
+	} else {
+		return collection, fmt.Errorf("missing or invalid field 'name'")
+	}
+
+	if kind, ok := input["kind"].(string); ok {
+		collection.Kind = kind
+	} else {
+		return collection, fmt.Errorf("missing or invalid field 'kind'")
+	}
+
+	if description, ok := input["description"].(string); ok {
+		collection.Description = description
+	}
+
+	// Extract and transform attributes
+	if rawAttributes, ok := input["attributes"].(map[string]interface{}); ok {
+		for attrName, rawAttr := range rawAttributes {
+			attrMap, ok := rawAttr.(map[string]interface{})
+			if !ok {
+				return collection, fmt.Errorf("invalid attribute format for '%s'", attrName)
+			}
+
+			attribute := Attribute{Name: attrName}
+			if err := mapToAttribute(attrMap, &attribute); err != nil {
+				return collection, fmt.Errorf("failed to parse attribute '%s': %v", attrName, err)
+			}
+
+			collection.Attributes = append(collection.Attributes, attribute)
+		}
+	} else {
+		return collection, fmt.Errorf("missing or invalid field 'attributes'")
+	}
+
+	return collection, nil
+}
+
+func mapToAttribute(attrMap map[string]interface{}, attribute *Attribute) error {
+	if attrType, ok := attrMap["type"].(string); ok {
+		attribute.Type = attrType
+	} else {
+		return fmt.Errorf("missing or invalid field 'type'")
+	}
+
+	if required, ok := attrMap["required"].(bool); ok {
+		attribute.Required = required
+	}
+
+	if unique, ok := attrMap["unique"].(bool); ok {
+		attribute.Unique = unique
+	}
+
+	if options, ok := attrMap["options"].([]interface{}); ok {
+		for _, option := range options {
+			if strOption, ok := option.(string); ok {
+				attribute.Options = append(attribute.Options, strOption)
+			}
+		}
+	}
+
+	if min, ok := attrMap["min"].(float64); ok {
+		minInt := int(min)
+		attribute.Min = &minInt
+	}
+
+	if max, ok := attrMap["max"].(float64); ok {
+		maxInt := int(max)
+		attribute.Max = &maxInt
+	}
+
+	if pattern, ok := attrMap["pattern"].(string); ok {
+		attribute.Pattern = pattern
+	}
+
+	return nil
 }
 
 //
@@ -47,54 +116,54 @@ var allowedRelationTypes = map[string]bool{
 // ValidateCollection validates the schema of a content type.
 func ValidateCollectionSchema(ct Collection) error {
 	if ct.Name == "" {
-		return errors.New("missing required field: 'name'")
+		return errors.New("missing required attribute: 'name'")
 	}
 
-	if len(ct.Fields) == 0 {
-		return errors.New("fields array cannot be empty")
+	if len(ct.Attributes) == 0 {
+		return errors.New("attributes array cannot be empty")
 	}
 
-	fieldNames := make(map[string]bool)
-	for _, field := range ct.Fields {
-		if fieldNames[field.Name] {
-			return fmt.Errorf("duplicate field name: '%s'", field.Name)
+	attributeNames := make(map[string]bool)
+	for _, attribute := range ct.Attributes {
+		if attributeNames[attribute.Name] {
+			return fmt.Errorf("duplicate attribute name: '%s'", attribute.Name)
 		}
-		fieldNames[field.Name] = true
-		logger.Log.WithField("field", field).Debug("Validate field type")
-		if err := validateFieldType(field); err != nil {
+		attributeNames[attribute.Name] = true
+		logger.Log.WithField("attribute", attribute).Debug("Validate attribute type")
+		if err := validateAttributeType(attribute); err != nil {
 			return err
 		}
 	}
 
-	logger.Log.WithField("relationship", ct.Relationships).Debug("Validating relationship")
+	//logger.Log.WithField("relationship", ct.Relationships).Debug("Validating relationship")
 
 	// Validate relationships
-	for _, rel := range ct.Relationships {
-		if rel.Field == "" || rel.RelationType == "" || rel.CollectionTarget == "" {
-			return fmt.Errorf("invalid relationship: all fields must be defined (field, collection, relation_type)")
-		}
+	// for _, rel := range ct.Relationships {
+	// 	if rel.Field == "" || rel.RelationType == "" || rel.CollectionTarget == "" {
+	// 		return fmt.Errorf("invalid relationship: all attributes must be defined (attribute, collection, relation_type)")
+	// 	}
 
-		logger.Log.WithField("relationship", rel).Debug("Validating relationship")
+	// 	logger.Log.WithField("relationship", rel).Debug("Validating relationship")
 
-		// Check if the referenced collection exists
-		var relatedCollection Collection
-		err := database.DB.Where("name = ?", rel.CollectionTarget).First(&relatedCollection).Error
-		if err != nil {
-			logger.Log.WithField("collection", rel.Collection).
-				WithError(err).
-				Warn("Referenced collection does not exist")
-			return fmt.Errorf("Target collection '%s' for relationship field '%s' does not exist", rel.CollectionTarget, rel.Field)
-		}
+	// 	// Check if the referenced collection exists
+	// 	var relatedCollection Collection
+	// 	err := database.DB.Where("name = ?", rel.CollectionTarget).First(&relatedCollection).Error
+	// 	if err != nil {
+	// 		logger.Log.WithField("collection", rel.Collection).
+	// 			WithError(err).
+	// 			Warn("Referenced collection does not exist")
+	// 		return fmt.Errorf("Target collection '%s' for relationship attribute '%s' does not exist", rel.CollectionTarget, rel.Field)
+	// 	}
 
-		// Check if the referenced relation type is correct
-		if _, isValid := allowedRelationTypes[rel.RelationType]; !isValid {
-			logger.Log.WithFields(map[string]interface{}{
-				"relation_type": rel.RelationType,
-				"field":         rel.Field,
-			}).Error("Invalid relation_type provided")
-			return fmt.Errorf("invalid relation_type '%s' for field '%s'; allowed values are: oneToOne, oneToMany, manyToMany", rel.RelationType, rel.Field)
-		}
-	}
+	// 	// Check if the referenced relation type is correct
+	// 	if _, isValid := allowedRelationTypes[rel.RelationType]; !isValid {
+	// 		logger.Log.WithFields(map[string]interface{}{
+	// 			"relation_type": rel.RelationType,
+	// 			"attribute":         rel.Field,
+	// 		}).Error("Invalid relation_type provided")
+	// 		return fmt.Errorf("invalid relation_type '%s' for attribute '%s'; allowed values are: oneToOne, oneToMany, manyToMany", rel.RelationType, rel.Field)
+	// 	}
+	// }
 
 	return nil
 }
@@ -104,8 +173,8 @@ func ValidateCollectionSchema(ct Collection) error {
 // -------------------- Schema validator helpers
 //
 
-// validateField checks the field schema for constraints and valid types.
-func validateFieldType(field Field) error {
+// validateField checks the attribute schema for constraints and valid types.
+func validateAttributeType(attribute Attribute) error {
 	validTypes := map[string]struct{}{
 		"string":   {},
 		"int":      {},
@@ -113,61 +182,62 @@ func validateFieldType(field Field) error {
 		"date":     {},
 		"richtext": {},
 		"enum":     {},
+		"relation": {},
 	}
 
-	if _, valid := validTypes[field.Type]; !valid {
-		return fmt.Errorf("invalid field type '%s' for field '%s'", field.Type, field.Name)
+	if _, valid := validTypes[attribute.Type]; !valid {
+		return fmt.Errorf("invalid attribute type '%s' for attribute '%s'", attribute.Type, attribute.Name)
 	}
 
-	if field.Type == "enum" && len(field.Options) == 0 {
-		return fmt.Errorf("field '%s' of type 'enum' must have options", field.Name)
+	if attribute.Type == "enum" && len(attribute.Options) == 0 {
+		return fmt.Errorf("attribute '%s' of type 'enum' must have options", attribute.Name)
 	}
 
-	if field.Type == "int" && field.Min != nil && field.Max != nil && *field.Min > *field.Max {
-		return fmt.Errorf("field '%s': min value cannot be greater than max value", field.Name)
+	if attribute.Type == "int" && attribute.Min != nil && attribute.Max != nil && *attribute.Min > *attribute.Max {
+		return fmt.Errorf("attribute '%s': min value cannot be greater than max value", attribute.Name)
 	}
 
-	if field.Type == "string" && field.Pattern != "" {
-		if _, err := regexp.Compile(field.Pattern); err != nil {
-			return fmt.Errorf("invalid regex pattern for field '%s': %v", field.Name, err)
+	if attribute.Type == "string" && attribute.Pattern != "" {
+		if _, err := regexp.Compile(attribute.Pattern); err != nil {
+			return fmt.Errorf("invalid regex pattern for attribute '%s': %v", attribute.Name, err)
 		}
 	}
 
 	return nil
 }
 
-// GetFieldType returns whether a given fieldName is a "field", "relationship", or unknown.
-func (c *Collection) GetFieldType(fieldName string) (string, error) {
-	for _, field := range c.Fields {
-		if field.Name == fieldName {
-			return "field", nil
+// GetFieldType returns whether a given attributeName is a "attribute", "relationship", or unknown.
+func (c *Collection) GetAttributeType(attributeName string) (string, error) {
+	for _, attribute := range c.Attributes {
+		if attribute.Name == attributeName {
+			return "attribute", nil
 		}
 	}
-	for _, rel := range c.Relationships {
-		if rel.Field == fieldName {
+	/* for _, rel := range c.Relationships {
+		if rel.Field == attributeName {
 			return "relationship", nil
 		}
-	}
-	logger.Log.WithField("field", fieldName).Warn("Unknown field or relationship")
-	return "", fmt.Errorf("unknown field or relationship: '%s'", fieldName)
+	} */
+	logger.Log.WithField("attribute", attributeName).Warn("Unknown attribute or relationship")
+	return "", fmt.Errorf("unknown attribute or relationship: '%s'", attributeName)
 }
 
-// validateFieldValue handles validation logic for a single field’s value.
-func validateFieldValue(field Field, value interface{}) error {
-	switch field.Type {
+// validateFieldValue handles validation logic for a single attribute’s value.
+func validateFieldValue(attribute Attribute, value interface{}) error {
+	switch attribute.Type {
 	case "string", "richtext":
 		strValue, err := convertToType(value, "string")
 		if err != nil {
 			return err
 		}
 		// Pattern match if specified
-		if field.Pattern != "" {
-			matched, err := regexp.MatchString(field.Pattern, strValue.(string))
+		if attribute.Pattern != "" {
+			matched, err := regexp.MatchString(attribute.Pattern, strValue.(string))
 			if err != nil {
-				return fmt.Errorf("invalid regex pattern for field '%s': %v", field.Name, err)
+				return fmt.Errorf("invalid regex pattern for attribute '%s': %v", attribute.Name, err)
 			}
 			if !matched {
-				return fmt.Errorf("field '%s' does not match required pattern", field.Name)
+				return fmt.Errorf("attribute '%s' does not match required pattern", attribute.Name)
 			}
 		}
 
@@ -177,11 +247,11 @@ func validateFieldValue(field Field, value interface{}) error {
 			return err
 		}
 		iv := intValue.(int)
-		if field.Min != nil && iv < *field.Min {
-			return fmt.Errorf("field '%s' must be at least %d", field.Name, *field.Min)
+		if attribute.Min != nil && iv < *attribute.Min {
+			return fmt.Errorf("attribute '%s' must be at least %d", attribute.Name, *attribute.Min)
 		}
-		if field.Max != nil && iv > *field.Max {
-			return fmt.Errorf("field '%s' must be at most %d", field.Name, *field.Max)
+		if attribute.Max != nil && iv > *attribute.Max {
+			return fmt.Errorf("attribute '%s' must be at most %d", attribute.Name, *attribute.Max)
 		}
 
 	case "bool":
@@ -199,15 +269,15 @@ func validateFieldValue(field Field, value interface{}) error {
 		if err != nil {
 			return err
 		}
-		if !sliceContains(field.Options, strValue.(string)) {
-			return fmt.Errorf("field '%s' must be one of %v", field.Name, field.Options)
+		if !sliceContains(attribute.Options, strValue.(string)) {
+			return fmt.Errorf("attribute '%s' must be one of %v", attribute.Name, attribute.Options)
 		}
 
 	default:
-		return fmt.Errorf("unsupported field type: '%s'", field.Type)
+		return fmt.Errorf("unsupported attribute type: '%s'", attribute.Type)
 	}
 
-	logger.Log.WithField("field", field.Name).Info("Field validated successfully")
+	logger.Log.WithField("attribute", attribute.Name).Info("attribute validated successfully")
 	return nil
 }
 

@@ -10,7 +10,7 @@ import (
 
 type Relationship struct {
 	gorm.Model
-	Field            string     `json:"name"`                                  // Field defining the relationship
+	Attribute        string     `json:"name"`                                  // Field defining the relationship
 	RelationType     string     `json:"relation_type"`                         // e.g., one-to-one, one-to-many, many-to-many
 	CollectionTarget string     `json:"collection_target"`                     // e.g., collection target name
 	Collection       Collection `json:"-" gorm:"foreignKey:CollectionID"`      // ID of the collection owning this relationship
@@ -19,6 +19,7 @@ type Relationship struct {
 	SourceItem       Item       `json:"-" gorm:"foreignKey:SourceItemID"`      // Source item
 }
 
+/*
 // GetRelationshipByField retrieves a relationship by its field name.
 func (c *Collection) GetRelationshipByField(fieldName string) (*Relationship, error) {
 	if len(c.Relationships) == 0 {
@@ -35,50 +36,50 @@ func (c *Collection) GetRelationshipByField(fieldName string) (*Relationship, er
 
 	// Field is not a relationship
 	return nil, fmt.Errorf("unknown relationship field '%s'", fieldName)
-}
+} */
 
-func ValidateRelationships(ct *Collection, relationships map[string]interface{}) error {
-	for field, value := range relationships {
-		// Check if the field exists as a relationship in the collection schema
-		rel, err := ct.GetRelationshipByField(field)
-		if rel == nil && err == nil {
-			logger.Log.WithField("collection_id", ct.ID).Info("No relationships")
-			return nil
-		}
-		if err != nil {
-			logger.Log.WithError(err).Error("Failed to retrieve relationship")
-			// Handle error (e.g., return an HTTP 400/404 response)
-		} else {
-			logger.Log.WithField("relationship", rel).Info("Relationship retrieved successfully")
-			// Proceed with the relationship logic
-			if rel == nil {
-				logger.Log.WithField("field", field).Warn("Validation failed: Unknown relationship field")
-				return fmt.Errorf("unknown relationship field '%s'", field)
-			}
+// func ValidateRelationships(ct *Collection, relationships map[string]interface{}) error {
+// 	for field, value := range relationships {
+// 		// Check if the field exists as a relationship in the collection schema
+// 		rel, err := ct.GetRelationshipByField(field)
+// 		if rel == nil && err == nil {
+// 			logger.Log.WithField("collection_id", ct.ID).Info("No relationships")
+// 			return nil
+// 		}
+// 		if err != nil {
+// 			logger.Log.WithError(err).Error("Failed to retrieve relationship")
+// 			// Handle error (e.g., return an HTTP 400/404 response)
+// 		} else {
+// 			logger.Log.WithField("relationship", rel).Info("Relationship retrieved successfully")
+// 			// Proceed with the relationship logic
+// 			if rel == nil {
+// 				logger.Log.WithField("field", field).Warn("Validation failed: Unknown relationship field")
+// 				return fmt.Errorf("unknown relationship field '%s'", field)
+// 			}
 
-			// Validate the relationship type
-			switch rel.RelationType {
-			case "one-to-one", "one-to-many":
-				if err := validateOneToOneOrOneToMany(field, value); err != nil {
-					return err
-				}
-			case "many-to-many":
-				if err := validateManyToMany(field, value); err != nil {
-					return err
-				}
-			default:
-				logger.Log.WithFields(logrus.Fields{
-					"field":         field,
-					"relation_type": rel.RelationType,
-				}).Error("Validation failed: Unsupported relationship type")
-				return fmt.Errorf("unsupported relationship type '%s' for field '%s'", rel.RelationType, field)
-			}
-		}
-	}
+// 			// Validate the relationship type
+// 			switch rel.RelationType {
+// 			case "one-to-one", "one-to-many":
+// 				if err := validateOneToOneOrOneToMany(field, value); err != nil {
+// 					return err
+// 				}
+// 			case "many-to-many":
+// 				if err := validateManyToMany(field, value); err != nil {
+// 					return err
+// 				}
+// 			default:
+// 				logger.Log.WithFields(logrus.Fields{
+// 					"field":         field,
+// 					"relation_type": rel.RelationType,
+// 				}).Error("Validation failed: Unsupported relationship type")
+// 				return fmt.Errorf("unsupported relationship type '%s' for field '%s'", rel.RelationType, field)
+// 			}
+// 		}
+// 	}
 
-	logger.Log.WithField("collection_id", ct.ID).Info("Relationships validated successfully")
-	return nil
-}
+// 	logger.Log.WithField("collection_id", ct.ID).Info("Relationships validated successfully")
+// 	return nil
+// }
 
 // Helper function to validate one-to-one and one-to-many relationships
 func validateOneToOneOrOneToMany(field string, value interface{}) error {

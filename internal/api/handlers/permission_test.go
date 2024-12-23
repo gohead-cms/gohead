@@ -32,7 +32,7 @@ func TestProtectedHandlerWithPermissions(t *testing.T) {
 	// Set up a test content type
 	contentType := models.Collection{
 		Name: "protected_items",
-		Fields: []models.Field{
+		Attributes: []models.Attribute{
 			{
 				Name:     "title",
 				Type:     "string",
