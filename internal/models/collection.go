@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"gitlab.com/sudo.bngz/gohead/pkg/database"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gorm.io/gorm"
 )
@@ -32,10 +33,15 @@ type Collection struct {
 	Relationships []Relationship `json:"relationships" gorm:"constraint:OnDelete:CASCADE;"`
 }
 
+var allowedRelationTypes = map[string]bool{
+	"oneToOne":   true,
+	"oneToMany":  true,
+	"manyToMany": true,
+}
+
 //
 //
-// -------------------- Schema validators
-//
+// -------------------- Schema validator
 //
 
 // ValidateCollection validates the schema of a content type.
@@ -54,21 +60,49 @@ func ValidateCollectionSchema(ct Collection) error {
 			return fmt.Errorf("duplicate field name: '%s'", field.Name)
 		}
 		fieldNames[field.Name] = true
-		//logger.Log.WithField("field", field).Info("Validate field type")
+		logger.Log.WithField("field", field).Debug("Validate field type")
 		if err := validateFieldType(field); err != nil {
 			return err
 		}
 	}
 
+	logger.Log.WithField("relationship", ct.Relationships).Debug("Validating relationship")
+
+	// Validate relationships
 	for _, rel := range ct.Relationships {
-		logger.Log.WithField("field", rel).Info("Test field")
-		if rel.Field == "" || rel.RelationType == "" {
+		if rel.Field == "" || rel.RelationType == "" || rel.CollectionTarget == "" {
 			return fmt.Errorf("invalid relationship: all fields must be defined (field, collection, relation_type)")
+		}
+
+		logger.Log.WithField("relationship", rel).Debug("Validating relationship")
+
+		// Check if the referenced collection exists
+		var relatedCollection Collection
+		err := database.DB.Where("name = ?", rel.CollectionTarget).First(&relatedCollection).Error
+		if err != nil {
+			logger.Log.WithField("collection", rel.Collection).
+				WithError(err).
+				Warn("Referenced collection does not exist")
+			return fmt.Errorf("Target collection '%s' for relationship field '%s' does not exist", rel.CollectionTarget, rel.Field)
+		}
+
+		// Check if the referenced relation type is correct
+		if _, isValid := allowedRelationTypes[rel.RelationType]; !isValid {
+			logger.Log.WithFields(map[string]interface{}{
+				"relation_type": rel.RelationType,
+				"field":         rel.Field,
+			}).Error("Invalid relation_type provided")
+			return fmt.Errorf("invalid relation_type '%s' for field '%s'; allowed values are: oneToOne, oneToMany, manyToMany", rel.RelationType, rel.Field)
 		}
 	}
 
 	return nil
 }
+
+//
+//
+// -------------------- Schema validator helpers
+//
 
 // validateField checks the field schema for constraints and valid types.
 func validateFieldType(field Field) error {

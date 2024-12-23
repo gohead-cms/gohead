@@ -10,12 +10,13 @@ import (
 
 type Relationship struct {
 	gorm.Model
-	Field        string     `json:"field"`                                 // Field defining the relationship
-	RelationType string     `json:"relation_type"`                         // e.g., one-to-one, one-to-many, many-to-many
-	Collection   Collection `json:"-" gorm:"foreignKey:CollectionID"`      // ID of the collection owning this relationship
-	CollectionID uint       `json:"-" gorm:"constraint:OnDelete:CASCADE;"` // Collection ID
-	SourceItemID *uint      `json:"-" gorm:"constraint:OnDelete:SET NULL"` // Nullable source item ID
-	SourceItem   Item       `json:"-" gorm:"foreignKey:SourceItemID"`      // Source item
+	Field            string     `json:"name"`                                  // Field defining the relationship
+	RelationType     string     `json:"relation_type"`                         // e.g., one-to-one, one-to-many, many-to-many
+	CollectionTarget string     `json:"collection_target"`                     // e.g., collection target name
+	Collection       Collection `json:"-" gorm:"foreignKey:CollectionID"`      // ID of the collection owning this relationship
+	CollectionID     uint       `json:"-" gorm:"constraint:OnDelete:CASCADE;"` // Collection ID
+	SourceItemID     *uint      `json:"-" gorm:"constraint:OnDelete:SET NULL"` // Nullable source item ID
+	SourceItem       Item       `json:"-" gorm:"foreignKey:SourceItemID"`      // Source item
 }
 
 // GetRelationshipByField retrieves a relationship by its field name.

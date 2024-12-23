@@ -5,7 +5,7 @@ cms.db
 *.so
 *.dylib
 *.bin
-
+debug.json
 # Test binary
 *.test
 coverage.html
