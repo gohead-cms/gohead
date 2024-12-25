@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"gitlab.com/sudo.bngz/gohead/pkg/database"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gorm.io/gorm"
 )
@@ -105,6 +106,21 @@ func mapToAttribute(attrMap map[string]interface{}, attribute *Attribute) error 
 		attribute.Pattern = pattern
 	}
 
+	// Handle relation-specific fields
+	if attribute.Type == "relation" {
+		if relation, ok := attrMap["relation"].(string); ok {
+			attribute.Relation = relation
+		} else {
+			return fmt.Errorf("missing or invalid field 'relation' for type 'relation'")
+		}
+
+		if target, ok := attrMap["target"].(string); ok {
+			attribute.Target = target
+		} else {
+			return fmt.Errorf("missing or invalid field 'target' for type 'relation'")
+		}
+	}
+
 	return nil
 }
 
@@ -130,40 +146,44 @@ func ValidateCollectionSchema(ct Collection) error {
 		}
 		attributeNames[attribute.Name] = true
 		logger.Log.WithField("attribute", attribute).Debug("Validate attribute type")
+		logger.Log.Debug(attribute.Type)
 		if err := validateAttributeType(attribute); err != nil {
 			return err
 		}
+
+		if attribute.Type == "relation" {
+			logger.Log.WithField("attributes", attribute).Debug("debug attributes")
+			// Validate presence of mandatory relationship fields
+			if attribute.Relation == "" || attribute.Target == "" {
+				return fmt.Errorf("relationship '%s' must define 'relation' and 'target'", attribute.Name)
+			}
+
+			// Check if the target collection exists
+			var relatedCollection Collection
+			err := database.DB.Where("name = ?", attribute.Target).First(&relatedCollection).Error
+			if err != nil {
+				logger.Log.WithField("collection", attribute.Target).
+					WithError(err).
+					Warn("Referenced collection does not exist")
+				return fmt.Errorf("target collection '%s' for relationship '%s' does not exist", attribute.Target, attribute.Name)
+			}
+
+			// Validate the relationship type
+			allowedRelationTypes := map[string]struct{}{
+				"oneToOne":   {},
+				"oneToMany":  {},
+				"manyToMany": {},
+			}
+
+			if _, isValid := allowedRelationTypes[attribute.Relation]; !isValid {
+				logger.Log.WithFields(map[string]interface{}{
+					"relation_type": attribute.Relation,
+					"attribute":     attribute.Name,
+				}).Error("Invalid relation_type provided")
+				return fmt.Errorf("invalid relation_type '%s' for relationship '%s'; allowed values are: oneToOne, oneToMany, manyToMany", attribute.Relation, attribute.Name)
+			}
+		}
 	}
-
-	//logger.Log.WithField("relationship", ct.Relationships).Debug("Validating relationship")
-
-	// Validate relationships
-	// for _, rel := range ct.Relationships {
-	// 	if rel.Field == "" || rel.RelationType == "" || rel.CollectionTarget == "" {
-	// 		return fmt.Errorf("invalid relationship: all attributes must be defined (attribute, collection, relation_type)")
-	// 	}
-
-	// 	logger.Log.WithField("relationship", rel).Debug("Validating relationship")
-
-	// 	// Check if the referenced collection exists
-	// 	var relatedCollection Collection
-	// 	err := database.DB.Where("name = ?", rel.CollectionTarget).First(&relatedCollection).Error
-	// 	if err != nil {
-	// 		logger.Log.WithField("collection", rel.Collection).
-	// 			WithError(err).
-	// 			Warn("Referenced collection does not exist")
-	// 		return fmt.Errorf("Target collection '%s' for relationship attribute '%s' does not exist", rel.CollectionTarget, rel.Field)
-	// 	}
-
-	// 	// Check if the referenced relation type is correct
-	// 	if _, isValid := allowedRelationTypes[rel.RelationType]; !isValid {
-	// 		logger.Log.WithFields(map[string]interface{}{
-	// 			"relation_type": rel.RelationType,
-	// 			"attribute":         rel.Field,
-	// 		}).Error("Invalid relation_type provided")
-	// 		return fmt.Errorf("invalid relation_type '%s' for attribute '%s'; allowed values are: oneToOne, oneToMany, manyToMany", rel.RelationType, rel.Field)
-	// 	}
-	// }
 
 	return nil
 }
