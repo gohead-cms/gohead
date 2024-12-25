@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"errors"
 	"fmt"
 
 	"gitlab.com/sudo.bngz/gohead/internal/models"
@@ -75,17 +76,25 @@ func restoreAssociatedRecords(model interface{}, collectionID uint) error {
 func GetCollectionByName(name string) (*models.Collection, error) {
 	var ct models.Collection
 
-	// Load the Collection, including its fields and relationships
-	if err := database.DB.Preload("attributes").Preload("relationships").
-		Where("name = ?", name).First(&ct).Error; err != nil {
-		if err.Error() == "record not found" {
-			logger.Log.WithField("name", name).Warn("collection not found")
+	// Preload the 'Attributes' relationship
+	if err := database.DB.
+		Preload("Attributes").
+		Where("name = ?", name).
+		First(&ct).Error; err != nil {
+
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			logger.Log.WithField("name", name).
+				Warn("collection not found")
 			return nil, fmt.Errorf("collection '%s' not found", name)
 		}
-		logger.Log.WithField("name", name).Error("Failed to fetch collection", err)
+
+		logger.Log.WithField("name", name).
+			Error("Failed to fetch collection", err)
 		return nil, fmt.Errorf("failed to fetch collection '%s': %w", name, err)
 	}
-	logger.Log.WithField("collection", ct.Name).Info("collection fetch successfully")
+
+	logger.Log.WithField("collection", ct.Name).
+		Info("collection fetch successfully")
 	return &ct, nil
 }
 

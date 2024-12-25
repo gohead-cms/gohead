@@ -15,6 +15,7 @@ func GetCollection(c *gin.Context) {
 	name := c.Param("name")
 
 	// Retrieve collection from storage
+	logger.Log.WithField("name", name).Debug("Handler:GetCollection ")
 	ct, err := storage.GetCollectionByName(name)
 	if err != nil {
 		logger.Log.WithField("name", name).Warn("GetCollection: collection not found")
@@ -26,7 +27,6 @@ func GetCollection(c *gin.Context) {
 	response := map[string]interface{}{
 		"name":       ct.Name,
 		"attributes": ct.Attributes,
-		//"relationships": ct.Relationships,
 	}
 
 	logger.Log.WithField("name", name).Info("GetCollection: collection retrieved successfully")
