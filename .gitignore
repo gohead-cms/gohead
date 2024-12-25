@@ -9,6 +9,7 @@ debug.json
 # Test binary
 *.test
 coverage.html
+*.patch
 
 # Output of the `go build` command
 /build/

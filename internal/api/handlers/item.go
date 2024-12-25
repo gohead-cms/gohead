@@ -20,18 +20,23 @@ func CreateItem(ct models.Collection) gin.HandlerFunc {
 		ctx, span := tracer.Start(ctx, "CreateItem")
 		defer span.End()
 
-		var itemData map[string]interface{}
-		if err := c.ShouldBindJSON(&itemData); err != nil {
+		// Parse incoming JSON payload
+		var input struct {
+			Data map[string]interface{} `json:"data"` // Strapi-style payload
+		}
+		if err := c.ShouldBindJSON(&input); err != nil {
 			logger.Log.
 				WithError(err).
 				WithField("collection_id", ct.ID).
 				Warn("CreateItem: Invalid input")
 
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input format"})
 			return
 		}
 
-		// Validate the incoming payload against the collection schema (fields)
+		itemData := input.Data
+
+		// Validate the incoming payload against the collection schema
 		if err := models.ValidateItemData(ct, itemData); err != nil {
 			logger.Log.
 				WithError(err).
@@ -42,19 +47,7 @@ func CreateItem(ct models.Collection) gin.HandlerFunc {
 			return
 		}
 
-		// If you have a separate function to validate relationships, pass the same itemData
-		// or extract a nested "relationships" key if your JSON is structured that way.
-		// Adjust as needed based on how your relationships are actually represented.
-		// if err := models.ValidateRelationships(&ct, itemData); err != nil {
-		// 	logger.Log.
-		// 		WithError(err).
-		// 		WithField("collection_id", ct.ID).
-		// 		Warn("CreateItem: Validation failed for relationships")
-
-		// 	c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		// 	return
-		// }
-
+		// Create the main item
 		item := models.Item{
 			CollectionID: ct.ID,
 			Data:         models.JSONMap(itemData),
