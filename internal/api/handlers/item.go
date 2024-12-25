@@ -37,7 +37,7 @@ func CreateItem(ct models.Collection) gin.HandlerFunc {
 		itemData := input.Data
 
 		// Validate the incoming payload against the collection schema
-		if err := models.ValidateItemData(ct, itemData); err != nil {
+		if err := models.ValidateItemValues(ct, itemData); err != nil {
 			logger.Log.
 				WithError(err).
 				WithField("collection_id", ct.ID).
@@ -178,7 +178,7 @@ func UpdateItem(ct models.Collection) gin.HandlerFunc {
 		}
 
 		// Re-validate the updated payload against the collection schema
-		if err := models.ValidateItemData(ct, itemData); err != nil {
+		if err := models.ValidateItemValues(ct, itemData); err != nil {
 			logger.Log.
 				WithError(err).
 				WithField("item_id", id).

@@ -68,14 +68,14 @@ func TestValidateItemData(t *testing.T) {
 			"published_date": "2024-12-10",
 			"rating":         rating,
 		}
-		assert.NoError(t, ValidateItemData(collection, data))
+		assert.NoError(t, ValidateItemValues(collection, data))
 	})
 
 	t.Run("Missing Required Field", func(t *testing.T) {
 		data := map[string]interface{}{
 			"published_date": "2024-12-10",
 		}
-		err := ValidateItemData(collection, data)
+		err := ValidateItemValues(collection, data)
 		assert.Error(t, err)
 		assert.Equal(t, "missing required attribute: 'title'", err.Error())
 	})
@@ -85,7 +85,7 @@ func TestValidateItemData(t *testing.T) {
 			"title":          "An Article",
 			"published_date": "12-10-2024",
 		}
-		err := ValidateItemData(collection, data)
+		err := ValidateItemValues(collection, data)
 		assert.Error(t, err)
 		assert.Equal(t, "validation failed for attribute 'published_date': invalid date format for value: 12-10-2024", err.Error())
 	})
@@ -95,7 +95,7 @@ func TestValidateItemData(t *testing.T) {
 			"title":  "An Article",
 			"rating": 30,
 		}
-		err := ValidateItemData(collection, data)
+		err := ValidateItemValues(collection, data)
 		assert.Error(t, err)
 		assert.Equal(t, "validation failed for attribute 'rating': attribute 'rating' must be at most 20", err.Error())
 	})
