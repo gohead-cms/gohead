@@ -10,7 +10,6 @@ func MigrateDatabase(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&models.Collection{},
 		&models.Attribute{},
-		&models.Relationship{},
 		&models.Item{},
 		&models.User{},
 	)

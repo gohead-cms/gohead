@@ -33,7 +33,7 @@ func TestDynamicContentHandler(t *testing.T) {
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
-	assert.NoError(t, db.AutoMigrate(&models.User{}, &models.UserRole{}, &models.Collection{}, &models.Attribute{}, &models.Relationship{}))
+	assert.NoError(t, db.AutoMigrate(&models.User{}, &models.UserRole{}, &models.Collection{}, &models.Attribute{}))
 
 	// Define a test content type
 	collection := models.Collection{

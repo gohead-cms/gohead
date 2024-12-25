@@ -71,18 +71,6 @@ func CreateItem(ct models.Collection) gin.HandlerFunc {
 			return
 		}
 
-		// Optionally, save relationships. This might involve linking itemData or a subset
-		// specifically for relationships, depending on your data model.
-		if err := storage.SaveRelationship(&ct, item.ID, itemData); err != nil {
-			logger.Log.
-				WithError(err).
-				WithField("item_id", item.ID).
-				Error("CreateItem: Relationship save failed")
-
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save relationships"})
-			return
-		}
-
 		logger.Log.WithFields(logrus.Fields{
 			"item_id":       item.ID,
 			"collection_id": ct.ID,
@@ -140,31 +128,31 @@ func GetItemByID(ct models.Collection) gin.HandlerFunc {
 		}
 
 		// Fetch relationships and attach them to the item data
-		relations, err := storage.GetRelationships(ct.ID, item.ID)
-		if err != nil {
-			logger.Log.
-				WithError(err).
-				WithField("item_id", id).
-				Error("GetItemByID: Relationship fetch failed")
+		// relations, err := storage.GetRelationships(ct.ID, item.ID)
+		// if err != nil {
+		// 	logger.Log.
+		// 		WithError(err).
+		// 		WithField("item_id", id).
+		// 		Error("GetItemByID: Relationship fetch failed")
 
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch relationships"})
-			return
-		}
+		// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch relationships"})
+		// 	return
+		// }
 
-		for _, rel := range relations {
-			relatedItem, err := storage.GetItemByID(*rel.SourceItemID)
-			if err != nil {
-				logger.Log.
-					WithError(err).
-					WithField("relation", rel).
-					Error("GetItemByID: Related item fetch failed")
+		// for _, rel := range relations {
+		// 	relatedItem, err := storage.GetItemByID(*rel.SourceItemID)
+		// 	if err != nil {
+		// 		logger.Log.
+		// 			WithError(err).
+		// 			WithField("relation", rel).
+		// 			Error("GetItemByID: Related item fetch failed")
 
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch related item"})
-				return
-			}
-			// Attach the related item’s data under the relationship’s field key:
-			item.Data[rel.Attribute] = relatedItem.Data
-		}
+		// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch related item"})
+		// 		return
+		// 	}
+		// 	// Attach the related item’s data under the relationship’s field key:
+		// 	item.Data[rel.Attribute] = relatedItem.Data
+		// }
 
 		logger.Log.WithField("item_id", id).Info("GetItemByID: Success")
 		c.JSON(http.StatusOK, item)

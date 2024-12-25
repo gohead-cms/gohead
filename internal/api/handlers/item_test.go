@@ -33,7 +33,7 @@ func TestCreateItemIntegration(t *testing.T) {
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
-	assert.NoError(t, db.AutoMigrate(&models.User{}, &models.UserRole{}, &models.Collection{}, &models.Attribute{}, &models.Relationship{}))
+	assert.NoError(t, db.AutoMigrate(&models.User{}, &models.UserRole{}, &models.Collection{}, &models.Attribute{}))
 
 	// Seed roles
 	adminRole := models.UserRole{Name: "admin", Description: "Administrator", Permissions: models.JSONMap{"manage_users": true}}

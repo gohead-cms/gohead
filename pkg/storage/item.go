@@ -42,17 +42,8 @@ func UpdateItem(collection *models.Collection, itemID uint, data models.JSONMap)
 		return fmt.Errorf("failed to update item data: %w", err)
 	}
 
-	// Delete existing relationships
-	if err := database.DB.Where("item_id = ?", itemID).Delete(&models.Relationship{}).Error; err != nil {
-		logger.Log.WithField("item_id", itemID).WithError(err).Error("Failed to delete existing relationships")
-		return fmt.Errorf("failed to delete existing relationships: %w", err)
-	}
-
 	// Save updated relationships
-	if err := SaveRelationship(collection, item.ID, data); err != nil {
-		logger.Log.WithField("item_id", itemID).WithError(err).Error("Failed to save updated relationships")
-		return fmt.Errorf("failed to save updated relationships: %w", err)
-	}
+	//TO CHECK
 
 	logger.Log.WithField("item_id", itemID).Info("Item updated successfully")
 	return nil
@@ -60,11 +51,6 @@ func UpdateItem(collection *models.Collection, itemID uint, data models.JSONMap)
 
 func DeleteItem(id uint) error {
 	if err := database.DB.Where("id = ?", id).Delete(&models.Item{}).Error; err != nil {
-		return err
-	}
-
-	// Delete relationships
-	if err := database.DB.Where("collection = ? AND source_item_id = ?", id).Delete(&models.Relationship{}).Error; err != nil {
 		return err
 	}
 

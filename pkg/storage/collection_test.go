@@ -28,7 +28,6 @@ func TestCollectionStorage(t *testing.T) {
 	// Apply migrations
 	err := db.AutoMigrate(&models.Collection{},
 		&models.Attribute{},
-		&models.Relationship{},
 		&models.Item{},
 	)
 	assert.NoError(t, err, "Failed to apply migrations")

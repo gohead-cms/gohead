@@ -42,10 +42,7 @@ func SaveCollection(ct *models.Collection) error {
 		}
 
 		// Restore associated relationships
-		if err := restoreAssociatedRecords(&models.Relationship{}, existing.ID); err != nil {
-			logger.Log.WithError(err).WithField("collection", ct.Name).Error("Failed to restore associated relationships")
-			return fmt.Errorf("failed to restore associated relationships: %w", err)
-		}
+		// TO CHECK
 
 		logger.Log.WithField("collection", ct.Name).Info("Collection restored successfully")
 		return nil
@@ -231,11 +228,7 @@ func DeleteCollection(CollectionID uint) error {
 	logger.Log.WithField("collection_id", CollectionID).Info("DeleteCollection: delete successfully associated fields")
 
 	// Delete associated relationships
-	if err := tx.Where("collection_id = ?", CollectionID).Delete(&models.Relationship{}).Error; err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to delete relationships for collection ID '%d': %w", CollectionID, err)
-	}
-	logger.Log.WithField("collection_id", CollectionID).Info("DeleteCollection: delete successfully associated relationships")
+	//TOCHECK
 
 	// Delete associated content items
 	if err := tx.Where("collection_id = ?", Collection.ID).Delete(&models.Item{}).Error; err != nil {

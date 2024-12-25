@@ -102,7 +102,7 @@ func TestUpdateItem(t *testing.T) {
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
-	assert.NoError(t, db.AutoMigrate(&models.Item{}, &models.Relationship{}, &models.Collection{}))
+	assert.NoError(t, db.AutoMigrate(&models.Item{}, &models.Collection{}))
 
 	// Create a collection
 	collection := &models.Collection{Name: "articles"}
@@ -114,14 +114,6 @@ func TestUpdateItem(t *testing.T) {
 		Data:         models.JSONMap{"title": "Old Title", "content": "Old Content"},
 	}
 	assert.NoError(t, db.Create(item).Error)
-
-	// Create and save relationships for the item
-	relationship := &models.Relationship{
-		SourceItemID: &item.ID,
-		RelationType: "one-to-one",
-		Attribute:    "related_attribute",
-	}
-	assert.NoError(t, db.Create(relationship).Error)
 
 	// Update the content item
 	updatedData := models.JSONMap{
@@ -138,12 +130,6 @@ func TestUpdateItem(t *testing.T) {
 	assert.Equal(t, "New Title", updatedItem.Data["title"])
 	assert.Equal(t, "New Content", updatedItem.Data["content"])
 
-	// Verify relationships are updated
-	var updatedRelationships []models.Relationship
-	assert.NoError(t, db.Where("source_item_id = ?", item.ID).Find(&updatedRelationships).Error)
-	assert.Len(t, updatedRelationships, 1)
-	assert.Equal(t, "related_field", updatedRelationships[0].Attribute)
-
 	// Verify nested item creation
 	var nestedItem models.Item
 	assert.NoError(t, db.Where("data->>'title' = ?", "Nested Title").First(&nestedItem).Error)
@@ -156,7 +142,7 @@ func TestDeleteItem(t *testing.T) {
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
-	assert.NoError(t, db.AutoMigrate(&models.Item{}, &models.Relationship{}, &models.Collection{}))
+	assert.NoError(t, db.AutoMigrate(&models.Item{}, &models.Collection{}))
 
 	// Create and save a collection
 	collection := &models.Collection{Name: "articles"}
@@ -178,11 +164,6 @@ func TestDeleteItem(t *testing.T) {
 	err = db.First(&deletedItem, item.ID).Error
 	assert.Error(t, err) // Should return an error because the item no longer exists
 
-	// Verify relationships are deleted
-	var deletedRelationships []models.Relationship
-	err = db.Where("source_item_id = ?", item.ID).Find(&deletedRelationships).Error
-	assert.NoError(t, err)
-	assert.Len(t, deletedRelationships, 0)
 }
 
 func TestCheckFieldUniqueness(t *testing.T) {
@@ -192,7 +173,6 @@ func TestCheckFieldUniqueness(t *testing.T) {
 
 	err := db.AutoMigrate(&models.Collection{},
 		&models.Attribute{},
-		&models.Relationship{},
 		&models.Item{},
 	)
 	assert.NoError(t, err)
