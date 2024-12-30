@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -78,7 +79,7 @@ func handleCreate(c *gin.Context, userRole string, ct *models.Collection) {
 	CreateItem(*ct)(c)
 }
 
-// handleRead handles fetching items or a single item by ID.
+// handleRead handles fetching items or a single item by ID with support for nested relationships.
 func handleRead(c *gin.Context, userRole string, ct *models.Collection, id string) {
 	if !hasPermission(userRole, "read") {
 		logger.Log.WithFields(logrus.Fields{
@@ -88,10 +89,30 @@ func handleRead(c *gin.Context, userRole string, ct *models.Collection, id strin
 		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
+
+	// Parse the "level" query parameter for nested relations, defaulting to 1
+	levelParam := c.Query("level")
+	level := 1
+	if levelParam != "" {
+		parsedLevel, err := strconv.Atoi(levelParam)
+		if err != nil || parsedLevel < 1 {
+			logger.Log.WithField("level_param", levelParam).Warn("Invalid level parameter")
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid level parameter"})
+			return
+		}
+		level = parsedLevel
+	}
+
+	// Handle fetching all items or a single item by ID
 	if id == "" {
-		GetItems(*ct)(c)
+		GetItems(*ct, uint(level))(c)
 	} else {
-		GetItemByID(*ct)(c)
+		itemID, err := strconv.Atoi(id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
+			return
+		}
+		GetItemByID(*ct, uint(itemID), uint(level))(c)
 	}
 }
 

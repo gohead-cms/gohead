@@ -43,33 +43,27 @@ func TestSaveItem(t *testing.T) {
 }
 
 func TestGetItemByID(t *testing.T) {
-	// Initialize in-memory test database
+	// Setup a test database
 	db := testutils.SetupTestDB()
 	defer testutils.CleanupTestDB()
 
-	// Apply migrations
-	assert.NoError(t, db.AutoMigrate(&models.Item{}, &models.Collection{}))
-
-	// Create a collection and content item
-	collection := &models.Collection{Name: "articles"}
-	assert.NoError(t, db.Create(collection).Error)
-
-	item := &models.Item{
-		CollectionID: collection.ID,
-		Data: models.JSONMap{
-			"title":   "Test Article",
-			"content": "This is a test.",
-		},
+	// Create a mock item
+	mockItem := models.Item{
+		CollectionID: 1,
+		Data:         models.JSONMap{"key": "value"},
 	}
-	assert.NoError(t, db.Create(item).Error)
+	db.Create(&mockItem)
 
-	// Fetch the content item by ID
-	result, err := GetItemByID(item.ID)
+	// Fetch the item
+	item, err := GetItemByID(1, mockItem.ID)
 	assert.NoError(t, err)
-	assert.NotNil(t, result)
-	assert.Equal(t, "Test Article", result.Data["title"])
-}
+	assert.NotNil(t, item)
+	assert.Equal(t, mockItem.ID, item.ID)
 
+	// Fetch a non-existent item
+	_, err = GetItemByID(1, 9999)
+	assert.Error(t, err)
+}
 func TestGetItems(t *testing.T) {
 	// Initialize in-memory test database
 	db := testutils.SetupTestDB()
@@ -121,7 +115,7 @@ func TestUpdateItem(t *testing.T) {
 		"content":           "New Content",
 		"related_attribute": map[string]interface{}{"title": "Nested Title"},
 	}
-	err := UpdateItem(collection, item.ID, updatedData)
+	err := UpdateItem(item.ID, updatedData)
 	assert.NoError(t, err)
 
 	// Verify the content item is updated

@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"gitlab.com/sudo.bngz/gohead/internal/models"
+	"gitlab.com/sudo.bngz/gohead/pkg/database"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gitlab.com/sudo.bngz/gohead/pkg/storage"
 	"go.opentelemetry.io/otel"
@@ -76,79 +78,144 @@ func CreateItem(ct models.Collection) gin.HandlerFunc {
 	}
 }
 
-// GetItems retrieves all items in a collection.
-func GetItems(ct models.Collection) gin.HandlerFunc {
+func GetItems(ct models.Collection, level uint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		items, err := storage.GetItems(ct.ID)
+		id, err := strconv.Atoi(c.Param("id"))
 		if err != nil {
-			logger.Log.
-				WithError(err).
-				WithField("collection_id", ct.ID).
-				Error("GetItems: Retrieval failed")
-
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve items"})
+			logger.Log.WithError(err).WithField("id", id).Error("Failed to fetch nested relations")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch item relations"})
 			return
 		}
 
-		logger.Log.WithField("collection_id", ct.ID).Info("GetItems: Success")
-		c.JSON(http.StatusOK, items)
-	}
-}
-
-// GetItemByID retrieves a specific item by ID.
-func GetItemByID(ct models.Collection) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		idStr := c.Param("id")
-		id, err := strconv.Atoi(idStr)
+		// Use storage package to fetch the item
+		item, err := storage.GetItemByID(uint(ct.ID), uint(id))
 		if err != nil {
-			logger.Log.
-				WithError(err).
-				Warn("GetItemByID: Invalid ID")
-
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
-			return
-		}
-
-		item, err := storage.GetItemByID(uint(id))
-		if err != nil {
-			logger.Log.
-				WithError(err).
-				WithField("item_id", id).
-				Warn("GetItemByID: Not found")
-
+			logger.Log.WithError(err).WithField("item_id", id).Warn("Item not found")
 			c.JSON(http.StatusNotFound, gin.H{"error": "Item not found"})
 			return
 		}
 
-		// Fetch relationships and attach them to the item data
-		// relations, err := storage.GetRelationships(ct.ID, item.ID)
-		// if err != nil {
-		// 	logger.Log.
-		// 		WithError(err).
-		// 		WithField("item_id", id).
-		// 		Error("GetItemByID: Relationship fetch failed")
+		// Fetch nested relations
+		data, err := fetchNestedRelations(ct, item.Data, level)
+		if err != nil {
+			logger.Log.WithError(err).WithField("item_id", id).Error("Failed to fetch nested relations")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch item relations"})
+			return
+		}
 
-		// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch relationships"})
-		// 	return
-		// }
+		c.JSON(http.StatusOK, gin.H{"data": data})
+	}
+}
 
-		// for _, rel := range relations {
-		// 	relatedItem, err := storage.GetItemByID(*rel.SourceItemID)
-		// 	if err != nil {
-		// 		logger.Log.
-		// 			WithError(err).
-		// 			WithField("relation", rel).
-		// 			Error("GetItemByID: Related item fetch failed")
+// fetchNestedRelations recursively fetches nested relationships up to a specified level.
+func fetchNestedRelations(ct models.Collection, data map[string]interface{}, level uint) (map[string]interface{}, error) {
+	if level <= 0 {
+		return data, nil // Stop recursion when level is zero
+	}
+	logger.Log.WithField("data", data).Debug("fetchNestedRelations:data")
+	result := make(map[string]interface{})
+	for key, value := range data {
+		// Check if the key is a relationship
+		attribute := findAttribute(ct.Attributes, key)
+		if attribute == nil || attribute.Type != "relation" {
+			result[key] = value
+			continue
+		}
 
-		// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch related item"})
-		// 		return
-		// 	}
-		// 	// Attach the related item’s data under the relationship’s field key:
-		// 	item.Data[rel.Attribute] = relatedItem.Data
-		// }
+		// Handle relationships
+		switch attribute.Relation {
+		case "oneToOne", "oneToMany":
+			id, ok := value.(float64)
+			if !ok {
+				result[key] = value
+				continue
+			}
+			relatedData, err := fetchRelatedItem(attribute.Target, uint(id), level-1)
+			if err != nil {
+				return nil, fmt.Errorf("failed to fetch relation '%s': %w", key, err)
+			}
+			result[key] = relatedData
 
-		logger.Log.WithField("item_id", id).Info("GetItemByID: Success")
-		c.JSON(http.StatusOK, item)
+		case "manyToMany":
+			array, ok := value.([]interface{})
+			if !ok {
+				result[key] = value
+				continue
+			}
+			relatedItems := []map[string]interface{}{}
+			for _, element := range array {
+				if id, isID := element.(float64); isID {
+					relatedData, err := fetchRelatedItem(attribute.Target, uint(id), level-1)
+					if err != nil {
+						return nil, fmt.Errorf("failed to fetch relation '%s': %w", key, err)
+					}
+					relatedItems = append(relatedItems, relatedData)
+				}
+			}
+			result[key] = relatedItems
+
+		default:
+			result[key] = value
+		}
+	}
+	return result, nil
+}
+
+// fetchRelatedItem fetches a single related item and its relations.
+func fetchRelatedItem(target string, id uint, level uint) (map[string]interface{}, error) {
+	var relatedCollection models.Collection
+	if err := database.DB.Where("name = ?", target).First(&relatedCollection).Error; err != nil {
+		return nil, fmt.Errorf("target collection '%s' not found: %w", target, err)
+	}
+
+	var relatedItem models.Item
+	if err := database.DB.Where("id = ? AND collection_id = ?", id, relatedCollection.ID).First(&relatedItem).Error; err != nil {
+		return nil, fmt.Errorf("related item not found in collection '%s': %w", target, err)
+	}
+
+	return fetchNestedRelations(relatedCollection, relatedItem.Data, level)
+}
+
+// findAttribute retrieves an attribute from a collection by name.
+func findAttribute(attributes []models.Attribute, name string) *models.Attribute {
+	for _, attr := range attributes {
+		if attr.Name == name {
+			return &attr
+		}
+	}
+	return nil
+}
+
+// GetItemsByID fetches an item by ID, including nested relations up to the specified level.
+func GetItemByID(ct models.Collection, id uint, level uint) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Parse item ID from the URL
+		idStr := c.Param("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			logger.Log.WithError(err).WithField("id", idStr).Warn("Invalid item ID format")
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid item ID format"})
+			return
+		}
+
+		// Fetch the item from the storage layer
+		item, err := storage.GetItemByID(uint(ct.ID), uint(id))
+		if err != nil {
+			logger.Log.WithError(err).WithField("item_id", id).Warn("Item not found")
+			c.JSON(http.StatusNotFound, gin.H{"error": "Item not found"})
+			return
+		}
+
+		// Fetch nested relationships for the item
+		data, err := storage.FetchNestedRelations(ct, item.Data, level)
+		if err != nil {
+			logger.Log.WithError(err).WithField("item_id", id).Error("Failed to fetch nested relations")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch item relations"})
+			return
+		}
+
+		// Respond with the fetched item and nested relationships
+		c.JSON(http.StatusOK, gin.H{"data": data})
 	}
 }
 
@@ -199,7 +266,7 @@ func UpdateItem(ct models.Collection) gin.HandlerFunc {
 		// 	return
 		// }
 
-		if err := storage.UpdateItem(&ct, uint(id), models.JSONMap(itemData)); err != nil {
+		if err := storage.UpdateItem(uint(id), models.JSONMap(itemData)); err != nil {
 			logger.Log.
 				WithError(err).
 				WithField("item_id", id).

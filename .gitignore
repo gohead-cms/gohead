@@ -10,6 +10,7 @@ debug.json
 *.test
 coverage.html
 *.patch
+TODO
 
 # Output of the `go build` command
 /build/
