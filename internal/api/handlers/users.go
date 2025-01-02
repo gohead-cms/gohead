@@ -16,7 +16,8 @@ func CreateUser(c *gin.Context) {
 	var user models.User
 	if err := c.ShouldBindJSON(&user); err != nil {
 		logger.Log.WithError(err).Warn("Failed to bind JSON for user creation")
-		c.Set("response", gin.H{"error": "Invalid input"})
+		c.Set("response", "Invalid input")
+		c.Set("details", err.Error())
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
@@ -27,14 +28,16 @@ func CreateUser(c *gin.Context) {
 			"username": user.Username,
 			"email":    user.Email,
 		}).Warn("User validation failed")
-		c.Set("response", gin.H{"error": err.Error()})
+		c.Set("response", "User validation failed")
+		c.Set("details", err.Error())
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
 
 	if err := storage.SaveUser(&user); err != nil {
 		logger.Log.WithError(err).Error("Failed to save user")
-		c.Set("response", gin.H{"error": "Failed to create user"})
+		c.Set("response", "Failed to create user")
+		c.Set("details", err.Error())
 		c.Set("status", http.StatusInternalServerError)
 		return
 	}
@@ -43,7 +46,7 @@ func CreateUser(c *gin.Context) {
 		"username": user.Username,
 		"role":     user.Role.Name,
 	}).Info("User created successfully")
-	c.Set("response", gin.H{"message": "User created successfully"})
+	c.Set("response", "User created successfully")
 	c.Set("status", http.StatusCreated)
 }
 
@@ -52,7 +55,8 @@ func GetAllUsers(c *gin.Context) {
 	users, err := storage.GetAllUsers()
 	if err != nil {
 		logger.Log.WithError(err).Error("Failed to fetch users")
-		c.Set("response", gin.H{"error": "Failed to fetch users"})
+		c.Set("response", "Failed to fetch users")
+		c.Set("details", err.Error())
 		c.Set("status", http.StatusInternalServerError)
 		return
 	}
@@ -67,7 +71,8 @@ func GetUser(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		logger.Log.WithError(err).Warn("Invalid user ID in request")
-		c.Set("response", gin.H{"error": "Invalid user ID"})
+		c.Set("response", "Invalid user ID")
+		c.Set("details", err.Error())
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
@@ -77,7 +82,8 @@ func GetUser(c *gin.Context) {
 		logger.Log.WithFields(logrus.Fields{
 			"user_id": id,
 		}).Warn("User not found")
-		c.Set("response", gin.H{"error": "User not found"})
+		c.Set("response", "User not found")
+		c.Set("details", err.Error())
 		c.Set("status", http.StatusNotFound)
 		return
 	}
@@ -85,7 +91,8 @@ func GetUser(c *gin.Context) {
 	logger.Log.WithFields(logrus.Fields{
 		"user_id": id,
 	}).Info("Fetched user successfully")
-	c.Set("response", gin.H{"user": user})
+	c.Set("response", user)
+	c.Set("details", err.Error())
 	c.Set("status", http.StatusOK)
 }
 
@@ -94,7 +101,8 @@ func UpdateUser(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		logger.Log.WithError(err).Warn("Invalid user ID in request")
-		c.Set("response", gin.H{"error": "Invalid user ID"})
+		c.Set("response", "Invalid user ID")
+		c.Set("details", err.Error())
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
@@ -102,7 +110,8 @@ func UpdateUser(c *gin.Context) {
 	var updates map[string]interface{}
 	if err := c.ShouldBindJSON(&updates); err != nil {
 		logger.Log.WithError(err).Warn("Failed to bind JSON for user updates")
-		c.Set("response", gin.H{"error": "Invalid input"})
+		c.Set("response", "Invalid input")
+		c.Set("details", err.Error())
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
@@ -113,7 +122,8 @@ func UpdateUser(c *gin.Context) {
 			"user_id": id,
 			"updates": updates,
 		}).Warn("User updates validation failed")
-		c.Set("response", gin.H{"error": err.Error()})
+		c.Set("response", "User updates validation failed")
+		c.Set("details", err.Error())
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
@@ -122,7 +132,8 @@ func UpdateUser(c *gin.Context) {
 		logger.Log.WithFields(logrus.Fields{
 			"user_id": id,
 		}).Error("Failed to update user")
-		c.Set("response", gin.H{"error": "Failed to update user"})
+		c.Set("response", "Failed to update user")
+		c.Set("details", err.Error())
 		c.Set("status", http.StatusInternalServerError)
 		return
 	}
@@ -140,7 +151,8 @@ func DeleteUser(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		logger.Log.WithError(err).Warn("Invalid user ID in request")
-		c.Set("response", gin.H{"error": "Invalid user ID"})
+		c.Set("response", "Invalid user ID")
+		c.Set("details", err.Error())
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
@@ -149,7 +161,8 @@ func DeleteUser(c *gin.Context) {
 		logger.Log.WithFields(logrus.Fields{
 			"user_id": id,
 		}).Error("Failed to delete user")
-		c.Set("response", gin.H{"error": "Failed to delete user"})
+		c.Set("response", "Failed to delete user")
+		c.Set("details", err.Error())
 		c.Set("status", http.StatusInternalServerError)
 		return
 	}

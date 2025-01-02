@@ -18,7 +18,7 @@ func DynamicCollectionHandler(c *gin.Context) {
 	userRole, ok := role.(string)
 	if !ok || userRole == "" {
 		logger.Log.Warn("DynamicContentHandler: Missing or invalid user role in context")
-		c.Set("response", gin.H{"error": "Unauthorized"})
+		c.Set("response", "Unauthorized")
 		c.Set("status", http.StatusUnauthorized)
 		return
 	}
@@ -32,7 +32,7 @@ func DynamicCollectionHandler(c *gin.Context) {
 		logger.Log.WithFields(logrus.Fields{
 			"collection": collectionName,
 		}).Warn("DynamicContentHandler: Collection not found")
-		c.Set("response", gin.H{"error": "Collection not found"})
+		c.Set("response", "Collection not found")
 		c.Set("status", http.StatusNotFound)
 		return
 	}
@@ -64,7 +64,7 @@ func DynamicCollectionHandler(c *gin.Context) {
 			"collection":     collectionName,
 			"request_method": c.Request.Method,
 		}).Warn("Unsupported HTTP method")
-		c.Set("response", gin.H{"error": "Method not allowed"})
+		c.Set("response", "Method not allowed")
 		c.Set("status", http.StatusMethodNotAllowed)
 	}
 }
@@ -76,7 +76,7 @@ func handleCreate(c *gin.Context, userRole string, ct *models.Collection) {
 			"user_role":  userRole,
 			"collection": ct.Name,
 		}).Warn("Create permission denied")
-		c.Set("response", gin.H{"error": "Access denied"})
+		c.Set("response", "Access denied")
 		c.Set("status", http.StatusForbidden)
 		return
 	}
@@ -90,7 +90,7 @@ func handleRead(c *gin.Context, userRole string, ct *models.Collection, id strin
 			"user_role":  userRole,
 			"collection": ct.Name,
 		}).Warn("Read permission denied")
-		c.Set("response", gin.H{"error": "Access denied"})
+		c.Set("response", "Access denied")
 		c.Set("status", http.StatusForbidden)
 		return
 	}
@@ -102,7 +102,7 @@ func handleRead(c *gin.Context, userRole string, ct *models.Collection, id strin
 		parsedLevel, err := strconv.Atoi(levelParam)
 		if err != nil || parsedLevel < 1 {
 			logger.Log.WithField("level_param", levelParam).Warn("Invalid level parameter")
-			c.Set("response", gin.H{"error": "Invalid level parameter"})
+			c.Set("response", "Invalid level parameter")
 			c.Set("status", http.StatusBadRequest)
 			return
 		}
@@ -115,7 +115,7 @@ func handleRead(c *gin.Context, userRole string, ct *models.Collection, id strin
 	} else {
 		itemID, err := strconv.Atoi(id)
 		if err != nil {
-			c.Set("response", gin.H{"error": "Invalid ID format"})
+			c.Set("response", "Invalid ID format")
 			c.Set("status", http.StatusBadRequest)
 			return
 		}
@@ -131,7 +131,7 @@ func handleUpdate(c *gin.Context, userRole string, ct *models.Collection, id str
 			"collection": ct.Name,
 			"item_id":    id,
 		}).Warn("Update permission denied")
-		c.Set("response", gin.H{"error": "Access denied"})
+		c.Set("response", "Access denied")
 		c.Set("status", http.StatusForbidden)
 		return
 	}
@@ -139,7 +139,7 @@ func handleUpdate(c *gin.Context, userRole string, ct *models.Collection, id str
 		UpdateItem(*ct)(c)
 	} else {
 		logger.Log.Warn("Update operation requires a valid ID")
-		c.Set("response", gin.H{"error": "ID is required for update"})
+		c.Set("response", "ID is required for update")
 		c.Set("status", http.StatusBadRequest)
 	}
 }
@@ -152,7 +152,7 @@ func handleDelete(c *gin.Context, userRole string, ct *models.Collection, id str
 			"collection": ct.Name,
 			"item_id":    id,
 		}).Warn("Delete permission denied")
-		c.Set("response", gin.H{"error": "Access denied"})
+		c.Set("response", "Access denied")
 		c.Set("status", http.StatusForbidden)
 		return
 	}
@@ -160,7 +160,7 @@ func handleDelete(c *gin.Context, userRole string, ct *models.Collection, id str
 		DeleteItem(*ct)(c)
 	} else {
 		logger.Log.Warn("Delete operation requires a valid ID")
-		c.Set("response", gin.H{"error": "ID is required for deletion"})
+		c.Set("response", "ID is required for deletion")
 		c.Set("status", http.StatusBadRequest)
 	}
 }

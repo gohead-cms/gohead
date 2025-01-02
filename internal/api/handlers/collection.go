@@ -19,7 +19,7 @@ func GetCollection(c *gin.Context) {
 	ct, err := storage.GetCollectionByName(name)
 	if err != nil {
 		logger.Log.WithField("name", name).Warn("GetCollection: collection not found")
-		c.Set("response", gin.H{"error": "Collection not found"})
+		c.Set("response", "Collection not found")
 		c.Set("status", http.StatusNotFound)
 		return
 	}
@@ -40,7 +40,7 @@ func CreateCollection(c *gin.Context) {
 	// Parse the JSON input into a map
 	var input map[string]interface{}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.Set("response", gin.H{"error": "Invalid JSON input"})
+		c.Set("response", "Invalid JSON input")
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
@@ -49,7 +49,7 @@ func CreateCollection(c *gin.Context) {
 	// Transform the map into a Collection struct
 	collection, err := models.ParseCollectionInput(input)
 	if err != nil {
-		c.Set("response", gin.H{"error": err.Error()})
+		c.Set("response", err.Error())
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
@@ -57,7 +57,8 @@ func CreateCollection(c *gin.Context) {
 	// Validate the Collection
 	if err := models.ValidateCollectionSchema(collection); err != nil {
 		logger.Log.WithError(err).Warn("CreateCollection: Validation failed")
-		c.Set("response", gin.H{"error": "Validation failed", "details": err.Error()})
+		c.Set("response", "Validation failed")
+		c.Set("details", err.Error())
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
@@ -65,7 +66,8 @@ func CreateCollection(c *gin.Context) {
 	// Save the Collection to the database
 	if err := storage.SaveCollection(&collection); err != nil {
 		logger.Log.WithError(err).Error("CreateCollection: Failed to save collection")
-		c.Set("response", gin.H{"error": "Failed to save collection", "details": err.Error()})
+		c.Set("response", "Failed to save collection")
+		c.Set("details", err.Error())
 		c.Set("status", http.StatusInternalServerError)
 		return
 	}
@@ -83,7 +85,7 @@ func UpdateCollection(c *gin.Context) {
 	// Parse the JSON input into a map
 	var input map[string]interface{}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.Set("response", gin.H{"error": "Invalid JSON input"})
+		c.Set("response", "Invalid JSON input")
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
@@ -91,7 +93,7 @@ func UpdateCollection(c *gin.Context) {
 	// Transform the map into a Collection struct
 	collection, err := models.ParseCollectionInput(input)
 	if err != nil {
-		c.Set("response", gin.H{"error": err.Error()})
+		c.Set("response", err.Error())
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
@@ -99,7 +101,7 @@ func UpdateCollection(c *gin.Context) {
 	// Validate the input collection
 	if err := models.ValidateCollectionSchema(collection); err != nil {
 		logger.Log.WithError(err).Warn("UpdateCollection: Validation failed")
-		c.Set("response", gin.H{"error": "Validation failed: " + err.Error()})
+		c.Set("response", "Validation failed: "+err.Error())
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
@@ -107,7 +109,8 @@ func UpdateCollection(c *gin.Context) {
 	// Attempt to update the collection
 	if err := storage.UpdateCollection(CollectionName, &collection); err != nil {
 		logger.Log.WithError(err).WithField("collection", CollectionName).Error("UpdateCollection: Failed to update collection")
-		c.Set("response", gin.H{"error": "Failed to update collection", "details": err.Error()})
+		c.Set("response", "Failed to update collection")
+		c.Set("detail", err.Error())
 		c.Set("status", http.StatusInternalServerError)
 		return
 	}
@@ -117,7 +120,7 @@ func UpdateCollection(c *gin.Context) {
 	}).Info("collection updated successfully")
 
 	// Respond with success
-	c.Set("response", gin.H{"message": "collection updated successfully"})
+	c.Set("response", "collection updated successfully")
 	c.Set("status", http.StatusOK)
 }
 
@@ -129,7 +132,7 @@ func DeleteCollection(c *gin.Context) {
 	Collection, err := storage.GetCollectionByName(CollectionName)
 	if err != nil {
 		logger.Log.WithError(err).Warn("DeleteCollectionHandler: collection not found")
-		c.Set("response", gin.H{"error": "Collection not found"})
+		c.Set("response", "Collection not found")
 		c.Set("status", http.StatusNotFound)
 		return
 	}
@@ -137,7 +140,7 @@ func DeleteCollection(c *gin.Context) {
 	// Call the storage function to delete the collection
 	if err := storage.DeleteCollection(Collection.ID); err != nil {
 		logger.Log.WithError(err).Error("DeleteCollectionHandler: Failed to delete collection")
-		c.Set("response", gin.H{"error": "Failed to delete collection"})
+		c.Set("response", "Failed to delete collection")
 		c.Set("status", http.StatusInternalServerError)
 		return
 	}
@@ -146,6 +149,6 @@ func DeleteCollection(c *gin.Context) {
 		"collection": CollectionName,
 	}).Info("collection deleted successfully")
 
-	c.Set("response", gin.H{"message": "collection deleted successfully"})
+	c.Set("response", "collection deleted successfully")
 	c.Set("status", http.StatusOK)
 }

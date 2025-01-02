@@ -26,7 +26,9 @@ func Register(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		logger.Log.WithError(err).Warn("Register: Invalid input")
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.Set("status", http.StatusBadRequest)
+		c.Set("details", err.Error())
+		c.Set("response", "Register: Invalid input")
 		return
 	}
 
@@ -34,12 +36,15 @@ func Register(c *gin.Context) {
 	role, err := storage.GetRoleByName(input.RoleName)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			logger.Log.WithField("role_name", input.RoleName).Warn("Register: Role not found")
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Role '%s' does not exist", input.RoleName)})
+			c.Set("status", http.StatusNotFound)
+			c.Set("response", fmt.Sprintf("Role '%s' does not exist", input.RoleName))
+			c.Set("details", err.Error())
 			return
 		}
 		logger.Log.WithError(err).Error("Register: Failed to fetch role")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch role"})
+		c.Set("status", http.StatusNotFound)
+		c.Set("response", fmt.Sprintf("Role '%s' does not exist", input.RoleName))
+		c.Set("details", err.Error())
 		return
 	}
 
@@ -47,7 +52,9 @@ func Register(c *gin.Context) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
 		logger.Log.WithError(err).Error("Register: Failed to hash password")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		c.Set("status", http.StatusInternalServerError)
+		c.Set("response", "Register: Failed to hash password")
+		c.Set("details", err.Error())
 		return
 	}
 
@@ -67,7 +74,9 @@ func Register(c *gin.Context) {
 	// Validate user
 	if err := models.ValidateUser(user); err != nil {
 		logger.Log.WithError(err).Warn("Register: User validation failed")
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.Set("status", http.StatusInternalServerError)
+		c.Set("response", "Register: User validation failed")
+		c.Set("details", err.Error())
 		return
 	}
 
@@ -79,19 +88,26 @@ func Register(c *gin.Context) {
 			"username": user.Username,
 			"role":     role.Name,
 		}).Info("User registered successfully")
-		c.JSON(http.StatusCreated, gin.H{"message": "User registered successfully"})
+		c.Set("status", http.StatusCreated)
+		c.Set("response", "User registered successfully")
 		return
 	case *storage.DuplicateEntryError:
 		logger.Log.WithError(err).Warn("Register: Duplicate entry")
-		c.JSON(http.StatusBadRequest, gin.H{"error": e.Error()})
+		c.Set("status", http.StatusInternalServerError)
+		c.Set("response", "Register: Duplicate entry")
+		c.Set("details", e.Error())
 		return
 	case *storage.GeneralDatabaseError:
 		logger.Log.WithError(err).Error("Register: General database error")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		c.Set("status", http.StatusInternalServerError)
+		c.Set("response", "Register: General database error")
+		c.Set("details", e.Error())
 		return
 	default:
 		logger.Log.WithError(err).Error("Register: Unknown error")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "An unknown error occurred"})
+		c.Set("status", http.StatusInternalServerError)
+		c.Set("response", "Register: Unknown error")
+		c.Set("details", e.Error())
 		return
 	}
 }
@@ -104,7 +120,7 @@ func Login(c *gin.Context) {
 	if err := c.ShouldBindJSON(&input); err != nil {
 		logger.Log.WithError(err).Warn("Login: Invalid input")
 		c.Set("status", http.StatusBadRequest)
-		c.Set("response", gin.H{"error": "Invalid input"})
+		c.Set("response", "Invalid input")
 		return
 	}
 
@@ -113,7 +129,7 @@ func Login(c *gin.Context) {
 	if err != nil {
 		logger.Log.WithError(err).Warn("Login: Invalid username or password")
 		c.Set("status", http.StatusUnauthorized)
-		c.Set("response", gin.H{"error": "Invalid username or password"})
+		c.Set("response", "Invalid username or password")
 		return
 	}
 
@@ -121,7 +137,7 @@ func Login(c *gin.Context) {
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
 		logger.Log.WithError(err).Warn("Login: Invalid username or password")
 		c.Set("status", http.StatusUnauthorized)
-		c.Set("response", gin.H{"error": "Invalid username or password"})
+		c.Set("response", "Invalid username or password")
 		return
 	}
 
@@ -129,7 +145,7 @@ func Login(c *gin.Context) {
 	if user.Role.Name == "" {
 		logger.Log.WithField("username", user.Username).Warn("Login: User role is not assigned")
 		c.Set("status", http.StatusUnauthorized)
-		c.Set("response", gin.H{"error": "User role is not assigned"})
+		c.Set("response", "User role is not assigned")
 		return
 	}
 
@@ -138,7 +154,7 @@ func Login(c *gin.Context) {
 	if err != nil {
 		logger.Log.WithError(err).Error("Login: Failed to generate token")
 		c.Set("status", http.StatusInternalServerError)
-		c.Set("response", gin.H{"error": "Failed to generate token"})
+		c.Set("response", "Failed to generate token")
 		return
 	}
 

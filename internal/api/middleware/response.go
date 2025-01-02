@@ -29,8 +29,14 @@ func ResponseWrapper() gin.HandlerFunc {
 		// Format the response
 		var formattedResponse gin.H
 		if statusCode >= 400 { // Error response
+			details, _ := c.Get("details")
 			formattedResponse = gin.H{
-				"error": response,
+				"error": gin.H{
+					"status":  statusCode,
+					"name":    getErrorName(statusCode),
+					"message": response,
+					"details": details,
+				},
 			}
 		} else { // Success response
 			formattedResponse = gin.H{

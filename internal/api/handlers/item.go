@@ -23,14 +23,14 @@ func CreateItem(ct models.Collection) gin.HandlerFunc {
 			Data map[string]interface{} `json:"data"`
 		}
 		if err := c.ShouldBindJSON(&input); err != nil {
-			c.Set("response", gin.H{"error": "Invalid input format"})
+			c.Set("response", "Invalid input format")
 			c.Set("status", http.StatusBadRequest)
 			return
 		}
 
 		itemData := input.Data
 		if err := models.ValidateItemValues(ct, itemData); err != nil {
-			c.Set("response", gin.H{"error": err.Error()})
+			c.Set("response", err.Error())
 			c.Set("status", http.StatusBadRequest)
 			return
 		}
@@ -40,7 +40,7 @@ func CreateItem(ct models.Collection) gin.HandlerFunc {
 			Data:         models.JSONMap(itemData),
 		}
 		if err := storage.SaveItem(&item); err != nil {
-			c.Set("response", gin.H{"error": "Failed to save item"})
+			c.Set("response", "Failed to save item")
 			c.Set("status", http.StatusInternalServerError)
 			return
 		}
@@ -63,7 +63,7 @@ func GetItems(ct models.Collection, level uint) gin.HandlerFunc {
 
 		items, totalItems, err := storage.GetItems(ct.ID, page, pageSize)
 		if err != nil {
-			c.Set("response", gin.H{"error": "Failed to fetch items"})
+			c.Set("response", "Failed to fetch items")
 			c.Set("status", http.StatusInternalServerError)
 			return
 		}
@@ -88,21 +88,21 @@ func GetItemByID(ct models.Collection, id uint, level uint) gin.HandlerFunc {
 		idStr := c.Param("id")
 		id, err := strconv.Atoi(idStr)
 		if err != nil {
-			c.Set("response", gin.H{"error": "Invalid item ID format"})
+			c.Set("response", "Invalid item ID format")
 			c.Set("status", http.StatusBadRequest)
 			return
 		}
 
 		item, err := storage.GetItemByID(uint(ct.ID), uint(id))
 		if err != nil {
-			c.Set("response", gin.H{"error": "Item not found"})
+			c.Set("response", "Item not found")
 			c.Set("status", http.StatusNotFound)
 			return
 		}
 
 		data, err := storage.FetchNestedRelations(ct, item.Data, level)
 		if err != nil {
-			c.Set("response", gin.H{"error": "Failed to fetch item relations"})
+			c.Set("response", "Failed to fetch item relations")
 			c.Set("status", http.StatusInternalServerError)
 			return
 		}
@@ -118,26 +118,29 @@ func UpdateItem(ct models.Collection) gin.HandlerFunc {
 		idStr := c.Param("id")
 		id, err := strconv.Atoi(idStr)
 		if err != nil {
-			c.Set("response", gin.H{"error": "Invalid ID"})
+			c.Set("response", "Invalid ID")
+			c.Set("details", err.Error())
 			c.Set("status", http.StatusBadRequest)
 			return
 		}
 
 		var itemData map[string]interface{}
 		if err := c.ShouldBindJSON(&itemData); err != nil {
-			c.Set("response", gin.H{"error": "Invalid input"})
+			c.Set("response", "Invalid input")
+			c.Set("details", err.Error())
 			c.Set("status", http.StatusBadRequest)
 			return
 		}
 
 		if err := models.ValidateItemValues(ct, itemData); err != nil {
-			c.Set("response", gin.H{"error": err.Error()})
+			c.Set("response", err.Error())
 			c.Set("status", http.StatusBadRequest)
 			return
 		}
 
 		if err := storage.UpdateItem(uint(id), models.JSONMap(itemData)); err != nil {
-			c.Set("response", gin.H{"error": "Failed to update item"})
+			c.Set("response", "Failed to update item")
+			c.Set("details", err.Error())
 			c.Set("status", http.StatusInternalServerError)
 			return
 		}
@@ -153,13 +156,15 @@ func DeleteItem(ct models.Collection) gin.HandlerFunc {
 		idStr := c.Param("id")
 		id, err := strconv.Atoi(idStr)
 		if err != nil {
-			c.Set("response", gin.H{"error": "Invalid ID"})
+			c.Set("response", "Invalid ID")
+			c.Set("details", err.Error())
 			c.Set("status", http.StatusBadRequest)
 			return
 		}
 
 		if err := storage.DeleteItem(uint(id)); err != nil {
-			c.Set("response", gin.H{"error": "Failed to delete item"})
+			c.Set("response", "Failed to delete item")
+			c.Set("details", err.Error())
 			c.Set("status", http.StatusInternalServerError)
 			return
 		}
