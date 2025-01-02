@@ -9,39 +9,37 @@ import (
 
 func ResponseWrapper() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Process the request
 		c.Next()
 
-		// Get the response data and status
+		// Retrieve the response and status from context
 		response, exists := c.Get("response")
 		if !exists {
-			return // If no response is set, do nothing
+			return
 		}
+
 		status, _ := c.Get("status")
 		statusCode := http.StatusOK
 		if status != nil {
 			statusCode = status.(int)
 		}
 
-		// Normalize the response
+		// Retrieve the meta from context
+		meta, _ := c.Get("meta")
+
+		// Format the response
 		var formattedResponse gin.H
 		if statusCode >= 400 { // Error response
 			formattedResponse = gin.H{
-				"error": gin.H{
-					"status":  statusCode,
-					"name":    getErrorName(statusCode),
-					"message": response,
-					"details": nil,
-				},
+				"error": response,
 			}
 		} else { // Success response
 			formattedResponse = gin.H{
 				"data": response,
-				"meta": nil, // Add metadata if needed
+				"meta": meta,
 			}
 		}
 
-		// Write the formatted response
+		// Send the JSON response
 		c.JSON(statusCode, formattedResponse)
 	}
 }

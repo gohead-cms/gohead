@@ -22,10 +22,30 @@ func GetItemByID(collectionID uint, itemID uint) (*models.Item, error) {
 	return &item, nil
 }
 
-func GetItems(CollectionID uint) ([]models.Item, error) {
+func GetItems(collectionID uint, page, pageSize int) ([]models.Item, int, error) {
 	var items []models.Item
-	err := database.DB.Where("collection_id = ?", CollectionID).Find(&items).Error
-	return items, err
+	var totalItems int64
+
+	// Calculate offset
+	offset := (page - 1) * pageSize
+
+	// Fetch total count
+	err := database.DB.Model(&models.Item{}).
+		Where("collection_id = ?", collectionID).
+		Count(&totalItems).Error
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to count items: %w", err)
+	}
+
+	// Fetch paginated data
+	err = database.DB.Where("collection_id = ?", collectionID).
+		Offset(offset).Limit(pageSize).
+		Find(&items).Error
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to fetch items: %w", err)
+	}
+
+	return items, int(totalItems), nil
 }
 
 func UpdateItem(itemID uint, data models.JSONMap) error {

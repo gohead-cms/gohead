@@ -102,8 +102,9 @@ func testCreateContentItem(router *gin.Engine, t *testing.T) {
 	collection, err := storage.GetCollectionByName("articles")
 	assert.NoError(t, err)
 
-	items, err := storage.GetItems(collection.ID)
+	items, total, err := storage.GetItems(collection.ID, 1, 15)
 	assert.NoError(t, err)
+	assert.Equal(t, 1, total)
 	assert.Equal(t, 1, len(items))
 	assert.Equal(t, "Test Article", items[0].Data["title"])
 }

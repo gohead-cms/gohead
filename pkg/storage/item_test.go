@@ -83,8 +83,9 @@ func TestGetItems(t *testing.T) {
 	assert.NoError(t, db.Create(&items).Error)
 
 	// Fetch all content items
-	results, err := GetItems(collection.ID)
+	results, total, err := GetItems(collection.ID, 1, 15)
 	assert.NoError(t, err)
+	assert.Equal(t, 1, total)
 	assert.Len(t, results, 2)
 	assert.Equal(t, "Article 1", results[0].Data["title"])
 	assert.Equal(t, "Article 2", results[1].Data["title"])
