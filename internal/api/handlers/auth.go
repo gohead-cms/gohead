@@ -103,7 +103,8 @@ func Login(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		logger.Log.WithError(err).Warn("Login: Invalid input")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		c.Set("status", http.StatusBadRequest)
+		c.Set("response", gin.H{"error": "Invalid input"})
 		return
 	}
 
@@ -111,21 +112,24 @@ func Login(c *gin.Context) {
 	user, err := storage.GetUserByUsername(input.Username)
 	if err != nil {
 		logger.Log.WithError(err).Warn("Login: Invalid username or password")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
+		c.Set("status", http.StatusUnauthorized)
+		c.Set("response", gin.H{"error": "Invalid username or password"})
 		return
 	}
 
 	// Compare the hashed password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
 		logger.Log.WithError(err).Warn("Login: Invalid username or password")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
+		c.Set("status", http.StatusUnauthorized)
+		c.Set("response", gin.H{"error": "Invalid username or password"})
 		return
 	}
 
 	// Validate the Role
 	if user.Role.Name == "" {
 		logger.Log.WithField("username", user.Username).Warn("Login: User role is not assigned")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User role is not assigned"})
+		c.Set("status", http.StatusUnauthorized)
+		c.Set("response", gin.H{"error": "User role is not assigned"})
 		return
 	}
 
@@ -133,14 +137,17 @@ func Login(c *gin.Context) {
 	tokenString, err := auth.GenerateJWT(user.Username, user.Role.Name)
 	if err != nil {
 		logger.Log.WithError(err).Error("Login: Failed to generate token")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		c.Set("status", http.StatusInternalServerError)
+		c.Set("response", gin.H{"error": "Failed to generate token"})
 		return
 	}
 
 	logger.Log.WithFields(logrus.Fields{
 		"username": user.Username,
 		"role":     user.Role.Name,
+		"token":    tokenString,
 	}).Info("User logged in successfully")
 
-	c.JSON(http.StatusOK, gin.H{"token": tokenString})
+	c.Set("status", http.StatusOK)
+	c.Set("response", gin.H{"token": tokenString})
 }

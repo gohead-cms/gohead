@@ -101,6 +101,7 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	router.Use(gin.Recovery())
 	router.Use(middleware.MetricsMiddleware())
 	router.Use(otelgin.Middleware("gohead"))
+	router.Use(middleware.ResponseWrapper())
 
 	// Monitoring
 	router.GET("/_metrics", gin.WrapH(promhttp.Handler()))

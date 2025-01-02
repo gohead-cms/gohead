@@ -103,7 +103,7 @@ func GetItems(ct models.Collection, level uint) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"data": data})
+		c.JSON(http.StatusOK, gin.H{"items": data})
 	}
 }
 

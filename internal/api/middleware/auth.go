@@ -31,7 +31,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		// Parse JWT and extract claims
 		claims, err := auth.ParseJWT(tokenString)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			abortWithError(c, http.StatusUnauthorized, "InvalidTokenError", "Invalid token")
 			return
 		}
 
@@ -48,4 +48,16 @@ func AuthMiddleware() gin.HandlerFunc {
 		c.Set("role", role.Name)
 		c.Next()
 	}
+}
+
+// Helper function to abort with a standardized error
+func abortWithError(c *gin.Context, status int, name, message string) {
+	c.AbortWithStatusJSON(status, gin.H{
+		"error": gin.H{
+			"status":  status,
+			"name":    name,
+			"message": message,
+			"details": nil,
+		},
+	})
 }

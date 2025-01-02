@@ -18,7 +18,8 @@ func DynamicCollectionHandler(c *gin.Context) {
 	userRole, ok := role.(string)
 	if !ok || userRole == "" {
 		logger.Log.Warn("DynamicContentHandler: Missing or invalid user role in context")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		c.Set("response", gin.H{"error": "Unauthorized"})
+		c.Set("status", http.StatusUnauthorized)
 		return
 	}
 
@@ -31,7 +32,8 @@ func DynamicCollectionHandler(c *gin.Context) {
 		logger.Log.WithFields(logrus.Fields{
 			"collection": collectionName,
 		}).Warn("DynamicContentHandler: Collection not found")
-		c.JSON(http.StatusNotFound, gin.H{"error": "Collection not found"})
+		c.Set("response", gin.H{"error": "Collection not found"})
+		c.Set("status", http.StatusNotFound)
 		return
 	}
 
@@ -62,7 +64,8 @@ func DynamicCollectionHandler(c *gin.Context) {
 			"collection":     collectionName,
 			"request_method": c.Request.Method,
 		}).Warn("Unsupported HTTP method")
-		c.JSON(http.StatusMethodNotAllowed, gin.H{"error": "Method not allowed"})
+		c.Set("response", gin.H{"error": "Method not allowed"})
+		c.Set("status", http.StatusMethodNotAllowed)
 	}
 }
 
@@ -73,7 +76,8 @@ func handleCreate(c *gin.Context, userRole string, ct *models.Collection) {
 			"user_role":  userRole,
 			"collection": ct.Name,
 		}).Warn("Create permission denied")
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		c.Set("response", gin.H{"error": "Access denied"})
+		c.Set("status", http.StatusForbidden)
 		return
 	}
 	CreateItem(*ct)(c)
@@ -86,7 +90,8 @@ func handleRead(c *gin.Context, userRole string, ct *models.Collection, id strin
 			"user_role":  userRole,
 			"collection": ct.Name,
 		}).Warn("Read permission denied")
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		c.Set("response", gin.H{"error": "Access denied"})
+		c.Set("status", http.StatusForbidden)
 		return
 	}
 
@@ -97,7 +102,8 @@ func handleRead(c *gin.Context, userRole string, ct *models.Collection, id strin
 		parsedLevel, err := strconv.Atoi(levelParam)
 		if err != nil || parsedLevel < 1 {
 			logger.Log.WithField("level_param", levelParam).Warn("Invalid level parameter")
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid level parameter"})
+			c.Set("response", gin.H{"error": "Invalid level parameter"})
+			c.Set("status", http.StatusBadRequest)
 			return
 		}
 		level = parsedLevel
@@ -109,7 +115,8 @@ func handleRead(c *gin.Context, userRole string, ct *models.Collection, id strin
 	} else {
 		itemID, err := strconv.Atoi(id)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
+			c.Set("response", gin.H{"error": "Invalid ID format"})
+			c.Set("status", http.StatusBadRequest)
 			return
 		}
 		GetItemByID(*ct, uint(itemID), uint(level))(c)
@@ -124,14 +131,16 @@ func handleUpdate(c *gin.Context, userRole string, ct *models.Collection, id str
 			"collection": ct.Name,
 			"item_id":    id,
 		}).Warn("Update permission denied")
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		c.Set("response", gin.H{"error": "Access denied"})
+		c.Set("status", http.StatusForbidden)
 		return
 	}
 	if id != "" {
 		UpdateItem(*ct)(c)
 	} else {
 		logger.Log.Warn("Update operation requires a valid ID")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID is required for update"})
+		c.Set("response", gin.H{"error": "ID is required for update"})
+		c.Set("status", http.StatusBadRequest)
 	}
 }
 
@@ -143,13 +152,15 @@ func handleDelete(c *gin.Context, userRole string, ct *models.Collection, id str
 			"collection": ct.Name,
 			"item_id":    id,
 		}).Warn("Delete permission denied")
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		c.Set("response", gin.H{"error": "Access denied"})
+		c.Set("status", http.StatusForbidden)
 		return
 	}
 	if id != "" {
 		DeleteItem(*ct)(c)
 	} else {
 		logger.Log.Warn("Delete operation requires a valid ID")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID is required for deletion"})
+		c.Set("response", gin.H{"error": "ID is required for deletion"})
+		c.Set("status", http.StatusBadRequest)
 	}
 }
