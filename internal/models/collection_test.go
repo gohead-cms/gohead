@@ -1,10 +1,70 @@
 package models
 
 import (
+	"bytes"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 )
+
+func init() {
+	// Configure logger to write logs to a buffer for testing
+	var buffer bytes.Buffer
+	logger.InitLogger("debug")
+	logger.Log.SetOutput(&buffer)
+	logger.Log.SetFormatter(&logrus.TextFormatter{})
+}
+
+func TestValidateCollectionSchema(t *testing.T) {
+	t.Run("Valid Collection", func(t *testing.T) {
+		collection := Collection{
+			Name: "articles",
+			Attributes: []Attribute{
+				{Name: "title", Type: "string", Required: true},
+				{Name: "content", Type: "richtext", Required: true},
+			},
+		}
+		assert.NoError(t, ValidateCollectionSchema(collection))
+	})
+
+	t.Run("Missing Name", func(t *testing.T) {
+		collection := Collection{
+			Attributes: []Attribute{
+				{Name: "title", Type: "string", Required: true},
+			},
+		}
+		err := ValidateCollectionSchema(collection)
+		assert.Error(t, err)
+		assert.Equal(t, "missing required attribute: 'name'", err.Error())
+	})
+
+	t.Run("Duplicate Field Names", func(t *testing.T) {
+		collection := Collection{
+			Name: "articles",
+			Attributes: []Attribute{
+				{Name: "title", Type: "string", Required: true},
+				{Name: "title", Type: "richtext", Required: true},
+			},
+		}
+		err := ValidateCollectionSchema(collection)
+		assert.Error(t, err)
+		assert.Equal(t, "duplicate attribute name: 'title'", err.Error())
+	})
+
+	t.Run("Invalid Attribute Type", func(t *testing.T) {
+		collection := Collection{
+			Name: "articles",
+			Attributes: []Attribute{
+				{Name: "invalid", Type: "unknownType"},
+			},
+		}
+		err := ValidateCollectionSchema(collection)
+		assert.Error(t, err)
+		assert.Equal(t, "invalid attribute type 'unknownType' for attribute 'invalid'", err.Error())
+	})
+}
 
 func TestValidateCollection(t *testing.T) {
 	t.Run("Valid Collection", func(t *testing.T) {

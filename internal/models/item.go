@@ -16,15 +16,15 @@ type Item struct {
 	Data         JSONMap `json:"data" gorm:"type:json"`
 }
 
-// ValidateItemValues validates a single item's data against the Collection's schema (fields).
+// ValidateItemValues validates a single item's data against the Collection's schema (attributes).
 func ValidateItemValues(ct Collection, itemData map[string]interface{}) error {
 	for _, attribute := range ct.Attributes {
 		value, exists := itemData[attribute.Name]
 
-		// Check for required fields
+		// Check for required attributes
 		if attribute.Required && !exists {
-			logger.Log.WithField("field", attribute.Name).Warn("Validation failed: missing required field")
-			return fmt.Errorf("missing required field: '%s'", attribute.Name)
+			logger.Log.WithField("attribute", attribute.Name).Warn("Validation failed: missing required attribute")
+			return fmt.Errorf("missing required attribute: '%s'", attribute.Name)
 		}
 		if !exists {
 			continue
@@ -38,19 +38,19 @@ func ValidateItemValues(ct Collection, itemData map[string]interface{}) error {
 			}
 		}
 
-		// Validate field value or relationships
-		if attribute.Type != "relation" { // Validate regular fields
-			if err := validateFieldValue(attribute, value); err != nil {
+		// Validate attribute value or relationships
+		if attribute.Type != "relation" { // Validate regular attributes
+			if err := validateAttributeValue(attribute, value); err != nil {
 				logger.Log.WithFields(logrus.Fields{
-					"field": attribute.Name,
-					"type":  attribute.Type,
-					"value": value,
-				}).Warn("Validation failed for field")
-				return fmt.Errorf("validation failed for field '%s': %w", attribute.Name, err)
+					"attribute": attribute.Name,
+					"type":      attribute.Type,
+					"value":     value,
+				}).Warn("Validation failed for attribute")
+				return fmt.Errorf("validation failed for attribute '%s': %w", attribute.Name, err)
 			}
 		} else { // Validate relationships
 			if err := validateRelationship(attribute, value); err != nil {
-				logger.Log.WithField("field", attribute.Name).Warn("Validation failed for relationship")
+				logger.Log.WithField("attribute", attribute.Name).Warn("Validation failed for relationship")
 				return fmt.Errorf("validation failed for relationship '%s': %w", attribute.Name, err)
 			}
 		}
@@ -64,7 +64,7 @@ func ValidateItemValues(ct Collection, itemData map[string]interface{}) error {
 func validateRelationship(attribute Attribute, value interface{}) error {
 	// Ensure the target collection exists and fetch its `collection_id`
 	if attribute.Target == "" {
-		logger.Log.WithField("field", attribute.Name).Warn("Missing target collection for relationship")
+		logger.Log.WithField("attribute", attribute.Name).Warn("Missing target collection for relationship")
 		return fmt.Errorf("missing target collection for relationship '%s'", attribute.Name)
 	}
 
@@ -90,7 +90,7 @@ func validateRelationship(attribute Attribute, value interface{}) error {
 				return fmt.Errorf("referenced item with ID '%d' in collection '%s' does not exist", uint(id), attribute.Target)
 			}
 		} else if _, isObject := value.(map[string]interface{}); !isObject {
-			logger.Log.WithField("field", attribute.Name).Warn("Invalid relationship format: expected ID or object")
+			logger.Log.WithField("attribute", attribute.Name).Warn("Invalid relationship format: expected ID or object")
 			return fmt.Errorf("invalid relationship format for '%s': expected ID or object", attribute.Name)
 		}
 
@@ -98,7 +98,7 @@ func validateRelationship(attribute Attribute, value interface{}) error {
 		// For many-to-many relationships, validate array of IDs or objects
 		array, ok := value.([]interface{})
 		if !ok {
-			logger.Log.WithField("field", attribute.Name).Warn("Invalid relationship format: expected array")
+			logger.Log.WithField("attribute", attribute.Name).Warn("Invalid relationship format: expected array")
 			return fmt.Errorf("invalid relationship format for '%s': expected array", attribute.Name)
 		}
 		for _, element := range array {
@@ -108,7 +108,7 @@ func validateRelationship(attribute Attribute, value interface{}) error {
 					return fmt.Errorf("referenced item with ID '%d' in collection '%s' does not exist", uint(id), attribute.Target)
 				}
 			} else if _, isObject := element.(map[string]interface{}); !isObject {
-				logger.Log.WithField("field", attribute.Name).Warn("Invalid element in relationship array")
+				logger.Log.WithField("attribute", attribute.Name).Warn("Invalid element in relationship array")
 				return fmt.Errorf("invalid element in relationship array for '%s'", attribute.Name)
 			}
 		}

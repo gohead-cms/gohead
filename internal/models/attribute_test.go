@@ -2,14 +2,25 @@
 package models
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 
+	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
+
+func init() {
+	// Configure logger to write logs to a buffer for testing
+	var buffer bytes.Buffer
+	logger.InitLogger("debug")
+	logger.Log.SetOutput(&buffer)
+	logger.Log.SetFormatter(&logrus.TextFormatter{})
+}
 
 func setupTestDB(t *testing.T) *gorm.DB {
 	// Use an in-memory SQLite database for testing
@@ -19,7 +30,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	}
 
 	// Automigrate the Attribute model
-	err = db.AutoMigrate(&Attribute{})
+	err = db.AutoMigrate(&Attribute{}, &Collection{}, &Item{}, &User{}, &UserRole{})
 	if err != nil {
 		t.Fatalf("Failed to migrate database: %v", err)
 	}

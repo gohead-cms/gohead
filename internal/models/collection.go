@@ -243,7 +243,7 @@ func (c *Collection) GetAttributeType(attributeName string) (string, error) {
 }
 
 // validateFieldValue handles validation logic for a single attribute’s value.
-func validateFieldValue(attribute Attribute, value interface{}) error {
+func validateAttributeValue(attribute Attribute, value interface{}) error {
 	switch attribute.Type {
 	case "string", "richtext":
 		strValue, err := convertToType(value, "string")
