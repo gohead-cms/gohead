@@ -1,0 +1,101 @@
+site_name: GoHead
+site_description: GoHead Documentation
+site_author: GoHead Team
+site_url: https://gohead.readthedocs.com
+dev_addr: 0.0.0.0:8000
+
+repo_name: 'Gitlab'
+repo_url: 'https://gitlab.com/sudo.bngz/gohead'
+
+docs_dir: 'content'
+
+theme:
+  name: 'readthedocs'
+  language: en
+  include_sidebar: true
+  favicon: assets/pic/gohead-icon.png
+  logo: assets/pic/gohead-logo.png
+  feature:
+    tabs: true
+  palette:
+    primary: 'blue'
+    accent: 'orange'
+  i18n:
+    prev: 'Previous'
+    next: 'Next'
+
+copyright: 'GoHead Team • Copyright &copy; 2025'
+
+extra_javascript:
+  - assets/js/highlight.min.js
+
+plugins:
+  - search
+
+markdown_extensions:
+  - meta
+  - attr_list
+  - admonition
+  - footnotes
+  - pymdownx.details
+  - pymdownx.inlinehilite
+  - pymdownx.highlight:
+      use_pygments: false
+  - pymdownx.smartsymbols
+  - pymdownx.superfences
+  - pymdownx.tabbed
+  - pymdownx.tasklist
+  - pymdownx.snippets:
+      check_paths: true
+  - markdown_include.include:
+      base_path: content/includes/
+      encoding: utf-8
+  - toc:
+      permalink: true
+
+# Page tree
+nav:
+  - 'Welcome': 'index.md'
+  - 'Getting Started':
+      - 'Overview': 'getting-started/overview.md'
+      - 'Quick Start':
+          - 'Docker': 'getting-started/quick-start-with-docker.md'
+      - 'Configuration': 'getting-started/configuration-overview.md'
+      - 'FAQ': 'getting-started/faq.md'
+  - 'User Management':
+      - 'Overview': 'user-management/overview.md'
+      - 'Authentication': 'user-management/authentication.md'
+      - 'Roles': 'user-management/roles.md'
+      - 'Permissions': 'user-management/permissions.md'
+  - 'Data Collections':
+      - 'Overview': 'data-collections/overview.md'
+      - 'Dynamic Fields': 'data-collections/dynamic-fields.md'
+      - 'Relationships': 'data-collections/relationships.md'
+  - 'API Reference':
+      - 'Authentication':
+          - 'Register': 'api/auth/register.md'
+          - 'Login': 'api/auth/login.md'
+      - 'Users':
+          - 'List Users': 'api/users/list.md'
+          - 'Get User': 'api/users/get.md'
+          - 'Update User': 'api/users/update.md'
+          - 'Delete User': 'api/users/delete.md'
+      - 'Collections':
+          - 'Create Collection': 'api/collections/create.md'
+          - 'Get Collection': 'api/collections/get.md'
+          - 'Delete Collection': 'api/collections/delete.md'
+  - 'Observability':
+      - 'Logs': 'observability/logs.md'
+      - 'Metrics': 'observability/metrics.md'
+      - 'Tracing': 'observability/tracing.md'
+  - 'Configuration Guide':
+      - 'Environment Variables': 'configuration/environment-variables.md'
+      - 'Database Setup': 'configuration/database-setup.md'
+      - 'Scaling': 'configuration/scaling.md'
+  - 'Contributing':
+      - 'Overview': 'contributing/overview.md'
+      - 'Submitting Issues': 'contributing/issues.md'
+      - 'Pull Requests': 'contributing/pull-requests.md'
+      - 'Code of Conduct': 'contributing/code-of-conduct.md'
+  - 'Release Notes':
+      - 'v1.0.0': 'release-notes/v1.0.0.md'

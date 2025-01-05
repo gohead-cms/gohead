@@ -1,0 +1,10 @@
+mkdocs
+mkdocs-material
+mkdocs-awesome-pages-plugin
+mkdocs-redirects
+mkdocs-git-revision-date-localized-plugin
+mkdocs-minify-plugin
+mkdocs-mermaid2-plugin
+mkdocs-glightbox
+pymdown-extensions
+markdown-include
