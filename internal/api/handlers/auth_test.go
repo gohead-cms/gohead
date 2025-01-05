@@ -14,7 +14,6 @@ import (
 	"gitlab.com/sudo.bngz/gohead/pkg/testutils"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
@@ -28,20 +27,11 @@ func init() {
 	logger.Log.SetFormatter(&logrus.TextFormatter{})
 }
 
-func setupTestRouter() *gin.Engine {
-	gin.SetMode(gin.TestMode)
-	router := gin.Default()
-	return router
-}
-
 func TestRegister(t *testing.T) {
 	// Setup the test database
 	// Initialize in-memory test database
-	db := testutils.SetupTestDB()
+	router, db := testutils.SetupTestServer()
 	defer testutils.CleanupTestDB()
-
-	// Apply migrations
-	assert.NoError(t, db.AutoMigrate(&models.User{}, &models.UserRole{}))
 
 	// Seed roles
 	adminRole := models.UserRole{Name: "admin", Description: "Administrator", Permissions: models.JSONMap{"manage_users": true}}
@@ -50,7 +40,6 @@ func TestRegister(t *testing.T) {
 	assert.NoError(t, db.Create(&readerRole).Error)
 
 	// Initialize the router and attach the handler
-	router := setupTestRouter()
 	router.POST("/auth/register", Register)
 
 	// Test valid registration with default role (reader)
@@ -108,7 +97,7 @@ func TestRegister(t *testing.T) {
 
 func TestLogin(t *testing.T) {
 	// Setup the test database
-	db := testutils.SetupTestDB()
+	router, db := testutils.SetupTestServer()
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
@@ -133,7 +122,6 @@ func TestLogin(t *testing.T) {
 	database.DB = db
 
 	// Initialize the router and attach the handler
-	router := setupTestRouter()
 	router.POST("/auth/login", Login)
 
 	// Test valid login

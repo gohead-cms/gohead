@@ -29,7 +29,7 @@ func init() {
 
 func TestDynamicContentHandler(t *testing.T) {
 	// Setup the test database
-	db := testutils.SetupTestDB()
+	router, db := testutils.SetupTestServer()
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
@@ -53,10 +53,6 @@ func TestDynamicContentHandler(t *testing.T) {
 	}
 	assert.NoError(t, storage.SaveCollection(&collection))
 
-	// Create the Gin router
-	gin.SetMode(gin.TestMode)
-	router := gin.Default()
-
 	// Register the dynamic handler
 	router.POST("/:collection", DynamicCollectionHandler)
 	router.GET("/:collection/:id", DynamicCollectionHandler)
@@ -65,10 +61,6 @@ func TestDynamicContentHandler(t *testing.T) {
 	t.Run("Create Content Item", func(t *testing.T) {
 		testCreateContentItem(router, t)
 	})
-
-	//.t.Run("Retrieve Content Item", func(t *testing.T) {
-	//	testRetrieveContentItem(router, t)
-	//})
 }
 
 func testCreateContentItem(router *gin.Engine, t *testing.T) {

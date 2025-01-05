@@ -64,7 +64,7 @@ func UpdateItem(itemID uint, data models.JSONMap) error {
 	}
 
 	// Save updated relationships
-	//TO CHECK
+	// TO CHECK
 
 	logger.Log.WithField("item_id", itemID).Info("Item updated successfully")
 	return nil

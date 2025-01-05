@@ -11,7 +11,7 @@ import (
 
 func TestSaveItem(t *testing.T) {
 	// Initialize in-memory test database
-	db := testutils.SetupTestDB()
+	_, db := testutils.SetupTestServer()
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
@@ -44,7 +44,7 @@ func TestSaveItem(t *testing.T) {
 
 func TestGetItemByID(t *testing.T) {
 	// Setup a test database
-	db := testutils.SetupTestDB()
+	_, db := testutils.SetupTestServer()
 	defer testutils.CleanupTestDB()
 
 	// Create a mock item
@@ -66,7 +66,7 @@ func TestGetItemByID(t *testing.T) {
 }
 func TestGetItems(t *testing.T) {
 	// Initialize in-memory test database
-	db := testutils.SetupTestDB()
+	_, db := testutils.SetupTestServer()
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
@@ -93,7 +93,7 @@ func TestGetItems(t *testing.T) {
 
 func TestUpdateItem(t *testing.T) {
 	// Initialize in-memory test database
-	db := testutils.SetupTestDB()
+	_, db := testutils.SetupTestServer()
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
@@ -133,7 +133,7 @@ func TestUpdateItem(t *testing.T) {
 
 func TestDeleteItem(t *testing.T) {
 	// Initialize in-memory test database
-	db := testutils.SetupTestDB()
+	_, db := testutils.SetupTestServer()
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
@@ -163,7 +163,7 @@ func TestDeleteItem(t *testing.T) {
 
 func TestCheckFieldUniqueness(t *testing.T) {
 	// Setup the test database
-	db := testutils.SetupTestDB()
+	_, db := testutils.SetupTestServer()
 	defer testutils.CleanupTestDB()
 
 	err := db.AutoMigrate(&models.Collection{},

@@ -21,7 +21,7 @@ func init() {
 
 func TestSeedRoles(t *testing.T) {
 	// Initialize in-memory test database
-	db := testutils.SetupTestDB()
+	_, db := testutils.SetupTestServer()
 	defer testutils.CleanupTestDB()
 
 	assert.NoError(t, db.AutoMigrate(&models.UserRole{}))

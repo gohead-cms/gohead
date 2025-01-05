@@ -22,7 +22,7 @@ func init() {
 
 func TestCollectionStorage(t *testing.T) {
 	// Set up the test database
-	db := testutils.SetupTestDB()
+	_, db := testutils.SetupTestServer()
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
@@ -39,9 +39,9 @@ func TestCollectionStorage(t *testing.T) {
 			{Name: "title", Type: "string", Required: true},
 			{Name: "content", Type: "text", Required: true},
 		},
-		//Relationships: []models.Relationship{
+		// Relationships: []models.Relationship{
 		//	{Field: "author", CollectionID: 1, RelationType: "one-to-one"},
-		//},
+		// },
 	}
 
 	assert.NoError(t, db.Create(testCollection).Error, "Failed to seed initial content type")
@@ -69,7 +69,7 @@ func TestCollectionStorage(t *testing.T) {
 		assert.NoError(t, err, "Expected no error when retrieving content type")
 		assert.Equal(t, "articles", ct.Name, "Content type name mismatch")
 		assert.Equal(t, 2, len(ct.Attributes), "Expected 2 fields")
-		//assert.Equal(t, 1, len(ct.Relationships), "Expected 1 relationship")
+		// assert.Equal(t, 1, len(ct.Relationships), "Expected 1 relationship")
 	})
 
 	t.Run("GetCollectionByName", func(t *testing.T) {

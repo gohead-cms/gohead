@@ -205,10 +205,10 @@ func updateAssociatedFields(tx *gorm.DB, collectionID uint, updatedAttributes []
 }
 
 // DeleteCollection deletes a collection and all associated data by its ID.
-func DeleteCollection(CollectionID uint) error {
+func DeleteCollection(collectionID uint) error {
 	// Begin a transaction for cascading deletion
 	tx := database.DB.Begin()
-	logger.Log.WithField("collection_id", CollectionID).Info("DeleteCollection: start to delete collection")
+	logger.Log.WithField("collection_id", collectionID).Info("DeleteCollection: start to delete collection")
 	defer func() {
 		if r := recover(); r != nil {
 			tx.Rollback()
@@ -218,11 +218,11 @@ func DeleteCollection(CollectionID uint) error {
 
 	// Retrieve the collection
 	var Collection models.Collection
-	if err := tx.Where("id = ?", CollectionID).First(&Collection).Error; err != nil {
+	if err := tx.Where("id = ?", collectionID).First(&Collection).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			logger.Log.WithField("collection_id", CollectionID).Error("DeleteCollection: failed to retreive collection")
+			logger.Log.WithField("collection_id", collectionID).Error("DeleteCollection: failed to retreive collection")
 			tx.Rollback()
-			return fmt.Errorf("DeleteCollection: failed to retreive collection '%d' not found", CollectionID)
+			return fmt.Errorf("DeleteCollection: failed to retreive collection '%d' not found", collectionID)
 		}
 		tx.Rollback()
 		return fmt.Errorf("failed to retrieve collection: %w", err)
@@ -230,26 +230,26 @@ func DeleteCollection(CollectionID uint) error {
 	logger.Log.WithField("collection", Collection).Info("DeleteCollection: successfully retrieve collection")
 
 	// Delete associated fields
-	if err := tx.Where("collection_id = ?", CollectionID).Delete(&models.Attribute{}).Error; err != nil {
+	if err := tx.Where("collection_id = ?", collectionID).Delete(&models.Attribute{}).Error; err != nil {
 		tx.Rollback()
-		return fmt.Errorf("failed to delete fields for collection ID '%d': %w", CollectionID, err)
+		return fmt.Errorf("failed to delete fields for collection ID '%d': %w", collectionID, err)
 	}
-	logger.Log.WithField("collection_id", CollectionID).Info("DeleteCollection: delete successfully associated fields")
+	logger.Log.WithField("collection_id", collectionID).Info("DeleteCollection: delete successfully associated fields")
 
 	// Delete associated relationships
-	//TOCHECK
+	// TOCHECK
 
 	// Delete associated content items
 	if err := tx.Where("collection_id = ?", Collection.ID).Delete(&models.Item{}).Error; err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to delete content items for collection '%s': %w", Collection.Name, err)
 	}
-	logger.Log.WithField("collection_id", CollectionID).Info("DeleteCollection: delete successfully associated items")
+	logger.Log.WithField("collection_id", collectionID).Info("DeleteCollection: delete successfully associated items")
 
 	// Delete the collection itself
 	if err := tx.Delete(&Collection).Error; err != nil {
 		tx.Rollback()
-		return fmt.Errorf("failed to delete collection with ID '%d': %w", CollectionID, err)
+		return fmt.Errorf("failed to delete collection with ID '%d': %w", collectionID, err)
 	}
 
 	// Commit the transaction

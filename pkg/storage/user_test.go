@@ -24,7 +24,7 @@ func init() {
 
 func TestSaveUser(t *testing.T) {
 	// Set up the test database
-	db := testutils.SetupTestDB()
+	_, db := testutils.SetupTestServer()
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
@@ -102,7 +102,7 @@ func TestSaveUser(t *testing.T) {
 }
 
 func TestGetUserByID(t *testing.T) {
-	db := testutils.SetupTestDB()
+	_, db := testutils.SetupTestServer()
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
@@ -131,7 +131,7 @@ func TestGetUserByID(t *testing.T) {
 }
 
 func TestGetUserByUsername(t *testing.T) {
-	db := testutils.SetupTestDB()
+	_, db := testutils.SetupTestServer()
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
@@ -162,7 +162,7 @@ func TestGetUserByUsername(t *testing.T) {
 func TestGetAllUsers(t *testing.T) {
 
 	// Set up the test database
-	db := testutils.SetupTestDB()
+	_, db := testutils.SetupTestServer()
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
@@ -205,7 +205,7 @@ func TestGetAllUsers(t *testing.T) {
 
 func TestUpdateUser(t *testing.T) {
 	// Set up the test database
-	db := testutils.SetupTestDB()
+	_, db := testutils.SetupTestServer()
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
@@ -245,7 +245,7 @@ func TestUpdateUser(t *testing.T) {
 
 func TestDeleteUser(t *testing.T) {
 	// Set up the test database
-	db := testutils.SetupTestDB()
+	_, db := testutils.SetupTestServer()
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations

@@ -29,7 +29,7 @@ func init() {
 func TestCreateItemIntegration(t *testing.T) {
 	// Setup the test database
 	// Initialize in-memory test database
-	db := testutils.SetupTestDB()
+	router, db := testutils.SetupTestServer()
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
@@ -40,9 +40,6 @@ func TestCreateItemIntegration(t *testing.T) {
 	readerRole := models.UserRole{Name: "reader", Description: "Reader", Permissions: models.JSONMap{"read_content": true}}
 	assert.NoError(t, db.Create(&adminRole).Error)
 	assert.NoError(t, db.Create(&readerRole).Error)
-
-	// Initialize the router and attach the handler
-	router := setupTestRouter()
 
 	// Create a test content type
 	ct := models.Collection{

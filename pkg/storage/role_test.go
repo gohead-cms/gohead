@@ -26,7 +26,7 @@ func init() {
 
 func TestGetRoleByName(t *testing.T) {
 	// Set up test database
-	db := testutils.SetupTestDB()
+	_, db := testutils.SetupTestServer()
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
@@ -66,7 +66,7 @@ func TestGetRoleByName(t *testing.T) {
 
 func TestRoleCRUD(t *testing.T) {
 
-	db := testutils.SetupTestDB()
+	_, db := testutils.SetupTestServer()
 	defer testutils.CleanupTestDB()
 
 	assert.NoError(t, db.AutoMigrate(&models.UserRole{}), "Failed to apply migrations")

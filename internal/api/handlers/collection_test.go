@@ -28,7 +28,7 @@ func init() {
 func TestCreateCollectionHandler(t *testing.T) {
 	// Setup the test database
 	// Initialize in-memory test database
-	db := testutils.SetupTestDB()
+	router, db := testutils.SetupTestServer()
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
@@ -41,7 +41,6 @@ func TestCreateCollectionHandler(t *testing.T) {
 	assert.NoError(t, db.Create(&readerRole).Error)
 
 	// Initialize the router and attach the handler
-	router := setupTestRouter()
 	router.POST("/auth/register", Register)
 	// Load test configuration
 	// Create the Gin router

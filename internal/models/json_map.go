@@ -35,11 +35,8 @@ func (j *JSONMap) Scan(value interface{}) error {
 
 	// Normalize types for consistent behavior
 	for key, val := range result {
-		switch v := val.(type) {
-		case float64:
-			if v == float64(int(v)) { // If the value is a whole number, cast to int
-				result[key] = int(v)
-			}
+		if v, ok := val.(float64); ok && v == float64(int(v)) {
+			result[key] = int(v)
 		}
 	}
 

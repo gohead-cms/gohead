@@ -6,7 +6,6 @@ import (
 	"gitlab.com/sudo.bngz/gohead/internal/models"
 	"gitlab.com/sudo.bngz/gohead/pkg/database"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 )
@@ -45,15 +44,6 @@ func SetupTestServer() (*gin.Engine, *gorm.DB) {
 	router := gin.Default()
 
 	return router, db
-}
-
-func SetupTestDB() *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		panic("failed to connect to in-memory database")
-	}
-	database.DB = db // Assign it to your global database instance
-	return db
 }
 
 func CleanupTestDB() {
