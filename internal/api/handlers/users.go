@@ -34,7 +34,7 @@ func CreateUser(c *gin.Context) {
 		return
 	}
 
-	if err := storage.SaveUser(&user); err != nil {
+	if err := storage.CreateUser(&user); err != nil {
 		logger.Log.WithError(err).Error("Failed to save user")
 		c.Set("response", "Failed to create user")
 		c.Set("details", err.Error())

@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func SaveUser(user *models.User) error {
+func CreateUser(user *models.User) error {
 	result := database.DB.Create(user)
 	if result.Error != nil {
 		if result.Error.Error() == "UNIQUE constraint failed: users.username" {
@@ -31,7 +31,7 @@ func SaveUser(user *models.User) error {
 	}
 
 	// Log success
-	logger.Log.WithField("username", user.Username).Info("User saved successfully")
+	logger.Log.WithField("username", user.Username).Info("User created successfully in database")
 	return nil
 }
 

@@ -21,6 +21,8 @@ func SetupTestServer() (*gin.Engine, *gorm.DB) {
 	}
 	database.DB = db
 
+	db.AutoMigrate(&models.UserRole{})
+
 	// Seed default roles
 	roles := []models.UserRole{
 		{Name: "admin", Description: "Administrator with full access", Permissions: models.JSONMap{"manage_users": true, "manage_content": true}},

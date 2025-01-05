@@ -34,7 +34,7 @@ func setupRouter() *gin.Engine {
 	return router
 }
 
-func TestSaveUser(t *testing.T) {
+func TestCreateUser(t *testing.T) {
 	router := setupRouter()
 
 	newUser := models.User{
@@ -58,12 +58,12 @@ func TestSaveUser(t *testing.T) {
 func TestGetAllUsers(t *testing.T) {
 	router := setupRouter()
 
-	storage.SaveUser(&models.User{
+	storage.CreateUser(&models.User{
 		Username: "user1",
 		Email:    "user1@example.com",
 		Role:     models.UserRole{Name: "user"},
 	})
-	storage.SaveUser(&models.User{
+	storage.CreateUser(&models.User{
 		Username: "user2",
 		Email:    "user2@example.com",
 		Role:     models.UserRole{Name: "admin"},
@@ -87,7 +87,7 @@ func TestGetUser(t *testing.T) {
 		Email:    "user1@example.com",
 		Role:     models.UserRole{Name: "user"},
 	}
-	storage.SaveUser(&mockUser)
+	storage.CreateUser(&mockUser)
 
 	req, _ := http.NewRequest("GET", "/users/1", nil)
 	resp := httptest.NewRecorder()
@@ -107,7 +107,7 @@ func TestUpdateUser(t *testing.T) {
 		Email:    "user1@example.com",
 		Role:     models.UserRole{Name: "user"},
 	}
-	storage.SaveUser(&mockUser)
+	storage.CreateUser(&mockUser)
 
 	updates := map[string]interface{}{
 		"email": "updated_user@example.com",
@@ -136,7 +136,7 @@ func TestDeleteUser(t *testing.T) {
 		Email:    "user1@example.com",
 		Role:     models.UserRole{Name: "user"},
 	}
-	storage.SaveUser(&mockUser)
+	storage.CreateUser(&mockUser)
 
 	req, _ := http.NewRequest("DELETE", "/users/1", nil)
 	resp := httptest.NewRecorder()

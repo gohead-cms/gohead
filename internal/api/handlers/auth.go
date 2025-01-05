@@ -32,16 +32,18 @@ func Register(c *gin.Context) {
 		return
 	}
 
+	logger.Log.WithField("request_body", c.Request.Body).Debug("Request received")
+
 	// Fetch the role
 	role, err := storage.GetRoleByName(input.RoleName)
 	if err != nil {
+		logger.Log.WithError(err).Error("Register: Failed to fetch role")
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.Set("status", http.StatusNotFound)
 			c.Set("response", fmt.Sprintf("Role '%s' does not exist", input.RoleName))
 			c.Set("details", err.Error())
 			return
 		}
-		logger.Log.WithError(err).Error("Register: Failed to fetch role")
 		c.Set("status", http.StatusNotFound)
 		c.Set("response", fmt.Sprintf("Role '%s' does not exist", input.RoleName))
 		c.Set("details", err.Error())
@@ -81,7 +83,7 @@ func Register(c *gin.Context) {
 	}
 
 	// Save the user
-	err = storage.SaveUser(&user)
+	err = storage.CreateUser(&user)
 	switch e := err.(type) {
 	case nil:
 		logger.Log.WithFields(logrus.Fields{
@@ -93,7 +95,7 @@ func Register(c *gin.Context) {
 		return
 	case *storage.DuplicateEntryError:
 		logger.Log.WithError(err).Warn("Register: Duplicate entry")
-		c.Set("status", http.StatusInternalServerError)
+		c.Set("status", http.StatusBadRequest)
 		c.Set("response", "Register: Duplicate entry")
 		c.Set("details", e.Error())
 		return

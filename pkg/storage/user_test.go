@@ -22,7 +22,7 @@ func init() {
 	logger.Log.SetFormatter(&logrus.TextFormatter{})
 }
 
-func TestSaveUser(t *testing.T) {
+func TestCreateUser(t *testing.T) {
 	// Set up the test database
 	_, db := testutils.SetupTestServer()
 	defer testutils.CleanupTestDB()
@@ -61,7 +61,7 @@ func TestSaveUser(t *testing.T) {
 		},
 	}
 
-	err = storage.SaveUser(user)
+	err = storage.CreateUser(user)
 	assert.NoError(t, err, "Failed to save user")
 
 	// Test duplicate username
@@ -78,7 +78,7 @@ func TestSaveUser(t *testing.T) {
 			},
 		},
 	}
-	err = storage.SaveUser(duplicateUser)
+	err = storage.CreateUser(duplicateUser)
 	assert.Error(t, err, "Expected error for duplicate username")
 	assert.IsType(t, &storage.DuplicateEntryError{}, err)
 
@@ -96,7 +96,7 @@ func TestSaveUser(t *testing.T) {
 			},
 		},
 	}
-	err = storage.SaveUser(duplicateUserEmail)
+	err = storage.CreateUser(duplicateUserEmail)
 	assert.Error(t, err, "Expected error for duplicate email")
 	assert.IsType(t, &storage.DuplicateEntryError{}, err)
 }
@@ -121,7 +121,7 @@ func TestGetUserByID(t *testing.T) {
 			Permissions: models.JSONMap{"manage_users": true, "manage_content": true},
 		},
 	}
-	err = storage.SaveUser(user)
+	err = storage.CreateUser(user)
 	assert.NoError(t, err, "Failed to save user")
 
 	retrievedUser, err := storage.GetUserByID(user.ID)
@@ -150,7 +150,7 @@ func TestGetUserByUsername(t *testing.T) {
 			Permissions: models.JSONMap{"manage_users": true, "manage_content": true},
 		},
 	}
-	err = storage.SaveUser(user)
+	err = storage.CreateUser(user)
 	assert.NoError(t, err, "Failed to save user")
 
 	retrievedUser, err := storage.GetUserByUsername(user.Username)
@@ -193,9 +193,9 @@ func TestGetAllUsers(t *testing.T) {
 			Permissions: models.JSONMap{"read_content": true},
 		},
 	}
-	err = storage.SaveUser(user1)
+	err = storage.CreateUser(user1)
 	assert.NoError(t, err, "Failed to save user1")
-	err = storage.SaveUser(user2)
+	err = storage.CreateUser(user2)
 	assert.NoError(t, err, "Failed to save user2")
 
 	users, err := storage.GetAllUsers()
@@ -227,7 +227,7 @@ func TestUpdateUser(t *testing.T) {
 			},
 		},
 	}
-	err = storage.SaveUser(user)
+	err = storage.CreateUser(user)
 	assert.NoError(t, err, "Failed to save user")
 
 	updates := map[string]interface{}{
@@ -267,7 +267,7 @@ func TestDeleteUser(t *testing.T) {
 			},
 		},
 	}
-	err = storage.SaveUser(user)
+	err = storage.CreateUser(user)
 	assert.NoError(t, err, "Failed to save user")
 
 	err = storage.DeleteUser(user.ID)
