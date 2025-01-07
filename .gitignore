@@ -12,8 +12,10 @@ coverage.html
 *.patch
 TODO
 venv
+*db
+
 # Output of the `go build` command
-/build/
+/dist/
 
 /config.yaml
 
@@ -49,4 +51,5 @@ yarn-error.log*
 package-lock.json
 .pnpm-debug.log
 
-*.db
+*.db# Added by goreleaser init:
+dist/

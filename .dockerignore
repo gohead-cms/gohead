@@ -1,0 +1,43 @@
+# Ignore binary output directories
+/dist/
+*.o
+*.out
+*.a
+*.so
+
+# Ignore Go test binaries
+*.test
+
+# Ignore dependency directories
+/vendor/
+/node_modules/
+/venv/
+*.egg-info/
+
+# Ignore temporary files and directories
+*.log
+*.tmp
+*.swp
+*.swo
+*.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+__pycache__/
+
+# Ignore version control files
+.git/
+.gitignore
+
+# Ignore configuration and sensitive files
+*.env
+secrets.*
+config.yml
+
+# Ignore IDE and editor files
+*.sublime*
+*.bak
+*.tmp
+
+# Ignore documentation build directories
+/docs/venv/
