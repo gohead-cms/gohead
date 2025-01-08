@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/spf13/cobra"
 	ginlogrus "github.com/toorop/gin-logrus"
 	"gitlab.com/sudo.bngz/gohead/internal/api/handlers"
 	"gitlab.com/sudo.bngz/gohead/internal/api/middleware"
@@ -23,7 +24,35 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 )
 
-// InitializeServer initializes the Gin server and all dependencies
+// Initialize start command
+func init() {
+	rootCmd.AddCommand(startCmd)
+}
+
+var startCmd = &cobra.Command{
+	Use:   "start",
+	Short: "Start GoHead server",
+	Run: func(cmd *cobra.Command, args []string) {
+		configPath, _ := cmd.Flags().GetString("config")
+
+		// Load configuration
+		cfg, _ := config.LoadConfig(configPath)
+
+		// Initialize and start the server
+		router, err := InitializeServer(configPath)
+		if err != nil {
+			logger.Log.Errorf("Cannot start server on port %s: %v", cfg.ServerPort, err)
+			return
+		}
+
+		logger.Log.Infof("Starting server on port %s", cfg.ServerPort)
+		router.Run(":" + cfg.ServerPort)
+	},
+}
+
+func init() {
+	startCmd.Flags().StringP("config", "c", "config.yaml", "Path to the configuration file")
+}
 func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	// Load configuration
 	cfg, err := config.LoadConfig(cfgPath)
