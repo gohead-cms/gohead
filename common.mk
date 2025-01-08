@@ -14,7 +14,6 @@ MODULE = $(shell env GO111MODULE=on go list -m)
 # This macro helps to print the command for debugging by setting V to 1. Example `make test-unit V=1`
 V = 0
 Q = $(if $(filter 1,$V),,@)
-# $M is a macro to print a colored ▶ character. Example `$(info $(M) running coverage tests…)` will print "▶ running coverage tests…"
 M = $(shell printf "\033[34;1m▶\033[0m")
 
 GREEN  := $(shell tput -Txterm setaf 2)
