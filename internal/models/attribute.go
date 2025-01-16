@@ -1,6 +1,10 @@
 package models
 
-import "gorm.io/gorm"
+import (
+	"fmt"
+
+	"gorm.io/gorm"
+)
 
 // Attribute defines the structure for fields in a collection.
 type Attribute struct {
@@ -16,5 +20,22 @@ type Attribute struct {
 	CustomErrors JSONMap  `gorm:"type:json" json:"custom_errors,omitempty"`
 	Target       string   `json:"target,omitempty"`   // Target collection for relationships
 	Relation     string   `json:"relation,omitempty"` // e.g., "oneToOne", "oneToMany", "manyToMany"
-	CollectionID uint     `json:"-"`                  // Foreign key to associate with Collection
+
+	// Foreign keys
+	CollectionID *uint       `json:"collection_id"` // Nullable foreign key
+	Collection   *Collection `json:"-" gorm:"constraint:OnDelete:CASCADE;"`
+
+	SingleTypeID *uint       `json:"single_type_id"` // Nullable foreign key
+	SingleType   *SingleType `json:"-" gorm:"constraint:OnDelete:CASCADE;"`
+}
+
+func (attr *Attribute) ValidateParent() error {
+	if attr.CollectionID != nil && attr.SingleTypeID != nil {
+
+		return fmt.Errorf("attribute '%s' cannot belong to both a collection and a single type", attr.Name)
+	}
+	if attr.CollectionID == nil && attr.SingleTypeID == nil {
+		return fmt.Errorf("attribute '%s' must belong to either a collection or a single type", attr.Name)
+	}
+	return nil
 }

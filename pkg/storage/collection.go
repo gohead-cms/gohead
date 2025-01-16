@@ -138,7 +138,7 @@ func UpdateCollection(name string, updated *models.Collection) error {
 	}()
 
 	// Update fields
-	if err := updateAssociatedFields(tx, existing.ID, updated.Attributes); err != nil {
+	if err := updateAssociatedFields(tx, &existing.ID, updated.Attributes); err != nil {
 		logger.Log.WithField("collection", name).Error("Rollback failed to updated fields")
 		tx.Rollback()
 		return fmt.Errorf("failed to update fields: %w", err)
@@ -161,7 +161,7 @@ func UpdateCollection(name string, updated *models.Collection) error {
 	return nil
 }
 
-func updateAssociatedFields(tx *gorm.DB, collectionID uint, updatedAttributes []models.Attribute) error {
+func updateAssociatedFields(tx *gorm.DB, collectionID *uint, updatedAttributes []models.Attribute) error {
 	// Fetch existing attributes
 	var existingAttributes []models.Attribute
 	if err := tx.Where("collection_id = ?", collectionID).Find(&existingAttributes).Error; err != nil {

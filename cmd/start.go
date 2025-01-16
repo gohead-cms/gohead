@@ -158,6 +158,10 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	protected := router.Group("/")
 	protected.Use(middleware.AuthMiddleware())
 	{
+		protected.POST("/single-type", handlers.CreateOrUpdateSingleType)
+		protected.GET("/single-type/:name", handlers.GetSingleType)
+		protected.POST("/single-type/:name", handlers.CreateOrUpdateSingleType)
+		protected.DELETE("/single-type/:name", handlers.DeleteSingleType)
 		protected.POST("/collections", handlers.CreateCollection)
 		protected.GET("/collections/:name", handlers.GetCollection)
 		protected.PUT("/collections/:name", handlers.UpdateCollection)

@@ -7,7 +7,6 @@ import (
 )
 
 func main() {
-	// Execute the root Cobra command
 	if err := cmd.Execute(); err != nil {
 		log.Fatalf("Error executing command: %v", err)
 	}

@@ -39,6 +39,8 @@ func setupTestDB(t *testing.T) *gorm.DB {
 }
 
 func TestAttributeModelInitialization(t *testing.T) {
+	var collectionID *uint
+	*collectionID = 1
 	attr := Attribute{
 		Name:         "Age",
 		Type:         "int",
@@ -51,7 +53,7 @@ func TestAttributeModelInitialization(t *testing.T) {
 		CustomErrors: JSONMap{"required": "Age is required."},
 		Target:       "User",
 		Relation:     "oneToOne",
-		CollectionID: 1,
+		CollectionID: collectionID,
 	}
 
 	assert.Equal(t, "Age", attr.Name)
@@ -69,6 +71,8 @@ func TestAttributeModelInitialization(t *testing.T) {
 }
 
 func TestAttributeJSONMarshalling(t *testing.T) {
+	var collectionID *uint
+	*collectionID = 2
 	attr := Attribute{
 		Name:     "Username",
 		Type:     "string",
@@ -84,7 +88,7 @@ func TestAttributeJSONMarshalling(t *testing.T) {
 		},
 		Target:       "",
 		Relation:     "",
-		CollectionID: 2,
+		CollectionID: collectionID,
 	}
 
 	jsonData, err := json.Marshal(attr)
@@ -118,7 +122,8 @@ func TestAttributeJSONMarshalling(t *testing.T) {
 
 func TestAttributeCRUD(t *testing.T) {
 	db := setupTestDB(t)
-
+	var collectionID *uint
+	*collectionID = 3
 	// Create
 	attr := Attribute{
 		Name:         "Email",
@@ -132,7 +137,7 @@ func TestAttributeCRUD(t *testing.T) {
 		CustomErrors: JSONMap{"required": "Email is required.", "pattern": "Invalid email format."},
 		Target:       "",
 		Relation:     "",
-		CollectionID: 3,
+		CollectionID: collectionID,
 	}
 
 	result := db.Create(&attr)
