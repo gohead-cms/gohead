@@ -160,7 +160,7 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	{
 		protected.POST("/single-type", handlers.CreateOrUpdateSingleType)
 		protected.GET("/single-type/:name", handlers.GetSingleType)
-		protected.POST("/single-type/:name", handlers.CreateOrUpdateSingleType)
+		protected.POST("/single-type/:name", handlers.CreateOrUpdateSingleTypeItem)
 		protected.DELETE("/single-type/:name", handlers.DeleteSingleType)
 		protected.POST("/collections", handlers.CreateCollection)
 		protected.GET("/collections/:name", handlers.GetCollection)

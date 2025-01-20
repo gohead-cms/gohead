@@ -8,6 +8,7 @@ import (
 	"gitlab.com/sudo.bngz/gohead/internal/models"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gitlab.com/sudo.bngz/gohead/pkg/storage"
+	"go.opentelemetry.io/otel"
 )
 
 // GetSingleType retrieves a single type by its name.
@@ -86,7 +87,6 @@ func CreateOrUpdateSingleType(c *gin.Context) {
 }
 
 // DeleteSingleType handles deleting a single type by its name (optional).
-// Strapi doesn’t usually delete single types, but you may implement it if needed.
 func DeleteSingleType(c *gin.Context) {
 	name := c.Param("name")
 
@@ -113,4 +113,97 @@ func DeleteSingleType(c *gin.Context) {
 
 	c.Set("response", "single type deleted successfully")
 	c.Set("status", http.StatusOK)
+}
+
+// CreateOrUpdateSingleTypeValue handles the creation or update of a single type content item.
+// Assumes you're storing the content in a SingleItem table, separate from the SingleType schema.
+func CreateOrUpdateSingleTypeItem(c *gin.Context) {
+	// Start OpenTelemetry span
+	ctx := c.Request.Context()
+	tracer := otel.Tracer("gohead")
+	ctx, span := tracer.Start(ctx, "CreateOrUpdateSingleTypeValue")
+	defer span.End()
+
+	// The single type name from URL (e.g. /single-types/:name)
+	singleTypeName := c.Param("name")
+
+	// Fetch the single type schema
+	st, err := storage.GetSingleTypeByName(singleTypeName)
+	if err != nil {
+		logger.Log.WithError(err).WithField("singleType", singleTypeName).
+			Error("Failed to retrieve single type")
+		c.Set("response", "Single type not found")
+		c.Set("status", http.StatusNotFound)
+		return
+	}
+
+	// Parse the input JSON -> { "data": { ... } }
+	var input struct {
+		Data map[string]interface{} `json:"data"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.Set("response", "Invalid input format")
+		c.Set("status", http.StatusBadRequest)
+		return
+	}
+	valueData := input.Data
+
+	// Validate user-provided data against the single type’s schema
+	if err := models.ValidateSingleItemValues(*st, valueData); err != nil {
+		c.Set("response", err.Error())
+		c.Set("status", http.StatusBadRequest)
+		return
+	}
+
+	// Check if a SingleItem already exists for this SingleType
+	existingItem, err := storage.GetSingleItemByType(singleTypeName)
+	if err != nil {
+		// If the error indicates "no single item found", we proceed to create a new one
+		// If it's another DB error, handle accordingly
+		logger.Log.WithError(err).WithField("singleType", singleTypeName).
+			Warn("Could not retrieve single item - may not exist yet")
+		existingItem = nil
+	}
+
+	if existingItem != nil {
+		// Update the existing single item
+		updatedItem, updateErr := storage.UpdateSingleItem(singleTypeName, valueData)
+		if updateErr != nil {
+			logger.Log.WithError(updateErr).WithField("singleType", singleTypeName).
+				Error("Failed to update single type item")
+			c.Set("response", "Failed to update single type value")
+			c.Set("status", http.StatusInternalServerError)
+			return
+		}
+
+		c.Set("response", gin.H{
+			"message": "Single type value updated successfully",
+			"data": gin.H{
+				"id":         updatedItem.ID,
+				"type":       singleTypeName,
+				"attributes": updatedItem.Data, // or build a Strapi-like structure
+			},
+		})
+		c.Set("status", http.StatusOK)
+	} else {
+		// Create a new SingleItem if one does not exist
+		newItem, createErr := storage.CreateSingleItem(st, valueData)
+		if createErr != nil {
+			logger.Log.WithError(createErr).WithField("singleType", singleTypeName).
+				Error("Failed to create single type item")
+			c.Set("response", "Failed to save single type value")
+			c.Set("status", http.StatusInternalServerError)
+			return
+		}
+
+		c.Set("response", gin.H{
+			"message": "Single type value created successfully",
+			"data": gin.H{
+				"id":         newItem.ID,
+				"type":       singleTypeName,
+				"attributes": newItem.Data,
+			},
+		})
+		c.Set("status", http.StatusCreated)
+	}
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"gitlab.com/sudo.bngz/gohead/pkg/database"
+	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gorm.io/gorm"
 )
 
@@ -92,5 +93,24 @@ func ValidateSingleTypeSchema(st SingleType) error {
 			}
 		}
 	}
+	return nil
+}
+
+// ValidateSingleTypeValues validates the input data against the SingleType schema (attributes).
+func ValidateSingleTypeValues(st SingleType, data map[string]interface{}) error {
+	for _, attribute := range st.Attributes {
+		_, exists := data[attribute.Name]
+
+		// Check for required attributes
+		if attribute.Required && !exists {
+			logger.Log.WithField("attribute", attribute.Name).Warn("Validation failed: missing required attribute")
+			return fmt.Errorf("missing required attribute: '%s'", attribute.Name)
+		}
+		if !exists {
+			continue // Skip validation for optional fields not provided
+		}
+	}
+
+	logger.Log.WithField("singleType", st.Name).Info("SingleType data validation passed")
 	return nil
 }
