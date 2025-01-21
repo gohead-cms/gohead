@@ -11,6 +11,7 @@ import (
 
 type SingleType struct {
 	gorm.Model
+	ID          uint        `json:"id"`
 	Name        string      `json:"name" gorm:"uniqueIndex"`
 	Description string      `json:"description"`
 	Attributes  []Attribute `json:"attributes" gorm:"constraint:OnDelete:CASCADE;"`

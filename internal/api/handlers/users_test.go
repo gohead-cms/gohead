@@ -51,31 +51,34 @@ func TestCreateUser(t *testing.T) {
 
 	assert.Equal(t, http.StatusCreated, resp.Code)
 	var response map[string]interface{}
-	json.Unmarshal(resp.Body.Bytes(), &response)
+	err := json.Unmarshal(resp.Body.Bytes(), &response)
+	assert.NoError(t, err)
 	assert.Equal(t, "User created successfully", response["message"])
 }
 
 func TestGetAllUsers(t *testing.T) {
 	router := setupRouter()
 
-	storage.CreateUser(&models.User{
+	err := storage.CreateUser(&models.User{
 		Username: "user1",
 		Email:    "user1@example.com",
 		Role:     models.UserRole{Name: "user"},
 	})
-	storage.CreateUser(&models.User{
+	assert.NoError(t, err)
+	err = storage.CreateUser(&models.User{
 		Username: "user2",
 		Email:    "user2@example.com",
 		Role:     models.UserRole{Name: "admin"},
 	})
-
+	assert.NoError(t, err)
 	req, _ := http.NewRequest("GET", "/users", nil)
 	resp := httptest.NewRecorder()
 	router.ServeHTTP(resp, req)
 
 	assert.Equal(t, http.StatusOK, resp.Code)
 	var response map[string]interface{}
-	json.Unmarshal(resp.Body.Bytes(), &response)
+	err = json.Unmarshal(resp.Body.Bytes(), &response)
+	assert.NoError(t, err)
 	assert.Len(t, response["users"], 2)
 }
 
@@ -87,15 +90,16 @@ func TestGetUser(t *testing.T) {
 		Email:    "user1@example.com",
 		Role:     models.UserRole{Name: "user"},
 	}
-	storage.CreateUser(&mockUser)
-
+	err := storage.CreateUser(&mockUser)
+	assert.NoError(t, err)
 	req, _ := http.NewRequest("GET", "/users/1", nil)
 	resp := httptest.NewRecorder()
 	router.ServeHTTP(resp, req)
 
 	assert.Equal(t, http.StatusOK, resp.Code)
 	var response map[string]interface{}
-	json.Unmarshal(resp.Body.Bytes(), &response)
+	err = json.Unmarshal(resp.Body.Bytes(), &response)
+	assert.NoError(t, err)
 	assert.Equal(t, "user1", response["user"].(map[string]interface{})["username"])
 }
 
@@ -107,8 +111,8 @@ func TestUpdateUser(t *testing.T) {
 		Email:    "user1@example.com",
 		Role:     models.UserRole{Name: "user"},
 	}
-	storage.CreateUser(&mockUser)
-
+	err := storage.CreateUser(&mockUser)
+	assert.NoError(t, err)
 	updates := map[string]interface{}{
 		"email": "updated_user@example.com",
 	}
@@ -121,7 +125,8 @@ func TestUpdateUser(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.Code)
 	var response map[string]interface{}
-	json.Unmarshal(resp.Body.Bytes(), &response)
+	err = json.Unmarshal(resp.Body.Bytes(), &response)
+	assert.NoError(t, err)
 	assert.Equal(t, "User updated successfully", response["message"])
 
 	updatedUser, _ := storage.GetUserByID(1)
@@ -136,17 +141,18 @@ func TestDeleteUser(t *testing.T) {
 		Email:    "user1@example.com",
 		Role:     models.UserRole{Name: "user"},
 	}
-	storage.CreateUser(&mockUser)
-
+	err := storage.CreateUser(&mockUser)
+	assert.NoError(t, err)
 	req, _ := http.NewRequest("DELETE", "/users/1", nil)
 	resp := httptest.NewRecorder()
 	router.ServeHTTP(resp, req)
 
 	assert.Equal(t, http.StatusOK, resp.Code)
 	var response map[string]interface{}
-	json.Unmarshal(resp.Body.Bytes(), &response)
+	err = json.Unmarshal(resp.Body.Bytes(), &response)
+	assert.NoError(t, err)
 	assert.Equal(t, "User deleted successfully", response["message"])
 
-	_, err := storage.GetUserByID(1)
+	_, err = storage.GetUserByID(1)
 	assert.NotNil(t, err)
 }

@@ -14,16 +14,11 @@ import (
 
 type Collection struct {
 	gorm.Model
+	ID          uint        `json:"id"`
 	Name        string      `json:"name" gorm:"uniqueIndex"`
 	Kind        string      `json:"kind" gorm:"type:varchar(50);not null"`
 	Description string      `json:"description"`
 	Attributes  []Attribute `json:"attributes" gorm:"constraint:OnDelete:CASCADE;"`
-}
-
-var allowedRelationTypes = map[string]bool{
-	"oneToOne":   true,
-	"oneToMany":  true,
-	"manyToMany": true,
 }
 
 func ParseCollectionInput(input map[string]interface{}) (Collection, error) {

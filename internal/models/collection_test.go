@@ -160,7 +160,3 @@ func TestValidateItemData(t *testing.T) {
 		assert.Equal(t, "validation failed for attribute 'rating': attribute 'rating' must be at most 20", err.Error())
 	})
 }
-
-func ptrInt(v int) *int {
-	return &v
-}

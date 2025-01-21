@@ -21,7 +21,11 @@ func SetupTestServer() (*gin.Engine, *gorm.DB) {
 	}
 	database.DB = db
 
-	db.AutoMigrate(&models.UserRole{})
+	err = db.AutoMigrate(&models.UserRole{})
+	if err != nil {
+		logger.Log.Error("Failed to migrate : ", err.Error())
+		panic("Failed to migrate :  " + err.Error())
+	}
 
 	// Seed default roles
 	roles := []models.UserRole{

@@ -101,7 +101,7 @@ func testCreateContentItem(router *gin.Engine, t *testing.T) {
 	assert.Equal(t, "Test Article", items[0].Data["title"])
 }
 
-func testRetrieveContentItem(router *gin.Engine, t *testing.T) {
+func TestRetrieveContentItem(router *gin.Engine, t *testing.T) {
 	// Prepare a collection using storage layer
 	collection := models.Collection{
 		Name: "articles",

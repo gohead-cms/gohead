@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,7 +33,7 @@ func TestJWTFunctions(t *testing.T) {
 		assert.NoError(t, err, "Parsing a valid JWT should not return an error")
 		assert.Equal(t, username, claims.Username, "Username should match the claims")
 		assert.Equal(t, role, claims.Role, "Role should match the claims")
-		assert.WithinDuration(t, time.Now().Add(72*time.Hour), time.Unix(claims.ExpiresAt, 0), time.Minute, "Expiration time should be within the expected range")
+		assert.WithinDuration(t, time.Now().Add(72*time.Hour), time.Unix(claims.StandardClaims.ExpiresAt, 0), time.Minute, "Expiration time should be within the expected range")
 	})
 
 	// Test ParseJWT with an invalid token

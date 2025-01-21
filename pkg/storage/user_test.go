@@ -31,6 +31,9 @@ func TestCreateUser(t *testing.T) {
 	err := db.AutoMigrate(
 		&models.UserRole{},
 	)
+	if err != nil {
+		logger.Log.Error("Cannot migrate")
+	}
 
 	// Create a user role with permissions
 	role := models.UserRole{
@@ -46,7 +49,7 @@ func TestCreateUser(t *testing.T) {
 	err = db.AutoMigrate(
 		&models.User{},
 	)
-
+	assert.NoError(t, err)
 	user := &models.User{
 		Username: "testuser",
 		Email:    "test@example.com",
@@ -110,7 +113,7 @@ func TestGetUserByID(t *testing.T) {
 		&models.UserRole{},
 		&models.User{},
 	)
-
+	assert.NoError(t, err)
 	user := &models.User{
 		Username: "testuser",
 		Email:    "test@example.com",
@@ -139,7 +142,7 @@ func TestGetUserByUsername(t *testing.T) {
 		&models.UserRole{},
 		&models.User{},
 	)
-
+	assert.NoError(t, err)
 	user := &models.User{
 		Username: "testuser",
 		Email:    "test@example.com",

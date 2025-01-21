@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"flag"
 	"log"
 	"net/http"
 
@@ -45,7 +44,11 @@ var startCmd = &cobra.Command{
 		}
 
 		logger.Log.Infof("Starting server on port %s", cfg.ServerPort)
-		router.Run(":" + cfg.ServerPort)
+		err = router.Run(":" + cfg.ServerPort)
+		if err != nil {
+			logger.Log.Errorf("Cannot start server on port %s: %v", cfg.ServerPort, err)
+			return
+		}
 	},
 }
 
@@ -177,23 +180,4 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	}
 
 	return router, nil
-}
-
-func main() {
-	// Parse command-line flags
-	configPath := flag.String("config", "config.yaml", "path to config file")
-	flag.Parse()
-
-	cfg, _ := config.LoadConfig(*configPath)
-
-	// Initialize server
-	router, err := InitializeServer(*configPath)
-	if err != nil {
-		logger.Log.Errorf("Cannot start server on port %s: %v", cfg.ServerPort, err)
-		return
-	}
-
-	// Start the server
-	logger.Log.Infof("Starting server on port %s", cfg.ServerPort)
-	router.Run(":" + cfg.ServerPort)
 }

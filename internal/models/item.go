@@ -12,6 +12,7 @@ import (
 
 type Item struct {
 	gorm.Model
+	ID           uint    `json:"id"`
 	CollectionID uint    `json:"collection"`
 	Data         JSONMap `json:"data" gorm:"type:json"`
 }

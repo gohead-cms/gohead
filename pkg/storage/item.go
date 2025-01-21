@@ -151,7 +151,7 @@ func fetchItemWithRelations(ct models.Collection, id uint, data models.JSONMap, 
 		logger.Log.WithError(err).WithFields(map[string]interface{}{
 			"item_id": id,
 		}).Warn("Failed to fetch item with relations")
-		return nil, fmt.Errorf("failed to fetch item with ID '%d' in collection '%s': %w", id, err)
+		return nil, fmt.Errorf("failed to fetch item with ID '%d' in collection '%s': %w", id, ct.Name, err)
 	}
 
 	// Fetch nested relations for the item

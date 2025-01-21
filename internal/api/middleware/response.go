@@ -7,6 +7,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type responseRecorder struct {
+	gin.ResponseWriter
+	body *bytes.Buffer
+}
+
 func ResponseWrapper() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
@@ -48,11 +53,6 @@ func ResponseWrapper() gin.HandlerFunc {
 		// Send the JSON response
 		c.JSON(statusCode, formattedResponse)
 	}
-}
-
-type responseRecorder struct {
-	gin.ResponseWriter
-	body *bytes.Buffer
 }
 
 func (r *responseRecorder) Write(b []byte) (int, error) {

@@ -9,6 +9,7 @@ import (
 // Attribute defines the structure for fields in a collection.
 type Attribute struct {
 	gorm.Model
+	ID           uint     `json:"id"`
 	Name         string   `json:"name"`
 	Type         string   `json:"type"` // e.g., "string", "int", "bool", "date", "richtext", "enum", "relation"
 	Required     bool     `json:"required"`

@@ -4,7 +4,7 @@ package auth
 import (
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	jwt "github.com/dgrijalva/jwt-go"
 )
 
 var jwtKey []byte
@@ -16,6 +16,7 @@ func InitializeJWT(secret string) {
 type Claims struct {
 	Username string `json:"username"`
 	Role     string `json:"role"`
+
 	jwt.StandardClaims
 }
 
