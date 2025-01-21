@@ -24,7 +24,6 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 )
 
-// Initialize start command
 func init() {
 	rootCmd.AddCommand(startCmd)
 }
@@ -53,6 +52,7 @@ var startCmd = &cobra.Command{
 func init() {
 	startCmd.Flags().StringP("config", "c", "config.yaml", "Path to the configuration file")
 }
+
 func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	// Load configuration
 	cfg, err := config.LoadConfig(cfgPath)
@@ -60,10 +60,10 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 		return nil, err
 	}
 
-	// Initialize the logger with the configured log level
+	// Initialize logger
 	logger.InitLogger(cfg.LogLevel)
 
-	// Map application log levels to GORM log levels
+	// Map to GORM log levels
 	var gormLogLevel gormlogger.LogLevel
 	switch cfg.LogLevel {
 	case "debug":
@@ -78,27 +78,23 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 		gormLogLevel = gormlogger.Silent
 	}
 
-	// Initialize the database with GORM logger level
+	// Initialize database
 	db, err := database.InitDatabase(cfg.DatabaseURL, gormLogLevel)
 	if err != nil {
 		return nil, err
 	}
 
-	// Apply migrations
+	// Migrate
 	if err := migrations.MigrateDatabase(db); err != nil {
 		return nil, err
 	}
 
-	// Seed default roles
+	// Seed roles, init JWT, metrics
 	seed.SeedRoles()
-
-	// Initialize JWT with the secret from config
 	auth.InitializeJWT(cfg.JWTSecret)
-
-	// Initialize metrics
 	metrics.InitMetrics()
 
-	// Set up telemetry
+	// Tracing
 	if cfg.TelemetryEnabled {
 		tracerProvider, err := tracing.InitTracer()
 		if err != nil {
@@ -111,7 +107,7 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 		}()
 	}
 
-	// Set Gin log level
+	// Gin mode
 	switch cfg.Mode {
 	case "development":
 		gin.SetMode(gin.DebugMode)
@@ -147,27 +143,37 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 		authRoutes.POST("/login", handlers.Login)
 	}
 
-	// Admin routes
-	adminRoutes := router.Group("/admin")
-	adminRoutes.Use(middleware.AdminOnly())
+	// ADMIN routes (schema/definition)
+	// Only admin can manage content definitions (e.g., collections & single-types)
+	admin := router.Group("/admin")
+	admin.Use(middleware.AuthMiddleware())
+	admin.Use(middleware.AdminOnly())
 	{
-		adminRoutes.POST("/register", handlers.Register)
+		admin.POST("/register", handlers.Register)
+
+		// Collections definitions
+		admin.POST("/collections", handlers.CreateCollection)
+		admin.GET("/collections/:name", handlers.GetCollection)
+		admin.PUT("/collections/:name", handlers.UpdateCollection)
+		admin.DELETE("/collections/:name", handlers.DeleteCollection)
+
+		// Single Types definitions
+		admin.POST("/single-types", handlers.CreateOrUpdateSingleType)
+		admin.GET("/single-types/:name", handlers.GetSingleType)
+		admin.PUT("/single-types/:name", handlers.CreateOrUpdateSingleType)
+		admin.DELETE("/single-types/:name", handlers.DeleteSingleType)
 	}
 
-	// Protected routes
-	protected := router.Group("/")
-	protected.Use(middleware.AuthMiddleware())
+	// CONTENT routes (actual data/items)
+	content := router.Group("/api")
+	content.Use(middleware.AuthMiddleware())
 	{
-		protected.POST("/single-type", handlers.CreateOrUpdateSingleType)
-		protected.GET("/single-type/:name", handlers.GetSingleType)
-		protected.POST("/single-type/:name", handlers.CreateOrUpdateSingleTypeItem)
-		protected.DELETE("/single-type/:name", handlers.DeleteSingleType)
-		protected.POST("/collections", handlers.CreateCollection)
-		protected.GET("/collections/:name", handlers.GetCollection)
-		protected.PUT("/collections/:name", handlers.UpdateCollection)
-		protected.DELETE("/collections/:name", handlers.DeleteCollection)
-		protected.Any("/:collection", handlers.DynamicCollectionHandler)
-		protected.Any("/:collection/:id", handlers.DynamicCollectionHandler)
+		content.Any("/:collection", handlers.DynamicCollectionHandler)
+		content.Any("/:collection/:id", handlers.DynamicCollectionHandler)
+
+		content.GET("/single-types/:name", handlers.GetSingleItem)
+		content.POST("/single-types/:name", handlers.CreateOrUpdateSingleTypeItem)
+		content.PUT("/single-types/:name", handlers.CreateOrUpdateSingleTypeItem)
 	}
 
 	return router, nil
@@ -178,9 +184,9 @@ func main() {
 	configPath := flag.String("config", "config.yaml", "path to config file")
 	flag.Parse()
 
-	cfg, _ := config.LoadConfig(*configPath) // Reload config to get ServerPort
+	cfg, _ := config.LoadConfig(*configPath)
 
-	// Initialize the server
+	// Initialize server
 	router, err := InitializeServer(*configPath)
 	if err != nil {
 		logger.Log.Errorf("Cannot start server on port %s: %v", cfg.ServerPort, err)

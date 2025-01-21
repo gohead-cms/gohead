@@ -11,6 +11,37 @@ import (
 	"go.opentelemetry.io/otel"
 )
 
+// GetSingleItem retrieves the content (single item) for a given single type name.
+func GetSingleItem(c *gin.Context) {
+	singleTypeName := c.Param("name")
+	logger.Log.Debugf("Fetching single item for type: %s", singleTypeName)
+
+	// Attempt to get the SingleItem corresponding to this singleTypeName
+	item, err := storage.GetSingleItemByType(singleTypeName)
+	if err != nil {
+		// Strapi-like error response
+		c.Set("response", gin.H{
+			"data": nil,
+			"error": gin.H{
+				"status":  http.StatusNotFound,
+				"name":    "NotFoundError",
+				"message": err.Error(),
+				"details": gin.H{},
+			},
+		})
+		c.Set("status", http.StatusNotFound)
+		return
+	}
+
+	response := map[string]interface{}{
+		"id":         item.ID,
+		"attributes": item.Data,
+	}
+
+	c.Set("response", response)
+	c.Set("status", http.StatusOK)
+}
+
 // GetSingleType retrieves a single type by its name.
 func GetSingleType(c *gin.Context) {
 	name := c.Param("name")
@@ -82,7 +113,7 @@ func CreateOrUpdateSingleType(c *gin.Context) {
 	}
 
 	logger.Log.WithField("singleType", singleType.Name).Info("single type created or updated successfully")
-	c.Set("response", gin.H{"message": "single type created/updated successfully", "data": input})
+	c.Set("response", gin.H{"message": "single type created/updated successfully", "single-type": input})
 	c.Set("status", http.StatusCreated)
 }
 
@@ -176,14 +207,8 @@ func CreateOrUpdateSingleTypeItem(c *gin.Context) {
 			return
 		}
 
-		c.Set("response", gin.H{
-			"message": "Single type value updated successfully",
-			"data": gin.H{
-				"id":         updatedItem.ID,
-				"type":       singleTypeName,
-				"attributes": updatedItem.Data, // or build a Strapi-like structure
-			},
-		})
+		c.Set("response", gin.H{"message": "single type updated successfully", "single-type": updatedItem})
+		c.Set("detail", updatedItem)
 		c.Set("status", http.StatusOK)
 	} else {
 		// Create a new SingleItem if one does not exist
@@ -196,14 +221,7 @@ func CreateOrUpdateSingleTypeItem(c *gin.Context) {
 			return
 		}
 
-		c.Set("response", gin.H{
-			"message": "Single type value created successfully",
-			"data": gin.H{
-				"id":         newItem.ID,
-				"type":       singleTypeName,
-				"attributes": newItem.Data,
-			},
-		})
+		c.Set("response", gin.H{"message": "single type updated successfully", "single-type": newItem})
 		c.Set("status", http.StatusCreated)
 	}
 }
