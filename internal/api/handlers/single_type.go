@@ -8,7 +8,6 @@ import (
 	"gitlab.com/sudo.bngz/gohead/internal/models"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gitlab.com/sudo.bngz/gohead/pkg/storage"
-	"go.opentelemetry.io/otel"
 )
 
 // GetSingleItem retrieves the content (single item) for a given single type name.
@@ -149,12 +148,6 @@ func DeleteSingleType(c *gin.Context) {
 // CreateOrUpdateSingleTypeValue handles the creation or update of a single type content item.
 // Assumes you're storing the content in a SingleItem table, separate from the SingleType schema.
 func CreateOrUpdateSingleTypeItem(c *gin.Context) {
-	// Start OpenTelemetry span
-	ctx := c.Request.Context()
-	tracer := otel.Tracer("gohead")
-	ctx, span := tracer.Start(ctx, "CreateOrUpdateSingleTypeValue")
-	defer span.End()
-
 	// The single type name from URL (e.g. /single-types/:name)
 	singleTypeName := c.Param("name")
 
@@ -167,6 +160,7 @@ func CreateOrUpdateSingleTypeItem(c *gin.Context) {
 		c.Set("status", http.StatusNotFound)
 		return
 	}
+	logger.Log.WithField("single-type", st).Debug("handler:CreateOrUpdateSingleTypeItem")
 
 	// Parse the input JSON -> { "data": { ... } }
 	var input struct {

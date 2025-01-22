@@ -8,17 +8,11 @@ import (
 	"gitlab.com/sudo.bngz/gohead/internal/models"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gitlab.com/sudo.bngz/gohead/pkg/storage"
-	"go.opentelemetry.io/otel"
 )
 
 // CreateItem handles the creation of a new content item.
 func CreateItem(ct models.Collection) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := c.Request.Context()
-		tracer := otel.Tracer("gohead")
-		ctx, span := tracer.Start(ctx, "CreateItem")
-		defer span.End()
-
 		var input struct {
 			Data map[string]interface{} `json:"data"`
 		}

@@ -19,6 +19,7 @@ func ResponseWrapper() gin.HandlerFunc {
 		// Retrieve the response and status from context
 		response, exists := c.Get("response")
 		if !exists {
+			// No response to send (e.g., static file served directly), do nothing
 			return
 		}
 
@@ -32,26 +33,29 @@ func ResponseWrapper() gin.HandlerFunc {
 		meta, _ := c.Get("meta")
 
 		// Format the response
-		var formattedResponse gin.H
-		if statusCode >= 400 { // Error response
+		if statusCode >= 400 {
+			// Error response
 			details, _ := c.Get("details")
-			formattedResponse = gin.H{
+			c.JSON(statusCode, gin.H{
 				"error": gin.H{
 					"status":  statusCode,
 					"name":    getErrorName(statusCode),
 					"message": response,
 					"details": details,
 				},
-			}
-		} else { // Success response
-			formattedResponse = gin.H{
+			})
+		} else {
+			// Success response
+			formattedResponse := gin.H{
 				"data": response,
-				"meta": meta,
 			}
-		}
+			// Only add "meta" if it’s not nil
+			if meta != nil {
+				formattedResponse["meta"] = meta
+			}
 
-		// Send the JSON response
-		c.JSON(statusCode, formattedResponse)
+			c.JSON(statusCode, formattedResponse)
+		}
 	}
 }
 
