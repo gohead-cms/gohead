@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"regexp"
 
 	"gitlab.com/sudo.bngz/gohead/pkg/database"
 	"gitlab.com/sudo.bngz/gohead/pkg/logger"
@@ -97,10 +98,24 @@ func ValidateSingleTypeSchema(st SingleType) error {
 	return nil
 }
 
-// ValidateSingleTypeValues validates the input data against the SingleType schema (attributes).
 func ValidateSingleTypeValues(st SingleType, data map[string]interface{}) error {
+	// 1. Build a set of valid attribute names
+	validAttributes := make(map[string]Attribute, len(st.Attributes))
+	for _, attr := range st.Attributes {
+		validAttributes[attr.Name] = attr
+	}
+
+	// 2. Check for unknown fields in 'data'
+	for key := range data {
+		if _, ok := validAttributes[key]; !ok {
+			logger.Log.WithField("attribute", key).Warn("Validation failed: unknown attribute")
+			return fmt.Errorf("unknown attribute: '%s'", key)
+		}
+	}
+
+	// 3. For each attribute in the schema, check required & apply pattern checks
 	for _, attribute := range st.Attributes {
-		_, exists := data[attribute.Name]
+		val, exists := data[attribute.Name]
 
 		// Check for required attributes
 		if attribute.Required && !exists {
@@ -108,10 +123,48 @@ func ValidateSingleTypeValues(st SingleType, data map[string]interface{}) error 
 			return fmt.Errorf("missing required attribute: '%s'", attribute.Name)
 		}
 		if !exists {
-			continue // Skip validation for optional fields not provided
+			// Not required & not provided => skip further checks
+			continue
 		}
+
+		// If there's a pattern, validate only if the attribute's type is "string"
+		if attribute.Pattern != "" && attribute.Type == "string" {
+			strVal, err := ensureString(val)
+			if err != nil {
+				logger.Log.WithField("attribute", attribute.Name).
+					Warnf("Validation failed: expected string, got %v", val)
+				return fmt.Errorf("attribute '%s' must be a string to check pattern", attribute.Name)
+			}
+
+			if matchErr := matchPattern(attribute.Pattern, strVal, attribute.Name); matchErr != nil {
+				return matchErr
+			}
+		}
+
+		// If you have other checks (e.g., type checks, min/max length, etc.), do them here.
 	}
 
 	logger.Log.WithField("singleType", st.Name).Info("SingleType data validation passed")
+	return nil
+}
+
+func ensureString(val interface{}) (string, error) {
+	switch v := val.(type) {
+	case string:
+		return v, nil
+	default:
+		return "", fmt.Errorf("not a string value")
+	}
+}
+
+func matchPattern(pattern string, val string, attrName string) error {
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return fmt.Errorf("invalid pattern for attribute '%s': %v", attrName, err)
+	}
+
+	if !re.MatchString(val) {
+		return fmt.Errorf("attribute '%s' value '%s' does not match pattern '%s'", attrName, val, pattern)
+	}
 	return nil
 }

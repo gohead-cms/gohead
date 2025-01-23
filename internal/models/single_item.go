@@ -21,6 +21,19 @@ type SingleItem struct {
 
 // ValidateSingleItemValues validates a single item's data against the SingleType's schema (attributes).
 func ValidateSingleItemValues(st SingleType, itemData map[string]interface{}) error {
+	// 1. Build a set of valid attribute names
+	validAttributes := make(map[string]Attribute, len(st.Attributes))
+	for _, attr := range st.Attributes {
+		validAttributes[attr.Name] = attr
+	}
+
+	// 2. Check for unknown fields in 'data'
+	for key := range itemData {
+		if _, ok := validAttributes[key]; !ok {
+			logger.Log.WithField("attribute", key).Warn("Validation failed: unknown attribute")
+			return fmt.Errorf("unknown attribute: '%s'", key)
+		}
+	}
 	for _, attribute := range st.Attributes {
 		value, exists := itemData[attribute.Name]
 

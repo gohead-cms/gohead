@@ -18,7 +18,23 @@ type Item struct {
 }
 
 // ValidateItemValues validates a single item's data against the Collection's schema (attributes).
+// Now rejects any extra fields not defined in the schema.
 func ValidateItemValues(ct Collection, itemData map[string]interface{}) error {
+	// Build a set of valid attribute names from the collection schema
+	validAttributes := make(map[string]bool, len(ct.Attributes))
+	for _, attr := range ct.Attributes {
+		validAttributes[attr.Name] = true
+	}
+
+	// Check for unknown fields in itemData
+	for key := range itemData {
+		if !validAttributes[key] {
+			logger.Log.WithField("attribute", key).Warn("Validation failed: unknown attribute")
+			return fmt.Errorf("unknown attribute: '%s'", key)
+		}
+	}
+
+	// Now perform the usual checks for required, uniqueness, types, etc.
 	for _, attribute := range ct.Attributes {
 		value, exists := itemData[attribute.Name]
 
@@ -40,7 +56,8 @@ func ValidateItemValues(ct Collection, itemData map[string]interface{}) error {
 		}
 
 		// Validate attribute value or relationships
-		if attribute.Type != "relation" { // Validate regular attributes
+		if attribute.Type != "relation" {
+			// Validate regular attributes
 			if err := validateAttributeValue(attribute, value); err != nil {
 				logger.Log.WithFields(logrus.Fields{
 					"attribute": attribute.Name,
@@ -49,7 +66,8 @@ func ValidateItemValues(ct Collection, itemData map[string]interface{}) error {
 				}).Warn("Validation failed for attribute")
 				return fmt.Errorf("validation failed for attribute '%s': %w", attribute.Name, err)
 			}
-		} else { // Validate relationships
+		} else {
+			// Validate relationships
 			if err := validateRelationship(attribute, value); err != nil {
 				logger.Log.WithField("attribute", attribute.Name).Warn("Validation failed for relationship")
 				return fmt.Errorf("validation failed for relationship '%s': %w", attribute.Name, err)
