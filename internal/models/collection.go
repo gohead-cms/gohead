@@ -191,7 +191,7 @@ func ValidateCollectionSchema(ct Collection) error {
 // validateField checks the attribute schema for constraints and valid types.
 func validateAttributeType(attribute Attribute) error {
 	validTypes := map[string]struct{}{
-		"string":   {},
+		"text":     {},
 		"int":      {},
 		"bool":     {},
 		"date":     {},
@@ -212,7 +212,7 @@ func validateAttributeType(attribute Attribute) error {
 		return fmt.Errorf("attribute '%s': min value cannot be greater than max value", attribute.Name)
 	}
 
-	if attribute.Type == "string" && attribute.Pattern != "" {
+	if attribute.Type == "text" && attribute.Pattern != "" {
 		if _, err := regexp.Compile(attribute.Pattern); err != nil {
 			return fmt.Errorf("invalid regex pattern for attribute '%s': %v", attribute.Name, err)
 		}
@@ -228,11 +228,7 @@ func (c *Collection) GetAttributeType(attributeName string) (string, error) {
 			return "attribute", nil
 		}
 	}
-	/* for _, rel := range c.Relationships {
-		if rel.Field == attributeName {
-			return "relationship", nil
-		}
-	} */
+
 	logger.Log.WithField("attribute", attributeName).Warn("Unknown attribute or relationship")
 	return "", fmt.Errorf("unknown attribute or relationship: '%s'", attributeName)
 }
@@ -240,8 +236,8 @@ func (c *Collection) GetAttributeType(attributeName string) (string, error) {
 // validateFieldValue handles validation logic for a single attribute’s value.
 func validateAttributeValue(attribute Attribute, value interface{}) error {
 	switch attribute.Type {
-	case "string", "richtext":
-		strValue, err := convertToType(value, "string")
+	case "text", "richtext":
+		strValue, err := convertToType(value, "text")
 		if err != nil {
 			return err
 		}
@@ -280,7 +276,7 @@ func validateAttributeValue(attribute Attribute, value interface{}) error {
 		}
 
 	case "enum":
-		strValue, err := convertToType(value, "string")
+		strValue, err := convertToType(value, "text")
 		if err != nil {
 			return err
 		}
@@ -299,7 +295,7 @@ func validateAttributeValue(attribute Attribute, value interface{}) error {
 // convertToType attempts to convert 'value' to the desired 'targetType'.
 func convertToType(value interface{}, targetType string) (interface{}, error) {
 	switch targetType {
-	case "string":
+	case "text":
 		if str, ok := value.(string); ok {
 			return str, nil
 		}

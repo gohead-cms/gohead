@@ -18,7 +18,6 @@ func GetSingleItem(c *gin.Context) {
 	// Attempt to get the SingleItem corresponding to this singleTypeName
 	item, err := storage.GetSingleItemByType(singleTypeName)
 	if err != nil {
-		// Strapi-like error response
 		c.Set("response", gin.H{
 			"data": nil,
 			"error": gin.H{
@@ -96,7 +95,7 @@ func CreateOrUpdateSingleType(c *gin.Context) {
 	// Validate the single type
 	if err := models.ValidateSingleTypeSchema(singleType); err != nil {
 		logger.Log.WithError(err).Warn("CreateOrUpdateSingleType: validation failed")
-		c.Set("response", "Validation failed")
+		c.Set("response", gin.H{"message": "Validation schema for failed", "single_type": input})
 		c.Set("details", err.Error())
 		c.Set("status", http.StatusBadRequest)
 		return
@@ -105,14 +104,14 @@ func CreateOrUpdateSingleType(c *gin.Context) {
 	// Save or update the SingleType in the database
 	if err := storage.SaveOrUpdateSingleType(&singleType); err != nil {
 		logger.Log.WithError(err).Error("CreateOrUpdateSingleType: Failed to save single type")
-		c.Set("response", "Failed to save single type")
+		c.Set("response", gin.H{"message": "Failed to save single type", "single_type": input})
 		c.Set("details", err.Error())
 		c.Set("status", http.StatusInternalServerError)
 		return
 	}
 
 	logger.Log.WithField("singleType", singleType.Name).Info("single type created or updated successfully")
-	c.Set("response", gin.H{"message": "single type created/updated successfully", "single-type": input})
+	c.Set("response", gin.H{"message": "single type created/updated successfully", "single_type": input})
 	c.Set("status", http.StatusCreated)
 }
 
@@ -124,7 +123,7 @@ func DeleteSingleType(c *gin.Context) {
 	st, err := storage.GetSingleTypeByName(name)
 	if err != nil {
 		logger.Log.WithError(err).Warn("DeleteSingleType: single type not found")
-		c.Set("response", "Single type not found")
+		c.Set("response", gin.H{"message": "Single type not found", "details": err})
 		c.Set("status", http.StatusNotFound)
 		return
 	}
@@ -132,7 +131,7 @@ func DeleteSingleType(c *gin.Context) {
 	// Call the storage function to delete the single type
 	if err := storage.DeleteSingleType(st.ID); err != nil {
 		logger.Log.WithError(err).Error("DeleteSingleType: Failed to delete single type")
-		c.Set("response", "Failed to delete single type")
+		c.Set("response", gin.H{"message": "Failed to delete single type", "details": err})
 		c.Set("status", http.StatusInternalServerError)
 		return
 	}
@@ -141,12 +140,11 @@ func DeleteSingleType(c *gin.Context) {
 		"singleType": name,
 	}).Info("single type deleted successfully")
 
-	c.Set("response", "single type deleted successfully")
+	c.Set("response", gin.H{"message": "single type delete successfully", "single_type": name})
 	c.Set("status", http.StatusOK)
 }
 
 // CreateOrUpdateSingleTypeValue handles the creation or update of a single type content item.
-// Assumes you're storing the content in a SingleItem table, separate from the SingleType schema.
 func CreateOrUpdateSingleTypeItem(c *gin.Context) {
 	// The single type name from URL (e.g. /single-types/:name)
 	singleTypeName := c.Param("name")
@@ -156,18 +154,18 @@ func CreateOrUpdateSingleTypeItem(c *gin.Context) {
 	if err != nil {
 		logger.Log.WithError(err).WithField("singleType", singleTypeName).
 			Error("Failed to retrieve single type")
-		c.Set("response", "Single type not found")
+		c.Set("response", gin.H{"message": "Single type not found", "details": err})
 		c.Set("status", http.StatusNotFound)
 		return
 	}
-	logger.Log.WithField("single-type", st).Debug("handler:CreateOrUpdateSingleTypeItem")
+	logger.Log.WithField("single_type", st).Debug("handler:CreateOrUpdateSingleTypeItem")
 
 	// Parse the input JSON -> { "data": { ... } }
 	var input struct {
 		Data map[string]interface{} `json:"data"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.Set("response", "Invalid input format")
+		c.Set("response", gin.H{"message": "Invalid input format", "details": err})
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
@@ -175,7 +173,7 @@ func CreateOrUpdateSingleTypeItem(c *gin.Context) {
 
 	// Validate user-provided data against the single type’s schema
 	if err := models.ValidateSingleItemValues(*st, valueData); err != nil {
-		c.Set("response", err.Error())
+		c.Set("response", gin.H{"message": "Failed to validate single type value", "details": err.Error()})
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
@@ -196,12 +194,12 @@ func CreateOrUpdateSingleTypeItem(c *gin.Context) {
 		if updateErr != nil {
 			logger.Log.WithError(updateErr).WithField("singleType", singleTypeName).
 				Error("Failed to update single type item")
-			c.Set("response", "Failed to update single type value")
+			c.Set("response", gin.H{"message": "Failed to update single type value", "details": err})
 			c.Set("status", http.StatusInternalServerError)
 			return
 		}
 
-		c.Set("response", gin.H{"message": "single type updated successfully", "single-type": updatedItem})
+		c.Set("response", gin.H{"message": "single type updated successfully", "single_type": updatedItem})
 		c.Set("detail", updatedItem)
 		c.Set("status", http.StatusOK)
 	} else {
@@ -210,12 +208,12 @@ func CreateOrUpdateSingleTypeItem(c *gin.Context) {
 		if createErr != nil {
 			logger.Log.WithError(createErr).WithField("singleType", singleTypeName).
 				Error("Failed to create single type item")
-			c.Set("response", "Failed to save single type value")
+			c.Set("response", gin.H{"message": "Failed to save single type value", "details": err})
 			c.Set("status", http.StatusInternalServerError)
 			return
 		}
 
-		c.Set("response", gin.H{"message": "single type updated successfully", "single-type": newItem})
+		c.Set("response", gin.H{"message": "single type updated successfully", "single_type": newItem})
 		c.Set("status", http.StatusCreated)
 	}
 }

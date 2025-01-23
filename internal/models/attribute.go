@@ -11,7 +11,7 @@ type Attribute struct {
 	gorm.Model
 	ID           uint     `json:"id"`
 	Name         string   `json:"name"`
-	Type         string   `json:"type"` // e.g., "string", "int", "bool", "date", "richtext", "enum", "relation"
+	Type         string   `json:"type"` // e.g., "text", "int", "bool", "date", "richtext", "enum", "relation"
 	Required     bool     `json:"required"`
 	Unique       bool     `json:"unique,omitempty"`
 	Options      []string `gorm:"type:json" json:"options,omitempty"`
@@ -32,7 +32,6 @@ type Attribute struct {
 
 func (attr *Attribute) ValidateParent() error {
 	if attr.CollectionID != nil && attr.SingleTypeID != nil {
-
 		return fmt.Errorf("attribute '%s' cannot belong to both a collection and a single type", attr.Name)
 	}
 	if attr.CollectionID == nil && attr.SingleTypeID == nil {

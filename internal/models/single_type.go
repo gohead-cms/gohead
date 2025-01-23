@@ -144,7 +144,7 @@ func ValidateSingleTypeValues(st SingleType, data map[string]interface{}) error 
 		// If you have other checks (e.g., type checks, min/max length, etc.), do them here.
 	}
 
-	logger.Log.WithField("singleType", st.Name).Info("SingleType data validation passed")
+	logger.Log.WithField("singleType", st.Name).Debug("SingleType data validation passed")
 	return nil
 }
 

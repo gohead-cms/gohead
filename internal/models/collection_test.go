@@ -22,7 +22,7 @@ func TestValidateCollectionSchema(t *testing.T) {
 		collection := Collection{
 			Name: "articles",
 			Attributes: []Attribute{
-				{Name: "title", Type: "string", Required: true},
+				{Name: "title", Type: "text", Required: true},
 				{Name: "content", Type: "richtext", Required: true},
 			},
 		}
@@ -32,7 +32,7 @@ func TestValidateCollectionSchema(t *testing.T) {
 	t.Run("Missing Name", func(t *testing.T) {
 		collection := Collection{
 			Attributes: []Attribute{
-				{Name: "title", Type: "string", Required: true},
+				{Name: "title", Type: "text", Required: true},
 			},
 		}
 		err := ValidateCollectionSchema(collection)
@@ -44,7 +44,7 @@ func TestValidateCollectionSchema(t *testing.T) {
 		collection := Collection{
 			Name: "articles",
 			Attributes: []Attribute{
-				{Name: "title", Type: "string", Required: true},
+				{Name: "title", Type: "text", Required: true},
 				{Name: "title", Type: "richtext", Required: true},
 			},
 		}
@@ -71,7 +71,7 @@ func TestValidateCollection(t *testing.T) {
 		collection := Collection{
 			Name: "articles",
 			Attributes: []Attribute{
-				{Name: "title", Type: "string", Required: true},
+				{Name: "title", Type: "text", Required: true},
 				{Name: "content", Type: "richtext", Required: true},
 			},
 		}
@@ -81,7 +81,7 @@ func TestValidateCollection(t *testing.T) {
 	t.Run("Missing Name", func(t *testing.T) {
 		collection := Collection{
 			Attributes: []Attribute{
-				{Name: "title", Type: "string", Required: true},
+				{Name: "title", Type: "text", Required: true},
 			},
 		}
 		err := ValidateCollectionSchema(collection)
@@ -93,7 +93,7 @@ func TestValidateCollection(t *testing.T) {
 		collection := Collection{
 			Name: "articles",
 			Attributes: []Attribute{
-				{Name: "title", Type: "string", Required: true},
+				{Name: "title", Type: "text", Required: true},
 				{Name: "title", Type: "richtext", Required: true},
 			},
 		}
@@ -111,7 +111,7 @@ func TestValidateItemData(t *testing.T) {
 	max := 20
 
 	attributes := []Attribute{
-		{Name: "title", Type: "string", Required: true},
+		{Name: "title", Type: "text", Required: true},
 		{Name: "published_date", Type: "date"},
 		{Name: "rating", Type: "int", Min: &min, Max: &max},
 	}

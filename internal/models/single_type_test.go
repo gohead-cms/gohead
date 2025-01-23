@@ -21,7 +21,7 @@ func TestParseSingleTypeInput(t *testing.T) {
 				"description": "A single type for the homepage content",
 				"attributes": map[string]interface{}{
 					"title": map[string]interface{}{
-						"type":     "string",
+						"type":     "text",
 						"required": true,
 					},
 					"description": map[string]interface{}{
@@ -33,7 +33,7 @@ func TestParseSingleTypeInput(t *testing.T) {
 				Name:        "homepage",
 				Description: "A single type for the homepage content",
 				Attributes: []models.Attribute{
-					{Name: "title", Type: "string", Required: true},
+					{Name: "title", Type: "text", Required: true},
 					{Name: "description", Type: "text"},
 				},
 			},
@@ -88,7 +88,7 @@ func TestValidateSingleTypeSchema(t *testing.T) {
 			schema: models.SingleType{
 				Name: "homepage",
 				Attributes: []models.Attribute{
-					{Name: "title", Type: "string", Required: true},
+					{Name: "title", Type: "text", Required: true},
 					{Name: "description", Type: "text"},
 				},
 			},
@@ -98,7 +98,7 @@ func TestValidateSingleTypeSchema(t *testing.T) {
 			name: "Missing name",
 			schema: models.SingleType{
 				Attributes: []models.Attribute{
-					{Name: "title", Type: "string", Required: true},
+					{Name: "title", Type: "text", Required: true},
 				},
 			},
 			hasError: true,
@@ -108,8 +108,8 @@ func TestValidateSingleTypeSchema(t *testing.T) {
 			schema: models.SingleType{
 				Name: "homepage",
 				Attributes: []models.Attribute{
-					{Name: "title", Type: "string", Required: true},
-					{Name: "title", Type: "text"},
+					{Name: "title", Type: "text", Required: true},
+					{Name: "title", Type: ""},
 				},
 			},
 			hasError: true,
@@ -140,7 +140,7 @@ func TestValidateSingleTypeValues(t *testing.T) {
 			schema: models.SingleType{
 				Name: "homepage",
 				Attributes: []models.Attribute{
-					{Name: "title", Type: "string", Required: true},
+					{Name: "title", Type: "text", Required: true},
 					{Name: "description", Type: "text", Required: false},
 				},
 			},
@@ -155,7 +155,7 @@ func TestValidateSingleTypeValues(t *testing.T) {
 			schema: models.SingleType{
 				Name: "homepage",
 				Attributes: []models.Attribute{
-					{Name: "title", Type: "string", Required: true},
+					{Name: "title", Type: "text", Required: true},
 				},
 			},
 			data:     map[string]interface{}{},
@@ -166,14 +166,14 @@ func TestValidateSingleTypeValues(t *testing.T) {
 			schema: models.SingleType{
 				Name: "homepage",
 				Attributes: []models.Attribute{
-					{Name: "title", Type: "string", Required: true},
+					{Name: "title", Type: "text", Required: true},
 				},
 			},
 			data: map[string]interface{}{
 				"title": "Welcome to the homepage",
 				"extra": "Unexpected value",
 			},
-			hasError: false, // Schema does not restrict extra fields unless explicitly required
+			hasError: true, // Schema does not restrict extra fields unless explicitly required
 		},
 	}
 
