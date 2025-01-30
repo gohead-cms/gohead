@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-contrib/cors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
 	ginlogrus "github.com/toorop/gin-logrus"
@@ -125,6 +126,12 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 
 	// Create the router
 	router := gin.New()
+
+	// CORS
+	config := cors.DefaultConfig()
+    config.AllowAllOrigins = true
+
+	router.Use(cors.New(config))
 	router.Use(ginlogrus.Logger(logger.Log))
 	router.Use(gin.Recovery())
 	router.Use(middleware.MetricsMiddleware())
