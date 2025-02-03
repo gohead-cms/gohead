@@ -3,11 +3,12 @@ package handlers
 import (
 	"net/http"
 
+	"gohead/internal/models"
+	"gohead/pkg/logger"
+	"gohead/pkg/storage"
+
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"gitlab.com/sudo.bngz/gohead/internal/models"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
-	"gitlab.com/sudo.bngz/gohead/pkg/storage"
 )
 
 // GetCollection retrieves a specific collection by its name.

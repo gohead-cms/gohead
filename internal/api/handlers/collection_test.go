@@ -8,12 +8,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"gohead/internal/models"
+	"gohead/pkg/logger"
+	"gohead/pkg/testutils"
+
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/sudo.bngz/gohead/internal/models"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
-	"gitlab.com/sudo.bngz/gohead/pkg/testutils"
 )
 
 // Initialize logger for testing

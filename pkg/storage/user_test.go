@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"testing"
 
+	"gohead/internal/models"
+	"gohead/pkg/logger"
+	"gohead/pkg/storage"
+	"gohead/pkg/testutils"
+	"gohead/pkg/utils"
+
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/sudo.bngz/gohead/internal/models"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
-	"gitlab.com/sudo.bngz/gohead/pkg/storage"
-	"gitlab.com/sudo.bngz/gohead/pkg/testutils"
-	"gitlab.com/sudo.bngz/gohead/pkg/utils"
 )
 
 // Initialize logger for testing

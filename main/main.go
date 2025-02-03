@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"gitlab.com/sudo.bngz/gohead/cmd"
+	"gohead/cmd"
 )
 
 func main() {

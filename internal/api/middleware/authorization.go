@@ -4,8 +4,9 @@ package middleware
 import (
 	"net/http"
 
+	"gohead/pkg/logger"
+
 	"github.com/gin-gonic/gin"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 )
 
 func AuthorizeRole(allowedRoles ...string) gin.HandlerFunc {

@@ -3,9 +3,9 @@ package storage
 import (
 	"fmt"
 
-	"gitlab.com/sudo.bngz/gohead/internal/models"
-	"gitlab.com/sudo.bngz/gohead/pkg/database"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
+	"gohead/internal/models"
+	"gohead/pkg/database"
+	"gohead/pkg/logger"
 )
 
 // CreateRole creates a new role.

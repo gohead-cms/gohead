@@ -7,8 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"gohead/pkg/logger"
+
 	"github.com/sirupsen/logrus"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gorm.io/gorm"
 )
 

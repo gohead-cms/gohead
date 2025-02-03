@@ -3,8 +3,8 @@ package database_test
 import (
 	"testing"
 
-	"gitlab.com/sudo.bngz/gohead/pkg/database"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
+	"gohead/pkg/database"
+	"gohead/pkg/logger"
 
 	"github.com/stretchr/testify/assert"
 	gormlogger "gorm.io/gorm/logger"

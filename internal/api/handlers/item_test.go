@@ -8,9 +8,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"gitlab.com/sudo.bngz/gohead/internal/models"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
-	"gitlab.com/sudo.bngz/gohead/pkg/testutils"
+	"gohead/internal/models"
+	"gohead/pkg/logger"
+	"gohead/pkg/testutils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"

@@ -3,8 +3,9 @@ package models_test
 import (
 	"testing"
 
+	"gohead/internal/models"
+
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/sudo.bngz/gohead/internal/models"
 )
 
 func TestValidateUser(t *testing.T) {

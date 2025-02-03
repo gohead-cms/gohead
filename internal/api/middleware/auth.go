@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 
-	"gitlab.com/sudo.bngz/gohead/pkg/auth"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
-	"gitlab.com/sudo.bngz/gohead/pkg/storage"
+	"gohead/pkg/auth"
+	"gohead/pkg/logger"
+	"gohead/pkg/storage"
 
 	"github.com/gin-gonic/gin"
 )

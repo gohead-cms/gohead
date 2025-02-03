@@ -4,8 +4,8 @@ package validation
 import (
 	"fmt"
 
-	"gitlab.com/sudo.bngz/gohead/pkg/database"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
+	"gohead/pkg/database"
+	"gohead/pkg/logger"
 )
 
 // CheckFieldUniqueness checks if a field value is unique within a collection.

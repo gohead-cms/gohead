@@ -4,9 +4,10 @@ import (
 	"errors"
 	"fmt"
 
+	"gohead/pkg/database"
+	"gohead/pkg/logger"
+
 	"github.com/sirupsen/logrus"
-	"gitlab.com/sudo.bngz/gohead/pkg/database"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gorm.io/gorm"
 )
 

@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"gitlab.com/sudo.bngz/gohead/pkg/metrics"
+	"gohead/pkg/metrics"
 
 	"github.com/gin-gonic/gin"
 )

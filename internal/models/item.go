@@ -3,10 +3,11 @@ package models
 import (
 	"fmt"
 
+	"gohead/pkg/database"
+	"gohead/pkg/logger"
+	"gohead/pkg/validation"
+
 	"github.com/sirupsen/logrus"
-	"gitlab.com/sudo.bngz/gohead/pkg/database"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
-	"gitlab.com/sudo.bngz/gohead/pkg/validation"
 	"gorm.io/gorm"
 )
 

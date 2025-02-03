@@ -5,7 +5,8 @@ import (
 	"net/url"
 	"strings"
 
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
+	"gohead/pkg/logger"
+
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"

@@ -3,8 +3,9 @@ package storage_test
 import (
 	"testing"
 
+	"gohead/pkg/storage"
+
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/sudo.bngz/gohead/pkg/storage"
 )
 
 func TestDuplicateEntryError(t *testing.T) {

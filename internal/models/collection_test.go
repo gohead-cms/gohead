@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"testing"
 
+	"gohead/pkg/logger"
+
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 )
 
 func init() {

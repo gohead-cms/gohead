@@ -10,9 +10,9 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"gitlab.com/sudo.bngz/gohead/internal/models"
-	"gitlab.com/sudo.bngz/gohead/pkg/database"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
+	"gohead/internal/models"
+	"gohead/pkg/database"
+	"gohead/pkg/logger"
 )
 
 func setupTestDB(t *testing.T) *gorm.DB {

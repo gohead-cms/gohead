@@ -4,10 +4,11 @@ import (
 	"net/http"
 	"strconv"
 
+	"gohead/internal/models"
+	"gohead/pkg/logger"
+	"gohead/pkg/storage"
+
 	"github.com/gin-gonic/gin"
-	"gitlab.com/sudo.bngz/gohead/internal/models"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
-	"gitlab.com/sudo.bngz/gohead/pkg/storage"
 )
 
 // CreateItem handles the creation of a new content item.

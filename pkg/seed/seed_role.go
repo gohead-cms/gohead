@@ -1,10 +1,11 @@
 package seed
 
 import (
+	"gohead/internal/models"
+	"gohead/pkg/database"
+	"gohead/pkg/logger"
+
 	"github.com/sirupsen/logrus"
-	"gitlab.com/sudo.bngz/gohead/internal/models"
-	"gitlab.com/sudo.bngz/gohead/pkg/database"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 )
 
 func SeedRoles() {

@@ -2,7 +2,8 @@
 package migrations
 
 import (
-	"gitlab.com/sudo.bngz/gohead/internal/models"
+	"gohead/internal/models"
+
 	"gorm.io/gorm"
 )
 

@@ -9,10 +9,10 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"gitlab.com/sudo.bngz/gohead/internal/models"
-	"gitlab.com/sudo.bngz/gohead/pkg/database"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
-	"gitlab.com/sudo.bngz/gohead/pkg/storage"
+	"gohead/internal/models"
+	"gohead/pkg/database"
+	"gohead/pkg/logger"
+	"gohead/pkg/storage"
 )
 
 // setupTestDB initializes an in-memory SQLite database for testing SingleType storage.

@@ -3,10 +3,11 @@ package storage
 import (
 	"testing"
 
+	"gohead/internal/models"
+	"gohead/pkg/testutils"
+	"gohead/pkg/validation"
+
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/sudo.bngz/gohead/internal/models"
-	"gitlab.com/sudo.bngz/gohead/pkg/testutils"
-	"gitlab.com/sudo.bngz/gohead/pkg/validation"
 )
 
 func TestSaveItem(t *testing.T) {

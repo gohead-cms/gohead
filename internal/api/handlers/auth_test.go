@@ -9,10 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	"gitlab.com/sudo.bngz/gohead/internal/models"
-	"gitlab.com/sudo.bngz/gohead/pkg/database"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
-	"gitlab.com/sudo.bngz/gohead/pkg/testutils"
+	"gohead/internal/models"
+
+	"gohead/pkg/database"
+	"gohead/pkg/logger"
+	"gohead/pkg/testutils"
+
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/sirupsen/logrus"

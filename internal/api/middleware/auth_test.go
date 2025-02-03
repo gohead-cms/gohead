@@ -6,10 +6,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"gohead/pkg/auth"
+	"gohead/pkg/logger"
+
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/sudo.bngz/gohead/pkg/auth"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 )
 
 // Mock handler to simulate a protected endpoint

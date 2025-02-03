@@ -6,7 +6,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
+	"gohead/pkg/logger"
+
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 

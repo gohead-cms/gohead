@@ -7,8 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"gitlab.com/sudo.bngz/gohead/pkg/database"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
+	"gohead/pkg/database"
+	"gohead/pkg/logger"
+
 	"gorm.io/gorm"
 )
 

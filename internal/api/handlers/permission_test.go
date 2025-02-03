@@ -8,14 +8,15 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"gohead/internal/api/middleware"
+	"gohead/internal/models"
+	"gohead/pkg/auth"
+	"gohead/pkg/config"
+	"gohead/pkg/database"
+	"gohead/pkg/logger"
+
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/sudo.bngz/gohead/internal/api/middleware"
-	"gitlab.com/sudo.bngz/gohead/internal/models"
-	"gitlab.com/sudo.bngz/gohead/pkg/auth"
-	"gitlab.com/sudo.bngz/gohead/pkg/config"
-	"gitlab.com/sudo.bngz/gohead/pkg/database"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 )
 
 func TestProtectedHandlerWithPermissions(t *testing.T) {

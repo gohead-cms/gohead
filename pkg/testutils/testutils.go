@@ -1,11 +1,12 @@
 package testutils
 
 import (
+	"gohead/internal/models"
+	"gohead/pkg/database"
+	"gohead/pkg/logger"
+
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"gitlab.com/sudo.bngz/gohead/internal/models"
-	"gitlab.com/sudo.bngz/gohead/pkg/database"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 )

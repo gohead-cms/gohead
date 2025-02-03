@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"net/http"
 
+	"gohead/internal/models"
+	"gohead/pkg/auth"
+	"gohead/pkg/logger"
+	"gohead/pkg/storage"
+	"gohead/pkg/utils"
+
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"gitlab.com/sudo.bngz/gohead/internal/models"
-	"gitlab.com/sudo.bngz/gohead/pkg/auth"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
-	"gitlab.com/sudo.bngz/gohead/pkg/storage"
-	"gitlab.com/sudo.bngz/gohead/pkg/utils"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )

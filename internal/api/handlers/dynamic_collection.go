@@ -4,11 +4,12 @@ import (
 	"net/http"
 	"strconv"
 
+	"gohead/internal/models"
+	"gohead/pkg/logger"
+	"gohead/pkg/storage"
+
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"gitlab.com/sudo.bngz/gohead/internal/models"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
-	"gitlab.com/sudo.bngz/gohead/pkg/storage"
 )
 
 // DynamicCollectionHandler handles CRUD operations for dynamic collections.

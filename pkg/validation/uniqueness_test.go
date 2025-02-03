@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"testing"
 
+	"gohead/pkg/database"
+	"gohead/pkg/logger"
+
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/sudo.bngz/gohead/pkg/database"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )

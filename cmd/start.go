@@ -5,21 +5,22 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
+	"gohead/internal/api/handlers"
+	"gohead/internal/api/middleware"
+	"gohead/pkg/auth"
+	"gohead/pkg/config"
+	"gohead/pkg/database"
+	"gohead/pkg/logger"
+	"gohead/pkg/metrics"
+	"gohead/pkg/migrations"
+	"gohead/pkg/seed"
+	"gohead/pkg/tracing"
+
 	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
 	ginlogrus "github.com/toorop/gin-logrus"
-	"gitlab.com/sudo.bngz/gohead/internal/api/handlers"
-	"gitlab.com/sudo.bngz/gohead/internal/api/middleware"
-	"gitlab.com/sudo.bngz/gohead/pkg/auth"
-	"gitlab.com/sudo.bngz/gohead/pkg/config"
-	"gitlab.com/sudo.bngz/gohead/pkg/database"
-	"gitlab.com/sudo.bngz/gohead/pkg/logger"
-	"gitlab.com/sudo.bngz/gohead/pkg/metrics"
-	"gitlab.com/sudo.bngz/gohead/pkg/migrations"
-	"gitlab.com/sudo.bngz/gohead/pkg/seed"
-	"gitlab.com/sudo.bngz/gohead/pkg/tracing"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	gormlogger "gorm.io/gorm/logger"
 )
@@ -129,7 +130,7 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 
 	// CORS
 	config := cors.DefaultConfig()
-    config.AllowAllOrigins = true
+	config.AllowAllOrigins = true
 
 	router.Use(cors.New(config))
 	router.Use(ginlogrus.Logger(logger.Log))
