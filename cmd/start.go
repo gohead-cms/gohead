@@ -155,7 +155,7 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	}
 
 	// ADMIN routes (schema/definition)
-	// Only admin can manage content definitions (e.g., collections & single-types)
+	// Only admin can manage content definitions (e.g., collections & single-types & components)
 	admin := router.Group("/admin")
 	admin.Use(middleware.AuthMiddleware())
 	admin.Use(middleware.AdminOnly())
@@ -173,6 +173,12 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 		admin.GET("/single-types/:name", handlers.GetSingleType)
 		admin.PUT("/single-types/:name", handlers.CreateOrUpdateSingleType)
 		admin.DELETE("/single-types/:name", handlers.DeleteSingleType)
+
+		// Single Types definitions
+		admin.POST("/components", handlers.CreateComponent)
+		//admin.GET("/components/:name", handlers.GetSingleType)
+		//admin.PUT("/components/:name", handlers.CreateOrUpdateSingleType)
+		admin.DELETE("/components/:name", handlers.DeleteComponent)
 	}
 
 	// CONTENT routes (actual data/items)

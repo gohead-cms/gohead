@@ -93,7 +93,7 @@ func GetUser(c *gin.Context) {
 		"user_id": id,
 	}).Info("Fetched user successfully")
 	c.Set("response", user)
-	c.Set("details", err.Error())
+	c.Set("details", err)
 	c.Set("status", http.StatusOK)
 }
 
