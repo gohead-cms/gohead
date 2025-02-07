@@ -160,24 +160,22 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	admin.Use(middleware.AuthMiddleware())
 	admin.Use(middleware.AdminOnly())
 	{
-		admin.POST("/register", handlers.Register)
-
-		// Collections definitions
+		// Collections admin endpoints
 		admin.POST("/collections", handlers.CreateCollection)
 		admin.GET("/collections/:name", handlers.GetCollection)
 		admin.PUT("/collections/:name", handlers.UpdateCollection)
 		admin.DELETE("/collections/:name", handlers.DeleteCollection)
 
-		// Single Types definitions
+		// Single Types admin endpoints
 		admin.POST("/single-types", handlers.CreateOrUpdateSingleType)
 		admin.GET("/single-types/:name", handlers.GetSingleType)
 		admin.PUT("/single-types/:name", handlers.CreateOrUpdateSingleType)
 		admin.DELETE("/single-types/:name", handlers.DeleteSingleType)
 
-		// Single Types definitions
+		// Component admin endpoints
 		admin.POST("/components", handlers.CreateComponent)
-		//admin.GET("/components/:name", handlers.GetSingleType)
-		//admin.PUT("/components/:name", handlers.CreateOrUpdateSingleType)
+		admin.GET("/components/:name", handlers.GetComponent)
+		admin.PUT("/components/:name", handlers.UpdateComponent)
 		admin.DELETE("/components/:name", handlers.DeleteComponent)
 	}
 
@@ -185,6 +183,8 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	content := router.Group("/api")
 	content.Use(middleware.AuthMiddleware())
 	{
+		content.POST("/graphql", handlers.GraphQLHandler)
+
 		content.Any("/:collection", handlers.DynamicCollectionHandler)
 		content.Any("/:collection/:id", handlers.DynamicCollectionHandler)
 
