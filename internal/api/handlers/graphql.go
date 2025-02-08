@@ -9,26 +9,6 @@ import (
 	schema "gohead/internal/graphql"
 )
 
-var Schema graphql.Schema
-
-// InitializeGraphQLSchema dynamically generates the GraphQL schema.
-func InitializeGraphQLSchema() error {
-	rootQuery, err := schema.GenerateGraphQLQueries()
-	if err != nil {
-		return err
-	}
-
-	schema, err := graphql.NewSchema(graphql.SchemaConfig{
-		Query: rootQuery,
-	})
-	if err != nil {
-		return err
-	}
-
-	Schema = schema
-	return nil
-}
-
 // GraphQLHandler handles GraphQL queries
 func GraphQLHandler(c *gin.Context) {
 	var request struct {
@@ -42,7 +22,7 @@ func GraphQLHandler(c *gin.Context) {
 
 	// Execute GraphQL query
 	result := graphql.Do(graphql.Params{
-		Schema:        Schema,
+		Schema:        schema.Schema,
 		RequestString: request.Query,
 	})
 

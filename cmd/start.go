@@ -7,6 +7,7 @@ import (
 
 	"gohead/internal/api/handlers"
 	"gohead/internal/api/middleware"
+	"gohead/internal/graphql"
 	"gohead/pkg/auth"
 	"gohead/pkg/config"
 	"gohead/pkg/database"
@@ -111,6 +112,9 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 			}
 		}()
 	}
+
+	// Init GraphQL
+	err = graphql.InitializeGraphQLSchema()
 
 	// Gin mode
 	switch cfg.Mode {

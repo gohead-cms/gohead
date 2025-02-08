@@ -38,8 +38,8 @@ func TestGenerateGraphQLQueries(t *testing.T) {
 	collection := models.Collection{
 		Name: "authors",
 		Attributes: []models.Attribute{
-			{Name: "name", Type: "string", Required: true},
-			{Name: "email", Type: "string", Required: true, Unique: true},
+			{Name: "name", Type: "text", Required: true},
+			{Name: "email", Type: "text", Required: true, Unique: true},
 		},
 	}
 	if err := db.Create(&collection).Error; err != nil {

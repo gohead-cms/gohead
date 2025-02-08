@@ -77,8 +77,8 @@ func TestGetOrCreateGraphQLType(t *testing.T) {
 	authorCollection := models.Collection{
 		Name: "authors",
 		Attributes: []models.Attribute{
-			{Name: "name", Type: "string", Required: true},
-			{Name: "email", Type: "string", Required: true, Unique: true},
+			{Name: "name", Type: "text", Required: true},
+			{Name: "email", Type: "text", Required: true, Unique: true},
 		},
 	}
 	if err := db.Create(&authorCollection).Error; err != nil {
@@ -89,8 +89,8 @@ func TestGetOrCreateGraphQLType(t *testing.T) {
 	collection := models.Collection{
 		Name: "posts",
 		Attributes: []models.Attribute{
-			{Name: "title", Type: "string", Required: true},
-			{Name: "content", Type: "string"},
+			{Name: "title", Type: "text", Required: true},
+			{Name: "content", Type: "text"},
 			{Name: "author_id", Type: "relation", Target: "authors", Relation: "oneToOne"},
 		},
 	}
