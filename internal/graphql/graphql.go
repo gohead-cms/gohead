@@ -5,6 +5,8 @@ import (
 	"gohead/internal/models"
 	"gohead/pkg/database"
 	"gohead/pkg/logger"
+	"gohead/pkg/storage"
+	"strconv"
 
 	"github.com/graphql-go/graphql"
 )
@@ -79,18 +81,25 @@ func GenerateGraphQLQueries() (*graphql.Object, error) {
 					return nil, fmt.Errorf("missing 'id' argument")
 				}
 
-				logger.Log.WithField("query_id", id).Debug("Fetching item by ID")
+				// Convert the string ID to uint
+				parsedID, err := strconv.ParseUint(id, 10, 32)
+				if err != nil {
+					logger.Log.WithError(err).Warn("Failed to parse 'id' argument to uint")
+					return nil, fmt.Errorf("invalid 'id' argument")
+				}
 
-				var item models.Item
-				if err := database.DB.Where("id = ?", id).First(&item).Error; err != nil {
+				logger.Log.WithField("query_id", id).Debug("Fetching item by ID for collection", collection.Name)
+
+				item, err := storage.GetItemByID(collection.ID, uint(parsedID))
+				if err != nil {
 					logger.Log.WithFields(map[string]interface{}{
 						"query_id": id,
 						"error":    err,
-					}).Warn("Item not found in database")
+					}).Warn("Item not found in storage for collection", collection.Name)
 					return nil, fmt.Errorf("item not found")
 				}
 
-				logger.Log.WithField("query_id", id).Info("Item retrieved successfully")
+				logger.Log.WithField("query_id", id).Info("Item retrieved successfully for collection", collection.Name)
 				return item, nil
 			},
 		}
