@@ -11,11 +11,37 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// GetCollection retrieves a specific collection by its name.
+// GetCollection retrieves a specific collection by its name or all collections if no name is provided.
 func GetCollection(c *gin.Context) {
 	name := c.Param("name")
 
-	// Retrieve collection from storage
+	if name == "" {
+		// Retrieve all collections
+		logger.Log.Debug("Handler:GetAllCollections")
+		collections, err := storage.GetAllCollections()
+		if err != nil {
+			logger.Log.Warn("GetAllCollections: failed to retrieve collections")
+			c.Set("response", "Failed to fetch collections")
+			c.Set("status", http.StatusInternalServerError)
+			return
+		}
+
+		// Format response
+		var response []map[string]interface{}
+		for _, ct := range collections {
+			response = append(response, map[string]interface{}{
+				"name":       ct.Name,
+				"attributes": ct.Attributes,
+			})
+		}
+
+		logger.Log.Info("GetAllCollections: all collections retrieved successfully")
+		c.Set("response", response)
+		c.Set("status", http.StatusOK)
+		return
+	}
+
+	// Retrieve a specific collection
 	logger.Log.WithField("name", name).Debug("Handler:GetCollection")
 	ct, err := storage.GetCollectionByName(name)
 	if err != nil {
@@ -25,7 +51,7 @@ func GetCollection(c *gin.Context) {
 		return
 	}
 
-	// Flatten the response
+	// Format response
 	response := map[string]interface{}{
 		"name":       ct.Name,
 		"attributes": ct.Attributes,

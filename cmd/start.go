@@ -166,6 +166,7 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	{
 		// Collections admin endpoints
 		admin.POST("/collections", handlers.CreateCollection)
+		admin.GET("/collections", handlers.GetCollection)
 		admin.GET("/collections/:name", handlers.GetCollection)
 		admin.PUT("/collections/:name", handlers.UpdateCollection)
 		admin.DELETE("/collections/:name", handlers.DeleteCollection)

@@ -16,7 +16,8 @@ func GraphQLHandler(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		c.Set("response", "Invalid input format")
+		c.Set("status", http.StatusBadRequest)
 		return
 	}
 
@@ -27,9 +28,12 @@ func GraphQLHandler(c *gin.Context) {
 	})
 
 	if len(result.Errors) > 0 {
-		c.JSON(http.StatusInternalServerError, gin.H{"errors": result.Errors})
+		c.Set("response", "Failed to fetch items")
+		c.Set("details", result.Errors[0].Message)
+		c.Set("status", http.StatusBadRequest)
 		return
 	}
 
-	c.JSON(http.StatusOK, result)
+	c.Set("response", result.Data)
+	c.Set("status", http.StatusOK)
 }

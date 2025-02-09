@@ -66,7 +66,7 @@ func ConvertCollectionToGraphQLType(collection models.Collection) (*graphql.Obje
 			}).Warn("Unsupported attribute type")
 			return nil, fmt.Errorf("unsupported attribute type: %s", localAttr.Type)
 		}
-
+		logger.Log.Debug(localAttr.Name)
 		fields[localAttr.Name] = &graphql.Field{
 			Type: gqlFieldType,
 			Resolve: func(p graphql.ResolveParams) (interface{}, error) {

@@ -75,32 +75,63 @@ func GenerateGraphQLQueries() (*graphql.Object, error) {
 			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 				logger.Log.Debug("Resolve function triggered for collection query")
 
-				id, ok := p.Args["id"].(string)
-				if !ok {
-					logger.Log.Warn("Missing 'id' argument in query")
-					return nil, fmt.Errorf("missing 'id' argument")
+				// Check if an 'id' argument was passed
+				idArg, idExists := p.Args["id"].(string)
+
+				if idExists {
+					// Fetch a single item by ID
+					parsedID, err := strconv.ParseUint(idArg, 10, 32)
+					if err != nil {
+						logger.Log.WithError(err).Warn("Failed to parse 'id' argument to uint")
+						return nil, fmt.Errorf("invalid 'id' argument")
+					}
+
+					logger.Log.WithField("query_id", idArg).Debug("Fetching item by ID for collection ", collection.Name)
+
+					item, err := storage.GetItemByID(collection.ID, uint(parsedID))
+					if err != nil {
+						logger.Log.WithFields(map[string]interface{}{
+							"query_id": idArg,
+							"error":    err,
+						}).Warn("Item not found in storage for collection", collection.Name)
+						return nil, fmt.Errorf("item not found")
+					}
+
+					// Convert item.Data JSON to GraphQL-compatible format
+					result := map[string]interface{}{"id": item.ID}
+					for _, attr := range collection.Attributes {
+						if value, exists := item.Data[attr.Name]; exists {
+							result[attr.Name] = value
+						}
+					}
+
+					logger.Log.WithField("query_id", idArg).Info("Item retrieved successfully for collection ", collection.Name)
+					return result, nil
 				}
 
-				// Convert the string ID to uint
-				parsedID, err := strconv.ParseUint(id, 10, 32)
+				// Fetch all items if no ID was provided
+				logger.Log.Debug("Fetching all items for collection", collection.Name)
+
+				items, _, err := storage.GetItems(collection.ID, 0, 25)
 				if err != nil {
-					logger.Log.WithError(err).Warn("Failed to parse 'id' argument to uint")
-					return nil, fmt.Errorf("invalid 'id' argument")
+					logger.Log.WithError(err).Warn("Failed to fetch items for collection", collection.Name)
+					return nil, fmt.Errorf("failed to fetch items")
 				}
 
-				logger.Log.WithField("query_id", id).Debug("Fetching item by ID for collection", collection.Name)
-
-				item, err := storage.GetItemByID(collection.ID, uint(parsedID))
-				if err != nil {
-					logger.Log.WithFields(map[string]interface{}{
-						"query_id": id,
-						"error":    err,
-					}).Warn("Item not found in storage for collection", collection.Name)
-					return nil, fmt.Errorf("item not found")
+				// Convert items to GraphQL-compatible format
+				var results []map[string]interface{}
+				for _, item := range items {
+					itemResult := map[string]interface{}{"id": item.ID}
+					for _, attr := range collection.Attributes {
+						if value, exists := item.Data[attr.Name]; exists {
+							itemResult[attr.Name] = value
+						}
+					}
+					results = append(results, itemResult)
 				}
 
-				logger.Log.WithField("query_id", id).Info("Item retrieved successfully for collection", collection.Name)
-				return item, nil
+				logger.Log.WithField("collection", collection.Name).Info("All items retrieved successfully")
+				return results, nil
 			},
 		}
 	}

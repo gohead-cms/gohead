@@ -102,7 +102,7 @@ func GetCollectionByName(name string) (*models.Collection, error) {
 // GetAllCollections retrieves all Collections.
 func GetAllCollections() ([]models.Collection, error) {
 	var cts []models.Collection
-	if err := database.DB.Preload("attributes").Preload("Relationships").Find(&cts).Error; err != nil {
+	if err := database.DB.Preload("Attributes").Find(&cts).Error; err != nil {
 		return nil, fmt.Errorf("failed to fetch collections: %w", err)
 	}
 	return cts, nil
