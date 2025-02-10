@@ -10,6 +10,15 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
+type CORSConfig struct {
+	AllowedOrigins   []string `mapstructure:"allowed_origins" yaml:"allowed_origins"`
+	AllowedMethods   []string `mapstructure:"allowed_methods" yaml:"allowed_methods"`
+	AllowedHeaders   []string `mapstructure:"allowed_headers" yaml:"allowed_headers"`
+	AllowCredentials bool     `mapstructure:"allow_credentials" yaml:"allow_credentials"`
+	MaxAge           int      `mapstructure:"max_age" yaml:"max_age"`
+}
+
+// Config holds all application settings.
 type Config struct {
 	LogLevel          string `mapstructure:"log_level"`
 	Mode              string `yaml:"gin_log_level"` // For Gin framework logging
@@ -18,8 +27,12 @@ type Config struct {
 	DatabaseURL       string `mapstructure:"database_url"`
 	ServerPort        string `mapstructure:"server_port"`
 	MinPasswordLength int    `json:"min_password_length" yaml:"min_password_length"`
+
+	// CORS settings
+	CORS CORSConfig `mapstructure:"cors"`
 }
 
+// LoadConfig loads the configuration from file and environment variables.
 func LoadConfig(configPath string) (Config, error) {
 	var cfg Config
 
@@ -30,6 +43,13 @@ func LoadConfig(configPath string) (Config, error) {
 	viper.SetDefault("database_url", "sqlite://gohead-cms.db")
 	viper.SetDefault("server_port", "8080")
 	viper.SetDefault("min_password_length", 6)
+
+	// CORS default values
+	viper.SetDefault("cors.allowed_origins", []string{"*"})
+	viper.SetDefault("cors.allowed_methods", []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"})
+	viper.SetDefault("cors.allowed_headers", []string{"Content-Type", "Authorization"})
+	viper.SetDefault("cors.allow_credentials", true)
+	viper.SetDefault("cors.max_age", 86400)
 
 	// Set the config file path
 	viper.SetConfigFile(configPath)
@@ -54,6 +74,7 @@ func LoadConfig(configPath string) (Config, error) {
 	return cfg, nil
 }
 
+// LoadTestConfig loads a test configuration file.
 func LoadTestConfig() (Config, error) {
 	return LoadConfig("//Users/nbo/go/src/gohead/config_test.yaml")
 }

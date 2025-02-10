@@ -17,7 +17,6 @@ import (
 	"gohead/pkg/seed"
 	"gohead/pkg/tracing"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
@@ -132,16 +131,13 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	// Create the router
 	router := gin.New()
 
-	// CORS
-	config := cors.DefaultConfig()
-	config.AllowAllOrigins = true
-
-	router.Use(cors.New(config))
+	logger.Log.WithField("config", cfg).Debug("GoHead Settings")
 	router.Use(ginlogrus.Logger(logger.Log))
 	router.Use(gin.Recovery())
 	router.Use(middleware.MetricsMiddleware())
 	router.Use(otelgin.Middleware("gohead"))
 	router.Use(middleware.ResponseWrapper())
+	router.Use(middleware.CORSMiddleware(cfg))
 
 	// Monitoring
 	router.GET("/_metrics", gin.WrapH(promhttp.Handler()))
