@@ -3,6 +3,7 @@ package storage
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"gohead/internal/models"
 	"gohead/pkg/database"
@@ -99,13 +100,57 @@ func GetCollectionByName(name string) (*models.Collection, error) {
 	return &ct, nil
 }
 
-// GetAllCollections retrieves all Collections.
-func GetAllCollections() ([]models.Collection, error) {
-	var cts []models.Collection
-	if err := database.DB.Preload("Attributes").Find(&cts).Error; err != nil {
-		return nil, fmt.Errorf("failed to fetch collections: %w", err)
+// GetAllCollectionsWithFilters retrieves collections with optional filtering, sorting, and pagination.
+func GetAllCollections(filters map[string]interface{}, sortValues []string, rangeValues []int) ([]models.Collection, int, error) {
+	var collections []models.Collection
+	query := database.DB.Model(&models.Collection{}).Preload("Attributes")
+
+	// Apply filtering dynamically
+	if len(filters) > 0 {
+		for key, value := range filters {
+			query = query.Where(fmt.Sprintf("%s = ?", key), value)
+		}
 	}
-	return cts, nil
+
+	// Apply sorting (e.g., ["name", "ASC"])
+	if len(sortValues) == 2 {
+		sortField := sortValues[0]
+		sortOrder := strings.ToUpper(sortValues[1])
+
+		if sortOrder != "ASC" && sortOrder != "DESC" {
+			sortOrder = "ASC" // Default to ASC if invalid
+		}
+		query = query.Order(fmt.Sprintf("%s %s", sortField, sortOrder))
+	} else {
+		query = query.Order("id ASC") // Default sorting
+	}
+
+	// Count total number of collections
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		logger.Log.WithError(err).Error("Failed to count collections")
+		return nil, 0, err
+	}
+
+	// Apply pagination if rangeValues are set (e.g., [0,9])
+	if len(rangeValues) == 2 {
+		offset := rangeValues[0]
+		limit := rangeValues[1] - rangeValues[0] + 1
+		query = query.Offset(offset).Limit(limit)
+	}
+
+	// Execute query
+	if err := query.Find(&collections).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			logger.Log.Warn("No collections found")
+			return nil, int(total), nil
+		}
+		logger.Log.WithError(err).Error("Failed to fetch collections")
+		return nil, 0, err
+	}
+
+	logger.Log.WithField("count", len(collections)).Info("Collections retrieved successfully")
+	return collections, int(total), nil
 }
 
 // UpdateCollection updates an existing Collection in the database.
