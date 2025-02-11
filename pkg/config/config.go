@@ -47,7 +47,7 @@ func LoadConfig(configPath string) (Config, error) {
 	// CORS default values
 	viper.SetDefault("cors.allowed_origins", []string{"*"})
 	viper.SetDefault("cors.allowed_methods", []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"})
-	viper.SetDefault("cors.allowed_headers", []string{"Content-Type", "Authorization"})
+	viper.SetDefault("cors.allowed_headers", []string{"Access-Control-Allow-Headers", "Access-Control-Allow-Headers, Origin,Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers"})
 	viper.SetDefault("cors.allow_credentials", true)
 	viper.SetDefault("cors.max_age", 86400)
 

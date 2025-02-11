@@ -73,14 +73,23 @@ func GetCollections(c *gin.Context) {
 	c.Set("status", http.StatusOK)
 }
 
-// GetCollection retrieves a specific collection by name.
+// GetCollectionByID retrieves a specific collection by its ID.
 func GetCollection(c *gin.Context) {
-	name := c.Param("name")
+	idParam := c.Param("id")
 
-	logger.Log.WithField("name", name).Debug("Handler:GetCollection")
-	ct, err := storage.GetCollectionByName(name)
+	// Convert ID to uint
+	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
-		logger.Log.WithField("name", name).Warn("GetCollection: collection not found")
+		logger.Log.WithField("id", idParam).Warn("GetCollectionByID: Invalid collection ID format")
+		c.Set("response", "Invalid collection ID format")
+		c.Set("status", http.StatusBadRequest)
+		return
+	}
+
+	logger.Log.WithField("id", id).Debug("Handler:GetCollectionByID")
+	ct, err := storage.GetCollectionByID(uint(id))
+	if err != nil {
+		logger.Log.WithField("id", id).Warn("GetCollectionByID: Collection not found")
 		c.Set("response", "Collection not found")
 		c.Set("status", http.StatusNotFound)
 		return
@@ -88,11 +97,12 @@ func GetCollection(c *gin.Context) {
 
 	// Format response
 	response := map[string]interface{}{
+		"id":         ct.ID,
 		"name":       ct.Name,
 		"attributes": ct.Attributes,
 	}
 
-	logger.Log.WithField("name", name).Info("GetCollection: collection retrieved successfully")
+	logger.Log.WithField("id", id).Info("GetCollectionByID: Collection retrieved successfully")
 	c.Set("response", response)
 	c.Set("status", http.StatusOK)
 }
@@ -136,7 +146,16 @@ func CreateCollection(c *gin.Context) {
 
 // UpdateCollection handles updating an existing collection.
 func UpdateCollection(c *gin.Context) {
-	name := c.Param("name")
+	id := c.Param("id")
+
+	// Convert ID from string to uint
+	idInt, err := strconv.ParseUint(id, 10, 32)
+	if err != nil {
+		logger.Log.WithField("id", id).Warn("DeleteCollectionByIDHandler: invalid collection ID format")
+		c.Set("response", "Invalid collection ID")
+		c.Set("status", http.StatusBadRequest)
+		return
+	}
 
 	var input map[string]interface{}
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -159,38 +178,42 @@ func UpdateCollection(c *gin.Context) {
 		return
 	}
 
-	if err := storage.UpdateCollection(name, &collection); err != nil {
+	if err := storage.UpdateCollection(uint(idInt), &collection); err != nil {
 		logger.Log.WithError(err).Error("UpdateCollection: Failed to update collection")
 		c.Set("response", "Failed to update collection")
 		c.Set("status", http.StatusInternalServerError)
 		return
 	}
 
-	logger.Log.WithField("collection", name).Info("Collection updated successfully")
+	logger.Log.WithField("collection", collection.Name).Info("Collection updated successfully")
 	c.Set("response", "Collection updated successfully")
 	c.Set("status", http.StatusOK)
 }
 
-// DeleteCollectionHandler handles deleting a collection.
+// DeleteCollectionByIDHandler handles deleting a collection by its ID.
 func DeleteCollection(c *gin.Context) {
-	name := c.Param("name")
+	idParam := c.Param("id")
 
-	Collection, err := storage.GetCollectionByName(name)
+	// Convert ID from string to uint
+	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
-		logger.Log.WithError(err).Warn("DeleteCollectionHandler: collection not found")
-		c.Set("response", "Collection not found")
-		c.Set("status", http.StatusNotFound)
+		logger.Log.WithField("id", idParam).Warn("DeleteCollectionByIDHandler: invalid collection ID format")
+		c.Set("response", "Invalid collection ID")
+		c.Set("status", http.StatusBadRequest)
 		return
 	}
 
-	if err := storage.DeleteCollection(Collection.ID); err != nil {
-		logger.Log.WithError(err).Error("DeleteCollectionHandler: Failed to delete collection")
+	logger.Log.WithField("collection_id", id).Debug("Handler:DeleteCollectionByID")
+
+	// Directly delete the collection without fetching it
+	if err := storage.DeleteCollection(uint(id)); err != nil {
+		logger.Log.WithError(err).WithField("collection_id", id).Error("DeleteCollectionByIDHandler: Failed to delete collection")
 		c.Set("response", "Failed to delete collection")
 		c.Set("status", http.StatusInternalServerError)
 		return
 	}
 
-	logger.Log.WithField("collection", name).Info("Collection deleted successfully")
+	logger.Log.WithField("collection_id", id).Info("Collection deleted successfully")
 	c.Set("response", "Collection deleted successfully")
 	c.Set("status", http.StatusOK)
 }

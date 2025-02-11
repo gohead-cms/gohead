@@ -74,6 +74,32 @@ func restoreAssociatedRecords(model interface{}, collectionID uint) error {
 		Update("deleted_at", nil).Error
 }
 
+// GetCollectionByID retrieves a collection by its ID.
+func GetCollectionByID(id uint) (*models.Collection, error) {
+	var ct models.Collection
+
+	// Preload the 'Attributes' relationship
+	if err := database.DB.
+		Preload("Attributes").
+		Where("id = ?", id).
+		First(&ct).Error; err != nil {
+
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			logger.Log.WithField("id", id).
+				Warn("collection not found")
+			return nil, fmt.Errorf("collection with ID '%d' not found", id)
+		}
+
+		logger.Log.WithField("id", id).
+			Error("Failed to fetch collection", err)
+		return nil, fmt.Errorf("failed to fetch collection with ID '%d': %w", id, err)
+	}
+
+	logger.Log.WithField("collection", ct.Name).
+		Info("Collection fetched successfully")
+	return &ct, nil
+}
+
 // GetCollectionByName retrieves a collection by its name.
 func GetCollectionByName(name string) (*models.Collection, error) {
 	var ct models.Collection
@@ -153,20 +179,20 @@ func GetAllCollections(filters map[string]interface{}, sortValues []string, rang
 	return collections, int(total), nil
 }
 
-// UpdateCollection updates an existing Collection in the database.
-func UpdateCollection(name string, updated *models.Collection) error {
+// UpdateCollectionByID updates an existing Collection in the database by its ID.
+func UpdateCollection(id uint, updated *models.Collection) error {
 	var existing models.Collection
 
 	logger.Log.WithField("collection input", updated).Info("Attempting to update collection in database")
 
-	// Find the existing collection by name
+	// Find the existing collection by ID
 	if err := database.DB.Preload("Attributes").
-		Where("name = ?", name).First(&existing).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			logger.Log.WithField("collection", name).Warn("Collection not found for update")
-			return fmt.Errorf("collection '%s' not found", name)
+		Where("id = ?", id).First(&existing).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			logger.Log.WithField("collection_id", id).Warn("Collection not found for update")
+			return fmt.Errorf("collection with ID '%d' not found", id)
 		}
-		logger.Log.WithError(err).WithField("collection", name).Error("Failed to retrieve collection for update")
+		logger.Log.WithError(err).WithField("collection_id", id).Error("Failed to retrieve collection for update")
 		return fmt.Errorf("failed to retrieve collection: %w", err)
 	}
 
@@ -175,7 +201,7 @@ func UpdateCollection(name string, updated *models.Collection) error {
 
 	// Start a transaction for updating associated attributes and relationships
 	tx := database.DB.Begin()
-	logger.Log.WithField("collection", name).Info("Begin transaction to update collection in database")
+	logger.Log.WithField("collection_id", id).Info("Begin transaction to update collection in database")
 	defer func() {
 		if r := recover(); r != nil {
 			tx.Rollback()
@@ -185,25 +211,25 @@ func UpdateCollection(name string, updated *models.Collection) error {
 
 	// Update fields
 	if err := updateAssociatedFields(tx, &existing.ID, updated.Attributes); err != nil {
-		logger.Log.WithField("collection", name).Error("Rollback failed to updated fields")
+		logger.Log.WithField("collection_id", id).Error("Rollback failed to update fields")
 		tx.Rollback()
 		return fmt.Errorf("failed to update fields: %w", err)
 	}
 
 	// Save the updated collection
-	logger.Log.WithField("collection input", updated).Debug("Existing ")
 	if err := tx.Save(&existing).Error; err != nil {
-		logger.Log.WithError(err).WithField("collection", name).Error("Failed to save updated collection")
+		logger.Log.WithError(err).WithField("collection_id", id).Error("Failed to save updated collection")
 		tx.Rollback()
 		return fmt.Errorf("failed to save updated collection: %w", err)
 	}
 
 	// Commit the transaction
 	if err := tx.Commit().Error; err != nil {
-		logger.Log.WithError(err).WithField("collection", name).Error("Failed to commit transaction for collection update")
+		logger.Log.WithError(err).WithField("collection_id", id).Error("Failed to commit transaction for collection update")
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
+	logger.Log.WithField("collection_id", id).Info("Collection updated successfully")
 	return nil
 }
 
