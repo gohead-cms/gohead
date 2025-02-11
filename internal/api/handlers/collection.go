@@ -73,37 +73,26 @@ func GetCollections(c *gin.Context) {
 	c.Set("status", http.StatusOK)
 }
 
-// GetCollectionByID retrieves a specific collection by its ID.
 func GetCollection(c *gin.Context) {
 	idParam := c.Param("id")
 
-	// Convert ID to uint
+	// Convert ID from string to uint
 	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
-		logger.Log.WithField("id", idParam).Warn("GetCollectionByID: Invalid collection ID format")
-		c.Set("response", "Invalid collection ID format")
+		c.Set("response", "Invalid collection ID")
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
 
-	logger.Log.WithField("id", id).Debug("Handler:GetCollectionByID")
+	// Retrieve collection
 	ct, err := storage.GetCollectionByID(uint(id))
 	if err != nil {
-		logger.Log.WithField("id", id).Warn("GetCollectionByID: Collection not found")
 		c.Set("response", "Collection not found")
 		c.Set("status", http.StatusNotFound)
 		return
 	}
 
-	// Format response
-	response := map[string]interface{}{
-		"id":         ct.ID,
-		"name":       ct.Name,
-		"attributes": ct.Attributes,
-	}
-
-	logger.Log.WithField("id", id).Info("GetCollectionByID: Collection retrieved successfully")
-	c.Set("response", response)
+	c.Set("response", ct.ToFlattenedMap())
 	c.Set("status", http.StatusOK)
 }
 

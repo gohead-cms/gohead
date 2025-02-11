@@ -234,6 +234,25 @@ func (c *Collection) GetAttributeType(attributeName string) (string, error) {
 	return "", fmt.Errorf("unknown attribute or relationship: '%s'", attributeName)
 }
 
+// ToFlattenedMap converts the Collection into a flat map structure
+func (c *Collection) ToFlattenedMap() map[string]interface{} {
+	flattened := map[string]interface{}{
+		"id":   c.ID,
+		"name": c.Name,
+	}
+
+	// Flatten attributes
+	for _, attr := range c.Attributes {
+		flattened[attr.Name] = map[string]interface{}{
+			"ID":   attr.ID,
+			"name": attr.Name,
+			"type": attr.Type,
+		}
+	}
+
+	return flattened
+}
+
 // validateFieldValue handles validation logic for a single attribute’s value.
 func validateAttributeValue(attribute Attribute, value interface{}) error {
 	switch attribute.Type {
