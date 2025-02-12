@@ -85,14 +85,14 @@ func GetCollection(c *gin.Context) {
 	}
 
 	// Retrieve collection
-	ct, err := storage.GetCollectionByID(uint(id))
+	ct, err := storage.GetCollectionSchema(int(id))
 	if err != nil {
 		c.Set("response", "Collection not found")
 		c.Set("status", http.StatusNotFound)
 		return
 	}
 
-	c.Set("response", ct.ToFlattenedMap())
+	c.Set("response", ct)
 	c.Set("status", http.StatusOK)
 }
 

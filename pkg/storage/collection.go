@@ -8,6 +8,7 @@ import (
 	"gohead/internal/models"
 	"gohead/pkg/database"
 	"gohead/pkg/logger"
+	"gohead/pkg/utils"
 
 	"gorm.io/gorm"
 )
@@ -98,6 +99,18 @@ func GetCollectionByID(id uint) (*models.Collection, error) {
 	logger.Log.WithField("collection", ct.Name).
 		Info("Collection fetched successfully")
 	return &ct, nil
+}
+
+// GetCollectionSchema retrieves the schema definition of a collection by name.
+func GetCollectionSchema(id int) (map[string]interface{}, error) {
+	var collection models.Collection
+
+	if err := database.DB.Preload("Attributes").Where("id = ?", id).First(&collection).Error; err != nil {
+		return nil, fmt.Errorf("collection with id '%d' not found", id)
+	}
+
+	// Format the collection using the utility function
+	return utils.FormatCollectionSchema(&collection), nil
 }
 
 // GetCollectionByName retrieves a collection by its name.

@@ -84,7 +84,7 @@ func handleCreate(c *gin.Context, userRole string, ct *models.Collection) {
 	CreateItem(*ct)(c)
 }
 
-// handleRead handles fetching items or a single item by ID with support for nested relationships.
+// handleRead handles fetching items or a single item by ID
 func handleRead(c *gin.Context, userRole string, ct *models.Collection, id string) {
 	if !hasPermission(userRole, "read") {
 		logger.Log.WithFields(logrus.Fields{
@@ -96,7 +96,6 @@ func handleRead(c *gin.Context, userRole string, ct *models.Collection, id strin
 		return
 	}
 
-	// Parse the "level" query parameter for nested relations, defaulting to 1
 	levelParam := c.Query("level")
 	level := 1
 	if levelParam != "" {

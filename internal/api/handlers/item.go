@@ -7,6 +7,7 @@ import (
 	"gohead/internal/models"
 	"gohead/pkg/logger"
 	"gohead/pkg/storage"
+	"gohead/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -64,7 +65,7 @@ func GetItems(ct models.Collection, level uint) gin.HandlerFunc {
 		}
 		logger.Log.WithField("totalItems", totalItems).Debug("handler:GetItems:totalItems")
 		totalPages := (totalItems + pageSize - 1) / pageSize
-		c.Set("response", gin.H{ct.Name: items})
+		c.Set("response", utils.FormatCollectionItems(items, &ct))
 		c.Set("meta", gin.H{
 			"pagination": gin.H{
 				"totalItems":  totalItems,
