@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"gohead/internal/types"
 	"gohead/pkg/database"
 	"gohead/pkg/logger"
 
@@ -125,7 +126,7 @@ func mapToAttribute(attrMap map[string]interface{}, attribute *Attribute) error 
 // -------------------- Schema validator
 //
 
-// ValidateCollection validates the schema of a content type.
+// ValidateCollectionSchema ensures all attributes have valid types and relationships.
 func ValidateCollectionSchema(ct Collection) error {
 	if ct.Name == "" {
 		return errors.New("missing required attribute: 'name'")
@@ -137,34 +138,39 @@ func ValidateCollectionSchema(ct Collection) error {
 
 	attributeNames := make(map[string]bool)
 	for _, attribute := range ct.Attributes {
+		// Prevent duplicate attributes
 		if attributeNames[attribute.Name] {
 			return fmt.Errorf("duplicate attribute name: '%s'", attribute.Name)
 		}
 		attributeNames[attribute.Name] = true
-		logger.Log.WithField("attribute", attribute).Debug("Validate attribute type")
-		logger.Log.Debug(attribute.Type)
-		if err := validateAttributeType(attribute); err != nil {
-			return err
+
+		logger.Log.WithField("attribute", attribute.Name).Debug("Validating attribute type:", attribute.Type)
+
+		// Validate attribute type using the Type Registry
+		if _, err := types.GetGraphQLType(attribute.Type); err != nil {
+			logger.Log.WithField("attribute", attribute.Name).WithError(err).Error("Invalid attribute type")
+			return fmt.Errorf("invalid type '%s' for attribute '%s'", attribute.Type, attribute.Name)
 		}
 
+		// Handle relationship validation
 		if attribute.Type == "relation" {
-			logger.Log.WithField("attributes", attribute).Debug("debug attributes")
-			// Validate presence of mandatory relationship fields
+			logger.Log.WithField("attribute", attribute.Name).Debug("Validating relationship attributes")
+
+			// Ensure required fields exist
 			if attribute.Relation == "" || attribute.Target == "" {
 				return fmt.Errorf("relationship '%s' must define 'relation' and 'target'", attribute.Name)
 			}
 
-			// Check if the target collection exists
+			// Verify the target collection exists
 			var relatedCollection Collection
-			err := database.DB.Where("name = ?", attribute.Target).First(&relatedCollection).Error
-			if err != nil {
+			if err := database.DB.Where("name = ?", attribute.Target).First(&relatedCollection).Error; err != nil {
 				logger.Log.WithField("collection", attribute.Target).
 					WithError(err).
 					Warn("Referenced collection does not exist")
 				return fmt.Errorf("target collection '%s' for relationship '%s' does not exist", attribute.Target, attribute.Name)
 			}
 
-			// Validate the relationship type
+			// Validate relationship types
 			allowedRelationTypes := map[string]struct{}{
 				"oneToOne":   {},
 				"oneToMany":  {},
@@ -181,6 +187,7 @@ func ValidateCollectionSchema(ct Collection) error {
 		}
 	}
 
+	logger.Log.WithField("collection", ct.Name).Info("Collection schema validated successfully")
 	return nil
 }
 
@@ -253,8 +260,15 @@ func (c *Collection) ToFlattenedMap() map[string]interface{} {
 	return flattened
 }
 
-// validateFieldValue handles validation logic for a single attribute’s value.
+// validateAttributeValue handles validation logic for a single attribute’s value.
 func validateAttributeValue(attribute Attribute, value interface{}) error {
+	// 1) Confirm the attribute type is recognized in the registry
+	if _, err := types.GetGraphQLType(attribute.Type); err != nil {
+		// e.g., if "relation" or unregistered type => returns an error
+		return fmt.Errorf("unsupported attribute type '%s': %w", attribute.Type, err)
+	}
+
+	// 2) Proceed with domain-specific validation logic:
 	switch attribute.Type {
 	case "text", "richtext":
 		strValue, err := convertToType(value, "text")
@@ -305,7 +319,8 @@ func validateAttributeValue(attribute Attribute, value interface{}) error {
 		}
 
 	default:
-		return fmt.Errorf("unsupported attribute type: '%s'", attribute.Type)
+		// If, for example, "relation" or "component" is encountered, we skip or return an error
+		return fmt.Errorf("unsupported or special attribute type '%s'; must be handled separately", attribute.Type)
 	}
 
 	logger.Log.WithField("attribute", attribute.Name).Info("attribute validated successfully")
@@ -353,9 +368,10 @@ func convertToType(value interface{}, targetType string) (interface{}, error) {
 			return boolVal, nil
 		}
 		if str, ok := value.(string); ok {
-			if str == "true" {
+			switch str {
+			case "true":
 				return true, nil
-			} else if str == "false" {
+			case "false":
 				return false, nil
 			}
 		}

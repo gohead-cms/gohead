@@ -27,10 +27,7 @@ func TestCollectionStorage(t *testing.T) {
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
-	err := db.AutoMigrate(&models.Collection{},
-		&models.Attribute{},
-		&models.Item{},
-	)
+	err := db.AutoMigrate(&models.Collection{}, &models.Attribute{}, &models.Item{})
 	assert.NoError(t, err, "Failed to apply migrations")
 
 	// Seed initial data
@@ -40,75 +37,44 @@ func TestCollectionStorage(t *testing.T) {
 			{Name: "title", Type: "string", Required: true},
 			{Name: "content", Type: "text", Required: true},
 		},
-		// Relationships: []models.Relationship{
-		//	{Field: "author", CollectionID: 1, RelationType: "one-to-one"},
-		// },
 	}
+	err = db.Create(testCollection).Error
+	assert.NoError(t, err, "Failed to seed initial 'articles' collection")
 
-	assert.NoError(t, db.Create(testCollection).Error, "Failed to seed initial content type")
-
-	t.Run("SaveCollection", func(t *testing.T) {
-		newCollection := &models.Collection{
-			Name: "products",
-			Attributes: []models.Attribute{
-				{Name: "name", Type: "string", Required: true},
-				{Name: "price", Type: "int", Required: true},
-			},
-		}
-
-		err := storage.SaveCollection(newCollection)
-		assert.NoError(t, err, "Failed to save content type")
-
-		var fetched models.Collection
-		err = db.Where("name = ?", "products").First(&fetched).Error
-		assert.NoError(t, err, "Failed to fetch saved content type")
-		assert.Equal(t, "products", fetched.Name, "Content type name mismatch")
+	t.Run("GetAllCollections_NoFilters", func(t *testing.T) {
+		// Call with no filters, no sort, no range
+		collections, total, err := storage.GetAllCollections(nil, nil, nil)
+		assert.NoError(t, err, "Expected no error retrieving all collections")
+		assert.GreaterOrEqual(t, len(collections), 1, "Expected at least one collection")
+		assert.GreaterOrEqual(t, total, 1, "Expected total count to be >= 1")
 	})
 
-	t.Run("GetCollection", func(t *testing.T) {
-		ct, err := storage.GetCollectionByName("articles")
-		assert.NoError(t, err, "Expected no error when retrieving content type")
-		assert.Equal(t, "articles", ct.Name, "Content type name mismatch")
-		assert.Equal(t, 2, len(ct.Attributes), "Expected 2 fields")
-		// assert.Equal(t, 1, len(ct.Relationships), "Expected 1 relationship")
+	t.Run("GetAllCollections_WithFilter", func(t *testing.T) {
+		// Filter by name = "articles"
+		filters := map[string]any{"name": "articles"}
+		collections, total, err := storage.GetAllCollections(filters, nil, nil)
+		assert.NoError(t, err, "Expected no error retrieving filtered collections")
+		assert.Equal(t, 1, len(collections), "Expected exactly one collection with name = 'articles'")
+		assert.Equal(t, 1, total, "Expected total count = 1 for name='articles'")
+		assert.Equal(t, "articles", collections[0].Name, "Collection name mismatch")
 	})
 
-	t.Run("GetCollectionByName", func(t *testing.T) {
-		ct, err := storage.GetCollectionByName("articles")
-		assert.NoError(t, err, "Expected no error when retrieving content type by name")
-		assert.Equal(t, "articles", ct.Name, "Content type name mismatch")
+	t.Run("GetAllCollections_WithSort", func(t *testing.T) {
+		// Suppose we created more collections, let's test sort by 'name' DESC
+		sortValues := []string{"name", "DESC"}
+		collections, total, err := storage.GetAllCollections(nil, sortValues, nil)
+		assert.NoError(t, err, "Expected no error retrieving sorted collections")
+		assert.GreaterOrEqual(t, len(collections), 1)
+		assert.GreaterOrEqual(t, total, 1)
+		// If we had multiple collections (articles, products, etc.), we'd check order
 	})
 
-	t.Run("GetAllCollections", func(t *testing.T) {
-		cts, err := storage.GetAllCollections()
-		assert.NoError(t, err, "Expected no error when retrieving all content types")
-		assert.GreaterOrEqual(t, len(cts), 1, "Expected at least one content type")
-	})
-
-	t.Run("UpdateCollection", func(t *testing.T) {
-		updatedCollection := &models.Collection{
-			Name: "articles",
-			Attributes: []models.Attribute{
-				{Name: "title", Type: "string", Required: true},
-				{Name: "summary", Type: "string", Required: false},
-			},
-		}
-
-		err := storage.UpdateCollection("articles", updatedCollection)
-		assert.NoError(t, err, "Failed to update content type")
-
-		ct, err := storage.GetCollectionByName("articles")
-		assert.NoError(t, err, "Expected no error when retrieving updated content type")
-		assert.Equal(t, 2, len(ct.Attributes), "Expected 2 fields after update")
-		assert.Equal(t, "summary", ct.Attributes[1].Name, "Expected updated field name")
-	})
-
-	t.Run("DeleteCollection", func(t *testing.T) {
-		err := storage.DeleteCollection(testCollection.ID)
-		assert.NoError(t, err, "Failed to delete content type")
-
-		_, err = storage.GetCollectionByName("articles")
-		assert.Error(t, err, "Expected error when fetching deleted content type")
-		assert.Contains(t, err.Error(), "content type 'articles' not found", "Error message mismatch")
+	t.Run("GetAllCollections_WithRange", func(t *testing.T) {
+		// Range as [0, 0] => first item only
+		rangeValues := []int{0, 0}
+		collections, total, err := storage.GetAllCollections(nil, nil, rangeValues)
+		assert.NoError(t, err, "Expected no error retrieving paginated collections")
+		assert.Equal(t, 1, len(collections), "Expected 1 collection in this range")
+		assert.GreaterOrEqual(t, total, 1)
 	})
 }

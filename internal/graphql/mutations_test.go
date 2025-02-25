@@ -80,7 +80,7 @@ func TestGenerateGraphQLMutations(t *testing.T) {
 	// --- Test Create Item Mutation ---
 	params := graphql.Params{
 		Schema: schema,
-		RequestString: fmt.Sprintf(`
+		RequestString: `
 			mutation {
 				createTestCollection(title: "Sample Title", age: 25) {
 					id
@@ -88,7 +88,7 @@ func TestGenerateGraphQLMutations(t *testing.T) {
 					age
 				}
 			}
-		`),
+		`,
 	}
 
 	result := graphql.Do(params)
