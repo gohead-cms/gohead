@@ -3,6 +3,7 @@ package graphql
 import (
 	"fmt"
 	"gohead/internal/models"
+	"gohead/internal/types"
 	"gohead/pkg/logger"
 	"gohead/pkg/storage"
 
@@ -31,20 +32,19 @@ func ConvertCollectionToGraphQLType(collection models.Collection) (*graphql.Obje
 		// Capture attr in a local variable for closure safety
 		localAttr := attr
 
-		var gqlFieldType graphql.Output
-		switch localAttr.Type {
-		case "text":
-			gqlFieldType = graphql.String
-		case "int":
-			gqlFieldType = graphql.Int
-		case "bool":
-			gqlFieldType = graphql.Boolean
-		case "float":
-			gqlFieldType = graphql.Float
-		case "date":
-			gqlFieldType = graphql.String // or a custom date type
-		case "relation":
-			// Resolve related types as needed (omitted for brevity)
+		// Fetch GraphQL type from the Type Registry
+		gqlFieldType, err := types.GetGraphQLType(localAttr.Type)
+		if err != nil {
+			logger.Log.WithFields(map[string]any{
+				"attribute_name":   localAttr.Name,
+				"unsupported_type": localAttr.Type,
+			}).Error("Unsupported attribute type")
+			return nil, fmt.Errorf("unsupported attribute type: %s", localAttr.Type)
+		}
+
+		// Handle relations using ResolveRelation
+		var resolveFunc graphql.FieldResolveFn
+		if localAttr.Type == "relation" {
 			relatedType, err := GetOrCreateGraphQLType(localAttr.Target)
 			if err != nil {
 				logger.Log.WithFields(map[string]interface{}{
@@ -59,26 +59,29 @@ func ConvertCollectionToGraphQLType(collection models.Collection) (*graphql.Obje
 			} else {
 				gqlFieldType = relatedType
 			}
-		default:
-			logger.Log.WithFields(map[string]interface{}{
-				"attribute_name":   localAttr.Name,
-				"unsupported_type": localAttr.Type,
-			}).Warn("Unsupported attribute type")
-			return nil, fmt.Errorf("unsupported attribute type: %s", localAttr.Type)
-		}
-		logger.Log.Debug(localAttr.Name)
-		fields[localAttr.Name] = &graphql.Field{
-			Type: gqlFieldType,
-			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				// p.Source is expected to be of type models.Item
-				if item, ok := p.Source.(models.Item); ok {
-					// Return the attribute value from the Data map
-					if value, exists := item.Data[localAttr.Name]; exists {
-						return value, nil
-					}
+
+			// Assign resolver for relations
+			resolveFunc = func(p graphql.ResolveParams) (interface{}, error) {
+				return ResolveRelation(p, collection.ID, localAttr)
+			}
+		} else {
+			// Default resolver for non-relation attributes
+			resolveFunc = func(p graphql.ResolveParams) (interface{}, error) {
+				item, ok := p.Source.(models.Item)
+				if !ok {
+					return nil, fmt.Errorf("invalid source type")
+				}
+				if value, exists := item.Data[localAttr.Name]; exists {
+					return value, nil
 				}
 				return nil, nil
-			},
+			}
+		}
+
+		// Add field with the resolver
+		fields[localAttr.Name] = &graphql.Field{
+			Type:    gqlFieldType,
+			Resolve: resolveFunc,
 		}
 	}
 

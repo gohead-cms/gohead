@@ -58,7 +58,7 @@ func GenerateGraphQLQueries() (*graphql.Object, error) {
 
 		gqlType, err := ConvertCollectionToGraphQLType(collection)
 		if err != nil {
-			logger.Log.WithFields(map[string]interface{}{
+			logger.Log.WithFields(map[string]any{
 				"collection": collection.Name,
 				"error":      err,
 			}).Error("Failed to convert collection to GraphQL type")
@@ -72,7 +72,7 @@ func GenerateGraphQLQueries() (*graphql.Object, error) {
 			Args: graphql.FieldConfigArgument{
 				"id": &graphql.ArgumentConfig{Type: graphql.ID},
 			},
-			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			Resolve: func(p graphql.ResolveParams) (any, error) {
 				logger.Log.Debug("Resolve function triggered for collection query")
 
 				// Check if an 'id' argument was passed
@@ -90,7 +90,7 @@ func GenerateGraphQLQueries() (*graphql.Object, error) {
 
 					item, err := storage.GetItemByID(collection.ID, uint(parsedID))
 					if err != nil {
-						logger.Log.WithFields(map[string]interface{}{
+						logger.Log.WithFields(map[string]any{
 							"query_id": idArg,
 							"error":    err,
 						}).Warn("Item not found in storage for collection", collection.Name)
@@ -98,7 +98,7 @@ func GenerateGraphQLQueries() (*graphql.Object, error) {
 					}
 
 					// Convert item.Data JSON to GraphQL-compatible format
-					result := map[string]interface{}{"id": item.ID}
+					result := map[string]any{"id": item.ID}
 					for _, attr := range collection.Attributes {
 						if value, exists := item.Data[attr.Name]; exists {
 							result[attr.Name] = value
@@ -119,9 +119,9 @@ func GenerateGraphQLQueries() (*graphql.Object, error) {
 				}
 
 				// Convert items to GraphQL-compatible format
-				var results []map[string]interface{}
+				var results []map[string]any
 				for _, item := range items {
-					itemResult := map[string]interface{}{"id": item.ID}
+					itemResult := map[string]any{"id": item.ID}
 					for _, attr := range collection.Attributes {
 						if value, exists := item.Data[attr.Name]; exists {
 							itemResult[attr.Name] = value
