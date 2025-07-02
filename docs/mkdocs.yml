@@ -92,6 +92,7 @@ nav:
       - 'Environment Variables': 'configuration/environment-variables.md'
       - 'Database Setup': 'configuration/database-setup.md'
       - 'Scaling': 'configuration/scaling.md'
+  - 'CLI Reference': 'cli/usage.md'
   - 'Contributing':
       - 'Overview': 'contributing/overview.md'
       - 'Submitting Issues': 'contributing/issues.md'
