@@ -41,11 +41,10 @@ func CreateItem(ct models.Collection) gin.HandlerFunc {
 			return
 		}
 
-		c.Set("response", gin.H{
-			"message": "Item created successfully",
-			ct.Name:   item,
-		})
+		c.Set("response", item.Data)
 		c.Set("status", http.StatusCreated)
+
+		c.Set("meta", gin.H{"message": "Item created successfully"})
 	}
 }
 

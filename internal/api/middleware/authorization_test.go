@@ -8,6 +8,7 @@ import (
 
 	"gohead/pkg/auth"
 	"gohead/pkg/logger"
+	"gohead/pkg/testutils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -19,7 +20,9 @@ func mockProtectedHandler(c *gin.Context) {
 }
 
 func TestAuthorizationMiddleware(t *testing.T) {
-	logger.InitLogger("debug")
+	testutils.SetupTestServer() // Initializes DB and roles
+	defer testutils.CleanupTestDB()
+	logger.InitLogger("info")
 	// Initialize JWT with a test secret
 	auth.InitializeJWT("test-secret")
 
@@ -30,7 +33,7 @@ func TestAuthorizationMiddleware(t *testing.T) {
 	router.GET("/protected", mockProtectedHandler)
 
 	// Generate a valid token
-	validToken, err := auth.GenerateJWT("test_user", "user")
+	validToken, err := auth.GenerateJWT("test_user", "viewer")
 	assert.NoError(t, err)
 
 	// Define test cases
@@ -54,9 +57,9 @@ func TestAuthorizationMiddleware(t *testing.T) {
 		},
 		{
 			name:           "Invalid Token",
-			token:          "invalid-token",
+			token:          "Bearer invalid-token",
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `{"error":"Invalid token"}`,
+			expectedBody:   `{"error":{"status":401,"name":"InvalidTokenError","message":"Invalid token","details":null}}`,
 		},
 	}
 
@@ -78,6 +81,8 @@ func TestAuthorizationMiddleware(t *testing.T) {
 }
 
 func TestAuthorizeRoleMiddleware(t *testing.T) {
+	testutils.SetupTestServer() // Initializes DB and roles
+	defer testutils.CleanupTestDB()
 	// Initialize JWT with a test secret
 	auth.InitializeJWT("test-secret")
 
@@ -91,7 +96,7 @@ func TestAuthorizeRoleMiddleware(t *testing.T) {
 	// Generate tokens for different roles
 	adminToken, err := auth.GenerateJWT("admin_user", "admin")
 	assert.NoError(t, err)
-	userToken, err := auth.GenerateJWT("user", "user")
+	userToken, err := auth.GenerateJWT("user", "viewer")
 	assert.NoError(t, err)
 
 	// Define test cases
@@ -111,13 +116,13 @@ func TestAuthorizeRoleMiddleware(t *testing.T) {
 			name:           "Non-Admin Token",
 			token:          userToken,
 			expectedStatus: http.StatusForbidden,
-			expectedBody:   `{"error":"insufficient permissions"}`,
+			expectedBody:   `{"error":{"status":403,"name":"ForbiddenError","message":"insufficient permissions","details":null}}`,
 		},
 		{
 			name:           "Missing Token",
 			token:          "",
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `{"error":"Authorization header required"}`,
+			expectedBody:   `{"error":{"status":401,"name":"UnauthorizedError","message":"Authorization header required","details":null}}`,
 		},
 	}
 

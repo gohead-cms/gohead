@@ -6,42 +6,36 @@ import (
 	"encoding/json"
 	"testing"
 
+	"gohead/pkg/database"
 	"gohead/pkg/logger"
-
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
+// Logger init for tests
 func init() {
-	// Configure logger to write logs to a buffer for testing
 	var buffer bytes.Buffer
 	logger.InitLogger("debug")
 	logger.Log.SetOutput(&buffer)
 	logger.Log.SetFormatter(&logrus.TextFormatter{})
 }
 
-func setupTestDB(t *testing.T) *gorm.DB {
-	// Use an in-memory SQLite database for testing
+func setupDatabase(t *testing.T) *gorm.DB {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("Failed to connect to in-memory database: %v", err)
-	}
-
-	// Automigrate the Attribute model
-	err = db.AutoMigrate(&Attribute{}, &Collection{}, &Item{}, &User{}, &UserRole{})
-	if err != nil {
-		t.Fatalf("Failed to migrate database: %v", err)
-	}
-
+	require.NoError(t, err, "failed to connect to in-memory database")
+	database.DB = db
+	err = db.AutoMigrate(&Collection{}, &Item{}, &SingleType{}, &SingleItem{}, &Attribute{})
+	require.NoError(t, err, "failed to auto-migrate schema")
 	return db
 }
 
 func TestAttributeModelInitialization(t *testing.T) {
-	var collectionID *uint
-	*collectionID = 1
+	id := uint(1)
+	collectionID := &id
 	attr := Attribute{
 		Name:         "Age",
 		Type:         "int",
@@ -68,12 +62,12 @@ func TestAttributeModelInitialization(t *testing.T) {
 	assert.Equal(t, JSONMap{"required": "Age is required."}, attr.CustomErrors)
 	assert.Equal(t, "User", attr.Target)
 	assert.Equal(t, "oneToOne", attr.Relation)
-	assert.Equal(t, uint(1), attr.CollectionID)
+	assert.Equal(t, uint(1), *attr.CollectionID)
 }
 
 func TestAttributeJSONMarshalling(t *testing.T) {
-	var collectionID *uint
-	*collectionID = 2
+	id := uint(2)
+	collectionID := &id
 	attr := Attribute{
 		Name:     "Username",
 		Type:     "string",
@@ -122,9 +116,11 @@ func TestAttributeJSONMarshalling(t *testing.T) {
 }
 
 func TestAttributeCRUD(t *testing.T) {
-	db := setupTestDB(t)
-	var collectionID *uint
-	*collectionID = 3
+	db := setupDatabase(t)
+
+	id := uint(3)
+	collectionID := &id
+
 	// Create
 	attr := Attribute{
 		Name:         "Email",
@@ -174,5 +170,5 @@ func TestAttributeCRUD(t *testing.T) {
 	var deletedAttr Attribute
 	result = db.First(&deletedAttr, attr.ID)
 	assert.Error(t, result.Error)
-	assert.Equal(t, gorm.ErrRecordNotFound, result.Error)
+	assert.Equal(t, "record not found", result.Error.Error())
 }

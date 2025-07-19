@@ -21,7 +21,7 @@ type SingleItem struct {
 }
 
 // ValidateSingleItemValues validates a single item's data against the SingleType's schema (attributes).
-func ValidateSingleItemValues(st SingleType, itemData map[string]interface{}) error {
+func ValidateSingleItemValues(st SingleType, itemData map[string]any) error {
 	// 1. Build a set of valid attribute names
 	validAttributes := make(map[string]Attribute, len(st.Attributes))
 	for _, attr := range st.Attributes {
@@ -114,7 +114,6 @@ func validateSingleItemRelationship(attribute Attribute, value interface{}) erro
 		}
 
 	case "manyToMany":
-		// Expect an array of IDs or objects
 		array, ok := value.([]interface{})
 		if !ok {
 			return fmt.Errorf("invalid relationship format for '%s': expected array", attribute.Name)
@@ -125,7 +124,8 @@ func validateSingleItemRelationship(attribute Attribute, value interface{}) erro
 					return fmt.Errorf("referenced item with ID '%d' in collection '%s' does not exist",
 						uint(id), attribute.Target)
 				}
-			} else if _, isObject := element.(map[string]interface{}); !isObject {
+			} else {
+				// **ANYTHING else is invalid!**
 				return fmt.Errorf("invalid element in relationship array for '%s'", attribute.Name)
 			}
 		}

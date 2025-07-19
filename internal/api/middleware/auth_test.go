@@ -8,6 +8,7 @@ import (
 
 	"gohead/pkg/auth"
 	"gohead/pkg/logger"
+	"gohead/pkg/testutils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -19,6 +20,8 @@ func mockHandler(c *gin.Context) {
 }
 
 func TestAuthMiddleware(t *testing.T) {
+	testutils.SetupTestServer() // Initializes DB and roles
+	defer testutils.CleanupTestDB()
 	logger.InitLogger("debug")
 	// Initialize JWT with a test secret
 	auth.InitializeJWT("test-secret")
@@ -30,7 +33,7 @@ func TestAuthMiddleware(t *testing.T) {
 	router.GET("/protected", mockHandler)
 
 	// Generate a valid token
-	validToken, err := auth.GenerateJWT("test_user", "user")
+	validToken, err := auth.GenerateJWT("test_user", "viewer")
 	assert.NoError(t, err)
 
 	// Define test cases
@@ -62,7 +65,7 @@ func TestAuthMiddleware(t *testing.T) {
 			name:           "Invalid Token",
 			authHeader:     "Bearer invalid-token",
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `{"error":"Invalid token"}`,
+			expectedBody:   `{"error":{"status":401,"name":"InvalidTokenError","message":"Invalid token","details":null}}`,
 		},
 	}
 

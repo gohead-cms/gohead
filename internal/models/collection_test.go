@@ -63,7 +63,7 @@ func TestValidateCollectionSchema(t *testing.T) {
 		}
 		err := ValidateCollectionSchema(collection)
 		assert.Error(t, err)
-		assert.Equal(t, "invalid attribute type 'unknownType' for attribute 'invalid'", err.Error())
+		assert.Equal(t, "invalid type 'unknownType' for attribute 'invalid'", err.Error())
 	})
 }
 

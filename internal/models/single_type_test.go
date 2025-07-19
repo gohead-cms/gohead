@@ -1,9 +1,7 @@
-package models_test
+package models
 
 import (
 	"testing"
-
-	"gohead/internal/models"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -11,8 +9,8 @@ import (
 func TestParseSingleTypeInput(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    map[string]interface{}
-		expected models.SingleType
+		input    map[string]any
+		expected SingleType
 		hasError bool
 	}{
 		{
@@ -20,8 +18,8 @@ func TestParseSingleTypeInput(t *testing.T) {
 			input: map[string]interface{}{
 				"name":        "homepage",
 				"description": "A single type for the homepage content",
-				"attributes": map[string]interface{}{
-					"title": map[string]interface{}{
+				"attributes": map[string]any{
+					"title": map[string]any{
 						"type":     "text",
 						"required": true,
 					},
@@ -30,10 +28,10 @@ func TestParseSingleTypeInput(t *testing.T) {
 					},
 				},
 			},
-			expected: models.SingleType{
+			expected: SingleType{
 				Name:        "homepage",
 				Description: "A single type for the homepage content",
-				Attributes: []models.Attribute{
+				Attributes: []Attribute{
 					{Name: "title", Type: "text", Required: true},
 					{Name: "description", Type: "text"},
 				},
@@ -42,30 +40,30 @@ func TestParseSingleTypeInput(t *testing.T) {
 		},
 		{
 			name: "Invalid input without attributes",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"name":        "homepage",
 				"description": "A single type for the homepage content",
 			},
-			expected: models.SingleType{},
+			expected: SingleType{},
 			hasError: true,
 		},
 		{
 			name: "Invalid attribute format",
-			input: map[string]interface{}{
+			input: map[string]any{
 				"name":        "homepage",
 				"description": "A single type for the homepage content",
-				"attributes": map[string]interface{}{
+				"attributes": map[string]any{
 					"title": "invalid_format",
 				},
 			},
-			expected: models.SingleType{},
+			expected: SingleType{},
 			hasError: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st, err := models.ParseSingleTypeInput(tt.input)
+			st, err := ParseSingleTypeInput(tt.input)
 			if tt.hasError {
 				assert.Error(t, err)
 			} else {
@@ -81,14 +79,14 @@ func TestParseSingleTypeInput(t *testing.T) {
 func TestValidateSingleTypeSchema(t *testing.T) {
 	tests := []struct {
 		name     string
-		schema   models.SingleType
+		schema   SingleType
 		hasError bool
 	}{
 		{
 			name: "Valid schema",
-			schema: models.SingleType{
+			schema: SingleType{
 				Name: "homepage",
-				Attributes: []models.Attribute{
+				Attributes: []Attribute{
 					{Name: "title", Type: "text", Required: true},
 					{Name: "description", Type: "text"},
 				},
@@ -97,8 +95,8 @@ func TestValidateSingleTypeSchema(t *testing.T) {
 		},
 		{
 			name: "Missing name",
-			schema: models.SingleType{
-				Attributes: []models.Attribute{
+			schema: SingleType{
+				Attributes: []Attribute{
 					{Name: "title", Type: "text", Required: true},
 				},
 			},
@@ -106,9 +104,9 @@ func TestValidateSingleTypeSchema(t *testing.T) {
 		},
 		{
 			name: "Duplicate attributes",
-			schema: models.SingleType{
+			schema: SingleType{
 				Name: "homepage",
-				Attributes: []models.Attribute{
+				Attributes: []Attribute{
 					{Name: "title", Type: "text", Required: true},
 					{Name: "title", Type: ""},
 				},
@@ -119,7 +117,7 @@ func TestValidateSingleTypeSchema(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := models.ValidateSingleTypeSchema(tt.schema)
+			err := ValidateSingleTypeSchema(tt.schema)
 			if tt.hasError {
 				assert.Error(t, err)
 			} else {
@@ -132,15 +130,15 @@ func TestValidateSingleTypeSchema(t *testing.T) {
 func TestValidateSingleTypeValues(t *testing.T) {
 	tests := []struct {
 		name     string
-		schema   models.SingleType
+		schema   SingleType
 		data     map[string]interface{}
 		hasError bool
 	}{
 		{
 			name: "Valid data",
-			schema: models.SingleType{
+			schema: SingleType{
 				Name: "homepage",
-				Attributes: []models.Attribute{
+				Attributes: []Attribute{
 					{Name: "title", Type: "text", Required: true},
 					{Name: "description", Type: "text", Required: false},
 				},
@@ -153,20 +151,20 @@ func TestValidateSingleTypeValues(t *testing.T) {
 		},
 		{
 			name: "Missing required attribute",
-			schema: models.SingleType{
+			schema: SingleType{
 				Name: "homepage",
-				Attributes: []models.Attribute{
+				Attributes: []Attribute{
 					{Name: "title", Type: "text", Required: true},
 				},
 			},
-			data:     map[string]interface{}{},
+			data:     map[string]any{},
 			hasError: true,
 		},
 		{
 			name: "Extra undefined attribute",
-			schema: models.SingleType{
+			schema: SingleType{
 				Name: "homepage",
-				Attributes: []models.Attribute{
+				Attributes: []Attribute{
 					{Name: "title", Type: "text", Required: true},
 				},
 			},
@@ -180,7 +178,7 @@ func TestValidateSingleTypeValues(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := models.ValidateSingleTypeValues(tt.schema, tt.data)
+			err := ValidateSingleTypeValues(tt.schema, tt.data)
 			if tt.hasError {
 				assert.Error(t, err)
 			} else {

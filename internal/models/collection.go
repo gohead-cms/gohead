@@ -270,7 +270,7 @@ func validateAttributeValue(attribute Attribute, value interface{}) error {
 
 	// 2) Proceed with domain-specific validation logic:
 	switch attribute.Type {
-	case "text", "richtext":
+	case "string", "text", "richtext":
 		strValue, err := convertToType(value, "text")
 		if err != nil {
 			return err
@@ -304,7 +304,7 @@ func validateAttributeValue(attribute Attribute, value interface{}) error {
 			return err
 		}
 
-	case "date":
+	case "time", "date":
 		if _, err := convertToType(value, "date"); err != nil {
 			return err
 		}

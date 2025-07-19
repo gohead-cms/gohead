@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"gohead/internal/models"
+	"gohead/pkg/auth"
 	"gohead/pkg/logger"
 	"gohead/pkg/storage"
 	"gohead/pkg/testutils"
@@ -64,33 +65,42 @@ func TestDynamicContentHandler(t *testing.T) {
 }
 
 func testCreateContentItem(router *gin.Engine, t *testing.T) {
+	// --- Setup authentication token (assuming JWT auth) ---
+	// Generate a valid JWT for an "admin" user (adapt role/username as needed)
+	token, err := auth.GenerateJWT("test_user", "admin")
+	assert.NoError(t, err)
 
-	requestBody := map[string]interface{}{
-		"title":   "Test Article",
-		"content": "This is the content of the test article.",
+	// --- Request body ---
+	requestBody := map[string]any{
+		"data": map[string]interface{}{
+			"title":   "Test Article",
+			"content": "This is the content of the test article.",
+		},
 	}
 	body, _ := json.Marshal(requestBody)
 
 	req, _ := http.NewRequest(http.MethodPost, "/articles", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token) // <-- add auth header
 
-	// Create a response recorder
+	// --- Response recorder ---
 	rr := httptest.NewRecorder()
 
-	// Serve the HTTP request
+	// --- Serve request ---
 	router.ServeHTTP(rr, req)
 
-	// Assert the response status
+	// --- Assert status ---
 	assert.Equal(t, http.StatusCreated, rr.Code)
 
-	// Assert the response body
+	// --- Assert response body ---
 	var response map[string]interface{}
-	err := json.Unmarshal(rr.Body.Bytes(), &response)
+	err = json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "Test Article", response["data"].(map[string]interface{})["title"])
-	assert.Equal(t, "This is the content of the test article.", response["data"].(map[string]interface{})["content"])
+	data := response["data"].(map[string]any)
+	assert.Equal(t, "Test Article", data["title"])
+	assert.Equal(t, "This is the content of the test article.", data["content"])
 
-	// Check that the item is stored in the database using storage layer
+	// --- Check DB storage ---
 	collection, err := storage.GetCollectionByName("articles")
 	assert.NoError(t, err)
 
@@ -101,10 +111,29 @@ func testCreateContentItem(router *gin.Engine, t *testing.T) {
 	assert.Equal(t, "Test Article", items[0].Data["title"])
 }
 
-func TestRetrieveContentItem(router *gin.Engine, t *testing.T) {
+func TestRetrieveContentItem(t *testing.T) {
+	// Setup the test database and router
+	router, db := testutils.SetupTestServer()
+	defer testutils.CleanupTestDB()
+
+	// Apply migrations
+	assert.NoError(t, db.AutoMigrate(&models.User{}, &models.UserRole{}, &models.Collection{}, &models.Attribute{}))
+
 	// Prepare a collection using storage layer
 	collection := models.Collection{
 		Name: "articles",
+		Attributes: []models.Attribute{
+			{
+				Name:     "title",
+				Type:     "string",
+				Required: true,
+			},
+			{
+				Name:     "content",
+				Type:     "richtext",
+				Required: true,
+			},
+		},
 	}
 	assert.NoError(t, storage.SaveCollection(&collection))
 
@@ -117,6 +146,9 @@ func TestRetrieveContentItem(router *gin.Engine, t *testing.T) {
 		},
 	}
 	assert.NoError(t, storage.SaveItem(&contentItem))
+
+	// Register the dynamic handler
+	router.GET("/:collection/:id", DynamicCollectionHandler)
 
 	// Send a GET request to retrieve the content item
 	url := fmt.Sprintf("/articles/%d", contentItem.ID)

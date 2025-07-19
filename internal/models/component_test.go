@@ -9,7 +9,7 @@ import (
 
 func TestParseComponentInput(t *testing.T) {
 	t.Run("Valid Input", func(t *testing.T) {
-		input := map[string]interface{}{
+		input := map[string]any{
 			"name":        "seo",
 			"description": "SEO-related fields",
 			"attributes": map[string]interface{}{
@@ -35,9 +35,9 @@ func TestParseComponentInput(t *testing.T) {
 	})
 
 	t.Run("Missing Name", func(t *testing.T) {
-		input := map[string]interface{}{
-			"attributes": map[string]interface{}{
-				"title": map[string]interface{}{
+		input := map[string]any{
+			"attributes": map[string]any{
+				"title": map[string]any{
 					"type": "text",
 				},
 			},
@@ -50,7 +50,7 @@ func TestParseComponentInput(t *testing.T) {
 	})
 
 	t.Run("Missing Attributes", func(t *testing.T) {
-		input := map[string]interface{}{
+		input := map[string]any{
 			"name": "empty-component",
 		}
 
@@ -61,9 +61,9 @@ func TestParseComponentInput(t *testing.T) {
 	})
 
 	t.Run("Invalid Attribute Format", func(t *testing.T) {
-		input := map[string]interface{}{
+		input := map[string]any{
 			"name": "bad-attrs",
-			"attributes": map[string]interface{}{
+			"attributes": map[string]any{
 				"title": "this should be a map, not a string",
 			},
 		}
