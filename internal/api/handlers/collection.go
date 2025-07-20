@@ -121,6 +121,14 @@ func CreateCollection(c *gin.Context) {
 		return
 	}
 
+	// Check if collection with same name already exists
+	existing, err := storage.GetCollectionByName(collection.Name)
+	if err == nil && existing != nil {
+		c.Set("response", "This model already exist")
+		c.Set("status", http.StatusBadRequest)
+		return
+	}
+
 	if err := storage.SaveCollection(&collection); err != nil {
 		logger.Log.WithError(err).Error("CreateCollection: Failed to save collection")
 		c.Set("response", "Failed to save collection")
