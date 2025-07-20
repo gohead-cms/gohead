@@ -40,7 +40,7 @@ func FormatCollectionSchema(collection *models.Collection) map[string]interface{
 }
 
 // FormatCollectionItem formats a single item to match Strapi's response format.
-func FormatCollectionItem(item *models.Item, collection *models.Collection) map[string]interface{} {
+func FormatCollectionItem(item *models.Item, collection *models.Collection) map[string]any {
 	if item == nil || collection == nil {
 		return nil
 	}
@@ -50,20 +50,21 @@ func FormatCollectionItem(item *models.Item, collection *models.Collection) map[
 		"attributes": map[string]interface{}{},
 	}
 
-	attributes := formatted["attributes"].(map[string]interface{})
+	attributes := formatted["attributes"].(map[string]any)
 
 	for _, attr := range collection.Attributes {
 		value, exists := item.Data[attr.Name]
 		if attr.Type == "relation" {
-			if attr.Relation == "oneToOne" {
-				var relData interface{}
+			switch attr.Relation {
+			case "oneToOne":
+				var relData any
 				if exists && value != nil {
-					relData = map[string]interface{}{"id": toInt(value)}
+					relData = map[string]any{"id": toInt(value)}
 				} else {
 					relData = nil
 				}
-				attributes[attr.Name] = map[string]interface{}{"data": relData}
-			} else if attr.Relation == "manyToMany" {
+				attributes[attr.Name] = map[string]any{"data": relData}
+			case "manyToMany":
 				relationData := []map[string]interface{}{}
 				if exists && value != nil {
 					if ids, ok := value.([]interface{}); ok {

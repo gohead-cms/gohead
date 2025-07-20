@@ -8,6 +8,7 @@ import (
 	"gohead/internal/models"
 	"gohead/pkg/logger"
 	"gohead/pkg/storage"
+	"gohead/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -142,8 +143,9 @@ func CreateCollection(c *gin.Context) {
 }
 
 // UpdateCollection handles updating an existing collection.
+// UpdateCollection handles updating an existing collection, Strapi style.
 func UpdateCollection(c *gin.Context) {
-	id := c.Param("id")
+	id := c.Param("id") // Collection name (not ID)
 
 	var input map[string]any
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -175,6 +177,7 @@ func UpdateCollection(c *gin.Context) {
 		return
 	}
 
+	// Update in DB
 	if err := storage.UpdateCollection(existing.ID, &collection); err != nil {
 		logger.Log.WithError(err).Error("UpdateCollection: Failed to update collection")
 		c.Set("response", "Failed to update collection")
@@ -182,8 +185,18 @@ func UpdateCollection(c *gin.Context) {
 		return
 	}
 
-	logger.Log.WithField("collection", collection.Name).Info("Collection updated successfully")
-	c.Set("response", "Collection updated successfully")
+	// Fetch updated collection
+	updated, err := storage.GetCollectionByID(existing.ID)
+	if err != nil {
+		logger.Log.WithError(err).Error("UpdateCollection: Failed to fetch updated collection")
+		c.Set("response", "Failed to fetch updated collection")
+		c.Set("status", http.StatusInternalServerError)
+		return
+	}
+
+	c.Set("response",
+		utils.FormatCollectionSchema(updated),
+	)
 	c.Set("status", http.StatusOK)
 }
 
