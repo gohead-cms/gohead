@@ -23,7 +23,7 @@ type Collection struct {
 	Attributes  []Attribute `json:"attributes" gorm:"constraint:OnDelete:CASCADE;"`
 }
 
-func ParseCollectionInput(input map[string]interface{}) (Collection, error) {
+func ParseCollectionInput(input map[string]any) (Collection, error) {
 	// Initialize a Collection struct
 	var collection Collection
 

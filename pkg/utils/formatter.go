@@ -9,12 +9,12 @@ import (
 func FormatCollectionSchema(collection *models.Collection) map[string]interface{} {
 	formatted := map[string]interface{}{
 		"id":  collection.ID,
-		"uid": "api::" + collection.Name + "." + collection.Name, // Generate UID
+		"uid": "api::" + collection.Name + "." + collection.Name,
 		"schema": map[string]interface{}{
 			"collectionName": collection.Name,
 			"info": map[string]interface{}{
-				"singularName": collection.Name, // Singular name assumed same as collection name
-				"pluralName":   collection.Name, // Assuming same name, can be modified if needed
+				"singularName": collection.Name,
+				"pluralName":   collection.Name,
 				"displayName":  capitalize(collection.Name),
 			},
 			"attributes": map[string]interface{}{},
@@ -29,12 +29,10 @@ func FormatCollectionSchema(collection *models.Collection) map[string]interface{
 			"type":     attr.Type,
 			"required": attr.Required,
 		}
-
 		if attr.Type == "relation" {
 			attrMap["target"] = "api::" + attr.Target + "." + attr.Target
 			attrMap["relation"] = attr.Relation
 		}
-
 		attributes[attr.Name] = attrMap
 	}
 
@@ -47,41 +45,37 @@ func FormatCollectionItem(item *models.Item, collection *models.Collection) map[
 		return nil
 	}
 
-	// Base structure
 	formatted := map[string]interface{}{
 		"id":         item.ID,
 		"attributes": map[string]interface{}{},
 	}
 
-	// Format attributes
 	attributes := formatted["attributes"].(map[string]interface{})
 
 	for _, attr := range collection.Attributes {
-		if value, exists := item.Data[attr.Name]; exists {
-			if attr.Type == "relation" {
-				// If it's a relation, wrap it in a "data" key
-				if attr.Relation == "oneToOne" {
-					attributes[attr.Name] = map[string]interface{}{
-						"data": map[string]interface{}{
-							"id": value,
-						},
-					}
-				} else if attr.Relation == "manyToMany" {
-					var relationData []map[string]interface{}
+		value, exists := item.Data[attr.Name]
+		if attr.Type == "relation" {
+			if attr.Relation == "oneToOne" {
+				var relData interface{}
+				if exists && value != nil {
+					relData = map[string]interface{}{"id": toInt(value)}
+				} else {
+					relData = nil
+				}
+				attributes[attr.Name] = map[string]interface{}{"data": relData}
+			} else if attr.Relation == "manyToMany" {
+				relationData := []map[string]interface{}{}
+				if exists && value != nil {
 					if ids, ok := value.([]interface{}); ok {
 						for _, id := range ids {
-							relationData = append(relationData, map[string]interface{}{
-								"id": id,
-							})
+							relationData = append(relationData, map[string]interface{}{"id": toInt(id)})
 						}
 					}
-					attributes[attr.Name] = map[string]interface{}{
-						"data": relationData,
-					}
 				}
-			} else {
-				attributes[attr.Name] = value
+				attributes[attr.Name] = map[string]interface{}{"data": relationData}
 			}
+		} else if exists {
+			attributes[attr.Name] = value
 		}
 	}
 
@@ -90,18 +84,33 @@ func FormatCollectionItem(item *models.Item, collection *models.Collection) map[
 
 // FormatCollectionItems formats multiple items and includes pagination metadata.
 func FormatCollectionItems(items []models.Item, collection *models.Collection) []map[string]interface{} {
-	formattedItems := []map[string]interface{}{}
-
-	for _, item := range items {
-		formattedItems = append(formattedItems, FormatCollectionItem(&item, collection))
+	formattedItems := make([]map[string]interface{}, 0, len(items))
+	for i := range items {
+		formattedItems = append(formattedItems, FormatCollectionItem(&items[i], collection))
 	}
-
 	return formattedItems
 }
 
+// Helper: capitalize first letter
 func capitalize(s string) string {
 	if len(s) == 0 {
 		return s
 	}
 	return strings.ToUpper(s[:1]) + s[1:]
+}
+
+// Helper: safely convert numeric interface{} to int for IDs
+func toInt(val interface{}) int {
+	switch v := val.(type) {
+	case int:
+		return v
+	case int64:
+		return int(v)
+	case float64:
+		return int(v)
+	case float32:
+		return int(v)
+	default:
+		return 0 // or panic/error if desired
+	}
 }

@@ -137,16 +137,7 @@ func CreateCollection(c *gin.Context) {
 func UpdateCollection(c *gin.Context) {
 	id := c.Param("id")
 
-	// Convert ID from string to uint
-	idInt, err := strconv.ParseUint(id, 10, 32)
-	if err != nil {
-		logger.Log.WithField("id", id).Warn("DeleteCollectionByIDHandler: invalid collection ID format")
-		c.Set("response", "Invalid collection ID")
-		c.Set("status", http.StatusBadRequest)
-		return
-	}
-
-	var input map[string]interface{}
+	var input map[string]any
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.Set("response", "Invalid JSON input")
 		c.Set("status", http.StatusBadRequest)
@@ -167,7 +158,16 @@ func UpdateCollection(c *gin.Context) {
 		return
 	}
 
-	if err := storage.UpdateCollection(uint(idInt), &collection); err != nil {
+	// Fetch the existing collection by name
+	existing, err := storage.GetCollectionByName(id)
+	if err != nil {
+		logger.Log.WithError(err).Warn("UpdateCollection: Collection not found")
+		c.Set("response", "Collection not found")
+		c.Set("status", http.StatusNotFound)
+		return
+	}
+
+	if err := storage.UpdateCollection(existing.ID, &collection); err != nil {
 		logger.Log.WithError(err).Error("UpdateCollection: Failed to update collection")
 		c.Set("response", "Failed to update collection")
 		c.Set("status", http.StatusInternalServerError)
