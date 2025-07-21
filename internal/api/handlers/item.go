@@ -62,9 +62,21 @@ func GetItems(ct models.Collection, level uint) gin.HandlerFunc {
 			c.Set("status", http.StatusInternalServerError)
 			return
 		}
-		logger.Log.WithField("totalItems", totalItems).Debug("handler:GetItems:totalItems")
+
 		totalPages := (totalItems + pageSize - 1) / pageSize
-		c.Set("response", utils.FormatCollectionItems(items, &ct))
+
+		formatted := make([]map[string]any, 0, len(items))
+		for _, item := range items {
+			nested, err := storage.FetchNestedRelations(ct, item.Data, level)
+			if err != nil {
+				c.Set("response", "Failed to fetch nested relations")
+				c.Set("status", http.StatusInternalServerError)
+				return
+			}
+			formatted = append(formatted, utils.FormatNestedItems(item.ID, nested, &ct))
+		}
+
+		c.Set("response", formatted)
 		c.Set("meta", gin.H{
 			"pagination": gin.H{
 				"total":     totalItems,
@@ -102,8 +114,9 @@ func GetItemByID(ct models.Collection, id uint, level uint) gin.HandlerFunc {
 			return
 		}
 
-		c.Set("response", gin.H{ct.Name: data})
+		c.Set("response", utils.FormatNestedItems(item.ID, data, &ct))
 		c.Set("status", http.StatusOK)
+		c.Set("meta", gin.H{})
 	}
 }
 
@@ -119,7 +132,7 @@ func UpdateItem(ct models.Collection) gin.HandlerFunc {
 			return
 		}
 
-		var itemData map[string]interface{}
+		var itemData map[string]any
 		if err := c.ShouldBindJSON(&itemData); err != nil {
 			c.Set("response", "Invalid input")
 			c.Set("details", err.Error())

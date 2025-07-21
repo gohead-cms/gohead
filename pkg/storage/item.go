@@ -2,12 +2,11 @@ package storage
 
 import (
 	"fmt"
+	"maps"
 
 	"gohead/internal/models"
 	"gohead/pkg/database"
 	"gohead/pkg/logger"
-
-	"github.com/sirupsen/logrus"
 )
 
 func SaveItem(item *models.Item) error {
@@ -79,87 +78,107 @@ func DeleteItem(id uint) error {
 	return nil
 }
 
-// FetchNestedRelations retrieves nested relationships up to the specified level for an item's data.
-func FetchNestedRelations(ct models.Collection, data models.JSONMap, level uint) (models.JSONMap, error) {
-	logger.Log.WithField("data'", data).Debug("FetchNestedRelations:data")
-	if level <= 0 {
+func FetchNestedRelations(collection models.Collection, data models.JSONMap, level uint) (models.JSONMap, error) {
+	if level == 0 {
 		return data, nil
 	}
-	logger.Log.WithField("collection", ct).Debug("FetchNestedRelations:collection")
-	// Iterate through the attributes to find relationships
-	for _, attribute := range ct.Attributes {
-		if attribute.Type != "relation" {
-			continue
-		}
-		// Get the relationship data from the current item's data
-		relationshipValue, exists := data[attribute.Name]
-		logger.Log.WithFields(logrus.Fields{
-			"attribute": attribute,
-			"exists":    exists,
-			"(exists)":  exists,
-		}).Debug("FetchNestedRelations:attribute")
-		if !exists {
+	// We'll mutate a copy
+	result := make(models.JSONMap, len(data))
+	maps.Copy(result, data)
+
+	for _, attr := range collection.Attributes {
+		if attr.Type != "relation" {
 			continue
 		}
 
-		// Fetch the target collection details
+		raw, exists := data[attr.Name]
+		if !exists || raw == nil {
+			// Always output as empty array/object if missing
+			switch attr.Relation {
+			case "manyToMany":
+				result[attr.Name] = []any{}
+			case "oneToOne", "oneToMany":
+				result[attr.Name] = nil
+			}
+			continue
+		}
+
+		// Fetch target collection
 		var targetCollection models.Collection
-		err := database.DB.Where("name = ?", attribute.Target).First(&targetCollection).Error
+		err := database.DB.Where("name = ?", attr.Target).First(&targetCollection).Error
 		if err != nil {
-			logger.Log.WithError(err).WithField("target", attribute.Target).Warn("Failed to fetch target collection")
-			return nil, fmt.Errorf("failed to fetch target collection '%s': %w", attribute.Target, err)
+			return nil, fmt.Errorf("failed to fetch target collection '%s': %w", attr.Target, err)
 		}
 
-		switch attribute.Relation {
+		switch attr.Relation {
 		case "oneToOne", "oneToMany":
-			if idFloat, ok := relationshipValue.(int); ok {
-				id := uint(idFloat)
-				nestedItem, err := fetchItemWithRelations(ct, uint(id), data, level-1)
-				if err != nil {
-					return nil, fmt.Errorf("failed to fetch nested item for '%s': %w", attribute.Name, err)
-				}
-				data[attribute.Name] = nestedItem
-			} else {
-				logger.Log.WithField("relationshipValue", relationshipValue).Warn("Failed to fetch relationshipValue")
+			id := toUint(raw)
+			if id == 0 {
+				result[attr.Name] = nil
+				break
 			}
-
+			nested, err := fetchItemWithRelations(targetCollection, id, level-1)
+			if err != nil {
+				return nil, fmt.Errorf("failed to fetch nested item for '%s': %w", attr.Name, err)
+			}
+			result[attr.Name] = nested
 		case "manyToMany":
-			// For many-to-many relationships, resolve each related item
-			if ids, ok := relationshipValue.([]interface{}); ok {
-				var nestedItems []models.JSONMap
-				for _, rawID := range ids {
-					if id, ok := rawID.(float64); ok {
-						nestedItem, err := fetchItemWithRelations(targetCollection, uint(id), data, level-1)
-						if err != nil {
-							return nil, fmt.Errorf("failed to fetch nested item for '%s': %w", attribute.Name, err)
-						}
-						nestedItems = append(nestedItems, nestedItem)
+			var nestedItems []models.JSONMap
+			logger.Log.WithField("netste", nestedItems)
+			switch ids := raw.(type) {
+			case []any:
+				for _, elem := range ids {
+					id := toUint(elem)
+					if id == 0 {
+						continue
 					}
+					nested, err := fetchItemWithRelations(targetCollection, id, level-1)
+					if err != nil {
+						return nil, fmt.Errorf("failed to fetch nested item for '%s': %w", attr.Name, err)
+					}
+					nestedItems = append(nestedItems, nested)
 				}
-				data[attribute.Name] = nestedItems
+			case []float64:
+				for _, elem := range ids {
+					id := uint(elem)
+					nested, err := fetchItemWithRelations(targetCollection, id, level-1)
+					if err != nil {
+						return nil, fmt.Errorf("failed to fetch nested item for '%s': %w", attr.Name, err)
+					}
+					nestedItems = append(nestedItems, nested)
+				}
+			default:
+				// If not an array, just output empty array
 			}
+			result[attr.Name] = nestedItems
 		}
 	}
-
-	return data, nil
+	return result, nil
 }
 
-// fetchItemWithRelations retrieves an item and recursively fetches its nested relations.
-func fetchItemWithRelations(ct models.Collection, id uint, data models.JSONMap, level uint) (models.JSONMap, error) {
+// This is now much simpler: always pass the correct collection!
+func fetchItemWithRelations(collection models.Collection, id uint, level uint) (models.JSONMap, error) {
 	var item models.Item
 	err := database.DB.Where("id = ?", id).First(&item).Error
 	if err != nil {
-		logger.Log.WithError(err).WithFields(map[string]interface{}{
-			"item_id": id,
-		}).Warn("Failed to fetch item with relations")
-		return nil, fmt.Errorf("failed to fetch item with ID '%d' in collection '%s': %w", id, ct.Name, err)
+		return nil, fmt.Errorf("failed to fetch item with ID '%d' in collection '%s': %w", id, collection.Name, err)
 	}
+	return FetchNestedRelations(collection, item.Data, level)
+}
 
-	// Fetch nested relations for the item
-	data, err = FetchNestedRelations(ct, item.Data, level)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch nested relations for item '%d': %w", id, err)
+func toUint(val any) uint {
+	switch v := val.(type) {
+	case int:
+		return uint(v)
+	case int64:
+		return uint(v)
+	case float64:
+		return uint(v)
+	case uint:
+		return v
+	case uint64:
+		return uint(v)
+	default:
+		return 0
 	}
-
-	return data, nil
 }

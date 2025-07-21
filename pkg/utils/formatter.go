@@ -118,6 +118,76 @@ func FormatCollectionItems(items []models.Item, collection *models.Collection) [
 	return formatted
 }
 
+// FormatNestedItemToStrapi wraps your nested JSONMap
+func FormatNestedItems(itemID uint, data models.JSONMap, collection *models.Collection) map[string]any {
+	attributes := map[string]any{}
+
+	for _, attr := range collection.Attributes {
+		val, exists := data[attr.Name]
+		switch attr.Type {
+		case "relation":
+			switch attr.Relation {
+			case "oneToOne":
+				if !exists || val == nil {
+					attributes[attr.Name] = nil
+				} else if nested, ok := val.(map[string]any); ok {
+					// Remove "id" if present from attributes
+					attrCopy := map[string]any{}
+					for k, v := range nested {
+						if k != "id" {
+							attrCopy[k] = v
+						}
+					}
+					attributes[attr.Name] = attrCopy
+				} else {
+					attributes[attr.Name] = val // fallback: put value directly
+				}
+			case "manyToMany":
+				arr := []any{}
+				if exists && val != nil {
+					switch list := val.(type) {
+					case []any:
+						for _, elem := range list {
+							arr = append(arr, elem)
+						}
+					case []models.JSONMap:
+						for _, nested := range list {
+							arr = append(arr, nested)
+						}
+					}
+				}
+				attributes[attr.Name] = arr
+
+			}
+		default:
+			if exists {
+				attributes[attr.Name] = val
+			}
+		}
+	}
+
+	return map[string]any{
+		"id":         itemID,
+		"attributes": attributes,
+	}
+}
+
+func toUintIfPresent(val any) (uint, bool) {
+	switch v := val.(type) {
+	case int:
+		return uint(v), true
+	case int64:
+		return uint(v), true
+	case float64:
+		return uint(v), true
+	case uint:
+		return v, true
+	case uint64:
+		return uint(v), true
+	}
+	return 0, false
+}
+
 // --- Helpers ---
 
 func capitalize(s string) string {
