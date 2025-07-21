@@ -321,8 +321,20 @@ func DeleteCollection(collectionID uint) error {
 	}
 	logger.Log.WithField("collection_id", collectionID).Info("DeleteCollection: delete successfully associated fields")
 
-	// Delete associated relationships
-	// TOCHECK
+	referencingAttrs, err := IsReferencedByOtherCollections(Collection.Name, tx)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to check referencing relations: %w", err)
+	}
+	if len(referencingAttrs) > 0 {
+		tx.Rollback()
+		// List the referencing collections and fields for UX
+		refs := []string{}
+		for _, attr := range referencingAttrs {
+			refs = append(refs, fmt.Sprintf("'%s.%s'", attr.Target, attr.Name))
+		}
+		return fmt.Errorf("Cannot delete collection '%s': it is referenced by fields: %s", Collection.Name, strings.Join(refs, ", "))
+	}
 
 	// Delete associated content items
 	if err := tx.Where("collection_id = ?", Collection.ID).Delete(&models.Item{}).Error; err != nil {
@@ -339,4 +351,10 @@ func DeleteCollection(collectionID uint) error {
 
 	// Commit the transaction
 	return tx.Commit().Error
+}
+
+func IsReferencedByOtherCollections(collectionName string, tx *gorm.DB) ([]models.Attribute, error) {
+	var referencingAttrs []models.Attribute
+	err := tx.Where("type = ? AND target = ?", "relation", collectionName).Find(&referencingAttrs).Error
+	return referencingAttrs, err
 }

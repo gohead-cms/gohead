@@ -107,7 +107,7 @@ func GetCollection(c *gin.Context) {
 		return
 	}
 
-	c.Set("response", ct)
+	c.Set("response", utils.FormatCollectionSchema(ct))
 	c.Set("status", http.StatusOK)
 }
 
@@ -232,8 +232,8 @@ func DeleteCollection(c *gin.Context) {
 	// Now delete using the collection's ID
 	if err := storage.DeleteCollection(collection.ID); err != nil {
 		logger.Log.WithError(err).WithField("collection_name", name).Error("DeleteCollection: Failed to delete collection")
-		c.Set("response", "Failed to delete collection")
-		c.Set("status", http.StatusInternalServerError)
+		c.Set("response", err.Error())
+		c.Set("status", http.StatusBadRequest)
 		return
 	}
 
