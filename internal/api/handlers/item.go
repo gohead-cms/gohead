@@ -67,10 +67,10 @@ func GetItems(ct models.Collection, level uint) gin.HandlerFunc {
 		c.Set("response", utils.FormatCollectionItems(items, &ct))
 		c.Set("meta", gin.H{
 			"pagination": gin.H{
-				"totalItems":  totalItems,
-				"totalPages":  totalPages,
-				"currentPage": page,
-				"pageSize":    pageSize,
+				"total":     totalItems,
+				"pageCount": totalPages,
+				"page":      page,
+				"pageSize":  pageSize,
 			},
 		})
 		c.Set("status", http.StatusOK)
@@ -145,7 +145,6 @@ func UpdateItem(ct models.Collection) gin.HandlerFunc {
 	}
 }
 
-// DeleteItem deletes a specific content item.
 func DeleteItem(ct models.Collection) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		idStr := c.Param("id")
@@ -157,6 +156,16 @@ func DeleteItem(ct models.Collection) gin.HandlerFunc {
 			return
 		}
 
+		// Make sure the item belongs to this collection!
+		_, err = storage.GetItemByID(ct.ID, uint(id))
+		if err != nil {
+			c.Set("response", "Item not found in this collection")
+			c.Set("details", err.Error())
+			c.Set("status", http.StatusNotFound)
+			return
+		}
+
+		// Now it is safe to delete!
 		if err := storage.DeleteItem(uint(id)); err != nil {
 			c.Set("response", "Failed to delete item")
 			c.Set("details", err.Error())
@@ -164,7 +173,9 @@ func DeleteItem(ct models.Collection) gin.HandlerFunc {
 			return
 		}
 
-		c.Set("response", gin.H{"message": "Item deleted successfully"})
+		logger.Log.WithField("iem of ", ct.Name).Info("Collection deleted successfully")
+		c.Set("response", nil)
+		c.Set("meta", gin.H{})
 		c.Set("status", http.StatusOK)
 	}
 }
