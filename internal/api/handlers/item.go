@@ -33,18 +33,18 @@ func CreateItem(ct models.Collection) gin.HandlerFunc {
 
 		item := models.Item{
 			CollectionID: ct.ID,
-			Data:         models.JSONMap(itemData),
+			Data:         itemData,
 		}
+
 		if err := storage.SaveItem(&item); err != nil {
 			c.Set("response", "Failed to save item")
 			c.Set("status", http.StatusInternalServerError)
 			return
 		}
 
-		c.Set("response", item.Data)
+		c.Set("response", utils.FormatCollectionItem(&item, &ct))
+		c.Set("meta", gin.H{})
 		c.Set("status", http.StatusCreated)
-
-		c.Set("meta", gin.H{"message": "Item created successfully"})
 	}
 }
 
