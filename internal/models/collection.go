@@ -126,7 +126,6 @@ func mapToAttribute(attrMap map[string]interface{}, attribute *Attribute) error 
 // -------------------- Schema validator
 //
 
-// ValidateCollectionSchema ensures all attributes have valid types and relationships.
 func ValidateCollectionSchema(ct Collection) error {
 	if ct.Name == "" {
 		return errors.New("missing required attribute: 'name'")
@@ -146,13 +145,7 @@ func ValidateCollectionSchema(ct Collection) error {
 
 		logger.Log.WithField("attribute", attribute.Name).Debug("Validating attribute type:", attribute.Type)
 
-		// Validate attribute type using the Type Registry
-		if _, err := types.GetGraphQLType(attribute.Type); err != nil {
-			logger.Log.WithField("attribute", attribute.Name).WithError(err).Error("Invalid attribute type")
-			return fmt.Errorf("invalid type '%s' for attribute '%s'", attribute.Type, attribute.Name)
-		}
-
-		// Handle relationship validation
+		// --- Handle relationship type FIRST ---
 		if attribute.Type == "relation" {
 			logger.Log.WithField("attribute", attribute.Name).Debug("Validating relationship attributes")
 
@@ -176,7 +169,6 @@ func ValidateCollectionSchema(ct Collection) error {
 				"oneToMany":  {},
 				"manyToMany": {},
 			}
-
 			if _, isValid := allowedRelationTypes[attribute.Relation]; !isValid {
 				logger.Log.WithFields(map[string]interface{}{
 					"relation_type": attribute.Relation,
@@ -184,6 +176,14 @@ func ValidateCollectionSchema(ct Collection) error {
 				}).Error("Invalid relation_type provided")
 				return fmt.Errorf("invalid relation_type '%s' for relationship '%s'; allowed values are: oneToOne, oneToMany, manyToMany", attribute.Relation, attribute.Name)
 			}
+
+			continue // relation is done, go to next attribute!
+		}
+
+		// --- Only call registry/type check for non-relation ---
+		if _, err := types.GetGraphQLType(attribute.Type); err != nil {
+			logger.Log.WithField("attribute", attribute.Name).WithError(err).Error("Invalid attribute type")
+			return fmt.Errorf("invalid type '%s' for attribute '%s'", attribute.Type, attribute.Name)
 		}
 	}
 
