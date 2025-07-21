@@ -3,10 +3,16 @@ package utils
 import (
 	"gohead/internal/models"
 	"strings"
+
+	"github.com/gertd/go-pluralize"
 )
 
-// FormatCollectionSchema returns a Strapi v4-like schema for a given collection
+var pluralizeClient = pluralize.NewClient()
+
 func FormatCollectionSchema(collection *models.Collection) map[string]any {
+	singular := pluralizeClient.Singular(collection.Name)
+	plural := pluralizeClient.Plural(collection.Name)
+
 	attrSchema := map[string]any{}
 	for _, attr := range collection.Attributes {
 		attrDef := map[string]any{
@@ -26,8 +32,8 @@ func FormatCollectionSchema(collection *models.Collection) map[string]any {
 		"schema": map[string]any{
 			"collectionName": collection.Name,
 			"info": map[string]any{
-				"singularName": collection.Name,
-				"pluralName":   collection.Name,
+				"singularName": singular,
+				"pluralName":   plural,
 				"displayName":  capitalize(collection.Name),
 			},
 			"attributes": attrSchema,
