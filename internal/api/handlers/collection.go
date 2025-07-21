@@ -17,10 +17,20 @@ import (
 func GetCollections(c *gin.Context) {
 	logger.Log.Debug("Handler:GetCollections")
 
-	// Extract optional query parameters
+	// Pagination management
 	filterParam := c.Query("filter")
 	rangeParam := c.Query("range")
 	sortParam := c.Query("sort")
+	pageParam := c.DefaultQuery("page", "1")
+	pageSizeParam := c.DefaultQuery("pageSize", "10")
+	page, _ := strconv.Atoi(pageParam)
+	pageSize, _ := strconv.Atoi(pageSizeParam)
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 10
+	}
 
 	var filters map[string]any
 	var rangeValues []int
@@ -68,25 +78,29 @@ func GetCollections(c *gin.Context) {
 		return
 	}
 
+	pageCount := (total + pageSize - 1) / pageSize
+
 	// Format response
-	c.Set("response", collections)
 	c.Header("Content-Range", formatContentRange(len(collections), total))
+	c.Set("response", utils.FormatCollectionsSchema(collections))
 	c.Set("status", http.StatusOK)
+	c.Set("meta", gin.H{
+		"pagination": gin.H{
+			"page":      page,
+			"pageSize":  pageSize,
+			"pageCount": pageCount,
+			"total":     total,
+		},
+	})
+	c.Set("status", http.StatusOK)
+
 }
 
 func GetCollection(c *gin.Context) {
 	name := c.Param("name")
 
-	// Convert ID from string to uint
-	id, err := strconv.ParseUint(name, 10, 32)
-	if err != nil {
-		c.Set("response", "Invalid collection ID")
-		c.Set("status", http.StatusBadRequest)
-		return
-	}
-
 	// Retrieve collection
-	ct, err := storage.GetCollectionSchema(int(id))
+	ct, err := storage.GetCollectionByName(name)
 	if err != nil {
 		c.Set("response", "Collection not found")
 		c.Set("status", http.StatusNotFound)
@@ -138,12 +152,12 @@ func CreateCollection(c *gin.Context) {
 	}
 
 	logger.Log.WithField("collection", collection.Name).Info("Collection created successfully")
-	c.Set("response", gin.H{"message": "Collection created successfully", "collection": collection})
+	c.Set("response", utils.FormatCollectionSchema(&collection))
+	c.Set("meta", gin.H{"message": "Collection created successfully"})
 	c.Set("status", http.StatusCreated)
 }
 
 // UpdateCollection handles updating an existing collection.
-// UpdateCollection handles updating an existing collection, Strapi style.
 func UpdateCollection(c *gin.Context) {
 	name := c.Param("name") // Collection name (not ID)
 
@@ -224,7 +238,6 @@ func DeleteCollection(c *gin.Context) {
 	}
 
 	logger.Log.WithField("collection_name", name).Info("Collection deleted successfully")
-	c.Set("response", "Collection deleted successfully")
 	c.Set("response", nil)
 	c.Set("meta", gin.H{
 		"message": "Collection deleted successfully",
