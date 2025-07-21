@@ -163,9 +163,9 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 		// Collections admin endpoints
 		admin.POST("/collections", handlers.CreateCollection)
 		admin.GET("/collections", handlers.GetCollections)
-		admin.GET("/collections/:id", handlers.GetCollection)
-		admin.PUT("/collections/:id", handlers.UpdateCollection)
-		admin.DELETE("/collections/:id", handlers.DeleteCollection)
+		admin.GET("/collections/:name", handlers.GetCollection)
+		admin.PUT("/collections/:name", handlers.UpdateCollection)
+		admin.DELETE("/collections/:name", handlers.DeleteCollection)
 
 		// Single Types admin endpoints
 		admin.POST("/single-types", handlers.CreateOrUpdateSingleType)

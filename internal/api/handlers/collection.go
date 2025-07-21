@@ -22,7 +22,7 @@ func GetCollections(c *gin.Context) {
 	rangeParam := c.Query("range")
 	sortParam := c.Query("sort")
 
-	var filters map[string]interface{}
+	var filters map[string]any
 	var rangeValues []int
 	var sortValues []string
 
@@ -75,10 +75,10 @@ func GetCollections(c *gin.Context) {
 }
 
 func GetCollection(c *gin.Context) {
-	idParam := c.Param("id")
+	name := c.Param("name")
 
 	// Convert ID from string to uint
-	id, err := strconv.ParseUint(idParam, 10, 32)
+	id, err := strconv.ParseUint(name, 10, 32)
 	if err != nil {
 		c.Set("response", "Invalid collection ID")
 		c.Set("status", http.StatusBadRequest)
@@ -99,7 +99,7 @@ func GetCollection(c *gin.Context) {
 
 // CreateCollection handles creating a new collection.
 func CreateCollection(c *gin.Context) {
-	var input map[string]interface{}
+	var input map[string]any
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.Set("response", "Invalid JSON input")
 		c.Set("status", http.StatusBadRequest)
@@ -145,7 +145,7 @@ func CreateCollection(c *gin.Context) {
 // UpdateCollection handles updating an existing collection.
 // UpdateCollection handles updating an existing collection, Strapi style.
 func UpdateCollection(c *gin.Context) {
-	id := c.Param("id") // Collection name (not ID)
+	name := c.Param("name") // Collection name (not ID)
 
 	var input map[string]any
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -169,7 +169,7 @@ func UpdateCollection(c *gin.Context) {
 	}
 
 	// Fetch the existing collection by name
-	existing, err := storage.GetCollectionByName(id)
+	existing, err := storage.GetCollectionByName(name)
 	if err != nil {
 		logger.Log.WithError(err).Warn("UpdateCollection: Collection not found")
 		c.Set("response", "Collection not found")
@@ -202,29 +202,33 @@ func UpdateCollection(c *gin.Context) {
 
 // DeleteCollectionByIDHandler handles deleting a collection by its ID.
 func DeleteCollection(c *gin.Context) {
-	idParam := c.Param("id")
+	name := c.Param("name")
 
-	// Convert ID from string to uint
-	id, err := strconv.ParseUint(idParam, 10, 32)
+	logger.Log.WithField("collection_name", name).Debug("Handler:DeleteCollection")
+
+	// Fetch the collection by name
+	collection, err := storage.GetCollectionByName(name)
 	if err != nil {
-		logger.Log.WithField("id", idParam).Warn("DeleteCollectionByIDHandler: invalid collection ID format")
-		c.Set("response", "Invalid collection ID")
-		c.Set("status", http.StatusBadRequest)
+		logger.Log.WithError(err).WithField("collection_name", name).Warn("DeleteCollection: Collection not found")
+		c.Set("response", "Collection not found")
+		c.Set("status", http.StatusNotFound)
 		return
 	}
 
-	logger.Log.WithField("collection_id", id).Debug("Handler:DeleteCollectionByID")
-
-	// Directly delete the collection without fetching it
-	if err := storage.DeleteCollection(uint(id)); err != nil {
-		logger.Log.WithError(err).WithField("collection_id", id).Error("DeleteCollectionByIDHandler: Failed to delete collection")
+	// Now delete using the collection's ID
+	if err := storage.DeleteCollection(collection.ID); err != nil {
+		logger.Log.WithError(err).WithField("collection_name", name).Error("DeleteCollection: Failed to delete collection")
 		c.Set("response", "Failed to delete collection")
 		c.Set("status", http.StatusInternalServerError)
 		return
 	}
 
-	logger.Log.WithField("collection_id", id).Info("Collection deleted successfully")
+	logger.Log.WithField("collection_name", name).Info("Collection deleted successfully")
 	c.Set("response", "Collection deleted successfully")
+	c.Set("response", nil)
+	c.Set("meta", gin.H{
+		"message": "Collection deleted successfully",
+	})
 	c.Set("status", http.StatusOK)
 }
 
