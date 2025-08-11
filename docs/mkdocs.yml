@@ -4,8 +4,8 @@ site_author: GoHead Team
 site_url: https://gohead.readthedocs.com
 dev_addr: 0.0.0.0:8000
 
-repo_name: 'Gitlab'
-repo_url: 'https://gitlab.com/sudo.bngz/gohead'
+repo_name: 'GoHead!'
+repo_url: 'https://github/gohead-cms/gohead'
 
 docs_dir: 'content'
 
@@ -13,8 +13,8 @@ theme:
   name: 'readthedocs'
   language: en
   include_sidebar: true
-  favicon: assets/pic/gohead-icon.png
-  logo: assets/pic/gohead-logo.png
+  favicon: assets/pic/gohead_logo.svg
+  logo: assets/pic/gohead_logo.svg
   feature:
     tabs: true
   palette:

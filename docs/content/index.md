@@ -1,175 +1,170 @@
 <!-- markdownlint-disable-next-line MD041 -->
-[![Build Status](https://github.com/your-username/gohead/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/your-username/gohead/actions/workflows/build.yml?query=branch%3Amain)
+[![Build Status](https://github.com/gohead-cms/gohead/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/gohead-cms/gohead/actions/workflows/build.yml?query=branch%3Amain)
 [![OpenSSF Best Practices](https://bestpractices.coreinfrastructure.org/projects/XXXX/badge)](https://bestpractices.coreinfrastructure.org/projects/XXXX)
-[![Go Report Card](https://goreportcard.com/badge/github.com/your-username/gohead)](https://goreportcard.com/report/github.com/your-username/gohead)
-[![License](https://gitlab.com/sudo.bngz/gohead)](LICENSE.md)
+[![Go Report Card](https://goreportcard.com/badge/github.com/gohead-cms/gohead)](https://goreportcard.com/report/github.com/gohead-cms/gohead)
+[![License](LICENSE.md)](LICENSE.md)
 
 ## What is GoHead?
 
-**GoHead** is a modern API platform for managing users, roles, and dynamic JSON-based collections. It’s designed for developers building scalable, microservices-ready applications with robust authentication, validation, and storage solutions.
+**GoHead** is a modern, open-source API platform written in Go for managing users, roles, and dynamic JSON-based collections.  
+It’s designed for developers building scalable, cloud-native applications, offering **robust authentication**, **flexible validation**, and **database-agnostic storage**—all seamlessly deployable on Kubernetes.
 
-* Manage user authentication, registration, and role-based access seamlessly.
-* Store dynamic JSON collections without the need for predefined schemas.
-* Ensure field-level validation, including uniqueness checks, for data integrity.
-* Built with Go and fully integrated with Kubernetes.
+* **User & Role Management** – Authentication, registration, and RBAC built in.
+* **Schema-less Collections** – Store structured JSON data without rigid schemas.
+* **Field-Level Validation** – Ensure uniqueness, type safety, and data integrity.
+* **Kubernetes-Ready** – First-class support for containerized deployments.
+
+---
 
 ## Use Cases
 
-- **User Management**: Manage user registration, login, and roles.
-- **Dynamic Data Storage**: Easily store, update, and query JSON data collections.
-- **Application Backend**: Use as a backend for web, mobile, or microservices applications.
-- **Custom APIs**: Extend functionality with custom endpoints.
+- **User Management** for SaaS platforms.
+- **Dynamic Data Storage** for CMS-like applications.
+- **Backend for Web/Mobile Apps** with minimal setup.
+- **Custom APIs** without rebuilding authentication and validation from scratch.
+
+---
 
 ## Why GoHead?
 
-- Lightweight and scalable, suitable for modern containerized environments.
-- Fully dynamic JSON storage—no rigid schema requirements.
-- Flexible role-based access with customizable permissions.
-- Built-in validation utilities for field-level integrity.
-- Supports SQLite, MySQL, and PostgreSQL out of the box.
-- Easy to deploy in any Kubernetes cluster.
+- 🪶 **Lightweight & Scalable** – Ideal for modern microservices and edge computing.
+- 🔄 **Dynamic JSON Storage** – No migrations for schema changes.
+- 🛡 **Role-Based Access Control** – Fine-grained permission system.
+- ✅ **Built-in Validation** – Unique field checks, required constraints.
+- 🗄 **Database Agnostic** – SQLite (dev), MySQL & PostgreSQL (prod).
+- ☸ **Kubernetes Native** – Works out-of-the-box with Ingress, Helm, and cloud deployments.
+
+---
 
 ## Try GoHead
 
-1. **Interactive Walkthrough**: Coming soon!
-2. **Quickstart Guide**: [Quickstart](docs/quickstart.md)
-3. **Demo Environment**: [Hosted Demo](https://demo.gohead.io)
+1. **Interactive Walkthrough** – Coming soon.
+2. **Quickstart Guide** – [docs/quickstart.md](docs/quickstart.md)
+3. **Live Demo** – Coming soon at [https://demo.gohead.io](https://demo.gohead.io)
 
 ---
 
 ## Features
 
-### Core Features
+### Core
 - **User Management**
-  - Register, authenticate, and manage users.
-  - Role-based access control with fine-grained permissions.
-- **Dynamic JSON Collections**
-  - Store structured data dynamically without predefined schemas.
-  - Validate fields for uniqueness and required constraints.
-- **Logging and Observability**
-  - Built-in support for structured logging with Logrus.
-  - Easily integrable with observability tools like Prometheus and Grafana.
+  - JWT-based authentication.
+  - Role-based permissions.
+- **Dynamic Collections**
+  - Create and store arbitrary JSON objects.
+  - Query and filter without rigid schemas.
+- **Observability**
+  - Structured logging with Logrus.
+  - Integrates with Prometheus & Grafana.
 
-### Advanced Features
+### Advanced
 - **Validation Utilities**
-  - Unique field validation for ensuring data consistency.
-- **API Middleware**
-  - Modular middleware for authentication and role enforcement.
-- **Database Agnostic**
-  - Use SQLite for development or MySQL/PostgreSQL for production.
+  - Unique field checks.
+- **Modular Middleware**
+  - Auth enforcement, RBAC, and logging.
+- **Multi-DB Support**
+  - SQLite, MySQL, PostgreSQL drivers built-in.
 
 ---
 
 ## Quickstart
 
 ### Prerequisites
-- **Go** 1.19+
-- **Docker** (optional for containerized deployment)
+- **Go** 1.21+
+- **Docker** (optional)
 - **Database**: SQLite, MySQL, or PostgreSQL
 
 ### Running Locally
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/your-username/gohead.git
-   cd gohead
-   ```
-
-2. Set up your environment:
-   ```bash
-   cp .env.example .env
-   ```
-
-3. Build and run:
-   ```bash
-   go build -o gohead .
-   ./gohead
-   ```
+```bash
+git clone https://github.com/gohead-cms/gohead.git
+cd gohead
+cp .env.example .env
+go build -o gohead .
+./gohead
+````
 
 ---
 
 ## API Endpoints
 
 ### User Management
-- `POST /auth/register` - Register a new user.
-- `POST /auth/login` - Log in and retrieve a JWT.
-- `GET /users` - List all users.
-- `GET /users/:id` - Retrieve a specific user.
+
+* `POST /auth/register` – Register a new user.
+* `POST /auth/login` – Log in & get a JWT.
+* `GET /users` – List users.
+* `GET /users/:id` – Get user by ID.
 
 ### Collections
-- `POST /collections` - Create a new collection.
-- `GET /collections/:id` - Retrieve collection details.
-- `POST /collections/:id/items` - Add an item to a collection.
-- `GET /collections/:id/items` - Fetch items from a collection.
+
+* `POST /collections` – Create collection.
+* `GET /collections/:id` – Get collection.
+* `POST /collections/:id/items` – Add item.
+* `GET /collections/:id/items` – Get items.
 
 ---
 
 ## Testing
 
-### Running Tests
-Run the unit tests:
+Run unit tests:
+
 ```bash
 go test ./...
 ```
 
-### Example
+Example:
+
 ```go
 func TestRegister(t *testing.T) {
     router, _ := testutils.SetupTestServer()
-
     payload := map[string]string{
         "username": "testuser",
         "password": "securepassword",
         "email": "testuser@example.com",
         "role_name": "viewer",
     }
-
     body, _ := json.Marshal(payload)
     req, _ := http.NewRequest("POST", "/auth/register", bytes.NewReader(body))
     req.Header.Set("Content-Type", "application/json")
-
     w := httptest.NewRecorder()
     router.ServeHTTP(w, req)
-
     assert.Equal(t, http.StatusCreated, w.Code)
 }
 ```
 
 ---
 
-## Community Blogs and Resources
+## Roadmap
 
-- [Introducing GoHead](https://medium.com/@your-username/introducing-gohead-a-modern-user-management-api-123456)
-- [GoHead vs Traditional User Management Solutions](https://medium.com/@your-username/comparison-gohead-567890)
+* [ ] Interactive demo playground.
+* [ ] CLI tool for schema & role management.
+* [ ] Built-in WebSocket support.
+* [ ] Federation of collections across clusters.
 
 ---
 
 ## Contributing
 
-We welcome contributions! Check out our [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting PRs.
 
 ---
 
 ## Release Cycle
 
-- **Major Versions** every 6 months.
-- **Minor Updates** every 2 months.
-- **Bug Fixes** as needed.
+* **Major**: Every 6 months.
+* **Minor**: Every 2 months.
+* **Patch**: As needed.
 
-GoHead adheres to [Semantic Versioning](https://semver.org).
+Follows [Semantic Versioning](https://semver.org).
 
 ---
 
 ## Security
 
-For security guidelines, see [SECURITY.md](SECURITY.md).
+Security policy: [SECURITY.md](SECURITY.md)
 
 ---
 
 ## Credits
 
-- Built with ❤️ by [Your Name](https://github.com/your-username) and the GoHead community.
-- Logo design by [Designer Name](https://designer-portfolio.com).
-
---- 
-
-You can modify this template with specifics from your project, such as actual contributors, demo links, and other project details.
+* Built with ❤️ by [Nicolas Bounoughaz](https://github.com/sudo-bngz) and the GoHead community.
+* Logo design by *to be announced*.
