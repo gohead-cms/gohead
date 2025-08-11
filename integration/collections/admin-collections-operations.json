@@ -1,0 +1,932 @@
+{
+	"info": {
+		"_postman_id": "8474b753-0aba-42d2-8c0a-72ed26fd81d7",
+		"name": "GoHead API Admin Collections",
+		"description": "Postman collection for testing Gohead API endpoints",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "4754503"
+	},
+	"item": [
+		{
+			"name": "Login to Retrieve JWT",
+			"request": {
+				"method": "POST",
+				"header": [
+				{
+					"key": "Content-Type",
+					"value": "application/json"
+				}
+				],
+				"url": {
+				"raw": "http://localhost:8080/auth/login",
+				"host": ["localhost"],
+				"port": "8080",
+				"path": ["auth", "login"]
+				},
+				"body": {
+				"mode": "raw",
+				"raw": "{\"username\": \"admin\", \"password\": \"admin\"}"
+				}
+			},
+			"event": [
+				{
+				"listen": "test",
+				"script": {
+					"exec": [
+					"pm.test(\"Login successful and token received\", function () {",
+					"    pm.response.to.have.status(200);",
+					"    const jsonData = pm.response.json();",
+					"    pm.expect(jsonData.data.token).to.be.a(\"string\")",
+					"    pm.environment.set(\"jwt_token\", jsonData.data.token);",
+					"});"
+					],
+					"type": "text/javascript"
+				}
+            }
+			],
+			"response": []
+    	},
+		{
+			"name": "Create Author Collection",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{jwt_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"authors\",\n  \"kind\": \"collection\",\n  \"description\" : \"authors collection\",\n  \"attributes\": {\n    \"name\" : {\n      \"type\": \"text\",\n      \"required\": true\n    }\n  }\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/admin/collections",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"admin",
+						"collections"
+					]
+				}
+			},
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test(\"Status code is 201\", function () {",
+							"    pm.response.to.have.status(201);",
+							"});",
+							"",
+							"pm.test(\"Response body matches expected schema\", function () {",
+							"    var json = pm.response.json();",
+							"    pm.expect(json).to.have.property('data');",
+							"    pm.expect(json.data).to.have.property('schema');",
+							"    pm.expect(json.data.schema).to.have.property('collectionName', 'authors');",
+							"    pm.expect(json.data.schema).to.have.property('attributes');",
+							"    pm.expect(json.data.schema.attributes).to.have.property('name');",
+							"    pm.expect(json.data.schema.attributes.name).to.be.an('object');",
+							"    pm.expect(json.data.schema.attributes.name).to.have.property('type', 'text');",
+							"    pm.expect(json.data.schema.attributes.name).to.have.property('required', true);",
+							"    pm.expect(json.data.schema).to.have.property('info');",
+							"    pm.expect(json.data.schema.info).to.have.property('displayName', 'Authors');",
+							"    pm.expect(json.data.schema.info).to.have.property('pluralName', 'authors');",
+							"    pm.expect(json.data.schema.info).to.have.property('singularName', 'author');",
+							"});",
+							"",
+							"pm.test(\"Meta message exists and is correct\", function () {",
+							"    var json = pm.response.json();",
+							"    pm.expect(json).to.have.property('meta');",
+							"    pm.expect(json.meta).to.have.property('message', 'Collection created successfully');",
+							"});",
+							"",
+							"// Optionally store the collection id if returned",
+							"if (pm.response.json().data && pm.response.json().data.id) {",
+							"    pm.environment.set(\"collection_id\", pm.response.json().data.id);",
+							"}"
+						]
+					}
+				}
+			],
+			"response": []
+		},
+		{
+			"name": "Create Preferences Collection",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{jwt_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"preferences\",\n  \"kind\": \"collection\",\n  \"attributes\": {\n    \"language\": {\n      \"type\": \"text\",\n      \"required\": true,\n      \"enum\": [\"English\", \"French\", \"Spanish\", \"German\", \"Chinese\"]\n    },\n    \"timezone\": {\n      \"type\": \"text\",\n      \"required\": true,\n      \"enum\": [\n        \"UTC-12:00\",\"UTC-11:00\",\"UTC-10:00\",\"UTC-09:00\",\"UTC-08:00\",\n        \"UTC-07:00\",\"UTC-06:00\",\"UTC-05:00\",\"UTC-04:00\",\"UTC-03:00\",\n        \"UTC-02:00\",\"UTC-01:00\",\"UTC+00:00\",\"UTC+01:00\",\"UTC+02:00\",\n        \"UTC+03:00\",\"UTC+04:00\",\"UTC+05:00\",\"UTC+06:00\",\"UTC+07:00\",\n        \"UTC+08:00\",\"UTC+09:00\",\"UTC+10:00\",\"UTC+11:00\",\"UTC+12:00\"\n      ]\n    }\n  }\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/admin/collections",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"admin",
+						"collections"
+					]
+				}
+			},
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test(\"Status code is 201\", function () {",
+							"    pm.response.to.have.status(201);",
+							"});",
+							"",
+							"pm.test(\"Response body matches expected preferences schema\", function () {",
+							"    var json = pm.response.json();",
+							"    pm.expect(json).to.have.property('data');",
+							"    pm.expect(json.data).to.have.property('schema');",
+							"    var attrs = json.data.schema.attributes;",
+							"    pm.expect(attrs).to.have.property('language');",
+							"    pm.expect(attrs.language).to.have.property('type', 'text');",
+							"    pm.expect(attrs.language).to.have.property('required', true);",
+							"    pm.expect(attrs.language).to.have.property('enum').that.is.an('array').with.lengthOf(5);",
+							"    pm.expect(attrs.language.enum).to.eql([\"English\", \"French\", \"Spanish\", \"German\", \"Chinese\"]);",
+							"",
+							"    pm.expect(attrs).to.have.property('timezone');",
+							"    pm.expect(attrs.timezone).to.have.property('type', 'text');",
+							"    pm.expect(attrs.timezone).to.have.property('required', true);",
+							"    pm.expect(attrs.timezone).to.have.property('enum').that.is.an('array').with.lengthOf(25);",
+							"",
+							"    pm.expect(json.data.schema.collectionName).to.equal('preferences');",
+							"    pm.expect(json.data.schema.info.displayName).to.equal('Preferences');",
+							"    pm.expect(json.data.schema.info.pluralName).to.equal('preferences');",
+							"    pm.expect(json.data.schema.info.singularName).to.equal('preference');",
+							"});",
+							"",
+							"pm.test(\"Meta message exists and is correct\", function () {",
+							"    var json = pm.response.json();",
+							"    pm.expect(json).to.have.property('meta');",
+							"    pm.expect(json.meta).to.have.property('message', 'Collection created successfully');",
+							"});",
+							"",
+							"// Optionally store the collection id if returned",
+							"if (pm.response.json().data && pm.response.json().data.id) {",
+							"    pm.environment.set(\"collection_id\", pm.response.json().data.id);",
+							"}"
+						]
+					}
+				}
+			],
+			"response": []
+		},
+		{
+			"name": "Create Image Collection",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{jwt_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"images\",\n  \"kind\": \"collection\",\n  \"description\" : \"images collection\",\n  \"attributes\": {\n    \"url\" : {\n      \"type\": \"string\"\n    }\n  }\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/admin/collections",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"admin",
+						"collections"
+					]
+				}
+			},
+			"response": []
+		},
+
+				{
+			"name": "Create Article Collection",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{jwt_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"kind\": \"collection\",\n  \"name\" : \"articles\",\n  \"attributes\": {\n    \"title\": {\n      \"type\": \"text\",\n      \"required\": true\n    },\n    \"summary\": {\n      \"type\": \"text\"\n    },\n    \"content\": {\n      \"type\": \"richtext\",\n      \"required\": true\n    },\n    \"published_date\": {\n      \"type\": \"date\"\n    },\n    \"author\": {\n      \"type\": \"relation\",\n      \"relation\": \"oneToOne\",\n      \"target\": \"authors\"\n    },\n    \"categories\": {\n      \"type\": \"relation\",\n      \"relation\": \"manyToMany\",\n      \"target\": \"categories\"\n    }\n  }\n}\n"
+				},
+				"url": {
+					"raw": "http://localhost:8080/admin/collections",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"admin",
+						"collections"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Comment Collection",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{jwt_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"kind\": \"collection\",\n  \"name\" : \"comments\",\n  \"attributes\": {\n    \"content\": {\n      \"type\": \"text\",\n      \"required\": true\n    },\n    \"author\": {\n      \"type\": \"relation\",\n      \"relation\": \"oneToOne\",\n      \"target\": \"authors\"\n    }\n  }\n}\n"
+				},
+				"url": {
+					"raw": "http://localhost:8080/admin/collections",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"admin",
+						"collections"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update Author Collection",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{jwt_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"authors\",\n  \"kind\": \"collection\",\n  \"attributes\": {\n    \"name\" : {\n      \"type\": \"text\",\n      \"unique\" : true,\n      \"required\": true\n    },\n    \"email\" :{\n      \"name\": \"email\",\n      \"type\": \"text\",\n      \"required\": true,\n      \"unique\" : true,\n      \"pattern\": \"^[^@\\\\s]+@[^@\\\\s]+\\\\.[^@\\\\s]+$\"\n    }\n  }\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/admin/collections/authors",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"admin",
+						"collections",
+						"authors"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update Author Collection",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{jwt_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"authors\",\n  \"kind\": \"collection\",\n  \"attributes\": {\n    \"name\" : {\n      \"type\": \"string\",\n      \"unique\" : true,\n      \"required\": true\n    },\n    \"email\" :{\n      \"name\": \"email\",\n      \"type\": \"string\",\n      \"required\": true,\n      \"unique\" : true,\n      \"pattern\": \"^[^@\\\\s]+@[^@\\\\s]+\\\\.[^@\\\\s]+$\"\n        }\n    }\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/admin/collections/authors",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"admin",
+						"collections",
+						"authors"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Category Collection",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{jwt_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"kind\": \"collection\",\n  \"name\" : \"categories\",\n  \"description\": \"Collection for managing categories\",\n  \"attributes\": {\n    \"name\": {\n      \"type\": \"text\",\n      \"required\": true,\n      \"unique\" : true\n    }\n  }\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/admin/collections",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"admin",
+						"collections"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Fetch Article Collection",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{jwt_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/admin/collections/articles",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"admin",
+						"collections",
+						"articles"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Fetch All Collections",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{jwt_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Origin",
+						"value": "*",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"url": {
+					"raw": "http://localhost:8080/admin/collections",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"admin",
+						"collections"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Fetch All Collections Filters",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{jwt_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Origin",
+						"value": "*",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"url": {
+					"raw": "http://localhost:8080/admin/collections?range=[1,2]",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"admin",
+						"collections"
+					],
+					"query": [
+						{
+							"key": "filter",
+							"value": "{\"name\":\"authors\"}",
+							"disabled": true
+						},
+						{
+							"key": "range",
+							"value": "[1,2]"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Fetch Authors Collection",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{jwt_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/collections/authors",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"collections",
+						"authors"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update Article Collection",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{jwt_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"kind\": \"collection\",\n  \"name\" : \"articles\",\n  \"attributes\": {\n    \"title\": {\n      \"type\": \"string\",\n      \"required\": true\n    },\n    \"summary\": {\n      \"type\": \"string\"\n    },\n    \"content\": {\n      \"type\": \"richtext\",\n      \"required\": true\n    },\n    \"published_date\": {\n      \"type\": \"date\"\n    },\n    \"author\": {\n      \"type\": \"relation\",\n      \"relation\": \"oneToOne\",\n      \"target\": \"authors\"\n    },\n    \"categories\": {\n      \"type\": \"relation\",\n      \"relation\": \"manyToMany\",\n      \"target\": \"categories\"\n    },\n    \"comments\": {\n      \"type\": \"relation\",\n      \"relation\": \"manyToMany\",\n      \"target\": \"comments\"\n    }\n  }\n}\n"
+				},
+				"url": {
+					"raw": "http://localhost:8080/collections/articles",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"collections",
+						"articles"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update Comment Collection",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{jwt_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"comments\",\n  \"kind\": \"collection\",\n  \"description\" : \"collection that manage comments\",\n  \"attributes\": {\n    \"name\": {\n      \"type\": \"string\",\n      \"required\": true\n    },\n    \"author\" : {\n      \"type\": \"string\",\n      \"required\": true\n    }\n  }\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/collections/comments",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"collections",
+						"comments"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Delete Article Collection",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{jwt_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": ""
+				},
+				"url": {
+					"raw": "http://localhost:8080/admin/collections/articles",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"admin",
+						"collections",
+						"articles"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Delete Comments Collection",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{jwt_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": ""
+				},
+				"url": {
+					"raw": "http://localhost:8080/admin/collections/comments",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"admin",
+						"collections",
+						"comments"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Delete Category Collection",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{jwt_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": ""
+				},
+				"url": {
+					"raw": "http://localhost:8080/admin/collections/categories",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"admin",
+						"collections",
+						"categories"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Delete Authors Collection",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{jwt_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": ""
+				},
+				"url": {
+					"raw": "http://localhost:8080/admin/collections/authors",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"admin",
+						"collections",
+						"authors"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Delete Preferences Collection",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{jwt_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": ""
+				},
+				"url": {
+					"raw": "http://localhost:8080/admin/collections/preferences",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"admin",
+						"collections",
+						"preferences"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Delete Images Collection",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{jwt_token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": ""
+				},
+				"url": {
+					"raw": "http://localhost:8080/admin/collections/images",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"admin",
+						"collections",
+						"images"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
