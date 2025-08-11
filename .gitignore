@@ -26,10 +26,6 @@ venv
 # Dependency directories (vendor/ is used with vendoring)
 vendor/
 
-# Go modules
-/go.sum
-/go.mod
-
 # IDE specific files
 .idea/
 .vscode/
