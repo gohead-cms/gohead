@@ -2,7 +2,7 @@
 package migrations
 
 import (
-	"gohead/internal/models"
+	"github.com/gohead-cms/gohead/internal/models"
 
 	"gorm.io/gorm"
 )

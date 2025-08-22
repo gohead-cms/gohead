@@ -4,8 +4,8 @@ package validation
 import (
 	"fmt"
 
-	"gohead/pkg/database"
-	"gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/database"
+	"github.com/gohead-cms/gohead/pkg/logger"
 )
 
 // CheckFieldUniqueness checks if a field value is unique within a collection.

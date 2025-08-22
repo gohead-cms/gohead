@@ -3,9 +3,9 @@ package models
 import (
 	"fmt"
 
-	"gohead/pkg/database"
-	"gohead/pkg/logger"
-	"gohead/pkg/validation"
+	"github.com/gohead-cms/gohead/pkg/database"
+	"github.com/gohead-cms/gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/validation"
 
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"

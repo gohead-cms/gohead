@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"testing"
 
-	"gohead/internal/models"
-	"gohead/pkg/logger"
-	"gohead/pkg/testutils"
+	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/testutils"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"

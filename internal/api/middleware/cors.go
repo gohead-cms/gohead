@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"gohead/pkg/config"
+	"github.com/gohead-cms/gohead/pkg/config"
 
 	"github.com/gin-gonic/gin"
 )

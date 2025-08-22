@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"gohead/internal/models"
-	"gohead/pkg/database"
-	"gohead/pkg/logger"
-	"gohead/pkg/utils"
+	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/database"
+	"github.com/gohead-cms/gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/utils"
 
 	"gorm.io/gorm"
 )

@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"gohead/internal/models"
+	"github.com/gohead-cms/gohead/internal/models"
 	"strings"
 
 	"github.com/gertd/go-pluralize"

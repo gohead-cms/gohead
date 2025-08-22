@@ -4,9 +4,9 @@ package handlers
 import (
 	"net/http"
 
-	"gohead/internal/models"
-	"gohead/pkg/logger"
-	"gohead/pkg/storage"
+	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/storage"
 
 	"github.com/gin-gonic/gin"
 )

@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/logger"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"

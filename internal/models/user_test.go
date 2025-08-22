@@ -3,7 +3,7 @@ package models_test
 import (
 	"testing"
 
-	"gohead/internal/models"
+	"github.com/gohead-cms/gohead/internal/models"
 
 	"github.com/stretchr/testify/assert"
 )

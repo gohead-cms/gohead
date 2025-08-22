@@ -9,11 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	"gohead/internal/models"
+	"github.com/gohead-cms/gohead/internal/models"
 
-	"gohead/pkg/database"
-	"gohead/pkg/logger"
-	"gohead/pkg/testutils"
+	"github.com/gohead-cms/gohead/pkg/database"
+	"github.com/gohead-cms/gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/testutils"
 
 	"golang.org/x/crypto/bcrypt"
 

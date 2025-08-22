@@ -6,9 +6,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"gohead/pkg/auth"
-	"gohead/pkg/logger"
-	"gohead/pkg/testutils"
+	"github.com/gohead-cms/gohead/pkg/auth"
+	"github.com/gohead-cms/gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/testutils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"

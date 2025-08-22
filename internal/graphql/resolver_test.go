@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"gohead/internal/models"
-	"gohead/pkg/logger"
-	"gohead/pkg/testutils"
+	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/testutils"
 
 	"github.com/graphql-go/graphql"
 	"github.com/sirupsen/logrus"

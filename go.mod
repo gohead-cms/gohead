@@ -1,4 +1,4 @@
-module gohead
+module github.com/gohead-cms/gohead
 
 go 1.23.5
 

@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"testing"
 
-	"gohead/internal/models"
-	"gohead/pkg/database"
-	"gohead/pkg/logger"
-	"gohead/pkg/testutils"
+	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/database"
+	"github.com/gohead-cms/gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/testutils"
 
 	"github.com/graphql-go/graphql"
 	"github.com/sirupsen/logrus"

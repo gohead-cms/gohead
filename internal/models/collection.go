@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"gohead/internal/types"
-	"gohead/pkg/database"
-	"gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/internal/types"
+	"github.com/gohead-cms/gohead/pkg/database"
+	"github.com/gohead-cms/gohead/pkg/logger"
 
 	"gorm.io/gorm"
 )

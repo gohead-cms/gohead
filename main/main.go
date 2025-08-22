@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"gohead/cmd"
+	"github.com/gohead-cms/gohead/cmd"
 )
 
 func main() {

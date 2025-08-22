@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 
-	"gohead/pkg/auth"
-	"gohead/pkg/logger"
-	"gohead/pkg/storage"
+	"github.com/gohead-cms/gohead/pkg/auth"
+	"github.com/gohead-cms/gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/storage"
 
 	"github.com/gin-gonic/gin"
 )

@@ -3,7 +3,7 @@ package utils
 import (
 	"testing"
 
-	"gohead/internal/models"
+	"github.com/gohead-cms/gohead/internal/models"
 )
 
 // TestFormatCollectionSchema tests the FormatCollectionSchema function.

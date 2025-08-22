@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/logger"
 
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"

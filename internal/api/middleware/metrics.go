@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"gohead/pkg/metrics"
+	"github.com/gohead-cms/gohead/pkg/metrics"
 
 	"github.com/gin-gonic/gin"
 )

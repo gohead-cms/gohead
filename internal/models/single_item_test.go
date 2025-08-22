@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/logger"
 )
 
 func TestValidateSingleItemValues(t *testing.T) {

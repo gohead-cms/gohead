@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"net/http"
 
-	"gohead/internal/models"
-	"gohead/pkg/auth"
-	"gohead/pkg/logger"
-	"gohead/pkg/storage"
-	"gohead/pkg/utils"
+	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/auth"
+	"github.com/gohead-cms/gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/storage"
+	"github.com/gohead-cms/gohead/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"

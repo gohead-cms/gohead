@@ -3,7 +3,7 @@ package storage_test
 import (
 	"testing"
 
-	"gohead/pkg/storage"
+	"github.com/gohead-cms/gohead/pkg/storage"
 
 	"github.com/stretchr/testify/assert"
 )

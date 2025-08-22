@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 
-	"gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/logger"
 )
 
 // TestSingleTypeHandlers demonstrates minimal tests for SingleType endpoints

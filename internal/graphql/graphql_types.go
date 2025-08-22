@@ -2,10 +2,10 @@ package graphql
 
 import (
 	"fmt"
-	"gohead/internal/models"
-	"gohead/internal/types"
-	"gohead/pkg/logger"
-	"gohead/pkg/storage"
+	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/internal/types"
+	"github.com/gohead-cms/gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/storage"
 
 	"github.com/graphql-go/graphql"
 )

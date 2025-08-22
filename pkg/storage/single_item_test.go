@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"gohead/internal/models"
-	"gohead/pkg/logger"
-	"gohead/pkg/storage"
+	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/storage"
 )
 
 func TestSingleItemStorage(t *testing.T) {

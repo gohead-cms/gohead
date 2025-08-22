@@ -3,9 +3,9 @@ package storage
 import (
 	"testing"
 
-	"gohead/internal/models"
-	"gohead/pkg/testutils"
-	"gohead/pkg/validation"
+	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/testutils"
+	"github.com/gohead-cms/gohead/pkg/validation"
 
 	"github.com/stretchr/testify/assert"
 )

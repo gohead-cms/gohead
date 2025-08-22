@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"gohead/internal/models"
-	"gohead/pkg/logger"
-	"gohead/pkg/testutils"
+	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/testutils"
 	"testing"
 
 	"github.com/graphql-go/graphql"

@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/graphql-go/graphql"
 
-	schema "gohead/internal/graphql"
+	schema "github.com/gohead-cms/gohead/internal/graphql"
 )
 
 // GraphQLHandler handles GraphQL queries

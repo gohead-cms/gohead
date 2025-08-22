@@ -4,7 +4,7 @@ package middleware
 import (
 	"net/http"
 
-	"gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/logger"
 
 	"github.com/gin-gonic/gin"
 )

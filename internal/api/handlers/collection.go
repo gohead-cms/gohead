@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"gohead/internal/models"
-	"gohead/pkg/logger"
-	"gohead/pkg/storage"
-	"gohead/pkg/utils"
+	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/storage"
+	"github.com/gohead-cms/gohead/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 )
