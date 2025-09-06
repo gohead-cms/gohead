@@ -1,8 +1,9 @@
 package utils
 
 import (
-	"github.com/gohead-cms/gohead/internal/models"
 	"strings"
+
+	"github.com/gohead-cms/gohead/internal/models"
 
 	"github.com/gertd/go-pluralize"
 )
@@ -210,4 +211,51 @@ func toInt(val interface{}) int {
 	default:
 		return 0
 	}
+}
+
+// FormatAgentSchema formats a single agent into a schema map for API endpoints.
+func FormatAgentSchema(agent *models.Agent) map[string]any {
+	if agent == nil {
+		return nil
+	}
+
+	return map[string]any{
+		"id":   agent.ID,
+		"name": agent.Name,
+		"schema": map[string]any{
+			"uid":          "api::" + agent.Name + "." + agent.Name,
+			"name":         agent.Name,
+			"systemPrompt": agent.SystemPrompt,
+			"maxTurns":     agent.MaxTurns,
+			"llmConfig":    agent.LLMConfig,
+			"memory":       agent.Memory,
+			"trigger":      agent.Trigger,
+			"functions":    agent.Functions,
+		},
+	}
+}
+
+// FormatAgentsSchema returns an array of agent schemas for admin endpoints.
+func FormatAgentsSchema(agents []models.Agent) []map[string]any {
+	formatted := make([]map[string]any, 0, len(agents))
+	for _, agent := range agents {
+		formatted = append(formatted, FormatAgentSchema(&agent))
+	}
+	return formatted
+}
+
+// FormatAgentData returns an array of agents as DATA (not schema).
+func FormatAgentData(agents []models.Agent) []map[string]any {
+	formatted := make([]map[string]any, 0, len(agents))
+	for _, agent := range agents {
+		formatted = append(formatted, map[string]any{
+			"id": agent.ID,
+			"attributes": map[string]any{
+				"name":         agent.Name,
+				"systemPrompt": agent.SystemPrompt,
+				"maxTurns":     agent.MaxTurns,
+			},
+		})
+	}
+	return formatted
 }
