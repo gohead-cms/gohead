@@ -7,7 +7,17 @@ import (
 
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/stretchr/testify/assert"
+	"gorm.io/datatypes"
 )
+
+// Helper function to marshal a struct to JSON for use in tests.
+func marshalJSON(v interface{}) datatypes.JSON {
+	b, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return datatypes.JSON(b)
+}
 
 func TestParseAgentInput(t *testing.T) {
 	t.Run("Valid Input", func(t *testing.T) {
@@ -37,12 +47,35 @@ func TestParseAgentInput(t *testing.T) {
 		}
 		agent, err := models.ParseAgentInput(input)
 		assert.NoError(t, err)
+
+		// Assertions for the main fields
 		assert.Equal(t, "test-agent", agent.Name)
 		assert.Equal(t, 5, agent.MaxTurns)
-		assert.Equal(t, "openai", agent.LLMConfig.Provider)
-		assert.Equal(t, "postgres", agent.Memory.Type)
-		assert.Equal(t, "manual", agent.Trigger.Type)
-		assert.Equal(t, 1, len(agent.Functions))
+		assert.Equal(t, "You are a test agent.", agent.SystemPrompt)
+
+		// Assertions for nested JSONB fields by unmarshaling first
+		var llmConfig models.LLMConfig
+		err = json.Unmarshal(agent.LLMConfig, &llmConfig)
+		assert.NoError(t, err)
+		assert.Equal(t, "openai", llmConfig.Provider)
+		assert.Equal(t, "gpt-3.5-turbo", llmConfig.Model)
+
+		var memoryConfig models.MemoryConfig
+		err = json.Unmarshal(agent.Memory, &memoryConfig)
+		assert.NoError(t, err)
+		assert.Equal(t, "postgres", memoryConfig.Type)
+		assert.Equal(t, "conversation", memoryConfig.SessionScope)
+
+		var triggerConfig models.TriggerConfig
+		err = json.Unmarshal(agent.Trigger, &triggerConfig)
+		assert.NoError(t, err)
+		assert.Equal(t, "manual", triggerConfig.Type)
+
+		var functions []models.FunctionSpec
+		err = json.Unmarshal(agent.Functions, &functions)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(functions))
+		assert.Equal(t, "TestTool", functions[0].Name)
 	})
 
 	t.Run("Invalid Input Format - Inside the map", func(t *testing.T) {
@@ -67,29 +100,36 @@ func TestParseAgentInput(t *testing.T) {
 }
 func TestValidateAgentSchema(t *testing.T) {
 	// A valid base agent for testing modifications
+	// A valid base agent for testing modifications
+	validLLMConfig := models.LLMConfig{
+		Provider: "openai",
+		Model:    "gpt-4",
+	}
+	validMemoryConfig := models.MemoryConfig{
+		Type:         "postgres",
+		SessionScope: "user-session",
+	}
+	validTriggerConfig := models.TriggerConfig{
+		Type: "manual",
+	}
+	validFunctions := []models.FunctionSpec{
+		{
+			ImplKey:     "email.send",
+			Name:        "SendEmail",
+			Description: "Sends an email.",
+			Parameters:  `{"type": "object", "properties": {}}`,
+		},
+	}
+
+	// Construct the base agent with the new JSON types using the helper function
 	baseAgent := models.Agent{
 		Name:         "ValidAgent",
 		SystemPrompt: "You are a helpful assistant.",
 		MaxTurns:     10,
-		LLMConfig: models.LLMConfig{
-			Provider: "openai",
-			Model:    "gpt-4",
-		},
-		Memory: models.MemoryConfig{
-			Type:         "postgres",
-			SessionScope: "user-session",
-		},
-		Trigger: models.TriggerConfig{
-			Type: "manual",
-		},
-		Functions: []models.FunctionSpec{
-			{
-				ImplKey:     "email.send",
-				Name:        "SendEmail",
-				Description: "Sends an email.",
-				Parameters:  `{"type": "object", "properties": {}}`,
-			},
-		},
+		LLMConfig:    marshalJSON(validLLMConfig),
+		Memory:       marshalJSON(validMemoryConfig),
+		Trigger:      marshalJSON(validTriggerConfig),
+		Functions:    marshalJSON(validFunctions),
 	}
 
 	t.Run("Valid Agent", func(t *testing.T) {
@@ -123,7 +163,9 @@ func TestValidateAgentSchema(t *testing.T) {
 
 	t.Run("Missing LLM Provider", func(t *testing.T) {
 		agent := baseAgent
-		agent.LLMConfig.Provider = ""
+		invalidLLMConfig := validLLMConfig
+		invalidLLMConfig.Provider = ""
+		agent.LLMConfig = marshalJSON(invalidLLMConfig)
 		err := models.ValidateAgentSchema(agent)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "llm_config provider cannot be empty")
@@ -131,7 +173,9 @@ func TestValidateAgentSchema(t *testing.T) {
 
 	t.Run("Missing Memory Type", func(t *testing.T) {
 		agent := baseAgent
-		agent.Memory.Type = ""
+		invalidMemoryConfig := validMemoryConfig
+		invalidMemoryConfig.Type = ""
+		agent.Memory = marshalJSON(invalidMemoryConfig)
 		err := models.ValidateAgentSchema(agent)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "memory type cannot be empty")
@@ -139,32 +183,42 @@ func TestValidateAgentSchema(t *testing.T) {
 
 	t.Run("Missing Memory Session Scope", func(t *testing.T) {
 		agent := baseAgent
-		agent.Memory.SessionScope = ""
+		invalidMemoryConfig := validMemoryConfig
+		invalidMemoryConfig.SessionScope = ""
+		agent.Memory = marshalJSON(invalidMemoryConfig)
 		err := models.ValidateAgentSchema(agent)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "memory session scope cannot be empty")
 	})
 
-	t.Run("Invalid Trigger Type", func(t *testing.T) {
+	t.Run("Missing Memory Session Scope", func(t *testing.T) {
 		agent := baseAgent
-		agent.Trigger.Type = "invalid"
+		invalidMemoryConfig := validMemoryConfig
+		invalidMemoryConfig.SessionScope = ""
+		agent.Memory = marshalJSON(invalidMemoryConfig)
 		err := models.ValidateAgentSchema(agent)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid trigger type")
+		assert.Contains(t, err.Error(), "memory session scope cannot be empty")
 	})
 
 	t.Run("Valid Cron Trigger", func(t *testing.T) {
 		agent := baseAgent
-		agent.Trigger.Type = "cron"
-		agent.Trigger.Cron = "@hourly"
+		validCronTrigger := models.TriggerConfig{
+			Type: "cron",
+			Cron: "@hourly",
+		}
+		agent.Trigger = marshalJSON(validCronTrigger)
 		err := models.ValidateAgentSchema(agent)
 		assert.NoError(t, err)
 	})
 
 	t.Run("Invalid Cron Expression", func(t *testing.T) {
 		agent := baseAgent
-		agent.Trigger.Type = "cron"
-		agent.Trigger.Cron = "invalid-cron"
+		invalidCronTrigger := models.TriggerConfig{
+			Type: "cron",
+			Cron: "invalid-cron",
+		}
+		agent.Trigger = marshalJSON(invalidCronTrigger)
 		err := models.ValidateAgentSchema(agent)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid cron expression")
@@ -172,16 +226,22 @@ func TestValidateAgentSchema(t *testing.T) {
 
 	t.Run("Valid Webhook Trigger", func(t *testing.T) {
 		agent := baseAgent
-		agent.Trigger.Type = "webhook"
-		agent.Trigger.WebhookToken = "super-secret-token"
+		validWebhookTrigger := models.TriggerConfig{
+			Type:         "webhook",
+			WebhookToken: "super-secret-token",
+		}
+		agent.Trigger = marshalJSON(validWebhookTrigger)
 		err := models.ValidateAgentSchema(agent)
 		assert.NoError(t, err)
 	})
 
 	t.Run("Missing Webhook Token", func(t *testing.T) {
 		agent := baseAgent
-		agent.Trigger.Type = "webhook"
-		agent.Trigger.WebhookToken = ""
+		invalidWebhookTrigger := models.TriggerConfig{
+			Type:         "webhook",
+			WebhookToken: "",
+		}
+		agent.Trigger = marshalJSON(invalidWebhookTrigger)
 		err := models.ValidateAgentSchema(agent)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "webhook trigger requires a 'webhook_token'")
@@ -189,7 +249,10 @@ func TestValidateAgentSchema(t *testing.T) {
 
 	t.Run("Missing Function Impl Key", func(t *testing.T) {
 		agent := baseAgent
-		agent.Functions[0].ImplKey = ""
+		var tempFunctions []models.FunctionSpec
+		json.Unmarshal(agent.Functions, &tempFunctions)
+		tempFunctions[0].ImplKey = ""
+		agent.Functions = marshalJSON(tempFunctions)
 		err := models.ValidateAgentSchema(agent)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "function must have a non-empty 'impl_key'")
@@ -197,7 +260,10 @@ func TestValidateAgentSchema(t *testing.T) {
 
 	t.Run("Missing Function Name", func(t *testing.T) {
 		agent := baseAgent
-		agent.Functions[0].Name = ""
+		var tempFunctions []models.FunctionSpec
+		json.Unmarshal(agent.Functions, &tempFunctions)
+		tempFunctions[0].Name = ""
+		agent.Functions = marshalJSON(tempFunctions)
 		err := models.ValidateAgentSchema(agent)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "function must have a non-empty 'name'")
@@ -205,39 +271,55 @@ func TestValidateAgentSchema(t *testing.T) {
 
 	t.Run("Duplicate Function Impl Key", func(t *testing.T) {
 		agent := baseAgent
-		agent.Functions = append(agent.Functions, models.FunctionSpec{
+		var tempFunctions []models.FunctionSpec
+		json.Unmarshal(agent.Functions, &tempFunctions)
+		tempFunctions = append(tempFunctions, models.FunctionSpec{
 			ImplKey:     "email.send", // Duplicate
 			Name:        "SendEmail2",
 			Description: "A test tool.",
 			Parameters:  `{"type": "object", "properties": {}}`,
 		})
+		agent.Functions = marshalJSON(tempFunctions)
 		err := models.ValidateAgentSchema(agent)
 		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "duplicate function implementation key")
 	})
 
-	t.Run("Duplicate Function Name", func(t *testing.T) {
+	t.Run("Duplicate Function Impl Key", func(t *testing.T) {
 		agent := baseAgent
-		agent.Functions = append(agent.Functions, models.FunctionSpec{
-			ImplKey:     "email.send.2",
-			Name:        "SendEmail", // Duplicate
+		var tempFunctions []models.FunctionSpec
+		json.Unmarshal(agent.Functions, &tempFunctions)
+		tempFunctions = append(tempFunctions, models.FunctionSpec{
+			ImplKey:     "email.send", // Duplicate
+			Name:        "SendEmail2",
 			Description: "A test tool.",
 			Parameters:  `{"type": "object", "properties": {}}`,
 		})
+		agent.Functions = marshalJSON(tempFunctions)
 		err := models.ValidateAgentSchema(agent)
 		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "duplicate function implementation key")
 	})
 
 	t.Run("Missing Function Parameters", func(t *testing.T) {
 		agent := baseAgent
-		agent.Functions[0].Parameters = ""
+		var tempFunctions []models.FunctionSpec
+		json.Unmarshal(agent.Functions, &tempFunctions)
+		tempFunctions[0].Parameters = ""
+		agent.Functions = marshalJSON(tempFunctions)
 		err := models.ValidateAgentSchema(agent)
 		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "function parameters cannot be empty")
 	})
 
 	t.Run("Invalid Function Parameters JSON", func(t *testing.T) {
 		agent := baseAgent
-		agent.Functions[0].Parameters = `{"type": "object"` // Invalid JSON
+		var tempFunctions []models.FunctionSpec
+		json.Unmarshal(agent.Functions, &tempFunctions)
+		tempFunctions[0].Parameters = `{"type": "object"` // Invalid JSON
+		agent.Functions = marshalJSON(tempFunctions)
 		err := models.ValidateAgentSchema(agent)
 		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid JSON in function parameters")
 	})
 }

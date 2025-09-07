@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -45,14 +44,6 @@ func SaveAgent(agent *models.Agent) error {
 	// No conflict, create a new agent.
 	logger.Log.WithField("agent", agent.Name).Info("Creating new agent")
 
-	// Marshal the entire Agent config to JSON.
-	agentJSON, err := json.Marshal(agent)
-	if err != nil {
-		logger.Log.WithError(err).WithField("agent", agent.Name).Error("Failed to marshal agent to JSON")
-		return fmt.Errorf("failed to save agent: %w", err)
-	}
-	agent.Config = string(agentJSON)
-
 	if err := database.DB.Create(agent).Error; err != nil {
 		logger.Log.WithError(err).WithField("agent", agent.Name).Error("Failed to create agent")
 		return fmt.Errorf("failed to save agent: %w", err)
@@ -75,12 +66,6 @@ func GetAgentByID(id uint) (*models.Agent, error) {
 		return nil, fmt.Errorf("failed to fetch agent with ID '%d': %w", id, err)
 	}
 
-	// Unmarshal the JSONB config back into the Agent struct.
-	if err := json.Unmarshal([]byte(agent.Config), &agent); err != nil {
-		logger.Log.WithError(err).WithField("id", id).Error("Failed to unmarshal agent config")
-		return nil, fmt.Errorf("failed to parse agent config for ID '%d': %w", id, err)
-	}
-
 	logger.Log.WithField("agent", agent.Name).Info("Agent fetched successfully")
 	return &agent, nil
 }
@@ -95,12 +80,6 @@ func GetAgentByName(name string) (*models.Agent, error) {
 		}
 		logger.Log.WithError(err).WithField("name", name).Error("Failed to fetch agent")
 		return nil, fmt.Errorf("failed to fetch agent '%s': %w", name, err)
-	}
-
-	// Unmarshal the JSONB config back into the Agent struct.
-	if err := json.Unmarshal([]byte(agent.Config), &agent); err != nil {
-		logger.Log.WithError(err).WithField("name", name).Error("Failed to unmarshal agent config")
-		return nil, fmt.Errorf("failed to parse agent config for name '%s': %w", name, err)
 	}
 
 	logger.Log.WithField("agent", agent.Name).Info("Agent fetched successfully")
@@ -163,16 +142,15 @@ func UpdateAgent(id uint, updated *models.Agent) error {
 		return fmt.Errorf("failed to retrieve agent: %w", err)
 	}
 
-	// Marshal the updated Agent struct to JSON.
-	agentJSON, err := json.Marshal(updated)
-	if err != nil {
-		logger.Log.WithError(err).WithField("agent_id", id).Error("Failed to marshal agent to JSON for update")
-		return fmt.Errorf("failed to update agent: %w", err)
-	}
-
-	// Update the config column.
+	// Update the individual fields.
 	existing.Name = updated.Name
-	existing.Config = string(agentJSON)
+	existing.SystemPrompt = updated.SystemPrompt
+	existing.MaxTurns = updated.MaxTurns
+	existing.LLMConfig = updated.LLMConfig
+	existing.Memory = updated.Memory
+	existing.Trigger = updated.Trigger
+	existing.Functions = updated.Functions
+	existing.Config = updated.Config
 
 	if err := database.DB.Save(&existing).Error; err != nil {
 		logger.Log.WithError(err).WithField("agent_id", id).Error("Failed to save updated agent")

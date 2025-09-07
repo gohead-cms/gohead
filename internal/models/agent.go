@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -14,13 +15,13 @@ import (
 type Agent struct {
 	gorm.Model
 	Name         string         `json:"name" gorm:"uniqueIndex"`
-	SystemPrompt string         `json:"system_prompt"`
-	MaxTurns     int            `json:"max_turns"`
-	LLMConfig    LLMConfig      `json:"llm_config"`
-	Memory       MemoryConfig   `json:"memory"`
-	Trigger      TriggerConfig  `json:"trigger"`
-	Functions    []FunctionSpec `json:"functions"`
-	Config       string         `json:"-" gorm:"type:jsonb"` // This is the new field.
+	SystemPrompt string         `json:"system_prompt" gorm:"type:text;not null"`
+	MaxTurns     int            `json:"max_turns" gorm:"not null;default:4"`
+	LLMConfig    datatypes.JSON `json:"llm_config" gorm:"type:jsonb;serializer:json;not null"`
+	Memory       datatypes.JSON `json:"memory" gorm:"type:jsonb;serializer:json;not null"`
+	Trigger      datatypes.JSON `json:"trigger" gorm:"type:jsonb;serializer:json;not null"`
+	Functions    datatypes.JSON `json:"functions" gorm:"type:jsonb"`
+	Config       datatypes.JSON `json:"-" gorm:"type:jsonb"`
 }
 
 // LLMConfig specifies the large language model to use.
@@ -83,33 +84,45 @@ func ValidateAgentSchema(agent Agent) error {
 	}
 
 	// 2. LLM Configuration
-	if agent.LLMConfig.Provider == "" {
+	var llmConfig LLMConfig
+	if err := json.Unmarshal(agent.LLMConfig, &llmConfig); err != nil {
+		return fmt.Errorf("invalid LLMConfig format: %w", err)
+	}
+	if llmConfig.Provider == "" {
 		return errors.New("llm_config provider cannot be empty")
 	}
 
 	// 3. Memory Configuration
-	if agent.Memory.Type == "" {
+	var memoryConfig MemoryConfig
+	if err := json.Unmarshal(agent.Memory, &memoryConfig); err != nil {
+		return fmt.Errorf("invalid Memory format: %w", err)
+	}
+	if memoryConfig.Type == "" {
 		return errors.New("memory type cannot be empty")
 	}
-	if agent.Memory.SessionScope == "" {
+	if memoryConfig.SessionScope == "" {
 		return errors.New("memory session scope cannot be empty")
 	}
 
 	// 4. Trigger Configuration
-	switch agent.Trigger.Type {
+	var triggerConfig TriggerConfig
+	if err := json.Unmarshal(agent.Trigger, &triggerConfig); err != nil {
+		return fmt.Errorf("invalid Trigger format: %w", err)
+	}
+	switch triggerConfig.Type {
 	case "manual":
 		// No additional checks needed
 	case "cron":
 		// Check for an empty string first
-		if agent.Trigger.Cron == "" {
+		if triggerConfig.Cron == "" {
 			return errors.New("cron trigger requires a cron expression")
 		}
 		// Now check if the expression matches the regex
-		if !cronRegex.MatchString(agent.Trigger.Cron) {
+		if !cronRegex.MatchString(triggerConfig.Cron) {
 			return errors.New("invalid cron expression")
 		}
 	case "webhook":
-		if agent.Trigger.WebhookToken == "" {
+		if triggerConfig.WebhookToken == "" {
 			return errors.New("webhook trigger requires a 'webhook_token'")
 		}
 	default:
@@ -117,7 +130,11 @@ func ValidateAgentSchema(agent Agent) error {
 	}
 
 	// 5. Functions
-	if err := validateFunctionSpecs(agent.Functions); err != nil {
+	var functions []FunctionSpec
+	if err := json.Unmarshal(agent.Functions, &functions); err != nil {
+		return fmt.Errorf("invalid Functions format: %w", err)
+	}
+	if err := validateFunctionSpecs(functions); err != nil {
 		return err
 	}
 

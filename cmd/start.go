@@ -178,6 +178,16 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 		admin.GET("/components/:name", handlers.GetComponent)
 		admin.PUT("/components/:name", handlers.UpdateComponent)
 		admin.DELETE("/components/:name", handlers.DeleteComponent)
+
+		// Agent admin endpoints
+		agents := admin.Group("/agents")
+		{
+			agents.POST("/", handlers.CreateAgent)
+			agents.GET("/", handlers.GetAgent)
+			agents.GET("/:name", handlers.GetAgent)
+			agents.PUT("/:name", handlers.UpdateAgent)
+			agents.DELETE("/:name", handlers.DeleteAgent)
+		}
 	}
 
 	// CONTENT routes (actual data/items)
@@ -186,9 +196,9 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	{
 		content.POST("/graphql", handlers.GraphQLHandler)
 
-		content.Any("/:collection", handlers.DynamicCollectionHandler)
-		content.Any("/:collection/:id", handlers.DynamicCollectionHandler)
-
+		// Collections & Single Types dynamic handlers
+		content.Any("/collections/:collection", handlers.DynamicCollectionHandler)
+		content.Any("/collections/:collection/:id", handlers.DynamicCollectionHandler)
 		content.GET("/single-types/:name", handlers.GetSingleItem)
 		content.POST("/single-types/:name", handlers.CreateOrUpdateSingleTypeItem)
 		content.PUT("/single-types/:name", handlers.CreateOrUpdateSingleTypeItem)

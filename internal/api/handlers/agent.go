@@ -80,9 +80,22 @@ func GetAgents(c *gin.Context) {
 }
 
 func GetAgent(c *gin.Context) {
+	// The `name` parameter is now optional.
 	name := c.Param("name")
 
-	// Retrieve agent
+	if name == "" {
+		agents, _, err := storage.GetAllAgents(nil, nil)
+		if err != nil {
+			c.Set("response", "Failed to retrieve agents")
+			c.Set("status", http.StatusInternalServerError)
+			return
+		}
+
+		c.Set("response", agents)
+		c.Set("status", http.StatusOK)
+		return
+	}
+
 	agent, err := storage.GetAgentByName(name)
 	if err != nil {
 		c.Set("response", "Agent not found")

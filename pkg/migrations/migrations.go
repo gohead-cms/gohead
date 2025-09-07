@@ -15,5 +15,6 @@ func MigrateDatabase(db *gorm.DB) error {
 		&models.SingleItem{},
 		&models.Item{},
 		&models.User{},
+		&models.Agent{},
 	)
 }

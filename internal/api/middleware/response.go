@@ -16,46 +16,42 @@ func ResponseWrapper() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
 
-		// Retrieve the response and status from context
-		response, exists := c.Get("response")
-		if !exists {
-			// No response to send (e.g., static file served directly), do nothing
+		// If the handler didn’t set a response, do nothing.
+		respVal, hasResp := c.Get("response")
+		if !hasResp {
 			return
 		}
 
-		status, _ := c.Get("status")
-		statusCode := http.StatusOK
-		if status != nil {
-			statusCode = status.(int)
+		// Start from writer status (in case something set it explicitly),
+		// then override with the context "status" key when present.
+		statusCode := c.Writer.Status()
+		if s, ok := c.Get("status"); ok {
+			if v, ok := s.(int); ok {
+				statusCode = v
+			}
 		}
-
-		// Retrieve the meta from context
+		// Meta is optional
 		meta, _ := c.Get("meta")
 
-		// Format the response
+		// Format + write once, then abort the chain so nothing else changes it.
 		if statusCode >= 400 {
-			// Error response
 			details, _ := c.Get("details")
-			c.JSON(statusCode, gin.H{
+			c.AbortWithStatusJSON(statusCode, gin.H{
 				"error": gin.H{
 					"status":  statusCode,
 					"name":    getErrorName(statusCode),
-					"message": response,
+					"message": respVal,
 					"details": details,
 				},
 			})
-		} else {
-			// Success response
-			formattedResponse := gin.H{
-				"data": response,
-			}
-			// Only add "meta" if it’s not nil
-			if meta != nil {
-				formattedResponse["meta"] = meta
-			}
-
-			c.JSON(statusCode, formattedResponse)
+			return
 		}
+
+		out := gin.H{"data": respVal}
+		if meta != nil {
+			out["meta"] = meta
+		}
+		c.AbortWithStatusJSON(statusCode, out)
 	}
 }
 
