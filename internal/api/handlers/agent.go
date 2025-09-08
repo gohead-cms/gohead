@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gohead-cms/gohead/internal/models"
+	agents "github.com/gohead-cms/gohead/internal/models/agents"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
 	"github.com/gohead-cms/gohead/pkg/utils"
@@ -118,14 +118,14 @@ func CreateAgent(c *gin.Context) {
 
 	logger.Log.WithField("input", input).Info("CreateAgent")
 
-	agent, err := models.ParseAgentInput(input)
+	agent, err := agents.ParseAgentInput(input)
 	if err != nil {
 		c.Set("response", err.Error())
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
 
-	if err := models.ValidateAgentSchema(agent); err != nil {
+	if err := agents.ValidateAgentSchema(agent); err != nil {
 		logger.Log.WithError(err).Warn("CreateAgent: Validation failed")
 		c.Set("response", err.Error())
 		c.Set("status", http.StatusBadRequest)
@@ -164,14 +164,14 @@ func UpdateAgent(c *gin.Context) {
 		return
 	}
 
-	agent, err := models.ParseAgentInput(input)
+	agent, err := agents.ParseAgentInput(input)
 	if err != nil {
 		c.Set("response", err.Error())
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
 
-	if err := models.ValidateAgentSchema(agent); err != nil {
+	if err := agents.ValidateAgentSchema(agent); err != nil {
 		logger.Log.WithError(err).Warn("UpdateAgent: Validation failed")
 		c.Set("response", err.Error())
 		c.Set("status", http.StatusBadRequest)

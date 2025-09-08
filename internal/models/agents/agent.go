@@ -1,15 +1,19 @@
 package models
 
 import (
+	"database/sql/driver"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
 
-	"gorm.io/datatypes"
+	"github.com/gohead-cms/gohead/internal/models"
+
 	"gorm.io/gorm"
 )
 
+// Agent represents an autonomous agent configuration.
+// It is stored as a JSONB object in the database.
 // Agent represents an autonomous agent configuration.
 // It is stored as a JSONB object in the database.
 type Agent struct {
@@ -17,11 +21,11 @@ type Agent struct {
 	Name         string         `json:"name" gorm:"uniqueIndex"`
 	SystemPrompt string         `json:"system_prompt" gorm:"type:text;not null"`
 	MaxTurns     int            `json:"max_turns" gorm:"not null;default:4"`
-	LLMConfig    datatypes.JSON `json:"llm_config" gorm:"type:jsonb;serializer:json;not null"`
-	Memory       datatypes.JSON `json:"memory" gorm:"type:jsonb;serializer:json;not null"`
-	Trigger      datatypes.JSON `json:"trigger" gorm:"type:jsonb;serializer:json;not null"`
-	Functions    datatypes.JSON `json:"functions" gorm:"type:jsonb"`
-	Config       datatypes.JSON `json:"-" gorm:"type:jsonb"`
+	LLMConfig    LLMConfig      `json:"llm_config" gorm:"type:jsonb"`
+	Memory       MemoryConfig   `json:"memory" gorm:"type:jsonb"`
+	Trigger      TriggerConfig  `json:"trigger" gorm:"type:jsonb"`
+	Functions    []FunctionSpec `json:"functions" gorm:"type:jsonb"`
+	Config       models.JSONMap `json:"-" gorm:"type:jsonb"`
 }
 
 // LLMConfig specifies the large language model to use.
@@ -32,10 +36,46 @@ type LLMConfig struct {
 	APISecret string `json:"api_secret"`
 }
 
+// Value implements the Valuer interface for `LLMConfig`.
+func (c LLMConfig) Value() (driver.Value, error) {
+	data, err := json.Marshal(c)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal LLMConfig: %w", err)
+	}
+	return data, nil
+}
+
+// Scan implements the Scanner interface for `LLMConfig`.
+func (c *LLMConfig) Scan(value interface{}) error {
+	bytes, ok := value.([]byte)
+	if !ok {
+		return errors.New("invalid data type for LLMConfig")
+	}
+	return json.Unmarshal(bytes, c)
+}
+
 // MemoryConfig defines how the conversation memory is stored.
 type MemoryConfig struct {
 	Type         string `json:"type"` // e.g., "in-memory", "postgres"
 	SessionScope string `json:"session_scope"`
+}
+
+// Value implements the Valuer interface for `MemoryConfig`.
+func (c MemoryConfig) Value() (driver.Value, error) {
+	data, err := json.Marshal(c)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal MemoryConfig: %w", err)
+	}
+	return data, nil
+}
+
+// Scan implements the Scanner interface for `MemoryConfig`.
+func (c *MemoryConfig) Scan(value interface{}) error {
+	bytes, ok := value.([]byte)
+	if !ok {
+		return errors.New("invalid data type for MemoryConfig")
+	}
+	return json.Unmarshal(bytes, c)
 }
 
 // TriggerConfig defines what initiates an agent's run.
@@ -45,12 +85,59 @@ type TriggerConfig struct {
 	WebhookToken string `json:"webhook_token"`
 }
 
+// Value implements the Valuer interface for `TriggerConfig`.
+// It marshals the struct into JSON for storage in the database.
+func (t TriggerConfig) Value() (driver.Value, error) {
+	if t.Cron == "" && t.WebhookToken == "" {
+		return nil, nil
+	}
+	data, err := json.Marshal(t)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal TriggerConfig: %w", err)
+	}
+	return data, nil
+}
+
+// Scan implements the Scanner interface for `TriggerConfig`.
+// It unmarshals the JSON data from the database into the struct.
+func (t *TriggerConfig) Scan(value any) error {
+	if value == nil {
+		return nil
+	}
+
+	bytes, ok := value.([]byte)
+	if !ok {
+		return errors.New("invalid data type for TriggerConfig")
+	}
+
+	return json.Unmarshal(bytes, t)
+}
+
 // FunctionSpec describes a tool the agent can call.
+// FunctionSpec represents a tool or function the agent can use.
 type FunctionSpec struct {
-	ImplKey     string `json:"impl_key"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Parameters  string `json:"parameters"` // JSON string of the function schema
+	Name        string         `json:"name"`        // The name of the function
+	Description string         `json:"description"` // A description for the LLM
+	Parameters  models.JSONMap `json:"parameters"`  // JSON schema for the function's parameters
+	ImplKey     string         `json:"impl_key"`    // Key used to look up the actual implementation
+}
+
+// Value implements the Valuer interface for `FunctionSpec`.
+func (c FunctionSpec) Value() (driver.Value, error) {
+	data, err := json.Marshal(c)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal FunctionSpec: %w", err)
+	}
+	return data, nil
+}
+
+// Scan implements the Scanner interface for `FunctionSpec`.
+func (c *FunctionSpec) Scan(value interface{}) error {
+	bytes, ok := value.([]byte)
+	if !ok {
+		return errors.New("invalid data type for FunctionSpec")
+	}
+	return json.Unmarshal(bytes, c)
 }
 
 var cronRegex = regexp.MustCompile(`^(?:@(annually|yearly|monthly|weekly|daily|hourly|reboot)|((\d+,)+\d+|(\d+-\d+)|\d+|\*)?( (\d+,)+\d+|(\d+-\d+)|\d+|\*)?( (\d+,)+\d+|(\d+-\d+)|\d+|\*)?( (\d+,)+\d+|(\d+-\d+)|\d+|\*)?( (\d+,)+\d+|(\d+-\d+)|\d+|\*)?( (\d+,)+\d+|(\d+-\d+)|\d+|\*)?( (\d+,)+\d+|(\d+-\d+)|\d+|\*)?)$`)
@@ -84,45 +171,33 @@ func ValidateAgentSchema(agent Agent) error {
 	}
 
 	// 2. LLM Configuration
-	var llmConfig LLMConfig
-	if err := json.Unmarshal(agent.LLMConfig, &llmConfig); err != nil {
-		return fmt.Errorf("invalid LLMConfig format: %w", err)
-	}
-	if llmConfig.Provider == "" {
+	if agent.LLMConfig.Provider == "" {
 		return errors.New("llm_config provider cannot be empty")
 	}
 
 	// 3. Memory Configuration
-	var memoryConfig MemoryConfig
-	if err := json.Unmarshal(agent.Memory, &memoryConfig); err != nil {
-		return fmt.Errorf("invalid Memory format: %w", err)
-	}
-	if memoryConfig.Type == "" {
+	if agent.Memory.Type == "" {
 		return errors.New("memory type cannot be empty")
 	}
-	if memoryConfig.SessionScope == "" {
+	if agent.Memory.SessionScope == "" {
 		return errors.New("memory session scope cannot be empty")
 	}
 
 	// 4. Trigger Configuration
-	var triggerConfig TriggerConfig
-	if err := json.Unmarshal(agent.Trigger, &triggerConfig); err != nil {
-		return fmt.Errorf("invalid Trigger format: %w", err)
-	}
-	switch triggerConfig.Type {
+	switch agent.Trigger.Type {
 	case "manual":
 		// No additional checks needed
 	case "cron":
 		// Check for an empty string first
-		if triggerConfig.Cron == "" {
+		if agent.Trigger.Cron == "" {
 			return errors.New("cron trigger requires a cron expression")
 		}
 		// Now check if the expression matches the regex
-		if !cronRegex.MatchString(triggerConfig.Cron) {
+		if !cronRegex.MatchString(agent.Trigger.Cron) {
 			return errors.New("invalid cron expression")
 		}
 	case "webhook":
-		if triggerConfig.WebhookToken == "" {
+		if agent.Trigger.WebhookToken == "" {
 			return errors.New("webhook trigger requires a 'webhook_token'")
 		}
 	default:
@@ -130,11 +205,7 @@ func ValidateAgentSchema(agent Agent) error {
 	}
 
 	// 5. Functions
-	var functions []FunctionSpec
-	if err := json.Unmarshal(agent.Functions, &functions); err != nil {
-		return fmt.Errorf("invalid Functions format: %w", err)
-	}
-	if err := validateFunctionSpecs(functions); err != nil {
+	if err := validateFunctionSpecs(agent.Functions); err != nil {
 		return err
 	}
 

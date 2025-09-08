@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gohead-cms/gohead/internal/models"
+	agents "github.com/gohead-cms/gohead/internal/models/agents"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/testutils"
 
@@ -31,7 +31,7 @@ func TestAgentHandlers(t *testing.T) {
 	defer testutils.CleanupTestDB()
 
 	// Migrate Agent (and anything it needs)
-	assert.NoError(t, db.AutoMigrate(&models.Agent{}))
+	assert.NoError(t, db.AutoMigrate(&agents.Agent{}))
 
 	gin.SetMode(gin.TestMode)
 

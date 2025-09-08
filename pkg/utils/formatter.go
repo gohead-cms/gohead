@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/gohead-cms/gohead/internal/models"
+	agents "github.com/gohead-cms/gohead/internal/models/agents"
 
 	"github.com/gertd/go-pluralize"
 )
@@ -214,7 +215,7 @@ func toInt(val interface{}) int {
 }
 
 // FormatAgentSchema formats a single agent into a schema map for API endpoints.
-func FormatAgentSchema(agent *models.Agent) map[string]any {
+func FormatAgentSchema(agent *agents.Agent) map[string]any {
 	if agent == nil {
 		return nil
 	}
@@ -236,7 +237,7 @@ func FormatAgentSchema(agent *models.Agent) map[string]any {
 }
 
 // FormatAgentsSchema returns an array of agent schemas for admin endpoints.
-func FormatAgentsSchema(agents []models.Agent) []map[string]any {
+func FormatAgentsSchema(agents []agents.Agent) []map[string]any {
 	formatted := make([]map[string]any, 0, len(agents))
 	for _, agent := range agents {
 		formatted = append(formatted, FormatAgentSchema(&agent))
@@ -245,7 +246,7 @@ func FormatAgentsSchema(agents []models.Agent) []map[string]any {
 }
 
 // FormatAgentData returns an array of agents as DATA (not schema).
-func FormatAgentData(agents []models.Agent) []map[string]any {
+func FormatAgentData(agents []agents.Agent) []map[string]any {
 	formatted := make([]map[string]any, 0, len(agents))
 	for _, agent := range agents {
 		formatted = append(formatted, map[string]any{

@@ -3,7 +3,7 @@ package migrations
 
 import (
 	"github.com/gohead-cms/gohead/internal/models"
-
+	agents "github.com/gohead-cms/gohead/internal/models/agents"
 	"gorm.io/gorm"
 )
 
@@ -15,6 +15,6 @@ func MigrateDatabase(db *gorm.DB) error {
 		&models.SingleItem{},
 		&models.Item{},
 		&models.User{},
-		&models.Agent{},
+		&agents.Agent{},
 	)
 }

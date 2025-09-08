@@ -2,27 +2,16 @@ package storage_test
 
 import (
 	"bytes"
-	"encoding/json"
 	"testing"
 
-	"github.com/gohead-cms/gohead/internal/models"
+	models "github.com/gohead-cms/gohead/internal/models/agents"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
 	"github.com/gohead-cms/gohead/pkg/testutils"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"gorm.io/datatypes"
 )
-
-// Helper function to marshal a struct to JSON for use in tests.
-func marshalJSON(v interface{}) datatypes.JSON {
-	b, err := json.Marshal(v)
-	if err != nil {
-		panic(err)
-	}
-	return datatypes.JSON(b)
-}
 
 func init() {
 	// Configure logger to write logs to a buffer for testing
@@ -46,9 +35,9 @@ func TestAgentStorage(t *testing.T) {
 		Name:         "CustomerServiceAgent",
 		SystemPrompt: "You are a helpful assistant.",
 		MaxTurns:     5,
-		LLMConfig:    marshalJSON(models.LLMConfig{Provider: "openai", Model: "gpt-4"}),
-		Memory:       marshalJSON(models.MemoryConfig{Type: "postgres", SessionScope: "user-session"}),
-		Trigger:      marshalJSON(models.TriggerConfig{Type: "manual"}),
+		LLMConfig:    models.LLMConfig{Provider: "openai", Model: "gpt-4"},
+		Memory:       models.MemoryConfig{Type: "postgres", SessionScope: "user-session"},
+		Trigger:      models.TriggerConfig{Type: "manual"},
 	}
 	err = db.Create(testAgent).Error
 	assert.NoError(t, err, "Failed to seed initial 'CustomerServiceAgent'")
@@ -57,9 +46,9 @@ func TestAgentStorage(t *testing.T) {
 		newAgent := &models.Agent{
 			Name:         "MarketingAgent",
 			SystemPrompt: "You generate creative marketing copy.",
-			LLMConfig:    marshalJSON(models.LLMConfig{Provider: "google", Model: "gemini-pro"}),
-			Memory:       marshalJSON(models.MemoryConfig{Type: "redis", SessionScope: "conversation"}),
-			Trigger:      marshalJSON(models.TriggerConfig{Type: "webhook"}),
+			LLMConfig:    models.LLMConfig{Provider: "google", Model: "gemini-pro"},
+			Memory:       models.MemoryConfig{Type: "redis", SessionScope: "conversation"},
+			Trigger:      models.TriggerConfig{Type: "webhook"},
 		}
 		err := storage.SaveAgent(newAgent)
 		assert.NoError(t, err, "Expected no error saving new agent")
@@ -82,10 +71,7 @@ func TestAgentStorage(t *testing.T) {
 		assert.NotNil(t, retrievedAgent, "Expected agent to be retrieved")
 		assert.Equal(t, testAgent.Name, retrievedAgent.Name, "Agent name mismatch")
 		// Verify one of the JSON fields as well
-		var llmConfig models.LLMConfig
-		err = json.Unmarshal(retrievedAgent.LLMConfig, &llmConfig)
-		assert.NoError(t, err)
-		assert.Equal(t, "openai", llmConfig.Provider, "LLM provider mismatch")
+		assert.Equal(t, "openai", retrievedAgent.LLMConfig.Provider, "LLM provider mismatch")
 	})
 
 	t.Run("GetAgentByID_NotFound", func(t *testing.T) {
@@ -142,11 +128,10 @@ func TestAgentStorage(t *testing.T) {
 			Name:         "UpdatedCustomerAgent",
 			SystemPrompt: "You are a friendly customer service bot.",
 			MaxTurns:     10,
-			LLMConfig:    marshalJSON(models.LLMConfig{Provider: "google", Model: "gemini-1.5-flash"}),
-			Memory:       marshalJSON(models.MemoryConfig{Type: "postgres", SessionScope: "user-session"}),
-			Trigger:      marshalJSON(models.TriggerConfig{Type: "manual"}),
+			LLMConfig:    models.LLMConfig{Provider: "google", Model: "gemini-1.5-flash"},
+			Memory:       models.MemoryConfig{Type: "postgres", SessionScope: "user-session"},
+			Trigger:      models.TriggerConfig{Type: "manual"},
 		}
-
 		// Call the update function
 		err = storage.UpdateAgent(agentToUpdate.ID, updatedAgent)
 		assert.NoError(t, err, "Expected no error when updating agent")
@@ -156,11 +141,8 @@ func TestAgentStorage(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "UpdatedCustomerAgent", retrievedAgent.Name, "Name was not updated")
 
-		var llmConfig models.LLMConfig
-		err = json.Unmarshal(retrievedAgent.LLMConfig, &llmConfig)
-		assert.NoError(t, err)
-		assert.Equal(t, "google", llmConfig.Provider, "LLM provider was not updated")
-		assert.Equal(t, "gemini-1.5-flash", llmConfig.Model, "LLM model was not updated")
+		assert.Equal(t, "google", retrievedAgent.LLMConfig.Provider, "LLM provider was not updated")
+		assert.Equal(t, "gemini-1.5-flash", retrievedAgent.LLMConfig.Model, "LLM model was not updated")
 	})
 
 	t.Run("DeleteAgent_Success", func(t *testing.T) {

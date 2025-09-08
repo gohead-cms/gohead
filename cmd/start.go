@@ -7,6 +7,7 @@ import (
 
 	"github.com/gohead-cms/gohead/internal/api/handlers"
 	"github.com/gohead-cms/gohead/internal/api/middleware"
+	"github.com/gohead-cms/gohead/pkg/agents/triggers"
 	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/config"
 	"github.com/gohead-cms/gohead/pkg/database"
@@ -97,6 +98,7 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	seed.SeedRoles()
 	auth.InitializeJWT(cfg.JWTSecret)
 	metrics.InitMetrics()
+	triggers.StartScheduler()
 
 	// Tracing
 	if cfg.TelemetryEnabled {

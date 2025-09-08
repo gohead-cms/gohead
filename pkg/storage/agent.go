@@ -6,7 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/gohead-cms/gohead/internal/models"
+	models "github.com/gohead-cms/gohead/internal/models/agents"
 	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
 )
@@ -86,8 +86,8 @@ func GetAgentByName(name string) (*models.Agent, error) {
 	return &agent, nil
 }
 
-// GetAllAgentsWithFilters retrieves agents with optional filtering and pagination.
-func GetAllAgents(filters map[string]interface{}, rangeValues []int) ([]models.Agent, int, error) {
+// GetAllAgents retrieves agents with optional filtering and pagination.
+func GetAllAgents(filters map[string]any, rangeValues []int) ([]models.Agent, int, error) {
 	var agents []models.Agent
 	query := database.DB.Model(&models.Agent{})
 
@@ -112,9 +112,9 @@ func GetAllAgents(filters map[string]interface{}, rangeValues []int) ([]models.A
 		query = query.Offset(offset).Limit(limit)
 	}
 
-	// Execute query.
+	// Execute query. GORM now automatically handles the JSON conversions for the nested structs.
 	if err := query.Find(&agents).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			logger.Log.Warn("No agents found")
 			return nil, int(total), nil
 		}
