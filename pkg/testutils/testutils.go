@@ -45,7 +45,7 @@ func SetupTestServer() (*gin.Engine, *gorm.DB) {
 	logger.Log.Info("Default roles seeded successfully.")
 
 	// Set Gin to Test Mode
-	gin.SetMode(gin.TestMode)
+	//gin.SetMode(gin.)
 
 	// Create a Gin router
 	router := gin.Default()

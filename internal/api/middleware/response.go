@@ -36,7 +36,9 @@ func ResponseWrapper() gin.HandlerFunc {
 		// Format + write once, then abort the chain so nothing else changes it.
 		if statusCode >= 400 {
 			details, _ := c.Get("details")
-			c.AbortWithStatusJSON(statusCode, gin.H{
+			c.Status(statusCode)
+			c.Abort()
+			c.JSON(statusCode, gin.H{
 				"error": gin.H{
 					"status":  statusCode,
 					"name":    getErrorName(statusCode),
@@ -51,7 +53,9 @@ func ResponseWrapper() gin.HandlerFunc {
 		if meta != nil {
 			out["meta"] = meta
 		}
-		c.AbortWithStatusJSON(statusCode, out)
+		c.Status(statusCode)
+		c.Abort()
+		c.JSON(statusCode, out)
 	}
 }
 

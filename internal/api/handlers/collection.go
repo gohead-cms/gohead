@@ -15,7 +15,7 @@ import (
 
 // GetCollections retrieves a list of collections with optional filtering, sorting, and pagination.
 func GetCollections(c *gin.Context) {
-	logger.Log.Debug("Handler:GetCollections")
+	logger.Log.Debug("Handler.GetCollections")
 
 	// Pagination management
 	filterParam := c.Query("filter")
@@ -120,7 +120,7 @@ func CreateCollection(c *gin.Context) {
 		return
 	}
 
-	logger.Log.WithField("input", input).Info("CreateCollection")
+	logger.Log.WithField("input", input).Debug("CreateCollection")
 
 	collection, err := models.ParseCollectionInput(input)
 	if err != nil {

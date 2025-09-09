@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gohead-cms/gohead/internal/api/middleware"
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/testutils"
@@ -30,8 +31,8 @@ func TestCreateCollectionHandler(t *testing.T) {
 	// Setup the test database
 	// Initialize in-memory test database
 	router, db := testutils.SetupTestServer()
+	router.Use(middleware.ResponseWrapper())
 	defer testutils.CleanupTestDB()
-
 	// Apply migrations
 	assert.NoError(t, db.AutoMigrate(&models.User{}, &models.UserRole{}, &models.Collection{}, &models.Attribute{}))
 
@@ -53,51 +54,86 @@ func TestCreateCollectionHandler(t *testing.T) {
 	// Define test cases
 	testCases := []struct {
 		name           string
-		inputData      map[string]interface{}
+		inputData      map[string]any
 		expectedStatus int
 		expectedBody   string
 	}{
 		{
-			name: "Valid Content Type",
-			inputData: map[string]interface{}{
-				"name": "articles",
-				"fields": []map[string]interface{}{
-					{
-						"name":     "title",
-						"type":     "string",
+			name: "Valid Preferences Collection",
+			inputData: map[string]any{
+				"name": "preferences",
+				"kind": "collection",
+				"attributes": map[string]any{
+					"language": map[string]any{
+						"type":     "text",
 						"required": true,
+						"enum":     []string{"English", "French", "Spanish", "German", "Chinese"},
 					},
-					{
-						"name":     "content",
-						"type":     "richtext",
+					"timezone": map[string]any{
+						"type":     "text",
 						"required": true,
+						"enum": []string{
+							"UTC-12:00", "UTC-11:00", "UTC-10:00", "UTC-09:00", "UTC-08:00", "UTC-07:00",
+							"UTC-06:00", "UTC-05:00", "UTC-04:00", "UTC-03:00", "UTC-02:00", "UTC-01:00",
+							"UTC+00:00", "UTC+01:00", "UTC+02:00", "UTC+03:00", "UTC+04:00", "UTC+05:00",
+							"UTC+06:00", "UTC+07:00", "UTC+08:00", "UTC+09:00", "UTC+10:00", "UTC+11:00",
+							"UTC+12:00",
+						},
 					},
 				},
 			},
 			expectedStatus: http.StatusCreated,
-			expectedBody:   `collection created successfully`,
+			expectedBody:   `Collection created successfully`,
 		},
 		{
 			name: "Missing Name Field",
-			inputData: map[string]interface{}{
-				"fields": []map[string]interface{}{
-					{
-						"type":     "string",
+			inputData: map[string]any{
+				"kind": "collection",
+				"attributes": map[string]any{
+					"language": map[string]any{
+						"type": "text",
+					},
+				},
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   `missing or invalid field`,
+		},
+		{
+			name: "Missing Kind Field",
+			inputData: map[string]any{
+				"name": "preferences",
+				"attributes": map[string]any{
+					"language": map[string]any{
+						"type": "text",
+					},
+				},
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   `missing or invalid field`,
+		},
+		{
+			name: "Empty Attributes Object",
+			inputData: map[string]any{
+				"name":       "preferences",
+				"kind":       "collection",
+				"attributes": map[string]any{},
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   `attributes array cannot be empty`,
+		},
+		{
+			name: "Attribute Missing Type",
+			inputData: map[string]any{
+				"name": "preferences",
+				"kind": "collection",
+				"attributes": map[string]any{
+					"language": map[string]any{
 						"required": true,
 					},
 				},
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedBody:   `missing required field: 'name'`,
-		},
-		{
-			name: "Empty Fields Array",
-			inputData: map[string]interface{}{
-				"name":   "users",
-				"fields": []map[string]interface{}{},
-			},
-			expectedStatus: http.StatusBadRequest,
-			expectedBody:   `fields array cannot be empty`,
+			expectedBody:   `failed to parse attribute`,
 		},
 	}
 

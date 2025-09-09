@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gohead-cms/gohead/internal/api/middleware"
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
@@ -37,7 +38,7 @@ func setupRouter() *gin.Engine {
 
 func TestCreateUser(t *testing.T) {
 	router := setupRouter()
-
+	router.Use(middleware.ResponseWrapper())
 	newUser := models.User{
 		Username: "test_user",
 		Email:    "test_user@example.com",
@@ -51,7 +52,7 @@ func TestCreateUser(t *testing.T) {
 	router.ServeHTTP(resp, req)
 
 	assert.Equal(t, http.StatusCreated, resp.Code)
-	var response map[string]interface{}
+	var response map[string]any
 	err := json.Unmarshal(resp.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.Equal(t, "User created successfully", response["message"])

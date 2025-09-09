@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gohead-cms/gohead/internal/api/middleware"
 	agents "github.com/gohead-cms/gohead/internal/models/agents"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/testutils"
@@ -28,6 +29,7 @@ func init() {
 func TestAgentHandlers(t *testing.T) {
 	// Setup test server and DB
 	router, db := testutils.SetupTestServer()
+	router.Use(middleware.ResponseWrapper())
 	defer testutils.CleanupTestDB()
 
 	// Migrate Agent (and anything it needs)
