@@ -26,10 +26,14 @@ func TestParseAgentInput(t *testing.T) {
 			},
 			"functions": []any{
 				map[string]any{
-					"impl_key":    "tool.test",
 					"name":        "TestTool",
 					"description": "A test tool.",
-					"parameters":  `{"type": "object", "properties": {}}`,
+					"impl_key":    "tool.test",
+					// parameters may be provided as a JSON object; your validator will marshal it to JSON.
+					"parameters": map[string]any{
+						"type":       "object",
+						"properties": map[string]any{},
+					},
 				},
 			},
 		}

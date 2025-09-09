@@ -5,17 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
+	"strings"
 
 	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/robfig/cron"
 
 	"gorm.io/gorm"
 )
 
 // Agent represents an autonomous agent configuration.
-// It is stored as a JSONB object in the database.
-// Agent represents an autonomous agent configuration.
-// It is stored as a JSONB object in the database.
 type Agent struct {
 	gorm.Model
 	Name         string         `json:"name" gorm:"uniqueIndex"`
@@ -24,7 +22,7 @@ type Agent struct {
 	LLMConfig    LLMConfig      `json:"llm_config" gorm:"type:jsonb"`
 	Memory       MemoryConfig   `json:"memory" gorm:"type:jsonb"`
 	Trigger      TriggerConfig  `json:"trigger" gorm:"type:jsonb"`
-	Functions    []FunctionSpec `json:"functions" gorm:"type:jsonb"`
+	Functions    FunctionSpecs  `json:"functions" gorm:"type:jsonb"`
 	Config       models.JSONMap `json:"-" gorm:"type:jsonb"`
 }
 
@@ -46,7 +44,7 @@ func (c LLMConfig) Value() (driver.Value, error) {
 }
 
 // Scan implements the Scanner interface for `LLMConfig`.
-func (c *LLMConfig) Scan(value interface{}) error {
+func (c *LLMConfig) Scan(value any) error {
 	bytes, ok := value.([]byte)
 	if !ok {
 		return errors.New("invalid data type for LLMConfig")
@@ -122,25 +120,48 @@ type FunctionSpec struct {
 	ImplKey     string         `json:"impl_key"`    // Key used to look up the actual implementation
 }
 
-// Value implements the Valuer interface for `FunctionSpec`.
-func (c FunctionSpec) Value() (driver.Value, error) {
-	data, err := json.Marshal(c)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal FunctionSpec: %w", err)
-	}
-	return data, nil
-}
+type FunctionSpecs []FunctionSpec
 
-// Scan implements the Scanner interface for `FunctionSpec`.
-func (c *FunctionSpec) Scan(value interface{}) error {
-	bytes, ok := value.([]byte)
-	if !ok {
-		return errors.New("invalid data type for FunctionSpec")
+// Scan implements sql.Scanner for FunctionSpecs, accepting either a JSON array
+// of FunctionSpec or a single JSON object (which will be wrapped into a slice).
+func (f *FunctionSpecs) Scan(value any) error {
+	if value == nil {
+		*f = nil
+		return nil
 	}
-	return json.Unmarshal(bytes, c)
-}
 
-var cronRegex = regexp.MustCompile(`^(?:@(annually|yearly|monthly|weekly|daily|hourly|reboot)|((\d+,)+\d+|(\d+-\d+)|\d+|\*)?( (\d+,)+\d+|(\d+-\d+)|\d+|\*)?( (\d+,)+\d+|(\d+-\d+)|\d+|\*)?( (\d+,)+\d+|(\d+-\d+)|\d+|\*)?( (\d+,)+\d+|(\d+-\d+)|\d+|\*)?( (\d+,)+\d+|(\d+-\d+)|\d+|\*)?( (\d+,)+\d+|(\d+-\d+)|\d+|\*)?)$`)
+	var raw []byte
+	switch v := value.(type) {
+	case []byte:
+		raw = v
+	case string:
+		raw = []byte(v)
+	default:
+		return fmt.Errorf("unsupported Scan, storing driver.Value type %T into type *models.FunctionSpecs", value)
+	}
+
+	s := strings.TrimSpace(string(raw))
+	if s == "" || s == "null" {
+		*f = FunctionSpecs{}
+		return nil
+	}
+
+	switch s[0] {
+	case '[':
+		// Proper slice
+		return json.Unmarshal(raw, f)
+	case '{':
+		// Single object stored in DB — wrap into slice for backward/dirty compatibility
+		var one FunctionSpec
+		if err := json.Unmarshal(raw, &one); err != nil {
+			return fmt.Errorf("unmarshal FunctionSpec object: %w", err)
+		}
+		*f = FunctionSpecs{one}
+		return nil
+	default:
+		return errors.New("functions column is neither JSON object nor array")
+	}
+}
 
 // ParseAgentInput parses a generic map into a typed Agent struct.
 // It handles potential data type mismatches gracefully.
@@ -193,8 +214,8 @@ func ValidateAgentSchema(agent Agent) error {
 			return errors.New("cron trigger requires a cron expression")
 		}
 		// Now check if the expression matches the regex
-		if !cronRegex.MatchString(agent.Trigger.Cron) {
-			return errors.New("invalid cron expression")
+		if _, err := cron.ParseStandard(agent.Trigger.Cron); err != nil {
+			return fmt.Errorf("invalid cron expression: %w", err)
 		}
 	case "webhook":
 		if agent.Trigger.WebhookToken == "" {

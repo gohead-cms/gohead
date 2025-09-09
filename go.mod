@@ -9,6 +9,7 @@ require (
 	github.com/go-co-op/gocron v1.37.0
 	github.com/graphql-go/graphql v0.8.1
 	github.com/prometheus/client_golang v1.20.5
+	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
@@ -21,7 +22,6 @@ require (
 	golang.org/x/crypto v0.32.0
 	golang.org/x/text v0.21.0
 	gopkg.in/yaml.v3 v3.0.1
-	gorm.io/datatypes v1.2.6
 	gorm.io/driver/mysql v1.5.7
 	gorm.io/driver/postgres v1.5.11
 	gorm.io/driver/sqlite v1.5.7
