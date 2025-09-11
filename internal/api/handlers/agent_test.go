@@ -1,4 +1,3 @@
-// internal/api/handlers/agent_test.go
 package handlers
 
 import (
@@ -12,216 +11,377 @@ import (
 	agents "github.com/gohead-cms/gohead/internal/models/agents"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/testutils"
-
-	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"gorm.io/gorm"
 )
 
-// Initialize logger for testing (same style as type_test.go)
+// Initialize logger for testing
 func init() {
+	// Configure logger to write logs to a buffer for testing
 	var buffer bytes.Buffer
 	logger.InitLogger("debug")
 	logger.Log.SetOutput(&buffer)
 	logger.Log.SetFormatter(&logrus.TextFormatter{})
 }
 
-func TestAgentHandlers(t *testing.T) {
-	// Setup test server and DB
+func TestGetAgentsHandler(t *testing.T) {
+	// Setup the test database and router
 	router, db := testutils.SetupTestServer()
 	router.Use(middleware.ResponseWrapper())
 	defer testutils.CleanupTestDB()
-
-	// Migrate Agent (and anything it needs)
 	assert.NoError(t, db.AutoMigrate(&agents.Agent{}))
 
-	gin.SetMode(gin.TestMode)
+	// Seed data
+	agent1 := agents.Agent{
+		Name:         "agent_one",
+		SystemPrompt: "...",
+		MaxTurns:     4,
+		LLMConfig:    agents.LLMConfig{Provider: "test_provider", Model: "test_model"},
+		Memory:       agents.MemoryConfig{Type: "in-memory", SessionScope: "user"},
+		Trigger:      agents.TriggerConfig{Type: "manual"},
+	}
+	agent2 := agents.Agent{
+		Name:         "agent_two",
+		SystemPrompt: "...",
+		MaxTurns:     4,
+		LLMConfig:    agents.LLMConfig{Provider: "test_provider", Model: "test_model"},
+		Memory:       agents.MemoryConfig{Type: "in-memory", SessionScope: "user"},
+		Trigger:      agents.TriggerConfig{Type: "manual"},
+	}
+	db.Create(&agent1)
+	db.Create(&agent2)
 
-	// Mount routes for agents
+	// Register the handler
 	router.GET("/agents", GetAgents)
-	router.GET("/agents/:name", GetAgent)
-	router.POST("/agents", CreateAgent)
-	router.PUT("/agents/:name", UpdateAgent)
-	router.DELETE("/agents/:name", DeleteAgent)
 
-	// ---- Helpers ----
-	validAgentInput := func(name string) map[string]any {
-		return map[string]any{
-			"name":          name,
-			"system_prompt": "You are a test agent.",
-			"max_turns":     5,
-			"llm_config": map[string]any{
-				"provider": "openai",
-				"model":    "gpt-3.5-turbo",
-			},
-			"memory": map[string]any{
-				"type":          "postgres",
-				"session_scope": "conversation",
-			},
-			"trigger": map[string]any{
-				"type": "manual",
-			},
-			"functions": []any{
-				map[string]any{
-					"impl_key":    "tool.test",
-					"name":        "TestTool",
-					"description": "A test tool.",
-					"parameters":  `{"type":"object","properties":{}}`,
-				},
-			},
-		}
+	testCases := []struct {
+		name           string
+		queryParams    string
+		expectedStatus int
+		expectedBody   string
+		expectedHeader string
+	}{
+		{
+			name:           "Success without pagination",
+			queryParams:    "",
+			expectedStatus: http.StatusOK,
+			expectedBody:   `"name":"agent_one"`,
+			expectedHeader: "items 0-1/2",
+		},
+		{
+			name:           "Success with pagination",
+			queryParams:    "?page=1&pageSize=1",
+			expectedStatus: http.StatusOK,
+			expectedBody:   `"name":"agent_one"`,
+			expectedHeader: "items 0-1/2",
+		},
+		{
+			name:           "Invalid range format",
+			queryParams:    "?range=invalid",
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   "Invalid range format",
+			expectedHeader: "",
+		},
+		{
+			name:           "Invalid filter format",
+			queryParams:    `?filter={"name"`,
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   "Invalid filter format",
+			expectedHeader: "",
+		},
 	}
 
-	// ---------- CreateAgent ----------
-	t.Run("CreateAgent - Valid", func(t *testing.T) {
-		body, _ := json.Marshal(validAgentInput("agent-alpha"))
-		req, _ := http.NewRequest(http.MethodPost, "/agents", bytes.NewBuffer(body))
-		req.Header.Set("Content-Type", "application/json")
-		rr := httptest.NewRecorder()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req, _ := http.NewRequest(http.MethodGet, "/agents"+tc.queryParams, nil)
+			rr := httptest.NewRecorder()
+			router.ServeHTTP(rr, req)
 
-		router.ServeHTTP(rr, req)
+			assert.Equal(t, tc.expectedStatus, rr.Code)
+			if tc.expectedBody != "" {
+				assert.Contains(t, rr.Body.String(), tc.expectedBody)
+			}
+			if tc.expectedHeader != "" {
+				assert.Equal(t, tc.expectedHeader, rr.Header().Get("Content-Range"))
+			}
+		})
+	}
+}
 
-		assert.Equal(t, http.StatusCreated, rr.Code)
-		assert.Contains(t, rr.Body.String(), "Agent created successfully")
+func TestGetAgentHandler(t *testing.T) {
+	router, db := testutils.SetupTestServer()
+	defer testutils.CleanupTestDB()
+	assert.NoError(t, db.AutoMigrate(&agents.Agent{}))
+
+	// Seed data
+	testAgent := agents.Agent{
+		Name:         "test_get_agent",
+		SystemPrompt: "...",
+		MaxTurns:     4,
+		LLMConfig:    agents.LLMConfig{Provider: "test_provider", Model: "test_model"},
+		Memory:       agents.MemoryConfig{Type: "in-memory", SessionScope: "user"},
+		Trigger:      agents.TriggerConfig{Type: "manual"},
+	}
+	db.Create(&testAgent)
+
+	router.GET("/agents/:name", GetAgent)
+
+	testCases := []struct {
+		name           string
+		agentName      string
+		expectedStatus int
+		expectedBody   string
+	}{
+		{
+			name:           "Success",
+			agentName:      "test_get_agent",
+			expectedStatus: http.StatusOK,
+			expectedBody:   `"name":"test_get_agent"`,
+		},
+		{
+			name:           "Agent Not Found",
+			agentName:      "nonexistent",
+			expectedStatus: http.StatusNotFound,
+			expectedBody:   "Agent not found",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req, _ := http.NewRequest(http.MethodGet, "/agents/"+tc.agentName, nil)
+			rr := httptest.NewRecorder()
+			router.ServeHTTP(rr, req)
+
+			assert.Equal(t, tc.expectedStatus, rr.Code)
+			assert.Contains(t, rr.Body.String(), tc.expectedBody)
+		})
+	}
+}
+
+func TestCreateAgentHandler(t *testing.T) {
+	router, db := testutils.SetupTestServer()
+	defer testutils.CleanupTestDB()
+	assert.NoError(t, db.AutoMigrate(&agents.Agent{}))
+
+	router.POST("/agents", CreateAgent)
+
+	testCases := []struct {
+		name           string
+		inputData      map[string]any
+		expectedStatus int
+		expectedBody   string
+	}{
+		{
+			name: "Valid Agent",
+			inputData: map[string]any{
+				"name":          "new_agent",
+				"system_prompt": "You are a new agent.",
+				"max_turns":     4,
+				"llm_config":    map[string]any{"provider": "openai", "model": "gpt-4"},
+				"memory":        map[string]any{"type": "in-memory", "session_scope": "user"},
+				"trigger":       map[string]any{"type": "manual"},
+			},
+			expectedStatus: http.StatusCreated,
+			expectedBody:   `"message":"Agent created successfully"`,
+		},
+		{
+			name:           "Invalid JSON",
+			inputData:      nil, // Simulates an empty body which results in JSON parsing error
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   "Invalid JSON input",
+		},
+		{
+			name: "Missing Name",
+			inputData: map[string]any{
+				"system_prompt": "...",
+				"llm_config":    map[string]any{"provider": "openai", "model": "gpt-4"},
+				"memory":        map[string]any{"type": "in-memory", "session_scope": "user"},
+				"trigger":       map[string]any{"type": "manual"},
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   "agent must have a 'name'",
+		},
+		{
+			name: "Agent Already Exists",
+			inputData: map[string]any{
+				"name":          "existing_agent",
+				"system_prompt": "...",
+				"max_turns":     4,
+				"llm_config":    map[string]any{"provider": "openai", "model": "gpt-4"},
+				"memory":        map[string]any{"type": "in-memory", "session_scope": "user"},
+				"trigger":       map[string]any{"type": "manual"},
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   "This agent already exists",
+		},
+	}
+
+	// Pre-create an agent for the "Agent Already Exists" case
+	db.Create(&agents.Agent{
+		Name:         "existing_agent",
+		SystemPrompt: "...",
+		MaxTurns:     4,
+		LLMConfig:    agents.LLMConfig{Provider: "openai", Model: "gpt-4"},
+		Memory:       agents.MemoryConfig{Type: "in-memory", SessionScope: "user"},
+		Trigger:      agents.TriggerConfig{Type: "manual"},
 	})
 
-	t.Run("CreateAgent - Missing Name", func(t *testing.T) {
-		payload := validAgentInput("")
-		body, _ := json.Marshal(payload)
-		req, _ := http.NewRequest(http.MethodPost, "/agents", bytes.NewBuffer(body))
-		req.Header.Set("Content-Type", "application/json")
-		rr := httptest.NewRecorder()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var body *bytes.Buffer
+			if tc.inputData != nil {
+				jsonBody, _ := json.Marshal(tc.inputData)
+				body = bytes.NewBuffer(jsonBody)
+			} else {
+				body = bytes.NewBufferString("")
+			}
 
-		router.ServeHTTP(rr, req)
+			req, _ := http.NewRequest(http.MethodPost, "/agents", body)
+			req.Header.Set("Content-Type", "application/json")
+			rr := httptest.NewRecorder()
+			router.ServeHTTP(rr, req)
 
-		assert.Equal(t, http.StatusBadRequest, rr.Code)
-		assert.Contains(t, rr.Body.String(), "agent must have a 'name'")
-	})
+			assert.Equal(t, tc.expectedStatus, rr.Code)
+			assert.Contains(t, rr.Body.String(), tc.expectedBody)
+		})
+	}
+}
 
-	t.Run("CreateAgent - Duplicate Name", func(t *testing.T) {
-		// Create initial
-		bodyA, _ := json.Marshal(validAgentInput("agent-dup"))
-		reqA, _ := http.NewRequest(http.MethodPost, "/agents", bytes.NewBuffer(bodyA))
-		reqA.Header.Set("Content-Type", "application/json")
-		rrA := httptest.NewRecorder()
-		router.ServeHTTP(rrA, reqA)
-		assert.Equal(t, http.StatusCreated, rrA.Code)
+func TestUpdateAgentHandler(t *testing.T) {
+	router, db := testutils.SetupTestServer()
+	defer testutils.CleanupTestDB()
+	assert.NoError(t, db.AutoMigrate(&agents.Agent{}))
 
-		// Create duplicate
-		bodyB, _ := json.Marshal(validAgentInput("agent-dup"))
-		reqB, _ := http.NewRequest(http.MethodPost, "/agents", bytes.NewBuffer(bodyB))
-		reqB.Header.Set("Content-Type", "application/json")
-		rrB := httptest.NewRecorder()
-		router.ServeHTTP(rrB, reqB)
+	// Seed agent to be updated
+	testAgent := agents.Agent{
+		Name:         "to_be_updated",
+		SystemPrompt: "initial prompt",
+		MaxTurns:     4,
+		LLMConfig:    agents.LLMConfig{Provider: "openai", Model: "gpt-4"},
+		Memory:       agents.MemoryConfig{Type: "in-memory", SessionScope: "user"},
+		Trigger:      agents.TriggerConfig{Type: "manual"},
+	}
+	db.Create(&testAgent)
 
-		assert.Equal(t, http.StatusBadRequest, rrB.Code)
-		assert.Contains(t, rrB.Body.String(), "This agent already exists")
-	})
+	router.PUT("/agents/:name", UpdateAgent)
 
-	// ---------- GetAgent ----------
-	t.Run("GetAgent - Exists", func(t *testing.T) {
-		// Ensure exists
-		body, _ := json.Marshal(validAgentInput("agent-get"))
-		reqC, _ := http.NewRequest(http.MethodPost, "/agents", bytes.NewBuffer(body))
-		reqC.Header.Set("Content-Type", "application/json")
-		rrC := httptest.NewRecorder()
-		router.ServeHTTP(rrC, reqC)
-		assert.Equal(t, http.StatusCreated, rrC.Code)
+	testCases := []struct {
+		name           string
+		agentName      string
+		inputData      map[string]any
+		expectedStatus int
+		expectedBody   string
+	}{
+		{
+			name:      "Success",
+			agentName: "to_be_updated",
+			inputData: map[string]any{
+				"name":          "updated_agent",
+				"system_prompt": "updated prompt",
+				"max_turns":     5,
+				"llm_config":    map[string]any{"provider": "google", "model": "gemini"},
+				"memory":        map[string]any{"type": "in-memory", "session_scope": "user"},
+				"trigger":       map[string]any{"type": "manual"},
+			},
+			expectedStatus: http.StatusOK,
+			expectedBody:   `"name":"updated_agent"`,
+		},
+		{
+			name:      "Agent Not Found",
+			agentName: "nonexistent",
+			inputData: map[string]any{
+				"name":          "nonexistent",
+				"system_prompt": "...",
+				"llm_config":    map[string]any{"provider": "openai"},
+				"memory":        map[string]any{"type": "in-memory", "session_scope": "user"},
+				"trigger":       map[string]any{"type": "manual"},
+			},
+			expectedStatus: http.StatusNotFound,
+			expectedBody:   "Agent not found",
+		},
+		{
+			name:      "Validation Fails",
+			agentName: "to_be_updated",
+			inputData: map[string]any{
+				"name":          "invalid_update",
+				"system_prompt": "", // Invalid field
+				"llm_config":    map[string]any{"provider": "openai"},
+				"memory":        map[string]any{"type": "in-memory", "session_scope": "user"},
+				"trigger":       map[string]any{"type": "manual"},
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   "agent must have a 'system_prompt'",
+		},
+	}
 
-		req, _ := http.NewRequest(http.MethodGet, "/agents/agent-get", nil)
-		rr := httptest.NewRecorder()
-		router.ServeHTTP(rr, req)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			jsonBody, _ := json.Marshal(tc.inputData)
+			req, _ := http.NewRequest(http.MethodPut, "/agents/"+tc.agentName, bytes.NewBuffer(jsonBody))
+			req.Header.Set("Content-Type", "application/json")
+			rr := httptest.NewRecorder()
+			router.ServeHTTP(rr, req)
 
-		assert.Equal(t, http.StatusOK, rr.Code)
-		assert.Contains(t, rr.Body.String(), "agent-get")
-	})
+			assert.Equal(t, tc.expectedStatus, rr.Code)
+			assert.Contains(t, rr.Body.String(), tc.expectedBody)
+		})
+	}
+}
 
-	t.Run("GetAgent - Not Found", func(t *testing.T) {
-		req, _ := http.NewRequest(http.MethodGet, "/agents/does-not-exist", nil)
-		rr := httptest.NewRecorder()
-		router.ServeHTTP(rr, req)
+func TestDeleteAgentHandler(t *testing.T) {
+	router, db := testutils.SetupTestServer()
+	defer testutils.CleanupTestDB()
+	assert.NoError(t, db.AutoMigrate(&agents.Agent{}))
 
-		assert.Equal(t, http.StatusNotFound, rr.Code)
-		assert.Contains(t, rr.Body.String(), "Agent not found")
-	})
+	// Seed agent to be deleted
+	testAgent := agents.Agent{
+		Name:         "to_be_deleted",
+		SystemPrompt: "...",
+		MaxTurns:     4,
+		LLMConfig:    agents.LLMConfig{Provider: "openai", Model: "gpt-4"},
+		Memory:       agents.MemoryConfig{Type: "in-memory", SessionScope: "user"},
+		Trigger:      agents.TriggerConfig{Type: "manual"},
+	}
+	db.Create(&testAgent)
 
-	// ---------- GetAgents (list) ----------
-	t.Run("GetAgents - List", func(t *testing.T) {
-		req, _ := http.NewRequest(http.MethodGet, "/agents", nil)
-		rr := httptest.NewRecorder()
+	router.DELETE("/agents/:name", DeleteAgent)
 
-		router.ServeHTTP(rr, req)
+	testCases := []struct {
+		name           string
+		agentName      string
+		expectedStatus int
+		expectedBody   string
+	}{
+		{
+			name:           "Success",
+			agentName:      "to_be_deleted",
+			expectedStatus: http.StatusOK,
+			expectedBody:   `"message":"Agent deleted successfully"`,
+		},
+		{
+			name:           "Agent Not Found",
+			agentName:      "nonexistent",
+			expectedStatus: http.StatusNotFound,
+			expectedBody:   "Agent not found",
+		},
+	}
 
-		assert.Equal(t, http.StatusOK, rr.Code)
-		// Should include Content-Range header and at least one agent's name
-		assert.NotEmpty(t, rr.Header().Get("Content-Range"))
-		assert.Contains(t, rr.Body.String(), "agent-alpha")
-	})
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req, _ := http.NewRequest(http.MethodDelete, "/agents/"+tc.agentName, nil)
+			rr := httptest.NewRecorder()
+			router.ServeHTTP(rr, req)
 
-	// ---------- UpdateAgent ----------
-	t.Run("UpdateAgent - Valid", func(t *testing.T) {
-		// Seed a record to update
-		bodySeed, _ := json.Marshal(validAgentInput("agent-update"))
-		reqSeed, _ := http.NewRequest(http.MethodPost, "/agents", bytes.NewBuffer(bodySeed))
-		reqSeed.Header.Set("Content-Type", "application/json")
-		rrSeed := httptest.NewRecorder()
-		router.ServeHTTP(rrSeed, reqSeed)
-		assert.Equal(t, http.StatusCreated, rrSeed.Code)
+			assert.Equal(t, tc.expectedStatus, rr.Code)
+			assert.Contains(t, rr.Body.String(), tc.expectedBody)
 
-		// Update payload
-		update := validAgentInput("agent-update")
-		update["system_prompt"] = "Updated system prompt."
-		body, _ := json.Marshal(update)
-
-		req, _ := http.NewRequest(http.MethodPut, "/agents/agent-update", bytes.NewBuffer(body))
-		req.Header.Set("Content-Type", "application/json")
-		rr := httptest.NewRecorder()
-
-		router.ServeHTTP(rr, req)
-
-		assert.Equal(t, http.StatusOK, rr.Code)
-		assert.Contains(t, rr.Body.String(), "Updated system prompt.")
-	})
-
-	t.Run("UpdateAgent - Not Found", func(t *testing.T) {
-		update := validAgentInput("nope")
-		update["system_prompt"] = "X"
-		body, _ := json.Marshal(update)
-
-		req, _ := http.NewRequest(http.MethodPut, "/agents/nope", bytes.NewBuffer(body))
-		req.Header.Set("Content-Type", "application/json")
-		rr := httptest.NewRecorder()
-
-		router.ServeHTTP(rr, req)
-
-		assert.Equal(t, http.StatusNotFound, rr.Code)
-		assert.Contains(t, rr.Body.String(), "Agent not found")
-	})
-
-	// ---------- DeleteAgent ----------
-	t.Run("DeleteAgent - Success", func(t *testing.T) {
-		// Seed
-		bodySeed, _ := json.Marshal(validAgentInput("agent-delete"))
-		reqSeed, _ := http.NewRequest(http.MethodPost, "/agents", bytes.NewBuffer(bodySeed))
-		reqSeed.Header.Set("Content-Type", "application/json")
-		rrSeed := httptest.NewRecorder()
-		router.ServeHTTP(rrSeed, reqSeed)
-		assert.Equal(t, http.StatusCreated, rrSeed.Code)
-
-		req, _ := http.NewRequest(http.MethodDelete, "/agents/agent-delete", nil)
-		rr := httptest.NewRecorder()
-		router.ServeHTTP(rr, req)
-
-		assert.Equal(t, http.StatusOK, rr.Code)
-		assert.Contains(t, rr.Body.String(), "Agent deleted successfully")
-	})
-
-	t.Run("DeleteAgent - Not Found", func(t *testing.T) {
-		req, _ := http.NewRequest(http.MethodDelete, "/agents/no-such-agent", nil)
-		rr := httptest.NewRecorder()
-		router.ServeHTTP(rr, req)
-
-		assert.Equal(t, http.StatusNotFound, rr.Code)
-		assert.Contains(t, rr.Body.String(), "Agent not found")
-	})
+			if tc.name == "Success" {
+				// Verify the agent was deleted from the database
+				var agent agents.Agent
+				result := db.Where("name = ?", tc.agentName).First(&agent)
+				assert.ErrorIs(t, result.Error, gorm.ErrRecordNotFound)
+			}
+		})
+	}
 }

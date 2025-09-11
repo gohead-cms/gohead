@@ -59,16 +59,12 @@ func init() {
 }
 
 func InitializeServer(cfgPath string) (*gin.Engine, error) {
-	// Load configuration
 	cfg, err := config.LoadConfig(cfgPath)
 	if err != nil {
 		return nil, err
 	}
-
-	// Initialize logger
 	logger.InitLogger(cfg.LogLevel)
 
-	// Map to GORM log levels
 	var gormLogLevel gormlogger.LogLevel
 	switch cfg.LogLevel {
 	case "debug":
@@ -83,24 +79,19 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 		gormLogLevel = gormlogger.Silent
 	}
 
-	// Initialize database
 	db, err := database.InitDatabase(cfg.DatabaseURL, gormLogLevel)
 	if err != nil {
 		return nil, err
 	}
-
-	// Migrate
 	if err := migrations.MigrateDatabase(db); err != nil {
 		return nil, err
 	}
 
-	// Seed roles, init JWT, metrics
 	seed.SeedRoles()
 	auth.InitializeJWT(cfg.JWTSecret)
 	metrics.InitMetrics()
 	triggers.StartScheduler()
 
-	// Tracing
 	if cfg.TelemetryEnabled {
 		tracerProvider, err := tracing.InitTracer()
 		if err != nil {
@@ -113,11 +104,6 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 		}()
 	}
 
-	// Init GraphQL
-	// Feature not stable
-	//err = graphql.InitializeGraphQLSchema()
-
-	// Gin mode
 	switch cfg.Mode {
 	case "development":
 		gin.SetMode(gin.DebugMode)
@@ -130,9 +116,7 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	// Create the router
 	router := gin.New()
-
 	logger.Log.WithField("config", cfg).Debug("GoHead Settings")
 	router.Use(ginlogrus.Logger(logger.Log))
 	router.Use(gin.Recovery())
@@ -149,6 +133,13 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
+	// Separate all routing into a dedicated function
+	setupRoutes(router)
+
+	return router, nil
+}
+
+func setupRoutes(router *gin.Engine) {
 	// Public routes
 	authRoutes := router.Group("/auth")
 	{
@@ -157,7 +148,6 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	}
 
 	// ADMIN routes (schema/definition)
-	// Only admin can manage content definitions (e.g., collections & single-types & components)
 	admin := router.Group("/admin")
 	admin.Use(middleware.AuthMiddleware())
 	admin.Use(middleware.AdminOnly())
@@ -205,6 +195,4 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 		content.POST("/singleton/:name", handlers.CreateOrUpdateSingletonItem)
 		content.PUT("/singleton/:name", handlers.CreateOrUpdateSingletonItem)
 	}
-
-	return router, nil
 }
