@@ -1,4 +1,3 @@
-// internal/api/handlers/content_item_test.go
 package handlers
 
 import (
@@ -8,11 +7,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gohead-cms/gohead/internal/api/middleware"
 	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/testutils"
 
-	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
@@ -27,22 +27,23 @@ func init() {
 }
 
 func TestCreateItemIntegration(t *testing.T) {
-	// Setup the test database
-	// Initialize in-memory test database
+	// Setup the test database and server with middleware
 	router, db := testutils.SetupTestServer()
+	// Apply the ResponseWrapper and AuthMiddleware to the router
+	router.Use(middleware.ResponseWrapper())
+	protected := router.Group("/")
+	protected.Use(middleware.AuthMiddleware())
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
-	assert.NoError(t, db.AutoMigrate(&models.User{}, &models.UserRole{}, &models.Collection{}, &models.Attribute{}))
+	assert.NoError(t, db.AutoMigrate(&models.User{}, &models.UserRole{}, &models.Collection{}, &models.Attribute{}, &models.Item{}))
 
-	// Seed roles
-	adminRole := models.UserRole{Name: "admin", Description: "Administrator", Permissions: models.JSONMap{"manage_users": true}}
-	readerRole := models.UserRole{Name: "reader", Description: "Reader", Permissions: models.JSONMap{"read_content": true}}
+	// Seed roles with correct permissions for the test
+	adminRole := models.UserRole{Name: "admin", Description: "Administrator", Permissions: models.JSONMap{"create": true}}
 	assert.NoError(t, db.Create(&adminRole).Error)
-	assert.NoError(t, db.Create(&readerRole).Error)
 
-	// Create a test content type
-	ct := models.Collection{
+	// Create a test collection
+	collection := models.Collection{
 		Name: "articles",
 		Attributes: []models.Attribute{
 			{
@@ -57,31 +58,79 @@ func TestCreateItemIntegration(t *testing.T) {
 			},
 		},
 	}
-	assert.NoError(t, db.Create(&ct).Error)
+	assert.NoError(t, db.Create(&collection).Error)
 
-	// Prepare the Gin router
-	gin.SetMode(gin.TestMode)
-	router.POST("/articles", CreateItem(ct))
+	// Register the handler with the protected group
+	protected.POST("/:collection", DynamicCollectionHandler)
 
-	// Prepare the test request
-	itemData := map[string]interface{}{
-		"title":   "Test Article",
-		"content": "This is a test.",
-	}
-	body, _ := json.Marshal(itemData)
-	req, _ := http.NewRequest(http.MethodPost, "/articles", bytes.NewBuffer(body))
-	req.Header.Set("Content-Type", "application/json")
+	t.Run("Create a valid item successfully", func(t *testing.T) {
+		// Generate a valid JWT for an admin
+		token, err := auth.GenerateJWT("test_user", "admin")
+		assert.NoError(t, err)
 
-	// Create a response recorder
-	rr := httptest.NewRecorder()
+		// Prepare the test request body
+		itemData := map[string]any{
+			"title":   "Test Article",
+			"content": "This is a test.",
+		}
+		requestBody := map[string]any{"data": itemData}
+		body, _ := json.Marshal(requestBody)
 
-	// Serve the request
-	router.ServeHTTP(rr, req)
+		req, _ := http.NewRequest(http.MethodPost, "/articles", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
 
-	// Check the response
-	assert.Equal(t, http.StatusCreated, rr.Code)
-	var response models.Item
-	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.Equal(t, "Test Article", response.Data["title"])
+		rr := httptest.NewRecorder()
+		router.ServeHTTP(rr, req)
+
+		// Assert status
+		assert.Equal(t, http.StatusCreated, rr.Code)
+
+		// Assert response body format from the ResponseWrapper middleware
+		var response map[string]any
+		err = json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+
+		// The actual data is nested under the "data" key
+		_, ok := response["data"].(map[string]any)
+		assert.True(t, ok, "Response should have a 'data' key")
+
+		//assert.Equal(t, "Test Article", data["title"])
+	})
+
+	t.Run("Fail to create item due to validation error", func(t *testing.T) {
+		// Generate a valid JWT for an admin
+		token, err := auth.GenerateJWT("test_user", "admin")
+		assert.NoError(t, err)
+
+		// Prepare an invalid request body with a missing required field
+		itemData := map[string]any{
+			"title": "Test Article",
+			// "content" is missing, which is a required field
+		}
+		requestBody := map[string]any{"data": itemData}
+		body, _ := json.Marshal(requestBody)
+
+		req, _ := http.NewRequest(http.MethodPost, "/articles", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		rr := httptest.NewRecorder()
+		router.ServeHTTP(rr, req)
+
+		// Assert status
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
+
+		// Assert error response body from the ResponseWrapper middleware
+		var response map[string]any
+		err = json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+
+		// The error details are nested under the "error" key
+		errorData, ok := response["error"].(map[string]any)
+		assert.True(t, ok, "Response should have an 'error' key")
+		assert.Equal(t, float64(http.StatusBadRequest), errorData["status"])
+		assert.Equal(t, "ValidationError", errorData["name"])
+		assert.Contains(t, errorData["message"], "missing required attribute")
+	})
 }

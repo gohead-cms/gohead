@@ -33,7 +33,7 @@ func TestValidateSingleItemValues(t *testing.T) {
 	//
 	// 2. Define a SingleType (schema) with various attributes
 	//
-	singleType := SingleType{
+	singleType := Singleton{
 		Name: "homepage",
 		Attributes: []Attribute{
 			{
@@ -134,7 +134,9 @@ func TestValidateSingleItemValues(t *testing.T) {
 }
 
 func TestCheckItemExists_NoSuchCollection(t *testing.T) {
-
+	logger.InitLogger("info") // or "debug", depending on how much log noise you want
+	db := setupDatabase(t)
+	assert.NotNil(t, db, "DB instance should not be nil")
 	err := checkItemExists(999, 1)
 	assert.Error(t, err, "collection 999 does not exist, so it can't have item 1")
 }

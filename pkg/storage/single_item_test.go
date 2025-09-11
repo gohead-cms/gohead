@@ -18,9 +18,9 @@ func TestSingleItemStorage(t *testing.T) {
 	assert.NotNil(t, db)
 
 	//
-	// 1. Create a SingleType with a required attribute
+	// 1. Create a Singleton with a required attribute
 	//
-	singleType := models.SingleType{
+	Singleton := models.Singleton{
 		Name: "homepage",
 		Attributes: []models.Attribute{
 			{
@@ -30,27 +30,27 @@ func TestSingleItemStorage(t *testing.T) {
 			},
 		},
 	}
-	err := db.Create(&singleType).Error
-	require.NoError(t, err, "failed to create singleType 'homepage'")
+	err := db.Create(&Singleton).Error
+	require.NoError(t, err, "failed to create Singleton 'homepage'")
 
 	t.Run("CreateSingleItem - success", func(t *testing.T) {
 		content := map[string]interface{}{
 			"title": "Welcome to Our Site",
 		}
-		item, err := storage.CreateSingleItem(&singleType, content)
+		item, err := storage.CreateSingleItem(&Singleton, content)
 		assert.NoError(t, err, "should create single item without conflict")
 		assert.NotNil(t, item, "item should not be nil")
 		assert.NotZero(t, item.ID, "new single item should have an ID")
-		assert.Equal(t, singleType.ID, item.SingleTypeID)
+		assert.Equal(t, Singleton.ID, item.SingleTypeID)
 		assert.Equal(t, content["title"], item.Data["title"])
 	})
 
 	t.Run("CreateSingleItem - conflict", func(t *testing.T) {
-		// Attempt to create another item for the same singleType => conflict
+		// Attempt to create another item for the same Singleton => conflict
 		duplicateContent := map[string]interface{}{
 			"title": "Another Attempt",
 		}
-		item, err := storage.CreateSingleItem(&singleType, duplicateContent)
+		item, err := storage.CreateSingleItem(&Singleton, duplicateContent)
 		assert.Error(t, err, "should fail because an item already exists for 'homepage'")
 		assert.Nil(t, item)
 		assert.Contains(t, err.Error(), "already exists")
@@ -99,14 +99,14 @@ func TestSingleItemStorage(t *testing.T) {
 
 	t.Run("UpdateSingleItem - no existing single item", func(t *testing.T) {
 		// Create a new single type
-		anotherType := models.SingleType{
+		anotherType := models.Singleton{
 			Name: "about-us",
 			Attributes: []models.Attribute{
 				{Name: "title", Type: "string", Required: true},
 			},
 		}
 		err := db.Create(&anotherType).Error
-		require.NoError(t, err, "failed to create singleType 'about-us'")
+		require.NoError(t, err, "failed to create Singleton 'about-us'")
 
 		newData := map[string]interface{}{
 			"title": "About Us Page",
@@ -145,8 +145,8 @@ func TestSingleItemStorage(t *testing.T) {
 func TestCheckValidationFails(t *testing.T) {
 	db := setupTestDB(t)
 
-	// Create SingleType with a required attribute
-	st := models.SingleType{
+	// Create Singleton with a required attribute
+	st := models.Singleton{
 		Name: "contact",
 		Attributes: []models.Attribute{
 			{Name: "email", Type: "string", Required: true},

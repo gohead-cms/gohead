@@ -30,8 +30,8 @@ type Attribute struct {
 	CollectionID *uint       `json:"collection_id,omitempty"`
 	Collection   *Collection `json:"-" gorm:"constraint:OnDelete:CASCADE;"`
 
-	SingleTypeID *uint       `json:"single_type_id,omitempty"`
-	SingleType   *SingleType `json:"-" gorm:"constraint:OnDelete:CASCADE;"`
+	SingletonID *uint      `json:"single_type_id,omitempty"`
+	Singleton   *Singleton `json:"-" gorm:"constraint:OnDelete:CASCADE;"`
 
 	ComponentID *uint      `json:"component_id,omitempty"`
 	Component   *Component `json:"-" gorm:"constraint:OnDelete:CASCADE;"`
@@ -44,7 +44,7 @@ func (attr *Attribute) ValidateParent() error {
 	if attr.CollectionID != nil {
 		parentsSet++
 	}
-	if attr.SingleTypeID != nil {
+	if attr.SingletonID != nil {
 		parentsSet++
 	}
 	if attr.ComponentID != nil {

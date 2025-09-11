@@ -11,14 +11,14 @@ import (
 	"gorm.io/gorm"
 )
 
-// SaveOrUpdateSingleType either creates a new single type or updates/restores
+// SaveOrUpdateSingleton either creates a new single type or updates/restores
 // a previously soft-deleted record with the same name.
 //
 // This mimics the "single type" behavior in Strapi (one record per name).
-func SaveOrUpdateSingleType(st *models.SingleType) error {
-	var existing models.SingleType
+func SaveOrUpdateSingleton(st *models.Singleton) error {
+	var existing models.Singleton
 
-	logger.Log.WithField("singleType", st.Name).Info("Attempting to save or update single type")
+	logger.Log.WithField("Singleton", st.Name).Info("Attempting to save or update single type")
 
 	// Check if a record with the same name exists (including soft-deleted)
 	err := database.DB.Unscoped().Where("name = ?", st.Name).First(&existing).Error
@@ -26,80 +26,80 @@ func SaveOrUpdateSingleType(st *models.SingleType) error {
 		// A single type with this name exists
 		if !existing.DeletedAt.Valid {
 			// Not soft-deleted => we update the single type
-			logger.Log.WithField("singleType", st.Name).Info("Single type exists, updating it")
+			logger.Log.WithField("Singleton", st.Name).Info("Single type exists, updating it")
 
 			// Copy updatable fields; preserve ID & Timestamps
 			existing.Description = st.Description
 
 			// Start transaction to update attributes, etc.
 			tx := database.DB.Begin()
-			if err := updateSingleTypeAttributes(tx, &existing, st.Attributes); err != nil {
-				logger.Log.WithError(err).WithField("singleType", st.Name).Error("Failed to update attributes")
+			if err := updateSingletonAttributes(tx, &existing, st.Attributes); err != nil {
+				logger.Log.WithError(err).WithField("Singleton", st.Name).Error("Failed to update attributes")
 				tx.Rollback()
 				return fmt.Errorf("failed to update single type attributes: %w", err)
 			}
 
 			if err := tx.Save(&existing).Error; err != nil {
-				logger.Log.WithError(err).WithField("singleType", st.Name).Error("Failed to save existing single type")
+				logger.Log.WithError(err).WithField("Singleton", st.Name).Error("Failed to save existing single type")
 				tx.Rollback()
 				return fmt.Errorf("failed to save existing single type: %w", err)
 			}
 
 			if err := tx.Commit().Error; err != nil {
-				logger.Log.WithError(err).WithField("singleType", st.Name).Error("Failed to commit transaction")
+				logger.Log.WithError(err).WithField("Singleton", st.Name).Error("Failed to commit transaction")
 				return fmt.Errorf("failed to commit single type update transaction: %w", err)
 			}
 
-			logger.Log.WithField("singleType", st.Name).Info("Single type updated successfully")
+			logger.Log.WithField("Singleton", st.Name).Info("Single type updated successfully")
 			return nil
 		}
 
 		// The single type is soft-deleted; restore it
-		logger.Log.WithField("singleType", st.Name).Info("Found soft-deleted single type, restoring")
+		logger.Log.WithField("Singleton", st.Name).Info("Found soft-deleted single type, restoring")
 
 		existing.DeletedAt.Valid = false // Clear the deleted_at flag
 		if err := database.DB.Unscoped().Save(&existing).Error; err != nil {
-			logger.Log.WithError(err).WithField("singleType", st.Name).Error("Failed to restore single type")
+			logger.Log.WithError(err).WithField("Singleton", st.Name).Error("Failed to restore single type")
 			return fmt.Errorf("failed to restore single type: %w", err)
 		}
 
 		// Restore associated attributes
 		if err := restoreAssociatedRecords(&models.Attribute{}, existing.ID); err != nil {
-			logger.Log.WithError(err).WithField("singleType", st.Name).Error("Failed to restore associated attributes")
+			logger.Log.WithError(err).WithField("Singleton", st.Name).Error("Failed to restore associated attributes")
 			return fmt.Errorf("failed to restore associated attributes: %w", err)
 		}
 
-		logger.Log.WithField("singleType", st.Name).Info("Single type restored successfully")
+		logger.Log.WithField("Singleton", st.Name).Info("Single type restored successfully")
 		return nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		// An unexpected error occurred
-		logger.Log.WithError(err).WithField("singleType", st.Name).Error("Failed to check for existing single type")
+		logger.Log.WithError(err).WithField("Singleton", st.Name).Error("Failed to check for existing single type")
 		return fmt.Errorf("failed to check for existing single type: %w", err)
 	}
 
 	// If we reach here, record not found => create a new single type
-	logger.Log.WithField("singleType", st.Name).Info("Creating new single type")
+	logger.Log.WithField("Singleton", st.Name).Info("Creating new single type")
 
 	tx := database.DB.Begin()
 	if err := tx.Create(st).Error; err != nil {
 		tx.Rollback()
-		logger.Log.WithError(err).WithField("singleType", st.Name).Error("Failed to create single type")
+		logger.Log.WithError(err).WithField("Singleton", st.Name).Error("Failed to create single type")
 		return fmt.Errorf("failed to create single type: %w", err)
 	}
 
 	// Commit creation
 	if err := tx.Commit().Error; err != nil {
-		logger.Log.WithError(err).WithField("singleType", st.Name).Error("Failed to commit transaction for new single type")
+		logger.Log.WithError(err).WithField("Singleton", st.Name).Error("Failed to commit transaction for new single type")
 		return fmt.Errorf("failed to commit transaction for new single type: %w", err)
 	}
 
-	logger.Log.WithField("singleType", st.Name).Info("Single type created successfully")
+	logger.Log.WithField("Singleton", st.Name).Info("Single type created successfully")
 	return nil
 }
 
-// GetSingleTypeByName retrieves a single type by its name (including associated attributes).
-func GetSingleTypeByName(name string) (*models.SingleType, error) {
-	var st models.SingleType
+// GetSingletonByName retrieves a single type by its name (including associated attributes).
+func GetSingletonByName(name string) (*models.Singleton, error) {
+	var st models.Singleton
 
 	// Preload the 'Attributes' relationship
 	if err := database.DB.
@@ -118,16 +118,16 @@ func GetSingleTypeByName(name string) (*models.SingleType, error) {
 		return nil, fmt.Errorf("failed to fetch single type '%s': %w", name, err)
 	}
 
-	logger.Log.WithField("singleType", st.Name).
+	logger.Log.WithField("Singleton", st.Name).
 		Info("Single type fetch successfully")
 	return &st, nil
 }
 
-// DeleteSingleType permanently deletes a single type by its ID (including attributes).
+// DeleteSingleton permanently deletes a single type by its ID (including attributes).
 // Note: Strapi typically doesn't expose DELETE for single types, but you can implement it if needed.
-func DeleteSingleType(singleTypeID uint) error {
+func DeleteSingleton(SingletonID uint) error {
 	tx := database.DB.Begin()
-	logger.Log.WithField("single_type_id", singleTypeID).Info("DeleteSingleType: start deletion")
+	logger.Log.WithField("single_type_id", SingletonID).Info("DeleteSingleton: start deletion")
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -137,38 +137,38 @@ func DeleteSingleType(singleTypeID uint) error {
 	}()
 
 	// Retrieve the single type
-	var st models.SingleType
-	if err := tx.Where("id = ?", singleTypeID).First(&st).Error; err != nil {
+	var st models.Singleton
+	if err := tx.Where("id = ?", SingletonID).First(&st).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			tx.Rollback()
-			logger.Log.WithField("single_type_id", singleTypeID).Warn("DeleteSingleType: single type not found")
-			return fmt.Errorf("single type with ID '%d' not found", singleTypeID)
+			logger.Log.WithField("single_type_id", SingletonID).Warn("DeleteSingleton: single type not found")
+			return fmt.Errorf("single type with ID '%d' not found", SingletonID)
 		}
 		tx.Rollback()
 		return fmt.Errorf("failed to retrieve single type: %w", err)
 	}
 
-	logger.Log.WithField("singleType", st.Name).Info("DeleteSingleType: successfully retrieved single type")
+	logger.Log.WithField("Singleton", st.Name).Info("DeleteSingleton: successfully retrieved single type")
 
 	// Delete associated attributes
-	if err := tx.Where("single_type_id = ?", singleTypeID).Delete(&models.Attribute{}).Error; err != nil {
+	if err := tx.Where("single_type_id = ?", SingletonID).Delete(&models.Attribute{}).Error; err != nil {
 		tx.Rollback()
-		return fmt.Errorf("failed to delete attributes for single type ID '%d': %w", singleTypeID, err)
+		return fmt.Errorf("failed to delete attributes for single type ID '%d': %w", SingletonID, err)
 	}
-	logger.Log.WithField("single_type_id", singleTypeID).Info("DeleteSingleType: deleted associated attributes")
+	logger.Log.WithField("single_type_id", SingletonID).Info("DeleteSingleton: deleted associated attributes")
 
 	// Delete the single type
 	if err := tx.Delete(&st).Error; err != nil {
 		tx.Rollback()
-		return fmt.Errorf("failed to delete single type with ID '%d': %w", singleTypeID, err)
+		return fmt.Errorf("failed to delete single type with ID '%d': %w", SingletonID, err)
 	}
 
 	if err := tx.Commit().Error; err != nil {
-		logger.Log.WithError(err).WithField("singleType", st.Name).Error("Failed to commit transaction for single type deletion")
+		logger.Log.WithError(err).WithField("Singleton", st.Name).Error("Failed to commit transaction for single type deletion")
 		return fmt.Errorf("failed to commit transaction for single type deletion: %w", err)
 	}
 
-	logger.Log.WithField("singleType", st.Name).Info("Single type deleted successfully")
+	logger.Log.WithField("Singleton", st.Name).Info("Single type deleted successfully")
 	return nil
 }
 
@@ -180,9 +180,9 @@ func DeleteSingleType(singleTypeID uint) error {
 // 		Update("deleted_at", nil).Error
 // }
 
-// updateSingleTypeAttributes handles creating/updating attributes for a single type within a transaction.
+// updateSingletonAttributes handles creating/updating attributes for a single type within a transaction.
 // Similar to `updateAssociatedFields` for collections, but keyed on `single_type_id`.
-func updateSingleTypeAttributes(tx *gorm.DB, existing *models.SingleType, updatedAttributes []models.Attribute) error {
+func updateSingletonAttributes(tx *gorm.DB, existing *models.Singleton, updatedAttributes []models.Attribute) error {
 	// Fetch existing attributes
 	var existingAttrs []models.Attribute
 	if err := tx.Where("single_type_id = ?", existing.ID).Find(&existingAttrs).Error; err != nil {
@@ -200,7 +200,7 @@ func updateSingleTypeAttributes(tx *gorm.DB, existing *models.SingleType, update
 		if existingAttr, ok := existingMap[updatedAttr.Name]; ok {
 			// Update existing
 			updatedAttr.ID = existingAttr.ID
-			updatedAttr.SingleTypeID = &existing.ID
+			updatedAttr.SingletonID = &existing.ID
 			updatedAttr.CollectionID = nil // ensure we don't mix collection vs single type
 			if err := tx.Save(&updatedAttr).Error; err != nil {
 				return fmt.Errorf("failed to update single type attribute '%s': %w", updatedAttr.Name, err)
@@ -208,7 +208,7 @@ func updateSingleTypeAttributes(tx *gorm.DB, existing *models.SingleType, update
 			delete(existingMap, updatedAttr.Name)
 		} else {
 			// Insert new
-			updatedAttr.SingleTypeID = &existing.ID
+			updatedAttr.SingletonID = &existing.ID
 			updatedAttr.CollectionID = nil
 			if err := tx.Create(&updatedAttr).Error; err != nil {
 				return fmt.Errorf("failed to create single type attribute '%s': %w", updatedAttr.Name, err)

@@ -11,17 +11,15 @@ import (
 	"gorm.io/gorm"
 )
 
-// SingleItem holds the actual content for a SingleType.
 type SingleItem struct {
 	gorm.Model
-	SingleTypeID uint       `json:"single_type_id" gorm:"uniqueIndex"`
-	SingleType   SingleType `json:"-" gorm:"constraint:OnDelete:CASCADE;"`
-
-	Data JSONMap `json:"data" gorm:"type:json"`
+	SingleTypeID uint      `json:"single_type_id" gorm:"uniqueIndex"`
+	SingleType   Singleton `json:"-" gorm:"constraint:OnDelete:CASCADE;foreignKey:SingleTypeID;references:ID"`
+	Data         JSONMap   `json:"data" gorm:"type:json"`
 }
 
 // ValidateSingleItemValues validates a single item's data against the SingleType's schema (attributes).
-func ValidateSingleItemValues(st SingleType, itemData map[string]any) error {
+func ValidateSingleItemValues(st Singleton, itemData map[string]any) error {
 	// 1. Build a set of valid attribute names
 	validAttributes := make(map[string]Attribute, len(st.Attributes))
 	for _, attr := range st.Attributes {

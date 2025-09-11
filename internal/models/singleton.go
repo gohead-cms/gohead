@@ -11,7 +11,9 @@ import (
 	"gorm.io/gorm"
 )
 
-type SingleType struct {
+// Singleton represents a content structure that has only one instance.
+// e.g., a homepage, site settings, or a header.
+type Singleton struct {
 	gorm.Model
 	ID          uint        `json:"id"`
 	Name        string      `json:"name" gorm:"uniqueIndex"`
@@ -19,53 +21,53 @@ type SingleType struct {
 	Attributes  []Attribute `json:"attributes" gorm:"constraint:OnDelete:CASCADE;"`
 }
 
-// ParseSingleTypeInput transforms a generic map input into a SingleType struct.
-// It mirrors the logic from ParseCollectionInput but adapts for single types.
-func ParseSingleTypeInput(input map[string]interface{}) (SingleType, error) {
-	var st SingleType
+// ParseSingletonInput transforms a generic map input into a Singleton struct.
+func ParseSingletonInput(input map[string]interface{}) (Singleton, error) {
+	var singleton Singleton
 
 	// Extract basic fields
 	if name, ok := input["name"].(string); ok {
-		st.Name = name
+		singleton.Name = name
 	}
 	if description, ok := input["description"].(string); ok {
-		st.Description = description
+		singleton.Description = description
 	}
 
 	// Attributes are expected to be a map of attributeName -> attributeDefinition
 	rawAttributes, hasAttributes := input["attributes"].(map[string]interface{})
 	if !hasAttributes {
-		return st, fmt.Errorf("missing or invalid 'attributes' field")
+		return singleton, fmt.Errorf("missing or invalid 'attributes' field")
 	}
 
 	for attrName, rawAttr := range rawAttributes {
 		attrMap, validMap := rawAttr.(map[string]interface{})
 		if !validMap {
-			return st, fmt.Errorf("invalid attribute format for '%s'", attrName)
+			return singleton, fmt.Errorf("invalid attribute format for '%s'", attrName)
 		}
-
-		attribute := Attribute{Name: attrName, SingleTypeID: &st.ID}
+		// NOTE: Assumes the Attribute model will be updated to have a SingletonID field.
+		attribute := Attribute{Name: attrName, SingletonID: &singleton.ID}
 		if err := mapToAttribute(attrMap, &attribute); err != nil {
-			return st, fmt.Errorf("failed to parse attribute '%s': %v", attrName, err)
+			return singleton, fmt.Errorf("failed to parse attribute '%s': %v", attrName, err)
 		}
 
-		st.Attributes = append(st.Attributes, attribute)
+		singleton.Attributes = append(singleton.Attributes, attribute)
 	}
 
-	return st, nil
+	return singleton, nil
 }
 
-func ValidateSingleTypeSchema(st SingleType) error {
-	if st.Name == "" {
+// ValidateSingletonSchema ensures the structure of a singleton is valid.
+func ValidateSingletonSchema(singleton Singleton) error {
+	if singleton.Name == "" {
 		return errors.New("missing required field: 'name'")
 	}
 
-	if len(st.Attributes) == 0 {
-		return errors.New("attributes array cannot be empty for a single type")
+	if len(singleton.Attributes) == 0 {
+		return errors.New("attributes array cannot be empty for a singleton")
 	}
 
 	seen := make(map[string]bool)
-	for _, attr := range st.Attributes {
+	for _, attr := range singleton.Attributes {
 		if seen[attr.Name] {
 			return fmt.Errorf("duplicate attribute name: '%s'", attr.Name)
 		}
@@ -99,10 +101,11 @@ func ValidateSingleTypeSchema(st SingleType) error {
 	return nil
 }
 
-func ValidateSingleTypeValues(st SingleType, data map[string]interface{}) error {
+// ValidateSingletonValues checks if provided data conforms to the singleton's schema.
+func ValidateSingletonValues(singleton Singleton, data map[string]interface{}) error {
 	// 1. Build a set of valid attribute names
-	validAttributes := make(map[string]Attribute, len(st.Attributes))
-	for _, attr := range st.Attributes {
+	validAttributes := make(map[string]Attribute, len(singleton.Attributes))
+	for _, attr := range singleton.Attributes {
 		validAttributes[attr.Name] = attr
 	}
 
@@ -115,7 +118,7 @@ func ValidateSingleTypeValues(st SingleType, data map[string]interface{}) error 
 	}
 
 	// 3. For each attribute in the schema, check required & apply pattern checks
-	for _, attribute := range st.Attributes {
+	for _, attribute := range singleton.Attributes {
 		val, exists := data[attribute.Name]
 
 		// Check for required attributes
@@ -124,11 +127,9 @@ func ValidateSingleTypeValues(st SingleType, data map[string]interface{}) error 
 			return fmt.Errorf("missing required attribute: '%s'", attribute.Name)
 		}
 		if !exists {
-			// Not required & not provided => skip further checks
 			continue
 		}
 
-		// If there's a pattern, validate only if the attribute's type is "string"
 		if attribute.Pattern != "" && attribute.Type == "string" {
 			strVal, err := ensureString(val)
 			if err != nil {
@@ -141,11 +142,9 @@ func ValidateSingleTypeValues(st SingleType, data map[string]interface{}) error 
 				return matchErr
 			}
 		}
-
-		// If you have other checks (e.g., type checks, min/max length, etc.), do them here.
 	}
 
-	logger.Log.WithField("singleType", st.Name).Debug("SingleType data validation passed")
+	logger.Log.WithField("singleton", singleton.Name).Debug("Singleton data validation passed")
 	return nil
 }
 

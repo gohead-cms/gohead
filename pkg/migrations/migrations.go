@@ -11,7 +11,7 @@ func MigrateDatabase(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&models.Collection{},
 		&models.Attribute{},
-		&models.SingleType{},
+		&models.Singleton{},
 		&models.SingleItem{},
 		&models.Item{},
 		&models.User{},

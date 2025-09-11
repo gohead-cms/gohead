@@ -7,7 +7,7 @@ import (
 
 	"github.com/gohead-cms/gohead/internal/api/handlers"
 	"github.com/gohead-cms/gohead/internal/api/middleware"
-	"github.com/gohead-cms/gohead/pkg/agents/triggers"
+	"github.com/gohead-cms/gohead/pkg/agent/triggers"
 	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/config"
 	"github.com/gohead-cms/gohead/pkg/database"
@@ -170,10 +170,10 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 		admin.DELETE("/collections/:name", handlers.DeleteCollection)
 
 		// Single Types admin endpoints
-		admin.POST("/single-types", handlers.CreateOrUpdateSingleType)
-		admin.GET("/single-types/:name", handlers.GetSingleType)
-		admin.PUT("/single-types/:name", handlers.CreateOrUpdateSingleType)
-		admin.DELETE("/single-types/:name", handlers.DeleteSingleType)
+		admin.POST("/singleton", handlers.CreateOrUpdateSingleton)
+		admin.GET("/singleton/:name", handlers.GetSingleton)
+		admin.PUT("/singleton/:name", handlers.CreateOrUpdateSingleton)
+		admin.DELETE("/singleton/:name", handlers.DeleteSingleton)
 
 		// Component admin endpoints
 		admin.POST("/components", handlers.CreateComponent)
@@ -201,9 +201,9 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 		// Collections & Single Types dynamic handlers
 		content.Any("/collections/:collection", handlers.DynamicCollectionHandler)
 		content.Any("/collections/:collection/:id", handlers.DynamicCollectionHandler)
-		content.GET("/single-types/:name", handlers.GetSingleItem)
-		content.POST("/single-types/:name", handlers.CreateOrUpdateSingleTypeItem)
-		content.PUT("/single-types/:name", handlers.CreateOrUpdateSingleTypeItem)
+		content.GET("/singleton/:name", handlers.GetSingleItem)
+		content.POST("/singleton/:name", handlers.CreateOrUpdateSingletonItem)
+		content.PUT("/singleton/:name", handlers.CreateOrUpdateSingletonItem)
 	}
 
 	return router, nil

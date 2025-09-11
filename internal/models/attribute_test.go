@@ -28,7 +28,7 @@ func setupDatabase(t *testing.T) *gorm.DB {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err, "failed to connect to in-memory database")
 	database.DB = db
-	err = db.AutoMigrate(&Collection{}, &Item{}, &SingleType{}, &SingleItem{}, &Attribute{})
+	err = db.AutoMigrate(&Collection{}, &Item{}, &Singleton{}, &SingleItem{}, &Attribute{})
 	require.NoError(t, err, "failed to auto-migrate schema")
 	return db
 }
