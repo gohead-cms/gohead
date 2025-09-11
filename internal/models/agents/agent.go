@@ -164,7 +164,7 @@ func (f *FunctionSpecs) Scan(value any) error {
 }
 
 // ParseAgentInput parses a generic map into a typed Agent struct.
-// It handles potential data type mismatches gracefully.
+// It handles potential data type mismatches gracefully and then validates the schema.
 func ParseAgentInput(input map[string]any) (Agent, error) {
 	var agent Agent
 	b, err := json.Marshal(input)
@@ -173,6 +173,10 @@ func ParseAgentInput(input map[string]any) (Agent, error) {
 	}
 	if err := json.Unmarshal(b, &agent); err != nil {
 		return agent, fmt.Errorf("invalid agent input format: %w", err)
+	}
+
+	if err := ValidateAgentSchema(agent); err != nil {
+		return agent, err
 	}
 
 	return agent, nil

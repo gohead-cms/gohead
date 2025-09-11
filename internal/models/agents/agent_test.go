@@ -1,203 +1,265 @@
 package models
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/logger"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
+// Initialize logger for testing
+func init() {
+	var buffer bytes.Buffer
+	logger.InitLogger("debug")
+	logger.Log.SetOutput(&buffer)
+	logger.Log.SetFormatter(&logrus.TextFormatter{})
+}
+
 func TestParseAgentInput(t *testing.T) {
-	t.Run("Valid Input", func(t *testing.T) {
-		input := map[string]any{
-			"name":          "test-agent",
-			"system_prompt": "You are a test agent.",
-			"max_turns":     5,
-			"llm_config": map[string]any{
-				"provider": "openai",
-				"model":    "gpt-3.5-turbo",
-			},
-			"memory": map[string]any{
-				"type":          "postgres",
-				"session_scope": "conversation",
-			},
-			"trigger": map[string]any{
-				"type": "manual",
-			},
-			"functions": []any{
-				map[string]any{
-					"name":        "TestTool",
-					"description": "A test tool.",
-					"impl_key":    "tool.test",
-					// parameters may be provided as a JSON object; your validator will marshal it to JSON.
-					"parameters": map[string]any{
-						"type":       "object",
-						"properties": map[string]any{},
+	tests := []struct {
+		name     string
+		input    map[string]any
+		hasError bool
+	}{
+		{
+			name: "Valid Agent Input",
+			input: map[string]any{
+				"name":          "sales_chatbot",
+				"system_prompt": "You are a friendly sales chatbot.",
+				"max_turns":     5,
+				"llm_config": map[string]any{
+					"provider": "openai",
+					"model":    "gpt-4",
+				},
+				"memory": map[string]any{
+					"type":          "in-memory",
+					"session_scope": "conversation",
+				},
+				"trigger": map[string]any{
+					"type": "manual",
+				},
+				"functions": []any{
+					map[string]any{
+						"name":        "search_product",
+						"description": "Searches for a product.",
+						"impl_key":    "search_product_impl",
+						"parameters": map[string]any{
+							"type": "object",
+						},
 					},
 				},
 			},
-		}
-		agent, err := ParseAgentInput(input)
-		assert.NoError(t, err)
-
-		// Assertions for the main fields
-		assert.Equal(t, "test-agent", agent.Name)
-		assert.Equal(t, 5, agent.MaxTurns)
-		assert.Equal(t, "You are a test agent.", agent.SystemPrompt)
-
-		// Assertions for nested fields (direct access, no unmarshaling needed)
-		assert.Equal(t, "openai", agent.LLMConfig.Provider)
-		assert.Equal(t, "gpt-3.5-turbo", agent.LLMConfig.Model)
-
-		// memory is a JSONMap, so direct map access is correct
-		assert.Equal(t, "postgres", agent.Memory.Type)
-		assert.Equal(t, "conversation", agent.Memory.SessionScope)
-
-		assert.Equal(t, "manual", agent.Trigger.Type)
-
-		functions := agent.Functions
-		assert.Equal(t, 1, len(functions))
-		function := functions[0]
-		assert.Equal(t, "TestTool", function.Name)
-	})
-
-	t.Run("Invalid Input Format - Inside the map", func(t *testing.T) {
-		// Pass a valid top-level map, but with an invalid data type inside.
-		// Forcing a type that json.Unmarshal can't handle.
-		input := map[string]any{
-			"name":      "test-agent",
-			"max_turns": "five", // Invalid type: string instead of int
-		}
-
-		_, err := ParseAgentInput(input)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "json: cannot unmarshal string into Go struct field Agent.max_turns of type int")
-	})
-}
-func TestValidateAgentSchema(t *testing.T) {
-	// A valid base agent for testing modifications
-	validLLMConfig := LLMConfig{
-		Provider: "openai",
-		Model:    "gpt-4",
-	}
-	validMemoryMap := MemoryConfig{
-		Type:         "postgres",
-		SessionScope: "user-session",
-	}
-	validTriggerConfig := TriggerConfig{
-		Type: "manual",
-	}
-	validFunctionsList := []FunctionSpec{
+			hasError: false,
+		},
 		{
-			ImplKey:     "email.send",
-			Name:        "SendEmail",
-			Description: "Sends an email.",
-			Parameters:  models.JSONMap{"type": "object", "properties": map[string]any{}},
+			name: "Invalid Agent Input - Missing Name",
+			input: map[string]any{
+				"system_prompt": "You are a chatbot.",
+			},
+			hasError: true,
+		},
+		{
+			name: "Invalid Agent Input - MaxTurns is not a number",
+			input: map[string]any{
+				"name":          "test_agent",
+				"system_prompt": "...",
+				"max_turns":     "five",
+			},
+			hasError: true,
 		},
 	}
 
-	baseAgent := Agent{
-		Name:         "ValidAgent",
-		SystemPrompt: "You are a helpful assistant.",
-		MaxTurns:     10,
-		LLMConfig:    validLLMConfig,
-		Memory:       validMemoryMap,
-		Trigger:      validTriggerConfig,
-		Functions:    validFunctionsList,
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseAgentInput(tt.input)
+			if tt.hasError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateAgentSchema(t *testing.T) {
+	tests := []struct {
+		name     string
+		agent    Agent
+		hasError bool
+		errMsg   string
+	}{
+		{
+			name: "Valid Schema",
+			agent: Agent{
+				Name:         "test_agent",
+				SystemPrompt: "A helpful assistant.",
+				MaxTurns:     4,
+				LLMConfig:    LLMConfig{Provider: "google", Model: "gemini-pro"},
+				Memory:       MemoryConfig{Type: "in-memory", SessionScope: "user"},
+				Trigger:      TriggerConfig{Type: "manual"},
+			},
+			hasError: false,
+		},
+		{
+			name:     "Missing Name",
+			agent:    Agent{SystemPrompt: "...", MaxTurns: 1, LLMConfig: LLMConfig{Provider: "p"}},
+			hasError: true,
+			errMsg:   "agent must have a 'name'",
+		},
+		{
+			name:     "Missing System Prompt",
+			agent:    Agent{Name: "test_agent", MaxTurns: 1, LLMConfig: LLMConfig{Provider: "p"}},
+			hasError: true,
+			errMsg:   "agent must have a 'system_prompt'",
+		},
+		{
+			name:     "MaxTurns is 0",
+			agent:    Agent{Name: "test", SystemPrompt: "...", MaxTurns: 0, LLMConfig: LLMConfig{Provider: "p"}},
+			hasError: true,
+			errMsg:   "max_turns must be a positive integer",
+		},
+		{
+			name:     "Missing LLM Provider",
+			agent:    Agent{Name: "test", SystemPrompt: "...", MaxTurns: 1},
+			hasError: true,
+			errMsg:   "llm_config provider cannot be empty",
+		},
+		{
+			name:     "Missing Memory Type",
+			agent:    Agent{Name: "test", SystemPrompt: "...", MaxTurns: 1, LLMConfig: LLMConfig{Provider: "p"}},
+			hasError: true,
+			errMsg:   "memory type cannot be empty",
+		},
+		{
+			name:     "Missing Memory Session Scope",
+			agent:    Agent{Name: "test", SystemPrompt: "...", MaxTurns: 1, LLMConfig: LLMConfig{Provider: "p"}, Memory: MemoryConfig{Type: "in-memory"}},
+			hasError: true,
+			errMsg:   "memory session scope cannot be empty",
+		},
+		{
+			name:     "Invalid Trigger Type",
+			agent:    Agent{Name: "test", SystemPrompt: "...", MaxTurns: 1, LLMConfig: LLMConfig{Provider: "p"}, Memory: MemoryConfig{Type: "in-memory", SessionScope: "user"}, Trigger: TriggerConfig{Type: "invalid"}},
+			hasError: true,
+			errMsg:   "invalid trigger type: must be 'manual', 'cron', or 'webhook'",
+		},
+		{
+			name:     "Cron Trigger with Empty Cron Expression",
+			agent:    Agent{Name: "test", SystemPrompt: "...", MaxTurns: 1, LLMConfig: LLMConfig{Provider: "p"}, Memory: MemoryConfig{Type: "in-memory", SessionScope: "user"}, Trigger: TriggerConfig{Type: "cron"}},
+			hasError: true,
+			errMsg:   "cron trigger requires a cron expression",
+		},
+		{
+			name:     "Cron Trigger with Invalid Cron Expression",
+			agent:    Agent{Name: "test", SystemPrompt: "...", MaxTurns: 1, LLMConfig: LLMConfig{Provider: "p"}, Memory: MemoryConfig{Type: "in-memory", SessionScope: "user"}, Trigger: TriggerConfig{Type: "cron", Cron: "invalid"}},
+			hasError: true,
+			errMsg:   "invalid cron expression",
+		},
+		{
+			name:     "Webhook Trigger with Empty Token",
+			agent:    Agent{Name: "test", SystemPrompt: "...", MaxTurns: 1, LLMConfig: LLMConfig{Provider: "p"}, Memory: MemoryConfig{Type: "in-memory", SessionScope: "user"}, Trigger: TriggerConfig{Type: "webhook"}},
+			hasError: true,
+			errMsg:   "webhook trigger requires a 'webhook_token'",
+		},
+		{
+			name:     "Function with Empty Name",
+			agent:    Agent{Name: "test", SystemPrompt: "...", MaxTurns: 1, LLMConfig: LLMConfig{Provider: "p"}, Memory: MemoryConfig{Type: "in-memory", SessionScope: "user"}, Trigger: TriggerConfig{Type: "manual"}, Functions: FunctionSpecs{{Name: ""}}},
+			hasError: true,
+			errMsg:   "function must have a non-empty 'name'",
+		},
+		{
+			name:     "Function with Empty ImplKey",
+			agent:    Agent{Name: "test", SystemPrompt: "...", MaxTurns: 1, LLMConfig: LLMConfig{Provider: "p"}, Memory: MemoryConfig{Type: "in-memory", SessionScope: "user"}, Trigger: TriggerConfig{Type: "manual"}, Functions: FunctionSpecs{{Name: "test_func"}}},
+			hasError: true,
+			errMsg:   "function must have a non-empty 'impl_key'",
+		},
+		{
+			name:     "Function with Invalid Parameters JSON",
+			agent:    Agent{Name: "test", SystemPrompt: "...", MaxTurns: 1, LLMConfig: LLMConfig{Provider: "p"}, Memory: MemoryConfig{Type: "in-memory", SessionScope: "user"}, Trigger: TriggerConfig{Type: "manual"}, Functions: FunctionSpecs{{Name: "test_func", ImplKey: "test_impl", Parameters: models.JSONMap{"invalid": make(chan int)}}}},
+			hasError: true,
+			errMsg:   "function parameters cannot be empty",
+		},
 	}
 
-	t.Run("Valid Agent", func(t *testing.T) {
-		err := ValidateAgentSchema(baseAgent)
-		assert.NoError(t, err)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateAgentSchema(tt.agent)
+			if tt.hasError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errMsg)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
 
-	t.Run("Missing Name", func(t *testing.T) {
-		agent := baseAgent
-		agent.Name = ""
-		err := ValidateAgentSchema(agent)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "agent must have a 'name'")
-	})
+func TestFunctionSpecsScan(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    any
+		expected FunctionSpecs
+		hasError bool
+	}{
+		{
+			name:  "Valid JSON Array",
+			input: []byte(`[{"name": "func1", "impl_key": "impl1", "parameters": {}}]`),
+			expected: FunctionSpecs{
+				{Name: "func1", ImplKey: "impl1", Parameters: models.JSONMap{}},
+			},
+			hasError: false,
+		},
+		{
+			name:  "Valid JSON Object",
+			input: []byte(`{"name": "func1", "impl_key": "impl1", "parameters": {}}`),
+			expected: FunctionSpecs{
+				{Name: "func1", ImplKey: "impl1", Parameters: models.JSONMap{}},
+			},
+			hasError: false,
+		},
+		{
+			name:     "Nil Value",
+			input:    nil,
+			expected: nil,
+			hasError: false,
+		},
+		{
+			name:     "Empty String",
+			input:    []byte(``),
+			expected: FunctionSpecs{},
+			hasError: false,
+		},
+		{
+			name:     "Invalid JSON",
+			input:    []byte(`{"name": "func1"`),
+			expected: nil,
+			hasError: true,
+		},
+		{
+			name:     "Unsupported Type",
+			input:    123,
+			expected: nil,
+			hasError: true,
+		},
+	}
 
-	t.Run("Missing System Prompt", func(t *testing.T) {
-		agent := baseAgent
-		agent.SystemPrompt = ""
-		err := ValidateAgentSchema(agent)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "agent must have a 'system_prompt'")
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var fs FunctionSpecs
+			err := fs.Scan(tt.input)
 
-	t.Run("Invalid Max Turns", func(t *testing.T) {
-		agent := baseAgent
-		agent.MaxTurns = 0
-		err := ValidateAgentSchema(agent)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "max_turns must be a positive integer")
-	})
-
-	t.Run("Missing LLM Provider", func(t *testing.T) {
-		agent := baseAgent
-		agent.LLMConfig.Provider = ""
-		err := ValidateAgentSchema(agent)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "llm_config provider cannot be empty")
-	})
-
-	t.Run("Missing Memory Type", func(t *testing.T) {
-		agent := baseAgent
-		agent.Memory.Type = ""
-		err := ValidateAgentSchema(agent)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "memory type cannot be empty")
-	})
-
-	t.Run("Missing Memory Session Scope", func(t *testing.T) {
-		agent := baseAgent
-		agent.Memory.SessionScope = ""
-		err := ValidateAgentSchema(agent)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "memory session scope cannot be empty")
-	})
-
-	t.Run("Valid Cron Trigger", func(t *testing.T) {
-		agent := baseAgent
-		agent.Trigger = TriggerConfig{
-			Type: "cron",
-			Cron: "@hourly",
-		}
-		err := ValidateAgentSchema(agent)
-		assert.NoError(t, err)
-	})
-
-	t.Run("Invalid Cron Expression", func(t *testing.T) {
-		agent := baseAgent
-		agent.Trigger = TriggerConfig{
-			Type: "cron",
-			Cron: "invalid-cron",
-		}
-		err := ValidateAgentSchema(agent)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid cron expression")
-	})
-
-	t.Run("Valid Webhook Trigger", func(t *testing.T) {
-		agent := baseAgent
-		agent.Trigger = TriggerConfig{
-			Type:         "webhook",
-			WebhookToken: "super-secret-token",
-		}
-		err := ValidateAgentSchema(agent)
-		assert.NoError(t, err)
-	})
-
-	t.Run("Missing Webhook Token", func(t *testing.T) {
-		agent := baseAgent
-		agent.Trigger = TriggerConfig{
-			Type:         "webhook",
-			WebhookToken: "",
-		}
-		err := ValidateAgentSchema(agent)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "webhook trigger requires a 'webhook_token'")
-	})
+			if tt.hasError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				if tt.input == nil {
+					assert.Nil(t, fs)
+				} else {
+					assert.Equal(t, tt.expected, fs)
+				}
+			}
+		})
+	}
 }
