@@ -8,6 +8,7 @@ import (
 
 	models "github.com/gohead-cms/gohead/internal/models/agents"
 	"github.com/gohead-cms/gohead/pkg/database"
+	"github.com/gohead-cms/gohead/pkg/llm"
 	"github.com/gohead-cms/gohead/pkg/logger"
 )
 
@@ -182,5 +183,71 @@ func DeleteAgent(agentID uint) error {
 	}
 
 	logger.Log.WithField("agent_id", agentID).Info("Agent deleted successfully")
+	return nil
+}
+
+// GetConversationHistory retrieves the messages for an agent.
+func GetConversationHistory(agentID uint) ([]llm.Message, error) {
+	var dbMessages []models.AgentMessage
+
+	// Retrieve messages, ordered by their turn sequence.
+	err := database.DB.
+		Where("agent_id = ?", agentID).
+		Order("turn asc").
+		Find(&dbMessages).Error
+
+	if err != nil {
+		logger.Log.WithError(err).WithField("agent_id", agentID).Error("Failed to retrieve conversation history")
+		return nil, fmt.Errorf("could not get conversation history: %w", err)
+	}
+
+	// Convert database models to the llm.Message type used by the runner.
+	history := make([]llm.Message, len(dbMessages))
+	for i, msg := range dbMessages {
+		history[i] = llm.Message{
+			Role:    msg.Role,
+			Content: msg.Content,
+		}
+	}
+
+	return history, nil
+}
+
+// SaveConversationHistory replaces the old history with the new one for an agent.
+func SaveConversationHistory(agentID uint, messages []llm.Message) error {
+	// Use a transaction for atomicity.
+	tx := database.DB.Begin()
+	if tx.Error != nil {
+		return fmt.Errorf("failed to begin transaction: %w", tx.Error)
+	}
+
+	// 1. Delete all existing messages for this agent.
+	if err := tx.Where("agent_id = ?", agentID).Delete(&models.AgentMessage{}).Error; err != nil {
+		tx.Rollback() // Rollback on error
+		logger.Log.WithError(err).WithField("agent_id", agentID).Error("Failed to delete old conversation history")
+		return fmt.Errorf("failed to clear old history: %w", err)
+	}
+
+	// 2. Insert the new messages with their correct turn order.
+	for i, msg := range messages {
+		dbMessage := models.AgentMessage{
+			AgentID: agentID,
+			Role:    msg.Role,
+			Content: msg.Content,
+			Turn:    i + 1, // Store the turn order
+		}
+		if err := tx.Create(&dbMessage).Error; err != nil {
+			tx.Rollback() // Rollback on error
+			logger.Log.WithError(err).WithField("agent_id", agentID).Error("Failed to insert new conversation message")
+			return fmt.Errorf("failed to save new history: %w", err)
+		}
+	}
+
+	// 3. Commit the transaction.
+	if err := tx.Commit().Error; err != nil {
+		logger.Log.WithError(err).WithField("agent_id", agentID).Error("Failed to commit conversation history transaction")
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
 	return nil
 }

@@ -1,7 +1,6 @@
 package triggers
 
 import (
-	"log"
 	"time"
 
 	"github.com/go-co-op/gocron"
@@ -66,5 +65,5 @@ func StartJob(agentID uint) {
 	}
 
 	// For the MVP, let's just log a message.
-	log.Printf("Agent job for '%s' completed successfully.", agent.Name)
+	logger.Log.WithField("Agent job for '%s' completed successfully.", agent.Name)
 }

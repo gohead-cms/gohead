@@ -26,7 +26,7 @@ func (l *GormLogger) LogMode(level logger.LogLevel) logger.Interface {
 }
 
 // Info logs informational messages
-func (l *GormLogger) Info(ctx context.Context, msg string, data ...interface{}) {
+func (l *GormLogger) Info(ctx context.Context, msg string, data ...any) {
 	if l.logLevel >= logger.Info {
 		Log.WithFields(logrus.Fields{
 			"source": "gorm",
@@ -36,7 +36,7 @@ func (l *GormLogger) Info(ctx context.Context, msg string, data ...interface{}) 
 }
 
 // Warn logs warning messages
-func (l *GormLogger) Warn(ctx context.Context, msg string, data ...interface{}) {
+func (l *GormLogger) Warn(ctx context.Context, msg string, data ...any) {
 	if l.logLevel >= logger.Warn {
 		Log.WithFields(logrus.Fields{
 			"source": "gorm",
@@ -46,7 +46,7 @@ func (l *GormLogger) Warn(ctx context.Context, msg string, data ...interface{}) 
 }
 
 // Error logs error messages
-func (l *GormLogger) Error(ctx context.Context, msg string, data ...interface{}) {
+func (l *GormLogger) Error(ctx context.Context, msg string, data ...any) {
 	if l.logLevel >= logger.Error {
 		Log.WithFields(logrus.Fields{
 			"source": "gorm",
