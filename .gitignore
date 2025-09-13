@@ -49,3 +49,14 @@ package-lock.json
 
 *.db# Added by goreleaser init:
 dist/
+
+gui/node_modules/
+gui/package-lock.json
+gui/yarn.lock
+
+gui/npm-debug.log*
+gui/yarn-debug.log*
+gui/yarn-error.log*
+
+gui/.env*
+!gui/.env.example
