@@ -1,4 +1,3 @@
-// pkg/config/config.go
 package config
 
 import (
@@ -18,6 +17,14 @@ type CORSConfig struct {
 	MaxAge           int      `mapstructure:"max_age" yaml:"max_age"`
 }
 
+// LLMConfig holds settings for Large Language Model providers.
+type LLMConfig struct {
+	Provider  string `mapstructure:"provider" yaml:"provider"`
+	Model     string `mapstructure:"model" yaml:"model"`
+	APIKey    string `mapstructure:"api_key" yaml:"api_key"`
+	APISecret string `mapstructure:"api_secret" yaml:"api_secret"`
+}
+
 // Config holds all application settings.
 type Config struct {
 	LogLevel          string `mapstructure:"log_level"`
@@ -30,6 +37,9 @@ type Config struct {
 
 	// CORS settings
 	CORS CORSConfig `mapstructure:"cors"`
+
+	// LLM settings
+	LLM LLMConfig `mapstructure:"llm" yaml:"llm"`
 }
 
 // LoadConfig loads the configuration from file and environment variables.
@@ -50,6 +60,11 @@ func LoadConfig(configPath string) (Config, error) {
 	viper.SetDefault("cors.allowed_headers", []string{"Access-Control-Allow-Headers", "Access-Control-Allow-Headers, Origin,Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers"})
 	viper.SetDefault("cors.allow_credentials", true)
 	viper.SetDefault("cors.max_age", 86400)
+
+	// LLM default values
+	viper.SetDefault("llm.provider", "openai")
+	viper.SetDefault("llm.model", "gpt-4o")
+	viper.SetDefault("llm.api_key", os.Getenv("OPENAI_API_KEY"))
 
 	// Set the config file path
 	viper.SetConfigFile(configPath)

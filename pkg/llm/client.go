@@ -2,10 +2,16 @@ package llm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
-	"github.com/tmc/langchaingo/llms/openai"
+	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/tools"
+
+	config "github.com/gohead-cms/gohead/pkg/config"
+	anthropic_client "github.com/gohead-cms/gohead/pkg/llm/anthropic"
+	ollama_client "github.com/gohead-cms/gohead/pkg/llm/ollama"
+	openai_client "github.com/gohead-cms/gohead/pkg/llm/openai"
 )
 
 // Role represents the role of a message sender.
@@ -18,6 +24,15 @@ const (
 	RoleTool      Role = "tool"
 )
 
+// Provider represents the LLM provider.
+type Provider string
+
+const (
+	ProviderOpenAI    Provider = "openai"
+	ProviderAnthropic Provider = "anthropic"
+	ProviderOllama    Provider = "ollama"
+)
+
 // Message represents a single message in a conversation.
 type Message struct {
 	Role    Role   `json:"role"`
@@ -26,8 +41,8 @@ type Message struct {
 
 // ToolCall represents a request to call a tool.
 type ToolCall struct {
-	Name      string      `json:"name"`
-	Arguments interface{} `json:"arguments"`
+	Name      string `json:"name"`
+	Arguments any    `json:"arguments"`
 }
 
 // ResponseType indicates the type of the LLM's response.
@@ -51,12 +66,7 @@ type Client interface {
 }
 
 // Config represents the LLM configuration, likely from your agent model.
-type Config struct {
-	Provider  string `json:"provider"`
-	Model     string `json:"model"`
-	APIKey    string `json:"api_key"`
-	APISecret string `json:"api_secret"`
-}
+type Config = config.LLMConfig
 
 // Option is a functional option for the Chat method.
 type Option func(*options)
@@ -72,18 +82,111 @@ func WithTools(tools []tools.Tool) Option {
 	}
 }
 
-// NewClient is a factory function that creates an LLM client based on the provider.
-func NewClient(cfg Config) (Client, error) {
+// langChainAdapter is a wrapper around a langchaingo LLM client.
+type langChainAdapter struct {
+	client llms.Model
+}
+
+// Chat implements the Client interface using the langchaingo library.
+func (a *langChainAdapter) Chat(ctx context.Context, messages []Message, opts ...Option) (*Response, error) {
+	cfg := &options{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	// 1) Convert internal messages to langchaingo []llms.MessageContent
+	lcMessages := make([]llms.MessageContent, 0, len(messages))
+	for _, msg := range messages {
+		lcMessages = append(lcMessages, llms.TextParts(convertRole(msg.Role), msg.Content))
+	}
+
+	// 2) Build call options; only pass tools if they are already []llms.Tool
+	var callOpts []llms.CallOption
+	if tools, ok := any(cfg.Tools).([]llms.Tool); ok && len(tools) > 0 {
+		callOpts = append(callOpts, llms.WithTools(tools))
+	}
+
+	// 3) Call the model
+	res, err := a.client.GenerateContent(ctx, lcMessages, callOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("langchaingo chat failed: %w", err)
+	}
+
+	// 4) Convert the langchaingo response back to our internal Response type
+	if res == nil || len(res.Choices) == 0 {
+		return nil, fmt.Errorf("no response choices returned from LLM")
+	}
+
+	choice := res.Choices[0]
+
+	// Function-calling (single func)
+	if choice.FuncCall != nil {
+		return &Response{
+			Type: ResponseTypeToolCall,
+			ToolCall: &ToolCall{
+				Name:      choice.FuncCall.Name,
+				Arguments: choice.FuncCall.Arguments,
+			},
+		}, nil
+	}
+
+	// Multi-tool calling path
+	if len(choice.ToolCalls) > 0 && choice.ToolCalls[0].FunctionCall != nil {
+		fc := choice.ToolCalls[0].FunctionCall
+		return &Response{
+			Type: ResponseTypeToolCall,
+			ToolCall: &ToolCall{
+				Name:      fc.Name,
+				Arguments: fc.Arguments,
+			},
+		}, nil
+	}
+
+	// Plain text response
+	return &Response{
+		Type:    ResponseTypeText,
+		Content: choice.Content,
+	}, nil
+}
+
+// Helper function to map our roles to LangChainGo roles.
+func convertRole(role Role) llms.ChatMessageType {
+	switch role {
+	case RoleSystem:
+		return llms.ChatMessageTypeSystem
+	case RoleUser:
+		return llms.ChatMessageTypeHuman
+	case RoleAssistant:
+		return llms.ChatMessageTypeAI
+	case RoleTool:
+		return llms.ChatMessageTypeTool
+	default:
+		return llms.ChatMessageTypeGeneric
+	}
+}
+
+// NewAdapter creates a new `Client` by wrapping the specified LLM provider.
+func NewAdapter(cfg Config) (Client, error) {
+	var client llms.Model
+	var err error
+	if err := config.ApplyLLMEnv(cfg); err != nil {
+		return nil, err
+	}
 	switch cfg.Provider {
 	case "openai":
-		lcClient, err := openai.New(openai.WithModel(cfg.Model), openai.WithToken(cfg.APIKey))
-		if err != nil {
-			return nil, err
-		}
-		return &langChainAdapter{
-			client: lcClient,
-		}, nil
+		client, err = openai_client.New()
+	case "anthropic":
+		client, err = anthropic_client.New()
+	case "ollama":
+		// Ollama is typically  run locally and uses a model name
+		client, err = ollama_client.New(cfg.Model)
 	default:
-		return nil, fmt.Errorf("unsupported LLM provider: %s", cfg.Provider)
+		return nil, errors.New("unsupported LLM provider")
 	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client for provider %s: %w", cfg.Provider, err)
+	}
+
+	return &langChainAdapter{client: client}, nil
 }
