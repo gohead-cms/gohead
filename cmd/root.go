@@ -6,8 +6,9 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:   "gohead",
-	Short: "Gohead - headless CMS",
-	Long:  `Gohead is a headless CMS built to provide flexible content management.`,
+	Short: "GoHead is a headless CMS and agentic framework.",
+	Long: `A flexible and powerful headless CMS built with Go,
+featuring an agentic framework for building autonomous workflows.`,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

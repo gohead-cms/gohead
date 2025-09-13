@@ -5,9 +5,9 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/gohead-cms/gohead/internal/agent/triggers"
 	"github.com/gohead-cms/gohead/internal/api/handlers"
 	"github.com/gohead-cms/gohead/internal/api/middleware"
-	"github.com/gohead-cms/gohead/pkg/agent/triggers"
 	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/config"
 	"github.com/gohead-cms/gohead/pkg/database"
@@ -18,6 +18,7 @@ import (
 	"github.com/gohead-cms/gohead/pkg/tracing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/hibiken/asynq"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
 	ginlogrus "github.com/toorop/gin-logrus"
@@ -87,10 +88,13 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 		return nil, err
 	}
 
+	asynqClient := asynq.NewClient(asynq.RedisClientOpt{Addr: cfg.Redis.Address})
+	triggers.InitAsynqClient(asynqClient)
+
 	seed.SeedRoles()
 	auth.InitializeJWT(cfg.JWTSecret)
 	metrics.InitMetrics()
-	triggers.StartScheduler()
+	triggers.StartScheduler() // StartScheduler should be modified to use the initialized client if needed.
 
 	if cfg.TelemetryEnabled {
 		tracerProvider, err := tracing.InitTracer()
@@ -146,6 +150,12 @@ func setupRoutes(router *gin.Engine) {
 		authRoutes.POST("/register", handlers.Register)
 		authRoutes.POST("/login", handlers.Login)
 	}
+
+	// ================== NEW CODE BLOCK ==================
+	// This route is public because authentication is handled via a
+	// custom Webhook-Token header inside the handler itself.
+	router.POST("/agents/webhook/:id", handlers.HandleWebhook)
+	// ======================================================
 
 	// ADMIN routes (schema/definition)
 	admin := router.Group("/admin")

@@ -25,6 +25,13 @@ type LLMConfig struct {
 	APISecret string `mapstructure:"api_secret" yaml:"api_secret"`
 }
 
+// RedisConfig holds settings for the Redis connection.
+type RedisConfig struct {
+	Address  string `mapstructure:"address" yaml:"address"`
+	Password string `mapstructure:"password" yaml:"password"`
+	DB       int    `mapstructure:"db" yaml:"db"`
+}
+
 // Config holds all application settings.
 type Config struct {
 	LogLevel          string `mapstructure:"log_level"`
@@ -34,6 +41,9 @@ type Config struct {
 	DatabaseURL       string `mapstructure:"database_url"`
 	ServerPort        string `mapstructure:"server_port"`
 	MinPasswordLength int    `json:"min_password_length" yaml:"min_password_length"`
+
+	// Redis settings
+	Redis RedisConfig `mapstructure:"redis"`
 
 	// CORS settings
 	CORS CORSConfig `mapstructure:"cors"`
@@ -60,6 +70,11 @@ func LoadConfig(configPath string) (Config, error) {
 	viper.SetDefault("cors.allowed_headers", []string{"Access-Control-Allow-Headers", "Access-Control-Allow-Headers, Origin,Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers"})
 	viper.SetDefault("cors.allow_credentials", true)
 	viper.SetDefault("cors.max_age", 86400)
+
+	// Redis default values
+	viper.SetDefault("redis.address", "localhost:6379")
+	viper.SetDefault("redis.password", "")
+	viper.SetDefault("redis.db", 0)
 
 	// LLM default values
 	viper.SetDefault("llm.provider", "openai")
