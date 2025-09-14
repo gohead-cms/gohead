@@ -65,7 +65,7 @@ func runWorker(cfgPath string) {
 		asynq.Config{
 			Concurrency: 10,
 			Logger:      &logger.AsynqLoggerAdapter{},
-			Queues:      map[string]int{"events": 10},
+			Queues:      map[string]int{"agents": 10},
 		},
 	)
 
