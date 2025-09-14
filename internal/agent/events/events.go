@@ -38,8 +38,8 @@ func EnqueueCollectionEvent(ctx context.Context, client *asynq.Client, payload C
 		return fmt.Errorf("could not marshal event payload: %w", err)
 	}
 
-	// "events:collection" is the dedicated queue for the dispatcher.
-	task := asynq.NewTask("events:collection", payloadBytes)
+	// Specify that this task should go to the "events" queue.
+	task := asynq.NewTask(TaskTypeCollectionEvent, payloadBytes, asynq.Queue("events"))
 
 	info, err := client.EnqueueContext(ctx, task)
 	if err != nil {

@@ -92,7 +92,6 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	asynqClient := asynq.NewClient(asynq.RedisClientOpt{Addr: cfg.Redis.Address})
 	storage.InitAsynqClient(asynqClient)
 	triggers.InitAsynqClient(asynqClient)
-
 	seed.SeedRoles()
 	auth.InitializeJWT(cfg.JWTSecret)
 	metrics.InitMetrics()

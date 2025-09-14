@@ -11,14 +11,33 @@ import (
 	"github.com/gohead-cms/gohead/pkg/logger"
 )
 
+// SaveItem creates a new item in the database and then publishes a generic
+// 'item:created' event to the dispatcher queue.
 func SaveItem(item *models.Item) error {
+	// Step 1: Create the item in the database.
+	// After this call succeeds, GORM will automatically populate the 'ID'
+	// field on the 'item' struct that was passed in.
+	if err := database.DB.Create(item).Error; err != nil {
+		logger.Log.WithError(err).Error("Failed to save new item")
+		return err
+	}
+
+	// Step 2: Publish the creation event.
+	// We check if the asynqClient has been initialized.
 	if asynqClient != nil {
+		// We need the collection name. We can get it efficiently from the item's CollectionID.
 		var collection models.Collection
 		if err := database.DB.First(&collection, item.CollectionID).Error; err != nil {
-			logger.Log.WithError(err).WithField("collection_id", item.CollectionID).Error("Failed to find collection for event publishing after item creation")
+			// The item was saved, but we couldn't find its collection to publish the event.
+			// This should be logged, but we don't return an error because the main
+			// operation (saving the item) was successful.
+			logger.Log.WithError(err).
+				WithField("collection_id", item.CollectionID).
+				Error("Failed to find collection for event publishing after item creation")
 			return nil
 		}
 
+		// Now, item.ID has the correct, non-zero ID from the database.
 		payload := events.CollectionEventPayload{
 			EventType:      events.EventTypeItemCreated,
 			CollectionName: collection.Name,
@@ -26,11 +45,12 @@ func SaveItem(item *models.Item) error {
 			ItemData:       item.Data,
 		}
 		if err := events.EnqueueCollectionEvent(context.Background(), asynqClient, payload); err != nil {
+			// Log the enqueuing error but don't fail the overall SaveItem operation.
 			logger.Log.WithError(err).Error("Failed to enqueue item:created event")
 		}
 	}
-	// --- END ---
-	return database.DB.Create(item).Error
+
+	return nil
 }
 
 // GetItemByID fetches an item by its ID and collection ID.
@@ -69,23 +89,19 @@ func GetItems(collectionID uint, page, pageSize int) ([]models.Item, int, error)
 }
 
 func UpdateItem(itemID uint, data models.JSONMap) error {
-	// Fetch the existing item
 	var item models.Item
 	if err := database.DB.Where("id = ?", itemID).First(&item).Error; err != nil {
 		logger.Log.WithField("item_id", itemID).WithError(err).Error("Failed to find item")
 		return fmt.Errorf("collection item not found")
 	}
 
-	// Update the item data
 	item.Data = data
 	if err := database.DB.Save(&item).Error; err != nil {
 		logger.Log.WithField("item_id", itemID).WithError(err).Error("Failed to update item data")
 		return fmt.Errorf("failed to update item data: %w", err)
 	}
 
-	// Save updated relationships
-	// TO CHECK
-	// --- Publish Event ---
+	// Publish the 'updated' event.
 	if asynqClient != nil {
 		var collection models.Collection
 		if err := database.DB.First(&collection, item.CollectionID).Error; err != nil {
@@ -103,7 +119,6 @@ func UpdateItem(itemID uint, data models.JSONMap) error {
 			logger.Log.WithError(err).Error("Failed to enqueue item:updated event")
 		}
 	}
-	// --- END ---
 
 	logger.Log.WithField("item_id", itemID).Info("Item updated successfully")
 	return nil

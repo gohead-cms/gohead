@@ -62,10 +62,10 @@ func runWorker(cfgPath string) {
 	// 3. Create the Asynq server for consuming jobs
 	srv := asynq.NewServer(
 		asynq.RedisClientOpt{Addr: cfg.Redis.Address},
-
 		asynq.Config{
 			Concurrency: 10,
 			Logger:      &logger.AsynqLoggerAdapter{},
+			Queues:      map[string]int{"events": 10},
 		},
 	)
 
