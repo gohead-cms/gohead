@@ -51,7 +51,7 @@ func (d *EventDispatcher) HandleCollectionEvent(ctx context.Context, t *asynq.Ta
 		logger.Log.
 			WithField("event_type", payload.EventType).
 			WithField("collection", payload.CollectionName).
-			Debug("No agents subscribed to this event")
+			Info("No agents subscribed to this event")
 		return nil // No error, just no work to do.
 	}
 

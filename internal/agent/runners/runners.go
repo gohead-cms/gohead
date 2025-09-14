@@ -32,7 +32,6 @@ func (r *AgentRunner) HandleAgentJob(ctx context.Context, t *asynq.Task) error {
 
 	logger.Log.WithField("agent_id", payload.AgentID).Info("Starting agent job execution")
 
-	// FIX 1: Replaced GetAgentByUUID with GetAgentByID, which uses the correct uint ID.
 	agent, err := storage.GetAgentByID(payload.AgentID)
 	if err != nil {
 		logger.Log.WithError(err).WithField("agent_id", payload.AgentID).Error("Failed to retrieve agent for job")
@@ -48,7 +47,7 @@ func (r *AgentRunner) HandleAgentJob(ctx context.Context, t *asynq.Task) error {
 	return nil
 }
 
-// runConversation now uses your clean llm.Client interface.
+// runConversation now uses llm.Client interface.
 func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Agent, payload jobs.AgentJobPayload) error {
 	// FIX 2: Manually convert the agent's LLMConfig to the type expected by the llm package.
 	llmConfigForAdapter := llm.Config{
