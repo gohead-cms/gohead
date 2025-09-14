@@ -12,6 +12,9 @@ import (
 // EventType defines the type of collection event that occurred.
 type EventType string
 
+// Using a constant prevents typos between the producer and the consumer.
+const TaskTypeCollectionEvent = "events:collection"
+
 const (
 	EventTypeItemCreated EventType = "item:created"
 	EventTypeItemUpdated EventType = "item:updated"

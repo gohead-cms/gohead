@@ -3,10 +3,10 @@ package storage
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"gorm.io/gorm"
 
-	"github.com/gohead-cms/gohead/internal/agent/events"
 	models "github.com/gohead-cms/gohead/internal/models/agents"
 	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/llm"
@@ -253,22 +253,44 @@ func SaveConversationHistory(agentID uint, messages []llm.Message) error {
 	return nil
 }
 
-// FindAgentsByEventTrigger queries for all agents configured to listen for a specific collection event.
-func FindAgentsByEventTrigger(collectionName string, eventType events.EventType) ([]models.Agent, error) {
-	var agents []models.Agent
+// FindAgentsByEventTrigger queries for agents subscribed to a specific collection event.
+func FindAgentsByEventTrigger(collectionName string, eventType string) ([]models.Agent, error) {
+	var allEventAgents []models.Agent
+	var subscribedAgents []models.Agent
 
-	// This query specifically targets the JSONB structure of your TriggerConfig for PostgreSQL.
+	// Step 1: Fetch agents by casting the JSONB trigger column to TEXT for a generic LIKE query.
 	err := database.DB.
-		Where("trigger ->> 'type' = ?", "collection_event").
-		Where("trigger -> 'event_trigger' ->> 'collection' = ?", collectionName).
-		Where("trigger -> 'event_trigger' -> 'events' ? ?", string(eventType)).
-		Find(&agents).Error
+		Where("CAST(trigger AS TEXT) LIKE ?", `%"type":"collection_event"%`).
+		Find(&allEventAgents).Error
 
 	if err != nil {
-		logger.Log.WithError(err).WithField("collection", collectionName).Error("Failed to query agents by event trigger")
-		return nil, fmt.Errorf("failed to find agents for event '%s' on collection '%s': %w", eventType, collectionName, err)
+		logger.Log.WithError(err).
+			WithField("collection", collectionName).
+			WithField("event", eventType).
+			Error("Failed to query for event-triggered agents")
+		return nil, fmt.Errorf("failed to find agents: %w", err)
 	}
 
-	logger.Log.WithField("count", len(agents)).WithField("collection", collectionName).WithField("event", eventType).Info("Found subscribed agents")
-	return agents, nil
+	// Step 2: Filter the results in Go code. This is completely generic.
+	for _, agent := range allEventAgents {
+		if agent.Trigger.Type != "collection_event" {
+			continue
+		}
+
+		config := agent.Trigger.EventTrigger
+
+		if config.Collection == collectionName || config.Collection == "*" {
+			if slices.Contains(config.Events, eventType) {
+				subscribedAgents = append(subscribedAgents, agent)
+			}
+		}
+	}
+
+	logger.Log.
+		WithField("count", len(subscribedAgents)).
+		WithField("collection", collectionName).
+		WithField("event", eventType).
+		Info("Found subscribed agents for event")
+
+	return subscribedAgents, nil
 }
