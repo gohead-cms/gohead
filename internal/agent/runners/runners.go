@@ -80,7 +80,12 @@ func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Ag
 
 	// 4. Start the execution loop.
 	for i := 0; i < agent.MaxTurns; i++ {
-		response, err := llmClient.Chat(ctx, messages, llm.WithTools(registry.Specs()))
+		response, err := llmClient.Chat(
+			ctx,
+			messages,
+			llm.WithTools(registry.Specs()),
+			llm.WithToolChoice("auto"),
+		)
 		if err != nil {
 			return fmt.Errorf("LLM call failed: %w", err)
 		}

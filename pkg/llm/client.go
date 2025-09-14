@@ -72,13 +72,22 @@ type Config = config.LLMConfig
 type Option func(*options)
 
 type options struct {
-	Tools []tools.Tool
+	Tools      []tools.Tool
+	ToolChoice any
 }
 
 // WithTools adds tools to the LLM's context.
 func WithTools(tools []tools.Tool) Option {
 	return func(o *options) {
 		o.Tools = tools
+	}
+}
+
+// WithToolChoice sets the tool choice option for the LLM call.
+// The `choice` argument can be a string (e.g., "auto", "none") or a struct.
+func WithToolChoice(choice any) Option {
+	return func(o *options) {
+		o.ToolChoice = choice
 	}
 }
 
