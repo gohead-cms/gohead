@@ -65,6 +65,7 @@ func initializeDispatcher(cfgPath string) (*asynq.Server, *asynq.ServeMux, error
 		asynq.Config{
 			Concurrency: 5,
 			Logger:      &logger.AsynqLoggerAdapter{},
+			Queues:      map[string]int{"events": 10},
 		},
 	)
 
