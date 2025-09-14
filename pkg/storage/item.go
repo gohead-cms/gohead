@@ -1,15 +1,35 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"maps"
 
+	"github.com/gohead-cms/gohead/internal/agent/events"
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
 )
 
 func SaveItem(item *models.Item) error {
+	if asynqClient != nil {
+		var collection models.Collection
+		if err := database.DB.First(&collection, item.CollectionID).Error; err != nil {
+			logger.Log.WithError(err).WithField("collection_id", item.CollectionID).Error("Failed to find collection for event publishing after item creation")
+			return nil
+		}
+
+		payload := events.CollectionEventPayload{
+			EventType:      events.EventTypeItemCreated,
+			CollectionName: collection.Name,
+			ItemID:         item.ID,
+			ItemData:       item.Data,
+		}
+		if err := events.EnqueueCollectionEvent(context.Background(), asynqClient, payload); err != nil {
+			logger.Log.WithError(err).Error("Failed to enqueue item:created event")
+		}
+	}
+	// --- END ---
 	return database.DB.Create(item).Error
 }
 
@@ -65,12 +85,54 @@ func UpdateItem(itemID uint, data models.JSONMap) error {
 
 	// Save updated relationships
 	// TO CHECK
+	// --- Publish Event ---
+	if asynqClient != nil {
+		var collection models.Collection
+		if err := database.DB.First(&collection, item.CollectionID).Error; err != nil {
+			logger.Log.WithError(err).WithField("collection_id", item.CollectionID).Error("Failed to find collection for event publishing after item update")
+			return nil
+		}
+
+		payload := events.CollectionEventPayload{
+			EventType:      events.EventTypeItemUpdated,
+			CollectionName: collection.Name,
+			ItemID:         item.ID,
+			ItemData:       item.Data,
+		}
+		if err := events.EnqueueCollectionEvent(context.Background(), asynqClient, payload); err != nil {
+			logger.Log.WithError(err).Error("Failed to enqueue item:updated event")
+		}
+	}
+	// --- END ---
 
 	logger.Log.WithField("item_id", itemID).Info("Item updated successfully")
 	return nil
 }
 
 func DeleteItem(id uint) error {
+	// --- NEW: Publish Event ---
+	// Before deleting, we must fetch the item to get its data for the event payload.
+	var item models.Item
+	// Fetch the item before deleting it so we can include its data in the event.
+	err := database.DB.First(&item, id).Error
+	if err == nil && asynqClient != nil {
+		// If the item was found, try to find its collection to get the name.
+		var collection models.Collection
+		if err := database.DB.First(&collection, item.CollectionID).Error; err == nil {
+			// If both are found, publish the event.
+			payload := events.CollectionEventPayload{
+				EventType:      events.EventTypeItemDeleted,
+				CollectionName: collection.Name,
+				ItemID:         item.ID,
+				ItemData:       item.Data,
+			}
+			if err := events.EnqueueCollectionEvent(context.Background(), asynqClient, payload); err != nil {
+				logger.Log.WithError(err).Error("Failed to enqueue item:deleted event")
+			}
+		}
+	}
+	// --- END ---
+
 	if err := database.DB.Where("id = ?", id).Delete(&models.Item{}).Error; err != nil {
 		return err
 	}

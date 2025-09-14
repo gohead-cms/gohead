@@ -6,6 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/gohead-cms/gohead/internal/agent/events"
 	models "github.com/gohead-cms/gohead/internal/models/agents"
 	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/llm"
@@ -250,4 +251,24 @@ func SaveConversationHistory(agentID uint, messages []llm.Message) error {
 	}
 
 	return nil
+}
+
+// FindAgentsByEventTrigger queries for all agents configured to listen for a specific collection event.
+func FindAgentsByEventTrigger(collectionName string, eventType events.EventType) ([]models.Agent, error) {
+	var agents []models.Agent
+
+	// This query specifically targets the JSONB structure of your TriggerConfig for PostgreSQL.
+	err := database.DB.
+		Where("trigger ->> 'type' = ?", "collection_event").
+		Where("trigger -> 'event_trigger' ->> 'collection' = ?", collectionName).
+		Where("trigger -> 'event_trigger' -> 'events' ? ?", string(eventType)).
+		Find(&agents).Error
+
+	if err != nil {
+		logger.Log.WithError(err).WithField("collection", collectionName).Error("Failed to query agents by event trigger")
+		return nil, fmt.Errorf("failed to find agents for event '%s' on collection '%s': %w", eventType, collectionName, err)
+	}
+
+	logger.Log.WithField("count", len(agents)).WithField("collection", collectionName).WithField("event", eventType).Info("Found subscribed agents")
+	return agents, nil
 }

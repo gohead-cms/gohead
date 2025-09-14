@@ -76,11 +76,18 @@ func (c *MemoryConfig) Scan(value interface{}) error {
 	return json.Unmarshal(bytes, c)
 }
 
+// EventTriggerConfig defines the specifics for a collection event trigger.
+type EventTriggerConfig struct {
+	Collection string   `json:"collection"` // The name of the collection to listen to.
+	Events     []string `json:"events"`     // e.g., ["item:created", "item:updated"]
+}
+
 // TriggerConfig defines what initiates an agent's run.
 type TriggerConfig struct {
-	Type         string `json:"type"` // e.g., "manual", "cron", "webhook"
-	Cron         string `json:"cron"`
-	WebhookToken string `json:"webhook_token"`
+	Type         string             `json:"type"` // e.g., "manual", "cron", "webhook"
+	Cron         string             `json:"cron"`
+	WebhookToken string             `json:"webhook_token"`
+	EventTrigger EventTriggerConfig `json:"event_trigger,omitempty"`
 }
 
 // Value implements the Valuer interface for `TriggerConfig`.
@@ -213,17 +220,22 @@ func ValidateAgentSchema(agent Agent) error {
 	case "manual":
 		// No additional checks needed
 	case "cron":
-		// Check for an empty string first
 		if agent.Trigger.Cron == "" {
 			return errors.New("cron trigger requires a cron expression")
 		}
-		// Now check if the expression matches the regex
 		if _, err := cron.ParseStandard(agent.Trigger.Cron); err != nil {
 			return fmt.Errorf("invalid cron expression: %w", err)
 		}
 	case "webhook":
 		if agent.Trigger.WebhookToken == "" {
 			return errors.New("webhook trigger requires a 'webhook_token'")
+		}
+	case "collection_event":
+		if agent.Trigger.EventTrigger.Collection == "" {
+			return errors.New("event trigger requires a 'collection' name")
+		}
+		if len(agent.Trigger.EventTrigger.Events) == 0 {
+			return errors.New("event trigger requires at least one event type (e.g., 'item:created')")
 		}
 	default:
 		return errors.New("invalid trigger type: must be 'manual', 'cron', or 'webhook'")
