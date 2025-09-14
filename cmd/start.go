@@ -15,6 +15,7 @@ import (
 	"github.com/gohead-cms/gohead/pkg/metrics"
 	"github.com/gohead-cms/gohead/pkg/migrations"
 	"github.com/gohead-cms/gohead/pkg/seed"
+	"github.com/gohead-cms/gohead/pkg/storage"
 	"github.com/gohead-cms/gohead/pkg/tracing"
 
 	"github.com/gin-gonic/gin"
@@ -89,6 +90,7 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	}
 
 	asynqClient := asynq.NewClient(asynq.RedisClientOpt{Addr: cfg.Redis.Address})
+	storage.InitAsynqClient(asynqClient)
 	triggers.InitAsynqClient(asynqClient)
 
 	seed.SeedRoles()
