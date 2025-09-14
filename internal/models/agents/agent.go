@@ -84,34 +84,37 @@ type EventTriggerConfig struct {
 
 // TriggerConfig defines what initiates an agent's run.
 type TriggerConfig struct {
-	Type         string             `json:"type"` // e.g., "manual", "cron", "webhook"
-	Cron         string             `json:"cron"`
-	WebhookToken string             `json:"webhook_token"`
+	Type         string             `json:"type"` // e.g., "manual", "cron", "webhook", "collection_event"
+	Cron         string             `json:"cron,omitempty"`
+	WebhookToken string             `json:"webhook_token,omitempty"`
 	EventTrigger EventTriggerConfig `json:"event_trigger,omitempty"`
 }
 
 // Value implements the Valuer interface for `TriggerConfig`.
 // It marshals the struct into JSON for storage in the database.
 func (t TriggerConfig) Value() (driver.Value, error) {
-	if t.Cron == "" && t.WebhookToken == "" {
+	// If the type is empty, we assume it's an uninitialized struct and save null.
+	if t.Type == "" {
 		return nil, nil
 	}
-	data, err := json.Marshal(t)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal TriggerConfig: %w", err)
-	}
-	return data, nil
+	return json.Marshal(t)
 }
 
 // Scan implements the Scanner interface for `TriggerConfig`.
-// It unmarshals the JSON data from the database into the struct.
+// This version is now robust and handles both []byte and string from the database.
 func (t *TriggerConfig) Scan(value any) error {
 	if value == nil {
+		*t = TriggerConfig{}
 		return nil
 	}
 
-	bytes, ok := value.([]byte)
-	if !ok {
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
 		return errors.New("invalid data type for TriggerConfig")
 	}
 

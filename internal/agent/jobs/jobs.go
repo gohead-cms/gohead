@@ -30,7 +30,7 @@ func EnqueueAgentJob(ctx context.Context, client *asynq.Client, payload AgentJob
 
 	// 2. Create a new Asynq task.
 	// "agent:run" is the task type that your worker will listen for.
-	task := asynq.NewTask("agent:run", payloadBytes)
+	task := asynq.NewTask("agent:run", payloadBytes, asynq.Queue("agents"))
 
 	// 3. Enqueue the task.
 	info, err := client.EnqueueContext(ctx, task)

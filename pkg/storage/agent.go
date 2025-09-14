@@ -254,13 +254,15 @@ func SaveConversationHistory(agentID uint, messages []llm.Message) error {
 }
 
 // FindAgentsByEventTrigger queries for agents subscribed to a specific collection event.
+// TOFIX This version uses a query for JSONB that is compatible with PostgreSQL.
 func FindAgentsByEventTrigger(collectionName string, eventType string) ([]models.Agent, error) {
 	var allEventAgents []models.Agent
 	var subscribedAgents []models.Agent
 
-	// Step 1: Fetch agents by casting the JSONB trigger column to TEXT for a generic LIKE query.
+	// This query is specific and reliable for finding agents with a 'collection_event' trigger type
+	// by directly querying the 'type' key within the JSONB 'trigger' column.
 	err := database.DB.
-		Where("CAST(trigger AS TEXT) LIKE ?", `%"type":"collection_event"%`).
+		Where("trigger ->> 'type' = ?", "collection_event").
 		Find(&allEventAgents).Error
 
 	if err != nil {
@@ -271,17 +273,19 @@ func FindAgentsByEventTrigger(collectionName string, eventType string) ([]models
 		return nil, fmt.Errorf("failed to find agents: %w", err)
 	}
 
-	// Step 2: Filter the results in Go code. This is completely generic.
 	for _, agent := range allEventAgents {
+		// This check is a good practice, though the query should already ensure it.
 		if agent.Trigger.Type != "collection_event" {
 			continue
 		}
 
 		config := agent.Trigger.EventTrigger
 
+		// Check if the agent is subscribed to this collection ("*" is a wildcard for all collections).
 		if config.Collection == collectionName || config.Collection == "*" {
+			// Check if the agent is subscribed to this specific event type.
 			if slices.Contains(config.Events, eventType) {
-				subscribedAgents = append(subscribedAgents, agent)
+				subscribedAgents = append(subscribedAgents, agent) // Found a match, no need to check other events for this agent.
 			}
 		}
 	}

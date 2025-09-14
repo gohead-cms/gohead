@@ -19,17 +19,15 @@ func ApplyLLMEnv(llm LLMConfig) error {
 			if err := os.Setenv("OPENAI_API_KEY", llm.APIKey); err != nil {
 				return fmt.Errorf("failed to set OPENAI_API_KEY: %w", err)
 			}
-			return nil
 		}
-		return fmt.Errorf("OPENAI_API_KEY is not set")
+		return nil
 	case "anthropic":
 		if llm.APIKey != "" {
 			if err := os.Setenv("ANTHROPIC_API_KEY", llm.APIKey); err != nil {
 				return fmt.Errorf("failed to set ANTHROPIC_API_KEY: %w", err)
 			}
-			return nil
 		}
-		return fmt.Errorf("ANTHROPIC_API_KEY is not set")
+		return nil
 	case "ollama":
 		// No API key required.
 		return nil
