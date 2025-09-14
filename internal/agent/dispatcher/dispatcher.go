@@ -61,7 +61,7 @@ func (d *EventDispatcher) HandleCollectionEvent(ctx context.Context, t *asynq.Ta
 	for _, agent := range subscribedAgents {
 		agentJobPayload := jobs.AgentJobPayload{
 			AgentID:      agent.ID,
-			TriggerType:  "collection_event",
+			TriggerType:  "events",
 			InitialInput: fmt.Sprintf("An event '%s' occurred for item %d in collection '%s'. Please process the provided data.", payload.EventType, payload.ItemID, payload.CollectionName),
 			TriggerData:  payload.ItemData,
 		}

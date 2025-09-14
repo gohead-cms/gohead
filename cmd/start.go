@@ -33,25 +33,25 @@ func init() {
 
 var startCmd = &cobra.Command{
 	Use:   "start",
-	Short: "Start GoHead server",
+	Short: "Start GoHead API server",
 	Run: func(cmd *cobra.Command, args []string) {
 		configPath, _ := cmd.Flags().GetString("config")
-
-		// Load configuration
-		cfg, _ := config.LoadConfig(configPath)
 
 		// Initialize and start the server
 		router, err := InitializeServer(configPath)
 		if err != nil {
-			logger.Log.Errorf("Cannot start server on port %s: %v", cfg.ServerPort, err)
-			return
+			// Use the initialized logger if available, otherwise fallback to standard log
+			if logger.Log != nil {
+				logger.Log.Fatalf("Cannot initialize server: %v", err)
+			}
+			log.Fatalf("Cannot initialize server: %v", err)
 		}
 
+		// Load config just to get the port, as logger is now initialized inside InitializeServer
+		cfg, _ := config.LoadConfig(configPath)
 		logger.Log.Infof("Starting server on port %s", cfg.ServerPort)
-		err = router.Run(":" + cfg.ServerPort)
-		if err != nil {
-			logger.Log.Errorf("Cannot start server on port %s: %v", cfg.ServerPort, err)
-			return
+		if err := router.Run(":" + cfg.ServerPort); err != nil {
+			logger.Log.Fatalf("Cannot start server: %v", err)
 		}
 	},
 }
@@ -61,6 +61,7 @@ func init() {
 }
 
 func InitializeServer(cfgPath string) (*gin.Engine, error) {
+	// --- Core Dependencies ---
 	cfg, err := config.LoadConfig(cfgPath)
 	if err != nil {
 		return nil, err
@@ -71,9 +72,7 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	switch cfg.LogLevel {
 	case "debug":
 		gormLogLevel = gormlogger.Info
-	case "info":
-		gormLogLevel = gormlogger.Warn
-	case "warn", "warning":
+	case "info", "warn", "warning":
 		gormLogLevel = gormlogger.Warn
 	case "error":
 		gormLogLevel = gormlogger.Error
@@ -89,14 +88,18 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 		return nil, err
 	}
 
-	asynqClient := asynq.NewClient(asynq.RedisClientOpt{Addr: cfg.Redis.Address})
-	storage.InitAsynqClient(asynqClient)
-	triggers.InitAsynqClient(asynqClient)
+	// --- Application Services ---
 	seed.SeedRoles()
 	auth.InitializeJWT(cfg.JWTSecret)
 	metrics.InitMetrics()
-	triggers.StartScheduler() // StartScheduler should be modified to use the initialized client if needed.
 
+	// --- Asynq Client Initialization for Producers ---
+	// The API server acts as a producer, enqueuing jobs for workers.
+	asynqClient := asynq.NewClient(asynq.RedisClientOpt{Addr: cfg.Redis.Address})
+	storage.InitAsynqClient(asynqClient)
+	triggers.InitAsynqClient(asynqClient)
+
+	// --- Telemetry (Optional) ---
 	if cfg.TelemetryEnabled {
 		tracerProvider, err := tracing.InitTracer()
 		if err != nil {
@@ -109,6 +112,7 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 		}()
 	}
 
+	// --- Gin Router Setup ---
 	switch cfg.Mode {
 	case "development":
 		gin.SetMode(gin.DebugMode)
@@ -117,34 +121,29 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	case "test":
 		gin.SetMode(gin.TestMode)
 	default:
-		log.Printf("Unknown Gin mode '%s', defaulting to 'release'", cfg.Mode)
 		gin.SetMode(gin.ReleaseMode)
 	}
 
 	router := gin.New()
-	logger.Log.WithField("config", cfg).Debug("GoHead Settings")
-	router.Use(ginlogrus.Logger(logger.Log))
-	router.Use(gin.Recovery())
+	router.Use(ginlogrus.Logger(logger.Log), gin.Recovery())
+	router.Use(middleware.CORSMiddleware(cfg))
 	router.Use(middleware.MetricsMiddleware())
 	router.Use(otelgin.Middleware("gohead"))
 	router.Use(middleware.ResponseWrapper())
-	router.Use(middleware.CORSMiddleware(cfg))
 
-	// Monitoring
-	router.GET("/_metrics", gin.WrapH(promhttp.Handler()))
-
-	// Healthcheck
-	router.GET("/_health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
-	})
-
-	// Separate all routing into a dedicated function
+	// --- Routes ---
 	setupRoutes(router)
 
 	return router, nil
 }
 
 func setupRoutes(router *gin.Engine) {
+	// Monitoring & Healthcheck
+	router.GET("/_metrics", gin.WrapH(promhttp.Handler()))
+	router.GET("/_health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
 	// Public routes
 	authRoutes := router.Group("/auth")
 	{
@@ -152,37 +151,33 @@ func setupRoutes(router *gin.Engine) {
 		authRoutes.POST("/login", handlers.Login)
 	}
 
-	// ================== NEW CODE BLOCK ==================
-	// This route is public because authentication is handled via a
-	// custom Webhook-Token header inside the handler itself.
+	// Agent Webhook Trigger (Public, authenticates with a token)
 	router.POST("/agents/webhook/:id", handlers.HandleWebhook)
-	// ======================================================
 
 	// ADMIN routes (schema/definition)
 	admin := router.Group("/admin")
-	admin.Use(middleware.AuthMiddleware())
-	admin.Use(middleware.AdminOnly())
+	admin.Use(middleware.AuthMiddleware(), middleware.AdminOnly())
 	{
-		// Collections admin endpoints
+		// Collections
 		admin.POST("/collections", handlers.CreateCollection)
 		admin.GET("/collections", handlers.GetCollections)
 		admin.GET("/collections/:name", handlers.GetCollection)
 		admin.PUT("/collections/:name", handlers.UpdateCollection)
 		admin.DELETE("/collections/:name", handlers.DeleteCollection)
 
-		// Single Types admin endpoints
+		// Singletons
 		admin.POST("/singleton", handlers.CreateOrUpdateSingleton)
 		admin.GET("/singleton/:name", handlers.GetSingleton)
 		admin.PUT("/singleton/:name", handlers.CreateOrUpdateSingleton)
 		admin.DELETE("/singleton/:name", handlers.DeleteSingleton)
 
-		// Component admin endpoints
+		// Components
 		admin.POST("/components", handlers.CreateComponent)
 		admin.GET("/components/:name", handlers.GetComponent)
 		admin.PUT("/components/:name", handlers.UpdateComponent)
 		admin.DELETE("/components/:name", handlers.DeleteComponent)
 
-		// Agent admin endpoints
+		// Agents
 		agents := admin.Group("/agents")
 		{
 			agents.POST("/", handlers.CreateAgent)
@@ -199,7 +194,7 @@ func setupRoutes(router *gin.Engine) {
 	{
 		content.POST("/graphql", handlers.GraphQLHandler)
 
-		// Collections & Single Types dynamic handlers
+		// Dynamic Handlers
 		content.Any("/collections/:collection", handlers.DynamicCollectionHandler)
 		content.Any("/collections/:collection/:id", handlers.DynamicCollectionHandler)
 		content.GET("/singleton/:name", handlers.GetSingleItem)
