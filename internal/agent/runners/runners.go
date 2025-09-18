@@ -12,17 +12,18 @@ import (
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
 	"github.com/hibiken/asynq"
+	"github.com/tmc/langchaingo/tools"
 )
 
-// AgentRunner no longer needs any LLM-related dependencies in its struct.
+// AgentRunner executes agentic workflows.
 type AgentRunner struct{}
 
-// NewAgentRunner is now much simpler.
+// NewAgentRunner creates a new, clean instance of the AgentRunner.
 func NewAgentRunner() *AgentRunner {
 	return &AgentRunner{}
 }
 
-// HandleAgentJob is the entry point for processing jobs from the queue.
+// HandleAgentJob is the entry point for processing jobs from the 'agents' queue.
 func (r *AgentRunner) HandleAgentJob(ctx context.Context, t *asynq.Task) error {
 	var payload jobs.AgentJobPayload
 	if err := json.Unmarshal(t.Payload(), &payload); err != nil {
@@ -47,9 +48,9 @@ func (r *AgentRunner) HandleAgentJob(ctx context.Context, t *asynq.Task) error {
 	return nil
 }
 
-// runConversation now uses llm.Client interface.
+// runConversation contains the main agent loop: LLM calls, function execution, and history management.
 func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Agent, payload jobs.AgentJobPayload) error {
-	// FIX 2: Manually convert the agent's LLMConfig to the type expected by the llm package.
+	// 1. Setup: Create LLM client and function registry
 	llmConfigForAdapter := llm.Config{
 		Provider:  agent.LLMConfig.Provider,
 		Model:     agent.LLMConfig.Model,
@@ -57,72 +58,130 @@ func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Ag
 		APISecret: agent.LLMConfig.APISecret,
 	}
 
-	// 1. Create the LLM client using the converted config.
 	llmClient, err := llm.NewAdapter(llmConfigForAdapter)
 	if err != nil {
 		return fmt.Errorf("could not create LLM adapter: %w", err)
 	}
 
-	// 2. Initialize the function registry.
 	registry := functions.NewRegistry(agent.Functions)
 
-	// 3. Prepare the message history using your internal llm.Message type.
+	// Convert registry to langchain-compatible tools
+	langchainTools := registry.ToLangchainTools()
+
+	// Convert to []tools.Tool interface
+	toolInterfaces := make([]tools.Tool, len(langchainTools))
+	for i, tool := range langchainTools {
+		toolInterfaces[i] = tool
+	}
+
+	// 2. Prepare conversation history
 	history, err := storage.GetConversationHistory(agent.ID)
 	if err != nil {
 		return fmt.Errorf("could not load conversation history: %w", err)
 	}
 
+	contextualInput := r.createContextualInput(payload)
 	messages := []llm.Message{
 		{Role: llm.RoleSystem, Content: agent.SystemPrompt},
 	}
 	messages = append(messages, history...)
-	messages = append(messages, llm.Message{Role: llm.RoleUser, Content: payload.InitialInput})
+	messages = append(messages, llm.Message{Role: llm.RoleUser, Content: contextualInput})
 
-	// 4. Start the execution loop.
+	// 3. Start execution loop
 	for i := 0; i < agent.MaxTurns; i++ {
 		response, err := llmClient.Chat(
 			ctx,
 			messages,
-			llm.WithTools(registry.Specs()),
+			llm.WithTools(toolInterfaces),
 			llm.WithToolChoice("auto"),
 		)
 		if err != nil {
-			return fmt.Errorf("LLM call failed: %w", err)
+			return fmt.Errorf("LLM call failed on turn %d: %w", i+1, err)
 		}
 
 		if response.Type == llm.ResponseTypeToolCall {
 			toolCall := response.ToolCall
-			logger.Log.WithField("agent_id", agent.ID).Infof("LLM requested tool call: %s", toolCall.Name)
+			logger.Log.WithFields(map[string]any{
+				"agent_id":       agent.ID,
+				"tool_name":      toolCall.Name,
+				"tool_arguments": toolCall.Arguments,
+			}).Info("LLM requested tool call")
 
-			messages = append(messages, llm.Message{Role: llm.RoleAssistant, Content: ""}) // Placeholder for assistant's turn
+			messages = append(messages, llm.Message{Role: llm.RoleAssistant, Content: ""})
 
 			fn, ok := registry.Get(toolCall.Name)
 			if !ok {
-				return fmt.Errorf("LLM requested unknown tool: %s", toolCall.Name)
+				errorPayload := map[string]string{"error": "Tool not found", "requested_tool": toolCall.Name}
+				errorJSON, _ := json.Marshal(errorPayload)
+				messages = append(messages, llm.Message{Role: llm.RoleTool, Content: string(errorJSON)})
+				continue
 			}
 
 			result, err := fn(ctx, toolCall.Arguments)
 			if err != nil {
-				return fmt.Errorf("tool '%s' execution failed: %w", toolCall.Name, err)
+				errorPayload := map[string]string{"error": "Tool execution failed", "message": err.Error()}
+				errorJSON, _ := json.Marshal(errorPayload)
+				messages = append(messages, llm.Message{Role: llm.RoleTool, Content: string(errorJSON)})
+				continue
 			}
 
-			messages = append(messages, llm.Message{
-				Role:    llm.RoleTool,
-				Content: result,
-			})
-			// Continue the loop
+			messages = append(messages, llm.Message{Role: llm.RoleTool, Content: result})
 
-		} else {
+		} else { // Plain text response
 			messages = append(messages, llm.Message{Role: llm.RoleAssistant, Content: response.Content})
 			logger.Log.WithField("agent_id", agent.ID).Info("LLM finished with text response. Ending turn.")
-			break // End the loop
+			break
 		}
 	}
 
-	// 5. Save the updated conversation history.
+	// 4. Save the final conversation history
 	if err := storage.SaveConversationHistory(agent.ID, messages[1:]); err != nil {
 		return fmt.Errorf("could not save conversation history: %w", err)
 	}
 
 	return nil
+}
+
+// createContextualInput creates a detailed initial prompt for the LLM based on the job's trigger.
+func (r *AgentRunner) createContextualInput(payload jobs.AgentJobPayload) string {
+	if payload.TriggerEvent != nil {
+		switch payload.TriggerEvent.Type {
+		case "collection_event":
+			if payload.TriggerEvent.CollectionEvent != nil {
+				event := payload.TriggerEvent.CollectionEvent
+				dataJSON, _ := json.Marshal(event.ItemData)
+				return fmt.Sprintf(
+					"An event has occurred. Here is the data:\n\n"+
+						"Event Type: %s\n"+
+						"Collection: %s\n"+
+						"Item ID: %s\n\n"+
+						"Item Data:\n"+
+						"```json\n%s\n```\n\n"+
+						"Based on your instructions, you must now call the appropriate function to handle this event.",
+					event.Event,
+					event.Collection,
+					event.ItemID,
+					string(dataJSON),
+				)
+			}
+		case "webhook":
+			if payload.TriggerEvent.WebhookData != nil {
+				dataJSON, _ := json.Marshal(payload.TriggerEvent.WebhookData)
+				return fmt.Sprintf(
+					"A webhook has been received. Here is the payload:\n\n"+
+						"```json\n%s\n```\n\n"+
+						"Based on your instructions, you must now call the appropriate function to process this webhook.",
+					string(dataJSON),
+				)
+			}
+		case "schedule":
+			return payload.InitialInput
+		}
+	}
+
+	if payload.InitialInput != "" {
+		return payload.InitialInput
+	}
+
+	return "You have been activated. Please execute your task according to your system prompt."
 }

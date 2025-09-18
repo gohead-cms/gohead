@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"time"
 
 	"github.com/gohead-cms/gohead/internal/agent/events"
 	"github.com/gohead-cms/gohead/internal/agent/jobs"
@@ -37,10 +39,10 @@ func (d *EventDispatcher) HandleCollectionEvent(ctx context.Context, t *asynq.Ta
 	logger.Log.
 		WithField("event_type", payload.EventType).
 		WithField("collection", payload.CollectionName).
+		WithField("item_id", payload.ItemID).
 		Info("Processing collection event")
 
 	// 1. Find all agents subscribed to this specific event.
-	// We cast the event type to a string to match the function signature.
 	subscribedAgents, err := storage.FindAgentsByEventTrigger(payload.CollectionName, string(payload.EventType))
 	if err != nil {
 		logger.Log.WithError(err).Error("Failed to find agents for event trigger")
@@ -59,19 +61,41 @@ func (d *EventDispatcher) HandleCollectionEvent(ctx context.Context, t *asynq.Ta
 
 	// 2. For each subscribed agent, enqueue a specific agent:run job.
 	for _, agent := range subscribedAgents {
+		// Create structured TriggerEvent - this contains all the data the runner needs
+		triggerEvent := &jobs.TriggerEvent{
+			Type: "collection_event",
+			CollectionEvent: &jobs.CollectionEventData{
+				Collection: payload.CollectionName,
+				Event:      string(payload.EventType),
+				ItemID:     strconv.FormatUint(uint64(payload.ItemID), 10),
+				ItemData:   payload.ItemData,
+			},
+		}
+
+		// Clean payload - only essential fields
 		agentJobPayload := jobs.AgentJobPayload{
 			AgentID:      agent.ID,
-			TriggerType:  "events",
-			InitialInput: fmt.Sprintf("An event '%s' occurred for item %d in collection '%s'. Please process the provided data.", payload.EventType, payload.ItemID, payload.CollectionName),
-			TriggerData:  payload.ItemData,
+			TriggerEvent: triggerEvent, // All event data is here
+			CreatedAt:    time.Now(),
 		}
+
+		logger.Log.WithFields(map[string]any{
+			"agent_id":   agent.ID,
+			"agent_name": agent.Name,
+			"event_type": payload.EventType,
+			"collection": payload.CollectionName,
+			"item_id":    payload.ItemID,
+		}).Info("Enqueuing agent job with structured trigger event")
 
 		if err := jobs.EnqueueAgentJob(ctx, d.asynqClient, agentJobPayload); err != nil {
 			logger.Log.
 				WithError(err).
 				WithField("agent_id", agent.ID).
+				WithField("agent_name", agent.Name).
 				Error("Failed to enqueue agent job from dispatcher")
 			// We continue to the next agent even if one fails.
+		} else {
+			logger.Log.WithField("agent_id", agent.ID).Info("Successfully enqueued agent job")
 		}
 	}
 
