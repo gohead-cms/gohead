@@ -68,8 +68,6 @@ func HandleWebhook(c *gin.Context) {
 	// 6. Create the job payload.
 	payload := jobs.AgentJobPayload{
 		AgentID:      uint(agentID),
-		TriggerType:  "webhook",
-		TriggerData:  requestData,
 		InitialInput: initialInput,
 	}
 

@@ -9,15 +9,6 @@ import (
 	"github.com/hibiken/asynq"
 )
 
-// AgentJobPayload is the data structure for an agent execution job.
-// It's the "contract" sent to the worker via Redis.
-type AgentJobPayload struct {
-	AgentID      uint           `json:"agent_id"`      // Changed from uuid.UUID to uint
-	TriggerType  string         `json:"trigger_type"`  // e.g., "cron", "webhook"
-	TriggerData  map[string]any `json:"trigger_data"`  // For webhook body, etc.
-	InitialInput string         `json:"initial_input"` // The first message to the agent
-}
-
 // EnqueueAgentJob creates and enqueues a new agent job.
 // This is the single entry point for all triggers.
 func EnqueueAgentJob(ctx context.Context, client *asynq.Client, payload AgentJobPayload) error {
