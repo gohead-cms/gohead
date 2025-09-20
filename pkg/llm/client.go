@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/tmc/langchaingo/llms"
-	"github.com/tmc/langchaingo/tools"
 
 	config "github.com/gohead-cms/gohead/pkg/config"
 	anthropic_client "github.com/gohead-cms/gohead/pkg/llm/anthropic"
@@ -72,19 +71,17 @@ type Config = config.LLMConfig
 type Option func(*options)
 
 type options struct {
-	Tools      []tools.Tool
+	Tools      []llms.Tool
 	ToolChoice any
 }
 
-// WithTools adds tools to the LLM's context.
-func WithTools(tools []tools.Tool) Option {
+func WithTools(tools []llms.Tool) Option {
 	return func(o *options) {
 		o.Tools = tools
 	}
 }
 
 // WithToolChoice sets the tool choice option for the LLM call.
-// The `choice` argument can be a string (e.g., "auto", "none") or a struct.
 func WithToolChoice(choice any) Option {
 	return func(o *options) {
 		o.ToolChoice = choice
@@ -109,10 +106,16 @@ func (a *langChainAdapter) Chat(ctx context.Context, messages []Message, opts ..
 		lcMessages = append(lcMessages, llms.TextParts(convertRole(msg.Role), msg.Content))
 	}
 
-	// 2) Build call options; only pass tools if they are already []llms.Tool
+	// 2) Build call options - now cfg.Tools is already []llms.Tool
 	var callOpts []llms.CallOption
-	if tools, ok := any(cfg.Tools).([]llms.Tool); ok && len(tools) > 0 {
-		callOpts = append(callOpts, llms.WithTools(tools))
+	if len(cfg.Tools) > 0 {
+		callOpts = append(callOpts, llms.WithTools(cfg.Tools))
+	}
+
+	// Add tool choice if specified
+	if cfg.ToolChoice != nil {
+		// You might need to handle ToolChoice conversion here
+		// depending on your LLM provider's expectations
 	}
 
 	// 3) Call the model
