@@ -1,6 +1,10 @@
 package functions
 
-import "context"
+import (
+	"context"
+
+	agentModels "github.com/gohead-cms/gohead/internal/models/agents"
+)
 
 // FunctionDefinition defines a function that can be called by the LLM
 type FunctionDefinition struct {
@@ -21,7 +25,7 @@ type ToolSpec struct {
 // Registry maps a tool's name to its executable function.
 type Registry struct {
 	tools map[string]ToolFunc
-	specs []ToolSpec
+	specs []agentModels.FunctionSpec
 }
 
 // RegistryTool implements langchain's tools.Tool interface

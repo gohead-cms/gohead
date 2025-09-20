@@ -7,6 +7,7 @@ import (
 
 	agentModels "github.com/gohead-cms/gohead/internal/models/agents"
 	"github.com/gohead-cms/gohead/pkg/logger"
+	"github.com/tmc/langchaingo/llms"
 )
 
 // Name returns the tool name (implements tools.Tool interface)
@@ -40,7 +41,7 @@ func (t *RegistryTool) Call(ctx context.Context, input string) (string, error) {
 func NewRegistry(agentFuncs agentModels.FunctionSpecs) *Registry {
 	r := &Registry{
 		tools: make(map[string]ToolFunc),
-		specs: make([]ToolSpec, 0, len(agentFuncs)),
+		specs: make([]agentModels.FunctionSpec, 0, len(agentFuncs)),
 	}
 
 	logger.Log.WithField("input_specs_count", len(agentFuncs)).Info("Creating function registry")
@@ -80,16 +81,8 @@ func NewRegistry(agentFuncs agentModels.FunctionSpecs) *Registry {
 		// Register the executable function
 		r.tools[spec.Name] = toolFunc
 
-		// Create tool spec for LLM
-		toolSpec := ToolSpec{
-			Type: "function",
-			Function: &FunctionDefinition{
-				Name:        spec.Name,
-				Description: spec.Description,
-				Parameters:  spec.Parameters,
-			},
-		}
-		r.specs = append(r.specs, toolSpec)
+		r.tools[spec.Name] = toolFunc
+		r.specs = append(r.specs, spec)
 
 		registeredFunctions = append(registeredFunctions, spec.Name)
 		logger.Log.WithFields(map[string]any{
@@ -112,12 +105,6 @@ func (r *Registry) Get(name string) (ToolFunc, bool) {
 	return fn, ok
 }
 
-// Specs returns the list of tool specifications to provide to the LLM.
-func (r *Registry) Specs() []ToolSpec {
-	logger.Log.WithField("specs_count", len(r.specs)).Info("Registry.Specs() called")
-	return r.specs
-}
-
 // ListFunctions returns a list of registered function names (for debugging)
 func (r *Registry) ListFunctions() []string {
 	names := make([]string, 0, len(r.tools))
@@ -127,17 +114,21 @@ func (r *Registry) ListFunctions() []string {
 	return names
 }
 
-// ToLangchainTools converts the registry to langchain-compatible tools
-func (r *Registry) ToLangchainTools() []*RegistryTool {
-	tools := make([]*RegistryTool, len(r.specs))
+// ToLangchainTools converts the registry to langchain-compatible []llms.Tool
+func (r *Registry) ToLangchainTools() []llms.Tool {
+	tools := make([]llms.Tool, 0, len(r.specs))
 
-	for i, spec := range r.specs {
-		tools[i] = &RegistryTool{
-			name:        spec.Function.Name,
-			description: spec.Function.Description,
-			registry:    r,
-			toolName:    spec.Function.Name,
+	for _, spec := range r.specs {
+		// Convert each spec to llms.Tool format
+		tool := llms.Tool{
+			Type: "function",
+			Function: &llms.FunctionDefinition{
+				Name:        spec.Name,
+				Description: spec.Description,
+				Parameters:  spec.Parameters,
+			},
 		}
+		tools = append(tools, tool)
 	}
 
 	logger.Log.WithField("tools_count", len(tools)).Info("Converted registry to langchain tools")

@@ -12,7 +12,7 @@ import (
 	config "github.com/gohead-cms/gohead/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tmc/langchaingo/tools"
+	"github.com/tmc/langchaingo/llms"
 )
 
 // TestNewAdapter validates the NewAdapter factory function for all providers.
@@ -99,10 +99,31 @@ func TestNewAdapter(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.NotNil(t, client)
-				// Assert that it implements the interface (don’t bind to concretes)
+				// Assert that it implements the interface (don't bind to concretes)
 				assert.Implements(t, (*Client)(nil), client, "adapter must implement Client interface")
 			}
 		})
+	}
+}
+
+// Helper function to create a test tool
+func createTestCalculatorTool() llms.Tool {
+	return llms.Tool{
+		Type: "function",
+		Function: &llms.FunctionDefinition{
+			Name:        "calculator",
+			Description: "Perform mathematical calculations",
+			Parameters: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"expression": map[string]any{
+						"type":        "string",
+						"description": "Mathematical expression to evaluate",
+					},
+				},
+				"required": []string{"expression"},
+			},
+		},
 	}
 }
 
@@ -190,8 +211,8 @@ func TestChatOpenAI(t *testing.T) {
 				{Role: RoleUser, Content: "What is 2+2?"},
 			},
 			inputOptions: []Option{
-				WithTools([]tools.Tool{
-					tools.Calculator{},
+				WithTools([]llms.Tool{
+					createTestCalculatorTool(),
 				}),
 			},
 			mockApiResponse: `{
@@ -360,6 +381,35 @@ func TestChatAnthropic(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name: "request with tools option",
+			inputMessages: []Message{
+				{Role: RoleUser, Content: "Calculate something for me"},
+			},
+			inputOptions: []Option{
+				WithTools([]llms.Tool{
+					createTestCalculatorTool(),
+				}),
+			},
+			mockApiResponse: `{
+                "id": "msg_03",
+                "type": "message",
+                "role": "assistant",
+                "model": "claude-3-opus-20240229",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "I can help you calculate. What would you like me to compute?"
+                    }
+                ]
+            }`,
+			mockApiStatusCode: http.StatusOK,
+			expectedResponse: &Response{
+				Type:    ResponseTypeText,
+				Content: "I can help you calculate. What would you like me to compute?",
+			},
+			expectErr: false,
+		},
+		{
 			name: "API returns an error",
 			inputMessages: []Message{
 				{Role: RoleUser, Content: "Hello"},
@@ -414,6 +464,7 @@ func TestChatOllama(t *testing.T) {
 	tests := []struct {
 		name              string
 		inputMessages     []Message
+		inputOptions      []Option
 		mockApiResponse   string
 		mockApiStatusCode int
 		expectedResponse  *Response
@@ -447,6 +498,32 @@ func TestChatOllama(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name: "request with tools option",
+			inputMessages: []Message{
+				{Role: RoleUser, Content: "Calculate 2+2"},
+			},
+			inputOptions: []Option{
+				WithTools([]llms.Tool{
+					createTestCalculatorTool(),
+				}),
+			},
+			mockApiResponse: `{
+                "model": "llama3",
+                "created_at": "2024-05-23T12:00:00Z",
+                "message": {
+                    "role": "assistant",
+                    "content": "The answer is 4."
+                },
+                "done": true
+            }`,
+			mockApiStatusCode: http.StatusOK,
+			expectedResponse: &Response{
+				Type:    ResponseTypeText,
+				Content: "The answer is 4.",
+			},
+			expectErr: false,
+		},
+		{
 			name: "API returns an error",
 			inputMessages: []Message{
 				{Role: RoleUser, Content: "Hello"},
@@ -476,7 +553,7 @@ func TestChatOllama(t *testing.T) {
 			client, err := NewAdapter(cfg)
 			require.NoError(t, err)
 
-			resp, err := client.Chat(context.Background(), tt.inputMessages)
+			resp, err := client.Chat(context.Background(), tt.inputMessages, tt.inputOptions...)
 
 			if tt.expectErr {
 				require.Error(t, err)

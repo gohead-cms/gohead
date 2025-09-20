@@ -12,7 +12,6 @@ import (
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
 	"github.com/hibiken/asynq"
-	"github.com/tmc/langchaingo/tools"
 )
 
 // AgentRunner executes agentic workflows.
@@ -63,16 +62,10 @@ func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Ag
 		return fmt.Errorf("could not create LLM adapter: %w", err)
 	}
 
+	// Create function registry for execution
 	registry := functions.NewRegistry(agent.Functions)
 
-	// Convert registry to langchain-compatible tools
 	langchainTools := registry.ToLangchainTools()
-
-	// Convert to []tools.Tool interface
-	toolInterfaces := make([]tools.Tool, len(langchainTools))
-	for i, tool := range langchainTools {
-		toolInterfaces[i] = tool
-	}
 
 	// 2. Prepare conversation history
 	history, err := storage.GetConversationHistory(agent.ID)
@@ -89,11 +82,17 @@ func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Ag
 
 	// 3. Start execution loop
 	for i := 0; i < agent.MaxTurns; i++ {
+		// Log the current turn
+		logger.Log.WithFields(map[string]any{
+			"agent_id":  agent.ID,
+			"turn":      i + 1,
+			"max_turns": agent.MaxTurns,
+		}).Debug("Starting turn")
+
 		response, err := llmClient.Chat(
 			ctx,
 			messages,
-			llm.WithTools(toolInterfaces),
-			llm.WithToolChoice("auto"),
+			llm.WithTools(langchainTools),
 		)
 		if err != nil {
 			return fmt.Errorf("LLM call failed on turn %d: %w", i+1, err)
@@ -107,25 +106,36 @@ func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Ag
 				"tool_arguments": toolCall.Arguments,
 			}).Info("LLM requested tool call")
 
+			// Add assistant message (tool call request)
 			messages = append(messages, llm.Message{Role: llm.RoleAssistant, Content: ""})
 
+			// Execute the tool
 			fn, ok := registry.Get(toolCall.Name)
 			if !ok {
 				errorPayload := map[string]string{"error": "Tool not found", "requested_tool": toolCall.Name}
 				errorJSON, _ := json.Marshal(errorPayload)
 				messages = append(messages, llm.Message{Role: llm.RoleTool, Content: string(errorJSON)})
+				logger.Log.WithField("tool_name", toolCall.Name).Warn("Tool not found in registry")
 				continue
 			}
 
+			// Execute the function with the arguments
 			result, err := fn(ctx, toolCall.Arguments)
 			if err != nil {
 				errorPayload := map[string]string{"error": "Tool execution failed", "message": err.Error()}
 				errorJSON, _ := json.Marshal(errorPayload)
 				messages = append(messages, llm.Message{Role: llm.RoleTool, Content: string(errorJSON)})
+				logger.Log.WithError(err).WithField("tool_name", toolCall.Name).Error("Tool execution failed")
 				continue
 			}
 
+			// Add tool result to messages
 			messages = append(messages, llm.Message{Role: llm.RoleTool, Content: result})
+
+			logger.Log.WithFields(map[string]any{
+				"agent_id":  agent.ID,
+				"tool_name": toolCall.Name,
+			}).Info("Tool executed successfully")
 
 		} else { // Plain text response
 			messages = append(messages, llm.Message{Role: llm.RoleAssistant, Content: response.Content})
