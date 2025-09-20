@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/tmc/langchaingo/llms"
 
@@ -11,6 +12,7 @@ import (
 	anthropic_client "github.com/gohead-cms/gohead/pkg/llm/anthropic"
 	ollama_client "github.com/gohead-cms/gohead/pkg/llm/ollama"
 	openai_client "github.com/gohead-cms/gohead/pkg/llm/openai"
+	"github.com/gohead-cms/gohead/pkg/logger"
 )
 
 // Role represents the role of a message sender.
@@ -34,14 +36,10 @@ const (
 
 // Message represents a single message in a conversation.
 type Message struct {
-	Role    Role   `json:"role"`
-	Content string `json:"content"`
-}
-
-// ToolCall represents a request to call a tool.
-type ToolCall struct {
-	Name      string `json:"name"`
-	Arguments any    `json:"arguments"`
+	Role       Role           `json:"role"`
+	Content    string         `json:"content"`
+	ToolCallID string         `json:"tool_call_id,omitempty"`
+	ToolCall   *llms.ToolCall `json:"tool_call,omitempty"`
 }
 
 // ResponseType indicates the type of the LLM's response.
@@ -56,7 +54,7 @@ const (
 type Response struct {
 	Type     ResponseType
 	Content  string
-	ToolCall *ToolCall
+	ToolCall *llms.ToolCall
 }
 
 // Client is the interface that all LLM providers must implement.
@@ -100,57 +98,84 @@ func (a *langChainAdapter) Chat(ctx context.Context, messages []Message, opts ..
 		opt(cfg)
 	}
 
-	// 1) Convert internal messages to langchaingo []llms.MessageContent
+	logger.Log.Info("Running chat with proper history conversion")
+
 	lcMessages := make([]llms.MessageContent, 0, len(messages))
 	for _, msg := range messages {
-		lcMessages = append(lcMessages, llms.TextParts(convertRole(msg.Role), msg.Content))
+		role := convertRole(msg.Role)
+
+		switch msg.Role {
+		case RoleTool:
+			lcMessages = append(lcMessages, llms.MessageContent{
+				Role: role,
+				Parts: []llms.ContentPart{llms.ToolCallResponse{
+					ToolCallID: msg.ToolCallID,
+					Content:    msg.Content,
+				}},
+			})
+		case RoleAssistant:
+			// Check for a single tool call request.
+			if msg.ToolCall != nil {
+				parts := []llms.ContentPart{
+					llms.ToolCall{
+						ID:   msg.ToolCall.ID,
+						Type: "function",
+						FunctionCall: &llms.FunctionCall{
+							Name:      msg.ToolCall.FunctionCall.Name,
+							Arguments: msg.ToolCall.FunctionCall.Arguments,
+						},
+					},
+				}
+				lcMessages = append(lcMessages, llms.MessageContent{Role: role, Parts: parts})
+			} else {
+				lcMessages = append(lcMessages, llms.TextParts(role, msg.Content))
+			}
+		default:
+			// Handles RoleUser and RoleSystem as plain text.
+			lcMessages = append(lcMessages, llms.TextParts(role, msg.Content))
+		}
 	}
 
-	// 2) Build call options - now cfg.Tools is already []llms.Tool
 	var callOpts []llms.CallOption
 	if len(cfg.Tools) > 0 {
 		callOpts = append(callOpts, llms.WithTools(cfg.Tools))
 	}
 
-	// Add tool choice if specified
 	if cfg.ToolChoice != nil {
-		// You might need to handle ToolChoice conversion here
-		// depending on your LLM provider's expectations
+		callOpts = append(callOpts, llms.WithToolChoice(cfg.ToolChoice))
 	}
 
-	// 3) Call the model
+	// Call the model
 	res, err := a.client.GenerateContent(ctx, lcMessages, callOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("langchaingo chat failed: %w", err)
 	}
 
-	// 4) Convert the langchaingo response back to our internal Response type
 	if res == nil || len(res.Choices) == 0 {
 		return nil, fmt.Errorf("no response choices returned from LLM")
 	}
 
 	choice := res.Choices[0]
 
-	// Function-calling (single func)
 	if choice.FuncCall != nil {
+		toolCallID := fmt.Sprintf("call_%d", time.Now().UnixNano())
 		return &Response{
 			Type: ResponseTypeToolCall,
-			ToolCall: &ToolCall{
-				Name:      choice.FuncCall.Name,
-				Arguments: choice.FuncCall.Arguments,
+			ToolCall: &llms.ToolCall{
+				ID:           toolCallID,
+				Type:         "function",
+				FunctionCall: choice.FuncCall,
 			},
 		}, nil
 	}
 
-	// Multi-tool calling path
-	if len(choice.ToolCalls) > 0 && choice.ToolCalls[0].FunctionCall != nil {
-		fc := choice.ToolCalls[0].FunctionCall
+	// Modern tool-calling path
+	if len(choice.ToolCalls) > 0 {
+		// CORRECTED: Directly use the ToolCall from the response.
+		// We process only the first one to match the Response struct.
 		return &Response{
-			Type: ResponseTypeToolCall,
-			ToolCall: &ToolCall{
-				Name:      fc.Name,
-				Arguments: fc.Arguments,
-			},
+			Type:     ResponseTypeToolCall,
+			ToolCall: &choice.ToolCalls[0],
 		}, nil
 	}
 

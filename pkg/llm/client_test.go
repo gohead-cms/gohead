@@ -196,7 +196,7 @@ func TestChatOpenAI(t *testing.T) {
 			mockApiStatusCode: http.StatusOK,
 			expectedResponse: &Response{
 				Type: ResponseTypeToolCall,
-				ToolCall: &ToolCall{
+				ToolCall: &llms.ToolCall{
 					Name: "get_weather",
 					Arguments: map[string]any{
 						"location": "Boston, MA",
