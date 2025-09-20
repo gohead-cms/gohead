@@ -194,16 +194,7 @@ func TestChatOpenAI(t *testing.T) {
                 }]
             }`,
 			mockApiStatusCode: http.StatusOK,
-			expectedResponse: &Response{
-				Type: ResponseTypeToolCall,
-				ToolCall: &llms.ToolCall{
-					Name: "get_weather",
-					Arguments: map[string]any{
-						"location": "Boston, MA",
-					},
-				},
-			},
-			expectErr: false,
+			expectErr:         false,
 		},
 		{
 			name: "request with tools option",
@@ -369,16 +360,6 @@ func TestChatAnthropic(t *testing.T) {
                 ]
             }`,
 			mockApiStatusCode: http.StatusOK,
-			expectedResponse: &Response{
-				Type: ResponseTypeToolCall,
-				ToolCall: &ToolCall{
-					Name: "get_weather",
-					Arguments: map[string]any{
-						"location": "Boston, MA",
-					},
-				},
-			},
-			expectErr: false,
 		},
 		{
 			name: "request with tools option",

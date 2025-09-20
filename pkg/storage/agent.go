@@ -13,6 +13,14 @@ import (
 	"github.com/gohead-cms/gohead/pkg/logger"
 )
 
+// DBToolCall represents a simplified tool call for database storage
+type DBToolCall struct {
+	ID           string `json:"id"`
+	Type         string `json:"type"`
+	FunctionName string `json:"function_name"`
+	Arguments    string `json:"arguments"`
+}
+
 // SaveAgent persists an Agent to the database, handling both new and soft-deleted records.
 func SaveAgent(agent *models.Agent) error {
 	var existing models.Agent
@@ -206,9 +214,12 @@ func GetConversationHistory(agentID uint) ([]llm.Message, error) {
 	history := make([]llm.Message, len(dbMessages))
 	for i, msg := range dbMessages {
 		history[i] = llm.Message{
-			Role:    msg.Role,
-			Content: msg.Content,
+			Role:       msg.Role,
+			Content:    msg.Content,
+			ToolCallID: msg.ToolCallID,
+			ToolCall:   msg.ToolCall.ToLangChainToolCall(),
 		}
+
 	}
 
 	return history, nil
@@ -232,10 +243,12 @@ func SaveConversationHistory(agentID uint, messages []llm.Message) error {
 	// 2. Insert the new messages with their correct turn order.
 	for i, msg := range messages {
 		dbMessage := models.AgentMessage{
-			AgentID: agentID,
-			Role:    msg.Role,
-			Content: msg.Content,
-			Turn:    i + 1, // Store the turn order
+			AgentID:    agentID,
+			Role:       msg.Role,
+			Content:    msg.Content,
+			ToolCallID: msg.ToolCallID,
+			ToolCall:   models.FromLangChainToolCall(msg.ToolCall),
+			Turn:       i + 1, // Store the turn order
 		}
 		if err := tx.Create(&dbMessage).Error; err != nil {
 			tx.Rollback() // Rollback on error

@@ -15,7 +15,7 @@ func New() (*openai.LLM, error) {
 	}
 
 	// The openai.New() function automatically reads the API key from the environment variable.
-	llm, err := openai.New()
+	llm, err := openai.New(openai.WithModel("gpt-4o"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create OpenAI client: %w", err)
 	}

@@ -2,9 +2,9 @@ package llm
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/tmc/langchaingo/llms"
 
@@ -103,7 +103,10 @@ func (a *langChainAdapter) Chat(ctx context.Context, messages []Message, opts ..
 	lcMessages := make([]llms.MessageContent, 0, len(messages))
 	for _, msg := range messages {
 		role := convertRole(msg.Role)
-
+		logger.Log.WithFields(map[string]any{
+			"message": msg.Content,
+			"role":    msg.Role,
+		}).Info("Message")
 		switch msg.Role {
 		case RoleTool:
 			lcMessages = append(lcMessages, llms.MessageContent{
@@ -114,20 +117,34 @@ func (a *langChainAdapter) Chat(ctx context.Context, messages []Message, opts ..
 				}},
 			})
 		case RoleAssistant:
-			// Check for a single tool call request.
 			if msg.ToolCall != nil {
-				parts := []llms.ContentPart{
-					llms.ToolCall{
-						ID:   msg.ToolCall.ID,
-						Type: "function",
-						FunctionCall: &llms.FunctionCall{
-							Name:      msg.ToolCall.FunctionCall.Name,
-							Arguments: msg.ToolCall.FunctionCall.Arguments,
-						},
-					},
+				// Assistant message with tool call - needs both content and tool call
+				parts := []llms.ContentPart{}
+
+				// Add text content first (even if empty)
+				if msg.Content != "" {
+					parts = append(parts, llms.TextPart(msg.Content))
 				}
-				lcMessages = append(lcMessages, llms.MessageContent{Role: role, Parts: parts})
+
+				logger.Log.WithFields(map[string]any{
+					"arguments": msg.ToolCall.FunctionCall.Arguments,
+				}).Info("LLM Response")
+				// Add the tool call
+				parts = append(parts, llms.ToolCall{
+					ID:   msg.ToolCall.ID,
+					Type: "function",
+					FunctionCall: &llms.FunctionCall{
+						Name:      msg.ToolCall.FunctionCall.Name,
+						Arguments: msg.ToolCall.FunctionCall.Arguments,
+					},
+				})
+
+				lcMessages = append(lcMessages, llms.MessageContent{
+					Role:  role,
+					Parts: parts,
+				})
 			} else {
+				// Regular assistant message with just text
 				lcMessages = append(lcMessages, llms.TextParts(role, msg.Content))
 			}
 		default:
@@ -155,24 +172,17 @@ func (a *langChainAdapter) Chat(ctx context.Context, messages []Message, opts ..
 		return nil, fmt.Errorf("no response choices returned from LLM")
 	}
 
-	choice := res.Choices[0]
-
-	if choice.FuncCall != nil {
-		toolCallID := fmt.Sprintf("call_%d", time.Now().UnixNano())
-		return &Response{
-			Type: ResponseTypeToolCall,
-			ToolCall: &llms.ToolCall{
-				ID:           toolCallID,
-				Type:         "function",
-				FunctionCall: choice.FuncCall,
-			},
-		}, nil
+	rawResponseJSON, jsonErr := json.MarshalIndent(res, "", "  ")
+	if jsonErr != nil {
+		logger.Log.WithError(jsonErr).Warn("Could not marshal raw LLM response for debugging")
+	} else {
+		logger.Log.WithField("raw_llm_response", string(rawResponseJSON)).Info("Received raw response from LLM")
 	}
+
+	choice := res.Choices[0]
 
 	// Modern tool-calling path
 	if len(choice.ToolCalls) > 0 {
-		// CORRECTED: Directly use the ToolCall from the response.
-		// We process only the first one to match the Response struct.
 		return &Response{
 			Type:     ResponseTypeToolCall,
 			ToolCall: &choice.ToolCalls[0],

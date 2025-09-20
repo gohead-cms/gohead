@@ -64,12 +64,25 @@ func getCollectionSchema(ctx context.Context, args any) (string, error) {
 // upsertCollectionItem creates a new item or updates an existing one.
 // NOTE: It treats `item_id` as the primary key. If `item_id` is "0" or empty, it creates a new record.
 func upsertCollectionItem(ctx context.Context, args any) (string, error) {
-	argMap, ok := args.(map[string]any)
+	argString, ok := args.(string)
 	if !ok {
-		return `{"status": "error", "message": "invalid arguments format"}`, nil
+		// This would happen if something other than a string is passed.
+		return `{"status": "error", "message": "invalid arguments type, expected a string"}`, nil
 	}
 
-	collectionName, _ := argMap["collection_name"].(string)
+	var argMap map[string]any
+	err := json.Unmarshal([]byte(argString), &argMap)
+	if err != nil {
+		// This handles cases where the LLM sends a malformed JSON string.
+		return `{"status": "error", "message": "invalid JSON format in arguments"}`, nil
+	}
+
+	// 3. Success! You can now use argMap as a normal map.
+	collectionName, ok := argMap["collection_name"].(string)
+	if !ok {
+		return `{"status": "error", "message": "missing or invalid 'collection_name'"}`, nil
+	}
+
 	itemIDStr, _ := argMap["item_id"].(string)
 	data, _ := argMap["data"].(map[string]any)
 

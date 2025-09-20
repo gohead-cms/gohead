@@ -66,13 +66,17 @@ func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Ag
 	registry := functions.NewRegistry(agent.Functions)
 
 	langchainTools := registry.ToLangchainTools()
-
+	logger.Log.WithFields(map[string]any{
+		"tools": langchainTools,
+	}).Info("tools")
 	// 2. Prepare conversation history
 	history, err := storage.GetConversationHistory(agent.ID)
 	if err != nil {
 		return fmt.Errorf("could not load conversation history: %w", err)
 	}
-
+	logger.Log.WithFields(map[string]any{
+		"history": history,
+	}).Info("Agent History")
 	contextualInput := r.createContextualInput(payload)
 	messages := []llm.Message{
 		{Role: llm.RoleSystem, Content: agent.SystemPrompt},
@@ -89,12 +93,17 @@ func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Ag
 			"max_turns": agent.MaxTurns,
 		}).Info("Starting turn")
 
+		logger.Log.Info("ENVOI")
+
 		response, err := llmClient.Chat(
 			ctx,
 			messages,
 			llm.WithTools(langchainTools),
 		)
-
+		logger.Log.WithFields(map[string]any{
+			"response": response,
+		}).Info("LLM Response")
+		logger.Log.Info(response)
 		if err != nil {
 			return fmt.Errorf("LLM call failed on turn %d: %w", i+1, err)
 		}
@@ -110,9 +119,8 @@ func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Ag
 
 			// Add assistant message (tool call request)
 			messages = append(messages, llm.Message{
-				Role:       llm.RoleAssistant,
-				ToolCallID: toolCall.ID,
-				ToolCall:   toolCall,
+				Role:     llm.RoleAssistant,
+				ToolCall: toolCall,
 			})
 
 			// Execute the tool
@@ -163,7 +171,8 @@ func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Ag
 			break
 		}
 	}
-
+	logger.Log.Info("MESSAGE")
+	logger.Log.Info(messages)
 	// 4. Save the final conversation history
 	if err := storage.SaveConversationHistory(agent.ID, messages[1:]); err != nil {
 		return fmt.Errorf("could not save conversation history: %w", err)
