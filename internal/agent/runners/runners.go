@@ -87,13 +87,14 @@ func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Ag
 			"agent_id":  agent.ID,
 			"turn":      i + 1,
 			"max_turns": agent.MaxTurns,
-		}).Debug("Starting turn")
+		}).Info("Starting turn")
 
 		response, err := llmClient.Chat(
 			ctx,
 			messages,
 			llm.WithTools(langchainTools),
 		)
+
 		if err != nil {
 			return fmt.Errorf("LLM call failed on turn %d: %w", i+1, err)
 		}
@@ -102,39 +103,58 @@ func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Ag
 			toolCall := response.ToolCall
 			logger.Log.WithFields(map[string]any{
 				"agent_id":       agent.ID,
-				"tool_name":      toolCall.Name,
-				"tool_arguments": toolCall.Arguments,
+				"tool_id":        toolCall.ID,
+				"tool_name":      toolCall.FunctionCall.Name,
+				"tool_arguments": toolCall.FunctionCall.Arguments,
 			}).Info("LLM requested tool call")
 
 			// Add assistant message (tool call request)
-			messages = append(messages, llm.Message{Role: llm.RoleAssistant, Content: ""})
+			messages = append(messages, llm.Message{
+				Role:       llm.RoleAssistant,
+				ToolCallID: toolCall.ID,
+				ToolCall:   toolCall,
+			})
 
 			// Execute the tool
-			fn, ok := registry.Get(toolCall.Name)
+			fn, ok := registry.Get(toolCall.FunctionCall.Name)
 			if !ok {
-				errorPayload := map[string]string{"error": "Tool not found", "requested_tool": toolCall.Name}
+				errorPayload := map[string]string{"error": "Tool not found", "requested_tool": toolCall.FunctionCall.Name}
 				errorJSON, _ := json.Marshal(errorPayload)
-				messages = append(messages, llm.Message{Role: llm.RoleTool, Content: string(errorJSON)})
-				logger.Log.WithField("tool_name", toolCall.Name).Warn("Tool not found in registry")
-				continue
+				// Add a tool response message with the error and the corresponding ID
+				messages = append(messages, llm.Message{
+					Role:       llm.RoleTool,
+					ToolCallID: toolCall.ID,
+					Content:    string(errorJSON),
+				})
+				logger.Log.WithField("tool_name", toolCall.FunctionCall.Name).Warn("Tool not found in registry")
+				continue // Continue to the next turn
 			}
 
 			// Execute the function with the arguments
-			result, err := fn(ctx, toolCall.Arguments)
+			result, err := fn(ctx, toolCall.FunctionCall.Arguments)
 			if err != nil {
 				errorPayload := map[string]string{"error": "Tool execution failed", "message": err.Error()}
 				errorJSON, _ := json.Marshal(errorPayload)
-				messages = append(messages, llm.Message{Role: llm.RoleTool, Content: string(errorJSON)})
-				logger.Log.WithError(err).WithField("tool_name", toolCall.Name).Error("Tool execution failed")
-				continue
+				// Add a tool response message with the error and the corresponding ID
+				messages = append(messages, llm.Message{
+					Role:       llm.RoleTool,
+					ToolCallID: toolCall.ID,
+					Content:    string(errorJSON),
+				})
+				logger.Log.WithError(err).WithField("tool_name", toolCall.FunctionCall.Name).Error("Tool execution failed")
+				continue // Continue to the next turn
 			}
 
 			// Add tool result to messages
-			messages = append(messages, llm.Message{Role: llm.RoleTool, Content: result})
+			messages = append(messages, llm.Message{
+				Role:       llm.RoleTool,
+				ToolCallID: toolCall.ID,
+				Content:    result,
+			})
 
 			logger.Log.WithFields(map[string]any{
 				"agent_id":  agent.ID,
-				"tool_name": toolCall.Name,
+				"tool_name": toolCall.FunctionCall.Name,
 			}).Info("Tool executed successfully")
 
 		} else { // Plain text response
