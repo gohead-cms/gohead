@@ -15,12 +15,17 @@ func init() {
 // logMessage is the implementation for the "system.log" agent function.
 // It logs a message and associated data to the worker's console.
 func logMessage(ctx context.Context, args any) (string, error) {
-	argMap, ok := args.(map[string]any)
+	argString, ok := args.(string)
 	if !ok {
-		// This case should ideally be handled by the LLM's structured output,
-		// but we add a fallback for safety.
-		logger.Log.WithField("source", "system.log").Warnf("Invalid arguments format received: %T", args)
-		return `{"status": "error", "message": "invalid arguments format"}`, nil
+		// This would happen if something other than a string is passed.
+		return `{"status": "error", "message": "invalid arguments type, expected a string"}`, nil
+	}
+
+	var argMap map[string]any
+	err := json.Unmarshal([]byte(argString), &argMap)
+	if err != nil {
+		// This handles cases where the LLM sends a malformed JSON string.
+		return `{"status": "error", "message": "invalid JSON format in arguments"}`, nil
 	}
 
 	message, _ := argMap["message"].(string)

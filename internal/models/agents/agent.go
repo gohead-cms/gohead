@@ -260,9 +260,6 @@ func validateFunctionSpecs(funcs []FunctionSpec) error {
 	seenName := make(map[string]struct{})
 	for _, f := range funcs {
 		if f.ImplKey != "" {
-			if _, ok := seenImpl[f.ImplKey]; ok {
-				return errors.New("duplicate function implementation key")
-			}
 			seenImpl[f.ImplKey] = struct{}{}
 		}
 		if f.Name != "" {
