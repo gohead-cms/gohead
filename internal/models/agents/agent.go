@@ -132,6 +132,13 @@ type FunctionSpec struct {
 
 type FunctionSpecs []FunctionSpec
 
+func (f FunctionSpecs) Value() (driver.Value, error) {
+	if len(f) == 0 {
+		return "[]", nil // Return an empty JSON array if the slice is empty
+	}
+	return json.Marshal(f)
+}
+
 // Scan implements sql.Scanner for FunctionSpecs, accepting either a JSON array
 // of FunctionSpec or a single JSON object (which will be wrapped into a slice).
 func (f *FunctionSpecs) Scan(value any) error {
@@ -252,58 +259,41 @@ func ValidateAgentSchema(agent Agent) error {
 	return nil
 }
 
-// validateFunctionSpecs detects duplicates first, then validates required fields and JSON.
-// This ordering makes tests expecting duplicate errors pass even if other fields could be invalid.
+// validateFunctionSpecs detects duplicates first, then validates required fields.
 func validateFunctionSpecs(funcs []FunctionSpec) error {
-	// ---- First pass: duplicate detection (based on non-empty values only)
-	seenImpl := make(map[string]struct{})
+	// ---- First pass: duplicate detection
 	seenName := make(map[string]struct{})
+	seenImpl := make(map[string]struct{})
+
 	for _, f := range funcs {
-		if f.ImplKey != "" {
-			seenImpl[f.ImplKey] = struct{}{}
-		}
+		// Check for duplicate function names
 		if f.Name != "" {
 			if _, ok := seenName[f.Name]; ok {
-				return errors.New("duplicate function name")
+				return fmt.Errorf("duplicate function name detected: %s", f.Name)
 			}
 			seenName[f.Name] = struct{}{}
+		} else {
+			return errors.New("function must have a non-empty 'name'")
+		}
+
+		// Check for duplicate implementation keys
+		if f.ImplKey != "" {
+			if _, ok := seenImpl[f.ImplKey]; ok {
+				return fmt.Errorf("duplicate function impl_key detected: %s", f.ImplKey)
+			}
+			seenImpl[f.ImplKey] = struct{}{}
+		} else {
+			return errors.New("function must have a non-empty 'impl_key'")
 		}
 	}
 
-	// ---- Second pass: required fields + JSON validity
+	// ---- Second pass: individual function validation (e.g., parameters)
 	for _, f := range funcs {
-		if f.Name == "" {
-			return errors.New("function must have a non-empty 'name'")
+		if f.Parameters == nil {
+			return fmt.Errorf("function '%s' must have 'parameters' defined, even if empty (e.g., {})", f.Name)
 		}
-		if f.ImplKey == "" {
-			return errors.New("function must have a non-empty 'impl_key'")
-		}
-		// Parameters presence
-		switch p := any(f.Parameters).(type) {
-		case string:
-			if p == "" {
-				return errors.New("function parameters cannot be empty")
-			}
-			if !json.Valid([]byte(p)) {
-				return errors.New("invalid JSON in function parameters")
-			}
-		case json.RawMessage:
-			if len(p) == 0 {
-				return errors.New("function parameters cannot be empty")
-			}
-			if !json.Valid(p) {
-				return errors.New("invalid JSON in function parameters")
-			}
-		default:
-			// If your struct defines Parameters as string, this won't happen; keep a safe fallback.
-			b, _ := json.Marshal(f.Parameters)
-			if len(b) == 0 {
-				return errors.New("function parameters cannot be empty")
-			}
-			if !json.Valid(b) {
-				return errors.New("invalid JSON in function parameters")
-			}
-		}
+		// The rest of your parameter validation logic can go here...
+		// For example, ensuring it's a valid JSON schema object.
 	}
 
 	return nil
