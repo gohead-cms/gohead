@@ -14,7 +14,7 @@ import (
 
 // GetAgents retrieves a list of agents with optional filtering and pagination.
 func GetAgents(c *gin.Context) {
-	logger.Log.Debug("Handler:GetAgents")
+	logger.Log.Debug("handler.get_agents")
 
 	// Pagination management
 	filterParam := c.Query("filter")

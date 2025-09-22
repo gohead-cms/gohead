@@ -1,9 +1,8 @@
-// src/api.ts
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-import { useAuthStore } from "../store/auth";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+import { useAuthStore } from "./auth";
 
 export function apiFetch(path: string, options?: RequestInit) {
-  return fetch(`${API_BASE_URL}${path}`, options)
+  return fetch(`${API_BASE_URL}${path}`, options);
 }
 
 export async function apiFetchWithAuth(path: string, options: RequestInit = {}) {
@@ -12,7 +11,8 @@ export async function apiFetchWithAuth(path: string, options: RequestInit = {}) 
     ...options.headers,
     Authorization: `Bearer ${token}`,
   };
-  return fetch(`${import.meta.env.VITE_API_URL || "http://localhost:8080"}${path}`, {
+  
+  return fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers,
   });

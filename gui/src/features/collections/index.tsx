@@ -2,8 +2,8 @@ import React, { useEffect, useState } from "react";
 import { Flex, Box, Spinner, Text, Badge, Link, Icon, List, ListItem } from "@chakra-ui/react";
 import {
   FiPlus} from "react-icons/fi";
-import { apiFetchWithAuth } from "../../utils/api";
-import CollectionSchema from "./CollectionSchema";
+import { apiFetchWithAuth } from "../../services/api";
+import CollectionSchema from "../workspace/components/CollectionSchema";
 
 export default function CollectionsPage() {
   const [collections, setCollections] = useState<{ name: string }[]>([]);

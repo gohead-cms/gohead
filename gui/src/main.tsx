@@ -1,14 +1,17 @@
-import { ChakraProvider } from "@chakra-ui/react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import React from "react";
-import ReactDOM from "react-dom/client";
-import App from "./App";
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import App from './app/App';
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
+const rootElement = document.getElementById('root');
+if (!rootElement) throw new Error('Failed to find the root element');
+
+const root = ReactDOM.createRoot(rootElement);
+
+root.render(
   <React.StrictMode>
-    {/* ChakraProvider will use its default theme automatically */}
-    <ChakraProvider>
+    <BrowserRouter>
       <App />
-    </ChakraProvider>
+    </BrowserRouter>
   </React.StrictMode>
 );

@@ -7,7 +7,7 @@ import Header from "./Header";
 // We no longer need to import the Sidebar
 // import Sidebar from "./Sidebar"; 
 
-export default function PageShell({ children }: { children: React.ReactNode }) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <Flex direction="column" minH="100vh">
       <Header />

@@ -1,6 +1,5 @@
-import React from 'react';
 import { Handle, NodeProps, Position } from '@xyflow/react';
-import { CollectionNodeData, CollectionNodeType } from './CollectionNodeData';
+import { CollectionNodeType } from '../../../shared/types/collections';
 
 // Use the CollectionNodeData interface with NodeProps
 export default function CollectionNode({ data }: NodeProps<CollectionNodeType>) {

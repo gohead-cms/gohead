@@ -181,7 +181,7 @@ func setupRoutes(router *gin.Engine) {
 		agents := admin.Group("/agents")
 		{
 			agents.POST("/", handlers.CreateAgent)
-			agents.GET("/", handlers.GetAgent)
+			agents.GET("", handlers.GetAgents)
 			agents.GET("/:name", handlers.GetAgent)
 			agents.PUT("/:name", handlers.UpdateAgent)
 			agents.DELETE("/:name", handlers.DeleteAgent)
