@@ -18,6 +18,6 @@
     "customConditions": ["dev"]
   },
   "exclude": ["node_modules"],
-  "include": ["src"],
+  "include": ["src", "../docs/WorkspaceCanvas_backup.tsx"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

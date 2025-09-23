@@ -4,8 +4,6 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
   addEdge,
-  Node,
-  Edge,
   NodeChange,
   EdgeChange,
   Connection,
@@ -16,19 +14,12 @@ import {
   BackgroundVariant
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import type { Schema, AgentNodeData } from "../../shared/types";
-import CollectionEdge from "./components/CollectionEdge";
-import CollectionNode from "./components/CollectionNode";
-import AgentNode from "./components/AgentNode";
-import { FaRobot } from "react-icons/fa";
-import { List, ListItem } from "@chakra-ui/react";
 import {
   Box,
   Spinner,
   Button,
   Flex,
   IconButton,
-  useDisclosure,
   Text,
   VStack,
   HStack,
@@ -58,161 +49,61 @@ import {
   ModalCloseButton,
 } from '@chakra-ui/react';
 import { FaPlus, FaEdit, FaTrash, FaEye, FaArrowsAltV, FaArrowsAltH } from "react-icons/fa";
-import { apiFetchWithAuth } from "../../services/api";
-import { CollectionEdgeType } from "../../shared/types";
-import dagre from "@dagrejs/dagre";
+
+// Local imports
+import CollectionEdge from "./components/CollectionEdge";
+import CollectionNode from "./components/CollectionNode";
+import AgentNode from "./components/AgentNode";
 import { AttributeEditorSidebar } from "./components/AttributeEditorSidebar";
 import { RelationModal } from "./components/RelationModal";
+import { useWorkspaceData } from "./hooks/useWorkspaceData";
+import { useWorkspaceModals } from "./hooks/useWorkspaceModals";
 
-type AttributeItem = {
-  name: string;
-  type: string;
-};
+// Types
+import type { AttributeItem, AppNode, CollectionNode as CollectionNodeType } from "../../shared/types/workspace";
+import type { CollectionEdgeType } from "../../shared/types";
 
-type CollectionNode = Node<{ label: string; attributes: AttributeItem[] }, 'collectionNode'>;
-type AgentNode = Node<AgentNodeData, 'agentNode'>;
-
-type AppNode = CollectionNode | AgentNode;
-
-// --- Dagre layout logic start ---
-const dagreGraph = new dagre.graphlib.Graph();
-dagreGraph.setDefaultEdgeLabel(() => ({}));
-
-const nodeWidth = 200;
-const nodeHeight = 60;
-
-function getLayoutedElements(nodes: AppNode[], edges: Edge[], direction = "TB") {
-  dagreGraph.setGraph({
-    rankdir: direction,
-    nodesep: 300,
-    ranksep: 350,
-  });
-  nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
-  });
-
-  edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
-  });
-
-  dagre.layout(dagreGraph);
-
-  const layoutedNodes = nodes.map((node) => {
-    const nodeWithPosition = dagreGraph.node(node.id);
-
-    node.position = {
-      x: nodeWithPosition.x - nodeWidth / 2,
-      y: nodeWithPosition.y - nodeHeight / 2,
-    };
-
-    return node;
-  });
-
-  return { nodes: layoutedNodes, edges };
-}
-// --- Dagre layout logic end ---
-
-export default function SchemaStudio() {
+export default function WorkspaceCanvas() {
   const reactFlowWrapperRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
-  const [nodes, setNodes] = useState<AppNode[]>([]);
-  const [edges, setEdges] = useState<Edge[]>([]); // Generic Edge type for both
-  const [loading, setLoading] = useState(true);
   const [layoutDirection, setLayoutDirection] = useState("LR");
-  const [selectedNode, setSelectedNode] = useState<AppNode | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; node: AppNode; } | null>(null);
 
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  // States for modals and sidebars
-  const { isOpen: isViewerOpen, onOpen: onViewerOpen, onClose: onViewerClose } = useDisclosure();
-  const [viewingNode, setViewingNode] = useState<AppNode | null>(null);
-  
-  const { isOpen: isCollectionEditorOpen, onOpen: onCollectionEditorOpen, onClose: onCollectionEditorClose } = useDisclosure();
-  const [editingCollection, setEditingCollection] = useState<CollectionNode | null>(null);
-  
-  const { isOpen: isAgentEditorOpen, onOpen: onAgentEditorOpen, onClose: onAgentEditorClose } = useDisclosure();
-  const [editingAgent, setEditingAgent] = useState<AgentNode | null>(null);
-
-  const { isOpen: isCreateModalOpen, onOpen: onCreateModalOpen, onClose: onCreateModalClose } = useDisclosure();
-  const [newCollectionData, setNewCollectionData] = useState({ displayName: "", singularId: "", pluralId: "" });
-  const [validationErrors, setValidationErrors] = useState({ displayName: "" });
-  
-  const { isOpen: isRelationModalOpen, onOpen: onRelationModalOpen, onClose: onRelationModalClose } = useDisclosure();
-  const [newConnection, setNewConnection] = useState<Connection | null>(null);
-  const fetchDataAndLayout = useCallback((direction: string) => {
-    setLoading(true);
-    Promise.all([
-      apiFetchWithAuth("/admin/collections"),
-      apiFetchWithAuth("/admin/agents"),
-    ]).then(async ([collectionsRes, agentsRes]) => {
-      // Process Collections
-      const collectionsJson = await collectionsRes.json();
-      const collections: { schema: Schema }[] = collectionsJson.data || [];
-      const collectionNodes: CollectionNode[] = collections.map((col) => ({
-        id: col.schema.collectionName!,
-        type: "collectionNode" as const,
-        position: { x: 0, y: 0 },
-        data: {
-          label: col.schema.info?.displayName || col.schema.collectionName || '',
-          attributes: Object.entries(col.schema.attributes).map(([name, attr]: [string, { type: string }]) => ({ name, type: attr.type })),
-        },
-      }));
-
-      const collectionEdges: CollectionEdgeType[] = collections.flatMap((col) => {
-        const collectionName = col.schema.collectionName;
-        if (!collectionName) return [];
-        return Object.entries(col.schema.attributes || {}).map(([attrName, attr]: [string, any]) => {
-          if (attr.type.includes("relation") && attr.target) {
-            const targetName = attr.target.split(".").pop();
-            return {
-              id: `${collectionName}-${targetName!}-${attrName}`,
-              source: collectionName, target: targetName!, animated: true, style: { stroke: "#52b4ca" }, type: "collection",
-              markerEnd: { type: MarkerType.ArrowClosed }, data: { label: attrName, relationType: attr.relation }
-            };
-          }
-          return null;
-        }).filter(Boolean) as CollectionEdgeType[];
-      });
-
-      // Process Agents
-      const agentsJson = await agentsRes.json();
-      const agents: AgentNodeData[] = agentsJson.data || [];
-      const agentNodes: AgentNode[] = agents.map((agent) => ({
-        id: agent.name,
-        type: "agentNode" as const,
-        position: { x: 0, y: 0 },
-        data: agent,
-      }));
-
-      const agentTriggerEdges: Edge[] = agents.flatMap((agent) => {
-        const trigger = agent.schema?.trigger;
-        if (trigger?.type === 'collection_event' && trigger.event_trigger?.collection) {
-          return {
-            id: `trigger-${trigger.event_trigger.collection}-to-${agent.name}`,
-            source: trigger.event_trigger.collection, target: agent.name, type: 'smoothstep', animated: true,
-            style: { stroke: '#8a52ca', strokeDasharray: '5,5' }, markerEnd: { type: MarkerType.ArrowClosed, color: '#8a52ca' },
-          };
-        }
-        return [];
-      });
-
-      // Combine and Layout
-      const allNodes: AppNode[] = [...collectionNodes, ...agentNodes];
-      const allEdges: Edge[] = [...collectionEdges, ...agentTriggerEdges];
-      const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(allNodes, allEdges, direction);
-
-      setNodes(layoutedNodes);
-      setEdges(layoutedEdges);
-    }).finally(() => setLoading(false));
-  }, []);
+  // Custom hooks
+  const { nodes, edges, loading, setNodes, setEdges, fetchDataAndLayout } = useWorkspaceData();
+  const {
+    modal,
+    viewerModal,
+    collectionEditorModal,
+    agentEditorModal,
+    createModal,
+    relationModal,
+    selectedNode,
+    setSelectedNode,
+    viewingNode,
+    setViewingNode,
+    editingCollection,
+    setEditingCollection,
+    editingAgent,
+    setEditingAgent,
+    contextMenu,
+    setContextMenu,
+    newCollectionData,
+    setNewCollectionData,
+    validationErrors,
+    setValidationErrors,
+    newConnection,
+    setNewConnection,
+    resetNewCollectionData,
+  } = useWorkspaceModals();
 
   useEffect(() => {
     fetchDataAndLayout(layoutDirection);
   }, [layoutDirection, fetchDataAndLayout]);
+
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => 
       setNodes((nds) => applyNodeChanges(changes, nds) as AppNode[]),
-    []
+    [setNodes]
   );
 
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {
@@ -240,15 +131,16 @@ export default function SchemaStudio() {
     (params: Connection) => {
       if (params.source === params.target) return;
       setNewConnection(params);
-      onRelationModalOpen();
+      relationModal.onOpen();
     },
-    [onRelationModalOpen]
+    [relationModal.onOpen, setNewConnection]
   );
+
   const onNodeClick = useCallback(
     (event: React.MouseEvent, node: AppNode) => {
       setSelectedNode(node);
     },
-    []
+    [setSelectedNode]
   );
   
   const onNodeContextMenu = useCallback(
@@ -264,12 +156,13 @@ export default function SchemaStudio() {
         setSelectedNode(node);
       }
     },
-    []
+    [setContextMenu, setSelectedNode]
   );
+
   const onPaneClick = useCallback(() => {
     setContextMenu(null);
     setSelectedNode(null);
-  }, []);
+  }, [setContextMenu, setSelectedNode]);
 
   const handleDisplayNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const displayName = e.target.value;
@@ -290,13 +183,8 @@ export default function SchemaStudio() {
   };
 
   const handleAddCollection = () => {
-    setNewCollectionData({
-      displayName: "",
-      singularId: "",
-      pluralId: ""
-    });
-    setValidationErrors({ displayName: "" });
-    onCreateModalOpen();
+    resetNewCollectionData();
+    createModal.onOpen();
   };
 
   const handleContinueClick = () => {
@@ -305,7 +193,7 @@ export default function SchemaStudio() {
       return;
     }
 
-    const newNode: CollectionNode = {
+    const newNode: CollectionNodeType = {
       id: newCollectionData.singularId,
       type: "collectionNode",
       position: { x: 50, y: 50 },
@@ -321,26 +209,17 @@ export default function SchemaStudio() {
       return;
     }
 
-    // This now works because newNode is correctly typed
     setNodes((currentNodes) => [...currentNodes, newNode]);
-
-    // Use the updated state setters from the refactor
     setEditingCollection(newNode);
-    onCollectionEditorOpen();
-    
-    onCreateModalClose();
-    setNewCollectionData({
-      displayName: "",
-      singularId: "",
-      pluralId: ""
-    });
+    collectionEditorModal.onOpen();
+    createModal.onClose();
+    resetNewCollectionData();
   };
 
   const handleUpdateNodeAttributes = useCallback(
     (nodeId: string, newAttributes: AttributeItem[]) => {
       setNodes((currentNodes) =>
         currentNodes.map((node) => {
-          // TYPE GUARD: Check both the ID and the node type.
           if (node.id === nodeId && node.type === 'collectionNode') {
             return {
               ...node,
@@ -350,12 +229,11 @@ export default function SchemaStudio() {
               },
             };
           }
-          // For all other nodes (including AgentNodes), return them unmodified.
           return node;
         })
       );
     },
-    []
+    [setNodes]
   );
   
   const handleSaveRelation = useCallback((sourceId: string, targetId: string, relation: { type: string; label: string; }) => {
@@ -380,9 +258,7 @@ export default function SchemaStudio() {
 
       setNodes(currentNodes =>
         currentNodes.map(node => {
-          // TYPE GUARD: Check both the ID and the node type.
           if (node.id === newConnection.source && node.type === 'collectionNode') {
-            // Inside this block, TypeScript knows `node` is a CollectionNode.
             const newAttribute: AttributeItem = { 
               name: relation.label, 
               type: `Relation: ${relation.type}` 
@@ -396,7 +272,6 @@ export default function SchemaStudio() {
               }
             };
           }
-          // For all other nodes (including AgentNodes), return them unmodified.
           return node;
         })
       );
@@ -410,17 +285,16 @@ export default function SchemaStudio() {
         isClosable: true,
       });
 
-      onRelationModalClose();
+      relationModal.onClose();
       setNewConnection(null);
     },
-    [newConnection, onRelationModalClose, toast]
+    [newConnection, relationModal.onClose, toast, setNodes, setEdges]
   );
   
   const handleViewDetails = (nodeToView: AppNode | null) => {
     if (nodeToView) {
-      // No casting is needed because nodeToView is already the correct type.
       setViewingNode(nodeToView);
-      onViewerOpen(); // Use the updated disclosure function name
+      viewerModal.onOpen();
     }
     setContextMenu(null);
   };
@@ -428,11 +302,11 @@ export default function SchemaStudio() {
   const handleEdit = (nodeToEdit: AppNode | null) => {
     if (nodeToEdit) {
       if(nodeToEdit.type === 'collectionNode') {
-        setEditingCollection(nodeToEdit as CollectionNode);
-        onCollectionEditorOpen();
+        setEditingCollection(nodeToEdit as CollectionNodeType);
+        collectionEditorModal.onOpen();
       } else if (nodeToEdit.type === 'agentNode') {
-        setEditingAgent(nodeToEdit as AgentNode);
-        onAgentEditorOpen();
+        setEditingAgent(nodeToEdit);
+        agentEditorModal.onOpen();
       }
     }
     setContextMenu(null);
@@ -450,13 +324,7 @@ export default function SchemaStudio() {
     setContextMenu(null);
   };
 
-  const handleCollectionEditorClose = () => {
-    setEditingCollection(null);
-    onCollectionEditorClose();
-  };
-
-
-const nodeTypes = { collectionNode: CollectionNode, agentNode: AgentNode };
+  const nodeTypes = { collectionNode: CollectionNode, agentNode: AgentNode };
   const edgeTypes = { collection: CollectionEdge };
 
   if (loading) return <Spinner />;
@@ -466,11 +334,11 @@ const nodeTypes = { collectionNode: CollectionNode, agentNode: AgentNode };
     : undefined;
 
   const sourceNode = newConnection?.source
-    ? nodes.find(n => n.id === newConnection.source && n.type === 'collectionNode') as CollectionNode | undefined
+    ? nodes.find(n => n.id === newConnection.source && n.type === 'collectionNode') as CollectionNodeType | undefined
     : undefined;
 
   const targetNode = newConnection?.target
-    ? nodes.find(n => n.id === newConnection.target && n.type === 'collectionNode') as CollectionNode | undefined
+    ? nodes.find(n => n.id === newConnection.target && n.type === 'collectionNode') as CollectionNodeType | undefined
     : undefined;
 
   const allNodeLabels = nodes.map(node => (node.data as { label: string; attributes: AttributeItem[] }).label);
@@ -575,12 +443,11 @@ const nodeTypes = { collectionNode: CollectionNode, agentNode: AgentNode };
         </Box>
       )}
 
-      <Modal isOpen={isOpen} onClose={onClose}>
+      <Modal isOpen={modal.isOpen} onClose={modal.onClose}>
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>
             Details: {
-              // FIX: Conditionally display the correct title property
               viewingNode?.type === 'collectionNode' 
                 ? viewingNode.data.label 
                 : viewingNode?.data.name
@@ -605,14 +472,14 @@ const nodeTypes = { collectionNode: CollectionNode, agentNode: AgentNode };
             )}
           </ModalBody>
           <ModalFooter>
-            <Button colorScheme="blue" onClick={onClose}>
+            <Button colorScheme="blue" onClick={modal.onClose}>
               Close
             </Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
 
-      <Modal isOpen={isCreateModalOpen} onClose={onCreateModalClose}>
+      <Modal isOpen={createModal.isOpen} onClose={createModal.onClose}>
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>Create a single type</ModalHeader>
@@ -665,7 +532,7 @@ const nodeTypes = { collectionNode: CollectionNode, agentNode: AgentNode };
             </Tabs>
           </ModalBody>
           <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={onCreateModalClose}>
+            <Button variant="ghost" mr={3} onClick={createModal.onClose}>
               Cancel
             </Button>
             <Button colorScheme="teal" onClick={handleContinueClick} isDisabled={!!validationErrors.displayName || !newCollectionData.displayName.trim()}>
@@ -676,16 +543,16 @@ const nodeTypes = { collectionNode: CollectionNode, agentNode: AgentNode };
       </Modal>
       
        <AttributeEditorSidebar
-        isOpen={isCollectionEditorOpen}
-        onClose={handleCollectionEditorClose}
+        isOpen={collectionEditorModal.isOpen}
+        onClose={collectionEditorModal.onClose}
         node={editingCollection}
         onSave={handleUpdateNodeAttributes}
       />
       
       <RelationModal
-        isOpen={isRelationModalOpen}
+        isOpen={relationModal.isOpen}
         onClose={() => {
-          onRelationModalClose();
+          relationModal.onClose();
           setNewConnection(null);
         }}
         sourceNodeLabel={sourceNode?.data.label || null}

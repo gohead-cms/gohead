@@ -3,23 +3,23 @@
 │   ├── App.tsx
 │   ├── Header.tsx
 │   ├── Layout.tsx
-│   ├── router.tsx
-│   └── Sidebar.tsx
+│   ├── Sidebar.tsx
+│   └── router.tsx
 ├── features
 │   ├── agents
-│   │   ├── components
 │   │   └── index.tsx
 │   ├── auth
 │   │   ├── Login.tsx
 │   │   └── RequireAuth.tsx
 │   ├── collections
-│   │   ├── components
 │   │   ├── hook
 │   │   └── index.tsx
+│   ├── contrib
+│   │   └── index.tsx
 │   └── workspace
+│       ├── WorkspaceCanvas.tsx
 │       ├── components
-│       ├── hooks
-│       └── WorkspaceCanvas.tsx
+│       └── hooks
 ├── main.tsx
 ├── provider.tsx
 ├── services
@@ -29,8 +29,7 @@
 │   ├── types
 │   │   ├── agents.ts
 │   │   ├── collections.ts
-│   │   ├── edges.ts
-│   │   ├── nodes.ts
+│   │   ├── index.ts
 │   │   ├── schema.ts
 │   │   └── workspace.ts
 │   └── ui
@@ -39,4 +38,4 @@
 │   └── auth.ts
 └── vite-env.d.ts
 
-17 directories, 23 files
+16 directories, 23 files
