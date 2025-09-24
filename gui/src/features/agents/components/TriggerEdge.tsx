@@ -1,7 +1,7 @@
 import React from 'react';
-import { EdgeProps, getSmoothStepPath, EdgeLabelRenderer, BaseEdge, Edge } from '@xyflow/react';
+import { EdgeProps, getSmoothStepPath, EdgeLabelRenderer, BaseEdge, Edge, MarkerType, getBezierPath } from '@xyflow/react';
 import { Box, HStack, Icon, Badge } from '@chakra-ui/react';
-import { FaPlusCircle, FaPencilAlt, FaTrashAlt, FaBolt } from 'react-icons/fa';
+import { FaPlusCircle, FaPencilAlt, FaTrashAlt, FaBolt, FaEye } from 'react-icons/fa';
 
 /**
  * Defines the shape of the custom `data` property for a TriggerEdge.
@@ -13,8 +13,6 @@ export interface TriggerEdgeData {
 
 /**
  * Defines the complete, strongly-typed Edge object for a 'triggerEdge'.
- * You can import and use this type in your hooks or state to ensure
- * that the edges you create have the correct shape.
  */
 export type TriggerEdgeType = Edge<TriggerEdgeData, 'triggerEdge'>;
 
@@ -35,7 +33,7 @@ export function TriggerEdge({
   targetPosition,
   data,
 }: EdgeProps<TriggerEdgeType>) {
-  const [edgePath, labelX, labelY] = getSmoothStepPath({
+  const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
     sourcePosition,
@@ -49,10 +47,23 @@ export function TriggerEdge({
   return (
     <>
       <BaseEdge 
-        path={edgePath} 
+        path={edgePath}
         style={{ stroke: '#8a52ca', strokeDasharray: '5,5', strokeWidth: 1.5 }} 
       />
       <EdgeLabelRenderer>
+        {/* Eye Icon near the source (Agent) */}
+        <Box
+          position="absolute"
+          transform={`translate(-50%, -50%) translate(${sourceX}px,${sourceY}px)`}
+          pointerEvents="all"
+          // Offset the icon slightly from the node's edge
+          style={{ transform: `translate(-50%, -50%) translate(${sourceX + 20}px, ${sourceY}px)` }}
+          zIndex={1}
+        >
+          <Icon as={FaEye} color="gray.400" bg="white" borderRadius="full" p={0.5} boxSize={5} />
+        </Box>
+
+        {/* Event Label in the middle */}
         <Box
           position="absolute"
           transform={`translate(-50%, -50%) translate(${labelX}px,${labelY}px)`}
@@ -76,14 +87,14 @@ export function TriggerEdge({
                  return (
                     <React.Fragment key={event}>
                       <Icon as={IconComp} color="purple.500" boxSize={3} />
-                      <Badge variant='subtle' size='md' textTransform="lowercase">
+                      <Badge colorScheme='purple' variant='subtle' size='sm' textTransform="lowercase">
                         on:{eventName}
                       </Badge>
                     </React.Fragment>
                  )
               })}
                {events.length > 1 && (
-                   <Badge variant='subtle' size='sd' borderRadius='full'>
+                   <Badge colorScheme='purple' variant='solid' size='sm' borderRadius='full'>
                       +{events.length - 1}
                   </Badge>
                )}

@@ -1,8 +1,7 @@
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
-import RequireAuth from "../features/auth/RequireAuth"; // Adjusted path
-import Login from "../features/auth/Login"; // Adjusted path
-import CollectionsPage from "../features/collections"; // Adjusted path
-import WorkspaceCanvas from "../features/workspace/WorkspaceCanvas"; // Adjusted path
+import RequireAuth from "../features/auth/RequireAuth"; 
+import Login from "../features/auth/Login";
+import WorkspaceCanvas from "../features/workspace/WorkspaceCanvas";
 import Layout from "./Layout"; // The main app shell
 
 /**
@@ -39,7 +38,6 @@ export default function AppRouter() {
 
         {/* Feature Routes */}
         <Route path="/workspace" element={<WorkspaceCanvas />} />
-        <Route path="/collections" element={<CollectionsPage />} />
         {/* Add future routes like /agents, /settings here */}
       </Route>
 
