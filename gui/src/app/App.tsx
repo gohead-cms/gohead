@@ -1,4 +1,4 @@
-import AppRouter from "./router";
+import { AppRouter }  from "./router";
 import { ChakraProvider } from "@chakra-ui/react"; // Example provider
 
 /**

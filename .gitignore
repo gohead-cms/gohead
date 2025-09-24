@@ -60,3 +60,4 @@ gui/yarn-error.log*
 
 gui/.env*
 !gui/.env.example
+tree

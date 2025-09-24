@@ -5,7 +5,7 @@ import type { Schema, AgentNodeData } from "../../../shared/types";
 import type { CollectionEdgeType } from "../../../shared/types";
 import {
   TriggerEdgeType }
-from '../components';
+from '../../agents';
 import type { AppNode, CollectionNode, AgentNode } from "../../../shared/types/workspace";
 import { useLayout } from "./useLayout";
 

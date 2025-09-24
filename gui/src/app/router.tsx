@@ -1,13 +1,22 @@
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
-import RequireAuth from "../features/auth/RequireAuth"; 
-import Login from "../features/auth/Login";
-import WorkspaceCanvas from "../features/workspace/WorkspaceCanvas";
-import Layout from "./Layout"; // The main app shell
+import { Box, Heading, Text } from "@chakra-ui/react";
 
-/**
- * A protected layout component that includes the main application shell (sidebar, header).
- * It uses an <Outlet /> to render nested child routes.
- */
+// Layout and Auth
+import { Layout } from "./Layout";
+import { LoginPage, RequireAuth } from "../features/auth"; 
+
+// Feature Pages
+import { WorkspaceCanvas } from "../features/workspace";
+import { CollectionsPage } from "../features/collections";
+import { SettingsPage } from "../features/settings";
+
+// --- Placeholder Components for new features ---
+const DashboardPage = () => <Box p={8}><Heading>Dashboard</Heading><Text mt={4}>Overview, metrics, and recent activity will be displayed here.</Text></Box>;
+const ContentBrowserPage = () => <Box p={8}><Heading>Content Browser</Heading></Box>;
+const PrimitivesPage = () => <Box p={8}><Heading>LLM Primitives</Heading></Box>;
+const AutomationPage = () => <Box p={8}><Heading>Automation</Heading></Box>;
+
+// The main layout that includes the Sidebar and Header
 function DashboardLayout() {
   return (
     <Layout>
@@ -16,15 +25,12 @@ function DashboardLayout() {
   );
 }
 
-/**
- * Defines all routes for the application. This component is rendered by App.tsx.
- */
-export default function AppRouter() {
+export function AppRouter() {
   return (
+    // The <BrowserRouter> has been removed from this file
     <Routes>
-      {/* Public Routes */}
-      <Route path="/login" element={<Login />} />
-
+      <Route path="/login" element={<LoginPage />} />
+      
       {/* Protected Routes */}
       <Route
         element={
@@ -33,16 +39,29 @@ export default function AppRouter() {
           </RequireAuth>
         }
       >
-        {/* Redirect base path to the workspace */}
-        <Route path="/" element={<Navigate to="/workspace" replace />} />
+        {/* Redirect base path to the dashboard */}
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-        {/* Feature Routes */}
+        <Route path="/dashboard" element={<DashboardPage />} />
+        
+        {/* Data Management */}
+        <Route path="/collections" element={<CollectionsPage />} />
         <Route path="/workspace" element={<WorkspaceCanvas />} />
-        {/* Add future routes like /agents, /settings here */}
-      </Route>
+        <Route path="/content" element={<ContentBrowserPage />} />
 
-      {/* Fallback Route */}
-      <Route path="*" element={<Navigate to="/login" />} />
+        {/* Agent Management */}
+        <Route path="/primitives" element={<PrimitivesPage />} />
+
+        {/* Automation */}
+        <Route path="/automation" element={<AutomationPage />} />
+
+        {/* Settings */}
+        <Route path="/settings" element={<SettingsPage />} />
+      </Route>
+      
+      {/* Fallback route */}
+      <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
 }
+

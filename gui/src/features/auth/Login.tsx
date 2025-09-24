@@ -18,7 +18,7 @@ import { useAuthStore } from "../../services/auth";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../../services/api";
 
-export default function Login() {
+export function LoginPage() {
   const setToken = useAuthStore((s) => s.setToken);
   const token = useAuthStore((s) => s.token);
   const [username, setUsername] = useState("");
