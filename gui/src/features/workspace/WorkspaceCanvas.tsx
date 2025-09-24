@@ -52,17 +52,20 @@ import {
 } from '@chakra-ui/react';
 import { FaPlus, FaEdit, FaTrash, FaEye, FaArrowsAltV, FaArrowsAltH } from "react-icons/fa";
 
+import {
+  AgentNode,
+  TriggerEdge,
+} from '../agents'
+
 import { 
   CollectionEdge, 
   CollectionNode, 
-  AgentNode, 
   AttributeEditorSidebar, 
   RelationModal,
-  TriggerEdge,
-} from './components';
+} from '../collections';
 // Types
 import type { AttributeItem, AppNode, CollectionNode as CollectionNodeType } from "../../shared/types/workspace";
-import type { CollectionEdgeType, AgentNodeData, AgentNodeType } from "../../shared/types";
+import type { CollectionEdgeType, AgentNodeType } from "../../shared/types";
 import { 
   useWorkspaceData,
   useWorkspaceModals

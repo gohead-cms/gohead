@@ -76,7 +76,6 @@ export const AttributeEditorSidebar: React.FC<AttributeEditorProps> = ({
   };
   
   const handleFinalSave = () => {
-    // In a real application, you might save to a database here
     toast({
         title: "Collection saved.",
         description: `Attributes for "${node?.data.label}" have been updated.`,
