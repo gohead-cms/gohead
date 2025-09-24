@@ -2,7 +2,7 @@ import { Handle, NodeProps, Position } from '@xyflow/react';
 import { CollectionNodeType } from '../../../shared/types/collections';
 
 // Use the CollectionNodeData interface with NodeProps
-export default function CollectionNode({ data }: NodeProps<CollectionNodeType>) {
+export function CollectionNode({ data }: NodeProps<CollectionNodeType>) {
   // Now, TypeScript knows `data.label` is a string, and `data.attributes` is an array of attributes
   const attributes = Array.isArray(data?.attributes) ? data.attributes : [];
 

@@ -11,7 +11,7 @@ export interface CollectionEdgeData {
 // The custom edge type also remains the same
 export type CustomCollectionEdge = Edge<CollectionEdgeData, 'collection'>;
 
-export default function CollectionEdge({
+export function CollectionEdge({
   id,
   sourceX,
   sourceY,

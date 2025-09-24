@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef, useMemo, useContext, createContext } from "react";
 import {
   ReactFlow,
   applyNodeChanges,
@@ -11,7 +11,8 @@ import {
   MarkerType,
   Background,
   Controls,
-  BackgroundVariant
+  BackgroundVariant,
+  NodeProps
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
@@ -38,6 +39,7 @@ import {
   MenuList,
   MenuItem,
   useToast,
+  useDisclosure,
 } from "@chakra-ui/react";
 import {
   Modal,
@@ -50,24 +52,59 @@ import {
 } from '@chakra-ui/react';
 import { FaPlus, FaEdit, FaTrash, FaEye, FaArrowsAltV, FaArrowsAltH } from "react-icons/fa";
 
-// Local imports
-import CollectionEdge from "./components/CollectionEdge";
-import CollectionNode from "./components/CollectionNode";
-import AgentNode from "./components/AgentNode";
-import { AttributeEditorSidebar } from "./components/AttributeEditorSidebar";
-import { RelationModal } from "./components/RelationModal";
-import { useWorkspaceData } from "./hooks/useWorkspaceData";
-import { useWorkspaceModals } from "./hooks/useWorkspaceModals";
-
+import { 
+  CollectionEdge, 
+  CollectionNode, 
+  AgentNode, 
+  AttributeEditorSidebar, 
+  RelationModal,
+  TriggerEdge,
+} from './components';
 // Types
 import type { AttributeItem, AppNode, CollectionNode as CollectionNodeType } from "../../shared/types/workspace";
-import type { CollectionEdgeType } from "../../shared/types";
+import type { CollectionEdgeType, AgentNodeData, AgentNodeType } from "../../shared/types";
+import { 
+  useWorkspaceData,
+  useWorkspaceModals
+} from './hooks'
+
+const edgeTypes = { 
+  collection: CollectionEdge, 
+  triggerEdge: TriggerEdge 
+};
+
+type AgentNodeHandlers = {
+  onEdit: (id: string) => void;
+  onDelete: (id: string) => void;
+  onViewLogs: (id: string) => void;
+};
+
+const HandlersContext = createContext<AgentNodeHandlers | null>(null);
+
+const AgentNodeWithCtx = (props: NodeProps<AgentNodeType>) => {
+const handlers = useContext(HandlersContext);
+  return (
+    <AgentNode
+      data={props.data}
+      selected={props.selected}
+      onEdit={() => handlers?.onEdit(props.id)}
+      onDelete={() => handlers?.onDelete(props.id)}
+      onViewLogs={() => handlers?.onViewLogs(props.id)}
+    />
+  );
+};
+
+const nodeTypes = {
+  collectionNode: CollectionNode,
+  agentNode: AgentNodeWithCtx,
+} as const;
 
 export default function WorkspaceCanvas() {
   const reactFlowWrapperRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
   const [layoutDirection, setLayoutDirection] = useState("LR");
-
+  const { isOpen: isCollectionEditorOpen, onOpen: onCollectionEditorOpen, onClose: onCollectionEditorClose } = useDisclosure();
+  const { isOpen: isAgentEditorOpen, onOpen: onAgentEditorOpen, onClose: onAgentEditorClose } = useDisclosure();
   // Custom hooks
   const { nodes, edges, loading, setNodes, setEdges, fetchDataAndLayout } = useWorkspaceData();
   const {
@@ -312,6 +349,8 @@ export default function WorkspaceCanvas() {
     setContextMenu(null);
   };
 
+  
+
   const handleDelete = (nodeToDelete: AppNode | null) => {
     if (nodeToDelete) {
       setNodes(nds => nds.filter(n => n.id !== nodeToDelete.id));
@@ -324,8 +363,54 @@ export default function WorkspaceCanvas() {
     setContextMenu(null);
   };
 
-  const nodeTypes = { collectionNode: CollectionNode, agentNode: AgentNode };
-  const edgeTypes = { collection: CollectionEdge };
+  const handleDeleteAction = useCallback((node: AppNode | null) => {
+    if (node) {
+       setNodes(nds => nds.filter(n => n.id !== node.id));
+       setEdges(eds => eds.filter(e => e.source !== node.id && e.target !== node.id));
+       toast({ title: `${node.type === 'agentNode' ? 'Agent' : 'Collection'} deleted.`, status: "info", duration: 5000, isClosable: true });
+     }
+     setContextMenu(null);
+   }, [setNodes, setEdges, toast]);
+  
+  // --- Action Handlers (wrapped in useCallback for performance) ---
+  const handleViewLogsAction = useCallback((node: AppNode | null) => {
+     if(node) {
+         toast({
+             title: `View Logs for "${node.id}"`,
+             description: "This feature is not yet implemented.",
+             status: "info",
+             duration: 3000,
+             isClosable: true,
+         });
+     }
+   }, [toast]);
+
+  const handleEditAction = useCallback((node: AppNode | null) => {
+      if (node?.type === 'collectionNode') {
+        setEditingCollection(node);
+        onCollectionEditorOpen();
+      } else if (node?.type === 'agentNode') {
+        setEditingAgent(node);
+        onAgentEditorOpen();
+     }
+     setContextMenu(null);
+   }, [onCollectionEditorOpen, onAgentEditorOpen, setEditingCollection, setEditingAgent]);
+
+  const nodeTypes = useMemo(() => ({
+    collectionNode: CollectionNode,
+    agentNode: (props: NodeProps<AgentNodeType>) => {
+      const node = nodes.find(n => n.id === props.id);
+      return (
+        <AgentNode 
+          data={props.data} 
+          selected={props.selected} 
+          onEdit={() => handleEditAction( node as AppNode)}
+          onDelete={() => handleDeleteAction(node as AppNode)}
+          onViewLogs={() => handleViewLogsAction(node as AppNode)}
+        />
+      );
+    },
+  }), [nodes, handleEditAction, handleDeleteAction, handleViewLogsAction]); 
 
   if (loading) return <Spinner />;
   

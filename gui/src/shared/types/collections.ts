@@ -2,6 +2,7 @@ import { Node, Edge } from "@xyflow/react";
 
 export interface Attribute {
   type: string;
+  name: string;
   required?: boolean;
   enum?: string[];
   target?: string;

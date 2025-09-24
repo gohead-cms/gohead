@@ -3,8 +3,12 @@ import { Edge, MarkerType } from "@xyflow/react";
 import { apiFetchWithAuth } from "../../../services/api";
 import type { Schema, AgentNodeData } from "../../../shared/types";
 import type { CollectionEdgeType } from "../../../shared/types";
+import {
+  TriggerEdgeType }
+from '../components';
 import type { AppNode, CollectionNode, AgentNode } from "../../../shared/types/workspace";
 import { useLayout } from "./useLayout";
+
 
 export function useWorkspaceData() {
   const [nodes, setNodes] = useState<AppNode[]>([]);
@@ -57,17 +61,22 @@ export function useWorkspaceData() {
         data: agent,
       }));
 
-      const agentTriggerEdges: Edge[] = agents.flatMap((agent) => {
-        const trigger = agent.schema?.trigger;
-        if (trigger?.type === 'collection_event' && trigger.event_trigger?.collection) {
-          return {
-            id: `trigger-${trigger.event_trigger.collection}-to-${agent.name}`,
-            source: trigger.event_trigger.collection, target: agent.name, type: 'smoothstep', animated: true,
-            style: { stroke: '#8a52ca', strokeDasharray: '5,5' }, markerEnd: { type: MarkerType.ArrowClosed, color: '#8a52ca' },
-          };
-        }
-        return [];
-      });
+        // --- UPDATED LOGIC HERE ---
+        const agentTriggerEdges: TriggerEdgeType[] = agents.flatMap((agent) => {
+          const trigger = agent.schema?.trigger;
+          if (trigger?.type === "collection_event" && trigger.event_trigger?.collection) {
+            return {
+              id: `trigger-${trigger.event_trigger.collection}-to-${agent.name}`,
+              source: trigger.event_trigger.collection,
+              target: agent.name,
+              type: "triggerEdge", 
+              data: {
+                events: trigger.event_trigger.events,
+              },
+            };
+          }
+          return [];
+        });
 
       // Combine and Layout
       const allNodes: AppNode[] = [...collectionNodes, ...agentNodes];
