@@ -4,6 +4,7 @@ import {
   FiPlus} from "react-icons/fi";
 import { apiFetchWithAuth } from "../../../services/api";
 import CollectionSchema from "./CollectionSchema";
+import { PageLoader } from "../../../shared/ui/page-loader";
 
 export function CollectionsPage() {
   const [collections, setCollections] = useState<{ name: string }[]>([]);
@@ -36,6 +37,10 @@ export function CollectionsPage() {
       })
       .finally(() => setSchemaLoading(false));
   }, [selected]);
+
+   if (schemaLoading || loading) {
+    return <PageLoader text="Fetching your collections..." />;
+  }
 
   return (
     <Flex h="100%" w="100%">

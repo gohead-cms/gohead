@@ -40,6 +40,7 @@ import { LiaProjectDiagramSolid } from "react-icons/lia";
 import { LuBrain } from "react-icons/lu";
 import { VscRobot } from "react-icons/vsc";
 import { TbMathFunction } from "react-icons/tb";
+import { PiPlug } from "react-icons/pi";
 
 // --- Menu Structure ---
 interface NavItemProps {
@@ -55,7 +56,7 @@ const LinkItems: Array<NavItemProps> = [
     name: 'Data Management',
     icon: FiDatabase,
     children: [
-      { name: 'Collections', icon: FiFileText, href: '/data/collections' },
+      { name: 'Collections', icon: FiFileText, href: '/collections' },
       { name: 'Schema Designer', icon: LiaProjectDiagramSolid, href: '/data/workspace' },
       { name: 'Contribution', icon: FiEdit2, href: '/data/contrib' },
       { name: 'Media Library', icon: FiImage, href: '/dam' },
@@ -81,7 +82,7 @@ const LinkItems: Array<NavItemProps> = [
   { name: 'Settings', icon: FiSettings, href: '/settings',
     children: [
         { name: 'LLM Providers', icon: FiCloud, href: '/providers' },
-        { name: 'Integration', icon: FiCloud, href: '/integration' },
+        { name: 'Integration', icon: PiPlug, href: '/integration' },
     ],
   },
 ];

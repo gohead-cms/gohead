@@ -21,6 +21,7 @@ import {
   useAgentStatus,
   useSystemHealth
 } from "./hooks";
+import { PageLoader } from "../../shared/ui/page-loader";
 
 export function DashboardPage() {
   const { stats, isLoading: statsLoading } = useDashboardStats();
@@ -31,7 +32,8 @@ export function DashboardPage() {
   if (statsLoading || activitiesLoading || agentsLoading || healthLoading) {
     return (
       <Box p={8}>
-        <Text>Loading dashboard...</Text>
+        <Text>.</Text>
+        <PageLoader text="Loading dashboard.." />;
       </Box>
     );
   }
