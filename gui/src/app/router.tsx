@@ -9,9 +9,8 @@ import { LoginPage, RequireAuth } from "../features/auth";
 import { WorkspaceCanvas } from "../features/workspace";
 import { CollectionsPage } from "../features/collections";
 import { SettingsPage } from "../features/settings";
+import { DashboardPage } from "../features/dashboard";
 
-// --- Placeholder Components for new features ---
-const DashboardPage = () => <Box p={8}><Heading>Dashboard</Heading><Text mt={4}>Overview, metrics, and recent activity will be displayed here.</Text></Box>;
 const ContentBrowserPage = () => <Box p={8}><Heading>Content Browser</Heading></Box>;
 const PrimitivesPage = () => <Box p={8}><Heading>LLM Primitives</Heading></Box>;
 const AutomationPage = () => <Box p={8}><Heading>Automation</Heading></Box>;
