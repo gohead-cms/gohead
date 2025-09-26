@@ -1,12 +1,12 @@
 import { Box, Flex, Text, Button, Icon } from "@chakra-ui/react";
 import { Menu, MenuButton, MenuList, MenuItem } from "@chakra-ui/react";
 import { Avatar } from "@chakra-ui/react";
-import { useAuthStore } from "../services/auth";
+import { useAuthStore } from "../../services/auth";
 import { useNavigate } from "react-router-dom";
 import { FiLogOut } from "react-icons/fi";
 import React from 'react';
 
-export default function Header() {
+export function Header() {
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
 
