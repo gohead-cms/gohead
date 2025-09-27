@@ -56,9 +56,8 @@ const LinkItems: Array<NavItemProps> = [
     name: 'Data Management',
     icon: FiDatabase,
     children: [
-      { name: 'Collections', icon: FiFileText, href: '/collections' },
-      { name: 'Schema Designer', icon: LiaProjectDiagramSolid, href: '/data/workspace' },
-      { name: 'Contribution', icon: FiEdit2, href: '/data/contrib' },
+      { name: 'Schema Designer', icon: LiaProjectDiagramSolid, href: '/workspace' },
+      { name: 'Data Browser', icon: FiGrid, href: '/contrib' },
       { name: 'Media Library', icon: FiImage, href: '/dam' },
     ],
   },

@@ -10,6 +10,7 @@ import { WorkspaceCanvas } from "../features/workspace";
 import { CollectionsPage } from "../features/collections";
 import { SettingsPage } from "../features/settings";
 import { DashboardPage } from "../features/dashboard";
+import { ContributionsPage } from "../features/contrib";
 
 const ContentBrowserPage = () => <Box p={8}><Heading>Content Browser</Heading></Box>;
 const PrimitivesPage = () => <Box p={8}><Heading>LLM Primitives</Heading></Box>;
@@ -46,7 +47,7 @@ export function AppRouter() {
         {/* Data Management */}
         <Route path="/collections" element={<CollectionsPage />} />
         <Route path="/workspace" element={<WorkspaceCanvas />} />
-        <Route path="/content" element={<ContentBrowserPage />} />
+        <Route path="/contrib" element={<ContributionsPage />} />
 
         {/* Agent Management */}
         <Route path="/primitives" element={<PrimitivesPage />} />
