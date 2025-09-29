@@ -35,7 +35,7 @@ interface EntryFormDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   schema: Schema;
-  onSubmit: (data: Partial<ContentItem>) => Promise<void>;
+  onSubmit: (payload: Partial<ContentItem>) => Promise<void>;
 }
 
 // Helper to render form fields in the sidebar

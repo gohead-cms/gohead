@@ -11,6 +11,7 @@ import { apiFetchWithAuth } from "../../../services/api";
 import { ContentItem } from "../hooks/useCollectionContent";
 import { useNavigate } from "react-router-dom";
 import { FaPenNib } from "react-icons/fa6";
+import { CiPen } from "react-icons/ci";
 
 export function ContributionsPage() {
   const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
@@ -20,6 +21,8 @@ export function ContributionsPage() {
 
   const { collections, loading: collectionsLoading } = useCollectionsList();
   const { content, loading: contentLoading, refetch } = useCollectionContent(selectedCollection);
+
+  const [editingItem, setEditingItem] = useState<ContentItem | null>(null);
 
   useEffect(() => {
     if (!selectedCollection && collections.length > 0) {
@@ -74,6 +77,10 @@ export function ContributionsPage() {
     }
   };
 
+  const handleEditClick = (item: ContentItem) => {
+    setEditingItem(item);
+    onOpen(); 
+  };
 
   return (
     <Flex h="calc(100vh - 64px)">
@@ -109,6 +116,7 @@ export function ContributionsPage() {
             <ContentTable
               schema={currentCollectionSchema}
               items={content.items}
+              onEdit={handleEditClick}
             />
           </>
         )}

@@ -22,7 +22,8 @@ interface EntryFormDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   schema: Schema;
-  onSubmit: (data: Partial<ContentItem>) => Promise<void>;
+  onSubmit: (payload: { data: Partial<ContentItem> }, id?: string | number) => Promise<void>;
+  itemToEdit?: ContentItem | null; // Optional prop for the item being edited
 }
 
 // Helper function to render the correct form field based on attribute type
@@ -56,20 +57,27 @@ const renderFormField = (key: string, attr: any, value: any, handleChange: any) 
   }
 };
 
-export function EntryFormModal({ isOpen, onClose, schema, onSubmit }: EntryFormDrawerProps) {
+export function EntryFormModal({ isOpen, onClose, schema, itemToEdit, onSubmit }: EntryFormDrawerProps) {
   const [formData, setFormData] = useState<Partial<ContentItem>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+
   useEffect(() => {
     if (isOpen) {
-      const initialData = Object.entries(schema.attributes).reduce((acc, [key, attr]) => {
-          if (attr.type === 'relation') return acc;
-          acc[key] = attr.type === 'boolean' ? false : '';
-          return acc;
-      }, {} as any);
-      setFormData(initialData);
+      if (itemToEdit) {
+        // If editing, pre-fill the form with the item's attributes
+        setFormData(itemToEdit.attributes || {});
+      } else {
+        // If creating, initialize a blank form
+        const initialData = Object.entries(schema.attributes).reduce((acc, [key, attr]) => {
+            if (attr.type === 'relation') return acc;
+            acc[key] = attr.type === 'boolean' ? false : '';
+            return acc;
+        }, {} as any);
+        setFormData(initialData);
+      }
     }
-  }, [isOpen, schema]);
+  }, [isOpen, schema, itemToEdit]);
 
   const handleChange = (key: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [key]: value }));
@@ -77,8 +85,9 @@ export function EntryFormModal({ isOpen, onClose, schema, onSubmit }: EntryFormD
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
-    try {
-      await onSubmit(formData);
+try {
+      // FIX: Wrap the form data in a 'data' object before submitting
+      await onSubmit({ data: formData }, itemToEdit?.id);
       onClose();
     } catch (error) {
       // Parent component handles error toast
@@ -93,7 +102,7 @@ export function EntryFormModal({ isOpen, onClose, schema, onSubmit }: EntryFormD
       <DrawerContent>
         <DrawerCloseButton />
         <DrawerHeader borderBottomWidth="1px">
-          Add New Entry to {schema.info?.displayName || schema.collectionName}
+          {itemToEdit ? "Edit Entry" : "Add New Entry"} in {schema.info?.displayName || schema.collectionName}
         </DrawerHeader>
         <DrawerBody>
           <VStack spacing={6}>
@@ -114,7 +123,7 @@ export function EntryFormModal({ isOpen, onClose, schema, onSubmit }: EntryFormD
             Cancel
           </Button>
           <Button colorScheme="purple" onClick={handleSubmit} isLoading={isSubmitting}>
-            Save Entry
+            Save Changes
           </Button>
         </DrawerFooter>
       </DrawerContent>

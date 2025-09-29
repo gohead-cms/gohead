@@ -261,7 +261,7 @@ func (c *Collection) ToFlattenedMap() map[string]interface{} {
 }
 
 // validateAttributeValue handles validation logic for a single attribute’s value.
-func validateAttributeValue(attribute Attribute, value interface{}) error {
+func validateAttributeValue(attribute Attribute, value any) error {
 	// 1) Confirm the attribute type is recognized in the registry
 	if _, err := types.GetGraphQLType(attribute.Type); err != nil {
 		// e.g., if "relation" or unregistered type => returns an error
@@ -317,6 +317,14 @@ func validateAttributeValue(attribute Attribute, value interface{}) error {
 		if !sliceContains(attribute.Options, strValue.(string)) {
 			return fmt.Errorf("attribute '%s' must be one of %v", attribute.Name, attribute.Options)
 		}
+	case "uid":
+		if _, err := convertToType(value, "text"); err != nil {
+			return err
+		}
+	case "media":
+		if _, err := convertToType(value, "text"); err != nil {
+			return err
+		}
 
 	default:
 		// If, for example, "relation" or "component" is encountered, we skip or return an error
@@ -328,7 +336,7 @@ func validateAttributeValue(attribute Attribute, value interface{}) error {
 }
 
 // convertToType attempts to convert 'value' to the desired 'targetType'.
-func convertToType(value interface{}, targetType string) (interface{}, error) {
+func convertToType(value any, targetType string) (any, error) {
 	switch targetType {
 	case "text":
 		if str, ok := value.(string); ok {
