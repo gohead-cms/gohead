@@ -19,28 +19,24 @@ import {
   FiHome,
   FiDatabase,
   FiCpu,
-  FiEdit2,
   FiSettings,
   FiMenu,
-  FiLayout,
-  FiFileText,
-  FiUsers,
-  FiCode,
-  FiChevronDown,
-  FiImage,
   FiGrid,
   FiCloud,
   FiActivity,
   FiBarChart,
-  FiTrendingUp
+  FiTrendingUp,
+  FiChevronDown
 } from 'react-icons/fi';
-import { IconBaseProps, IconType } from 'react-icons';
+import { GoWorkflow } from "react-icons/go";
+import { IconType } from 'react-icons';
 import { NavLink, useLocation } from "react-router-dom";
 import { LiaProjectDiagramSolid } from "react-icons/lia";
 import { LuBrain } from "react-icons/lu";
 import { VscRobot } from "react-icons/vsc";
 import { TbMathFunction } from "react-icons/tb";
 import { PiPlug } from "react-icons/pi";
+import { FiImage } from 'react-icons/fi';
 
 // --- Menu Structure ---
 interface NavItemProps {
@@ -57,15 +53,16 @@ const LinkItems: Array<NavItemProps> = [
     icon: FiDatabase,
     children: [
       { name: 'Schema Designer', icon: LiaProjectDiagramSolid, href: '/workspace' },
-      { name: 'Data Browser', icon: FiGrid, href: '/contrib' },
-      { name: 'Media Library', icon: FiImage, href: '/dam' },
+      { name: 'Content Editor', icon: FiGrid, href: '/contrib' },
+      { name: 'Media Library', icon: FiImage, href: '/media' },
     ],
   },
   {
     name: 'AI Management',
     icon: LuBrain,
     children: [
-        { name: 'Agents', icon: VscRobot, href: '/workspace' },
+        { name: 'Agents', icon: VscRobot, href: '/agents' },
+        { name: 'Workflows', icon: GoWorkflow, href: '/workflows' },
         { name: 'LLM Primitives', icon: TbMathFunction, href: '/primitives' },
     ],
   },
@@ -74,11 +71,13 @@ const LinkItems: Array<NavItemProps> = [
     icon: FiActivity,
     children: [
       { name: 'Analytics', icon: FiBarChart, href: '/analytics' },
-      { name: 'Logs', icon: FiActivity, href: '/logs' },
       { name: 'Agent Performance', icon: FiTrendingUp, href: '/performance' },
+      { name: 'Logs', icon: FiActivity, href: '/logs' },
     ]
   },
-  { name: 'Settings', icon: FiSettings, href: '/settings',
+  { 
+    name: 'Settings', 
+    icon: FiSettings,
     children: [
         { name: 'LLM Providers', icon: FiCloud, href: '/providers' },
         { name: 'Integration', icon: PiPlug, href: '/integration' },
@@ -170,7 +169,7 @@ function NavItem({ icon, children, href, childrenItems, onNavItemClick }: { icon
     if (childrenItems) {
       onToggle();
     } else if (onNavItemClick) {
-      onNavItemClick(); // Close mobile drawer on link click
+      onNavItemClick();
     }
   };
 
@@ -214,7 +213,6 @@ function NavItem({ icon, children, href, childrenItems, onNavItemClick }: { icon
           />
         </Flex>
         <Collapse in={isOpen} animateOpacity style={{ marginTop: '0!' }}>
-          {/* FIX: Adjusted margin and padding for a tighter look */}
           <Box pl={1} py={1} borderLeft="1px solid" borderColor={useColorModeValue('gray.200', 'gray.700')} ml={2} mr={4}>
             {childrenItems.map((child) => (
               <NavItem
@@ -253,3 +251,4 @@ function NavItem({ icon, children, href, childrenItems, onNavItemClick }: { icon
     </Flex>
   );
 }
+

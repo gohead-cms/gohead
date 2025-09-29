@@ -51,7 +51,7 @@ import {
   ModalCloseButton,
 } from '@chakra-ui/react';
 import { FaPlus, FaEdit, FaTrash, FaEye, FaArrowsAltV, FaArrowsAltH } from "react-icons/fa";
-
+import { CiViewTable } from "react-icons/ci";
 import {
   AgentNode,
   TriggerEdge,
@@ -451,12 +451,20 @@ export default function WorkspaceCanvas() {
       >
         <Panel position="top-right">
           <Flex gap={2} p={2} bg="white" borderRadius="md" boxShadow="md" alignItems="center">
-            <Button size="sm" colorScheme="teal" onClick={handleAddCollection}>
-              <Flex align="center" gap={2}>
-                <FaPlus />
-                <span>Add Collection</span>
-              </Flex>
-            </Button>
+
+            <IconButton
+              size="sm"
+              aria-label="Edit Collection"
+              onClick={() => handleEdit(selectedNode)}
+            ><CiViewTable />
+            </IconButton>
+            <IconButton
+              size="sm"
+              aria-label="Create Collection"
+              onClick={() => handleAddCollection}
+            ><FaPlus />
+            </IconButton>
+            <Box h="24px" w="1px" bg="gray.300" mx={2} />
             <IconButton
               size="sm"
               aria-label="View Details"

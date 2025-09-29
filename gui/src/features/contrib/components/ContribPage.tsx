@@ -4,18 +4,19 @@ import { FiPlus } from "react-icons/fi";
 import { 
   useCollectionsList,
   useCollectionContent
-} from "./hooks";
-import {  } from "./hooks/useCollectionContent";
-import { CollectionSelector, ContentTable, EntryFormModal } from "./components";
-import { PageLoader } from "../../shared/ui/page-loader";
-import { apiFetchWithAuth } from "../../services/api";
-import { ContentItem } from "./hooks/useCollectionContent";
-import { EntryFormDrawer } from "./components/EntryFormDrawer";
+} from "../hooks";
+import { CollectionSelector, ContentTable, EntryFormModal } from ".";
+import { PageLoader } from "../../../shared/ui/page-loader";
+import { apiFetchWithAuth } from "../../../services/api";
+import { ContentItem } from "../hooks/useCollectionContent";
+import { useNavigate } from "react-router-dom";
+import { FaPenNib } from "react-icons/fa6";
 
 export function ContributionsPage() {
   const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
   const { isOpen, onOpen, onClose } = useDisclosure(); // For the form drawer
   const toast = useToast();
+  const navigate = useNavigate();
 
   const { collections, loading: collectionsLoading } = useCollectionsList();
   const { content, loading: contentLoading, refetch } = useCollectionContent(selectedCollection);
@@ -66,6 +67,14 @@ export function ContributionsPage() {
     }
   };
 
+  const handleContribClick = () => {
+    if (selectedCollection) {
+      // Navigate to the dedicated creative editor page
+      navigate(`/contrib/edit/${selectedCollection}`);
+    }
+  };
+
+
   return (
     <Flex h="calc(100vh - 64px)">
       <CollectionSelector
@@ -89,10 +98,10 @@ export function ContributionsPage() {
               </Box>
               {/* Button Group for adding content */}
               <HStack>
-                <Button variant="outline" size="sm" leftIcon={<Icon as={FiPlus} />} onClick={onOpen}>
-                  Add New Entry
+                <Button bg="white" variant="outline"  size="sm" leftIcon={<Icon as={FiPlus} />} onClick={onOpen}>
+                  Quick Add
                 </Button>
-                <Button colorScheme="purple" size="sm" leftIcon={<Icon as={FiPlus} />} onClick={onOpen}>
+                <Button colorScheme="purple" size="sm" leftIcon={<Icon as={FaPenNib} />} onClick={handleContribClick}>
                   Contrib
                 </Button>
               </HStack>
@@ -105,7 +114,7 @@ export function ContributionsPage() {
         )}
 
         {currentCollectionSchema && (
-            <EntryFormDrawer
+            <EntryFormModal
                 isOpen={isOpen}
                 onClose={onClose}
                 schema={currentCollectionSchema}
