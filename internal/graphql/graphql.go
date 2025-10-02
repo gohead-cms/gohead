@@ -76,9 +76,6 @@ func GenerateGraphQLQueries() (*graphql.Object, error) {
 	logger.Log.WithField("collections_count", len(collections)).Info("Collections retrieved for schema generation")
 
 	for _, collection := range collections {
-		// IMPORTANT FIX: Create a new variable to capture the current collection
-		// for the closure. Otherwise, all resolvers would use the last collection
-		// from the loop.
 		coll := collection
 
 		logger.Log.WithField("collection_name", coll.Name).Debug("Processing collection for GraphQL schema")

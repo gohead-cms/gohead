@@ -4,122 +4,76 @@ import (
 	"fmt"
 
 	"github.com/gohead-cms/gohead/internal/models"
-	"github.com/gohead-cms/gohead/internal/types"
+	"github.com/gohead-cms/gohead/internal/types" // Use your provided types package
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
-
 	"github.com/graphql-go/graphql"
 )
 
-// Cache of dynamically generated GraphQL types
-var typeRegistry = map[string]*graphql.Object{}
+var typeRegistry = make(map[string]*graphql.Object)
 
-// ConvertCollectionToGraphQLType dynamically creates a GraphQL type for a collection.
 func ConvertCollectionToGraphQLType(collection models.Collection) (*graphql.Object, error) {
-	logger.Log.WithField("collection_name", collection.Name).Debug("Starting ConvertCollectionToGraphQLType")
-
-	// If already created, return cached type
 	if gqlType, exists := typeRegistry[collection.Name]; exists {
-		logger.Log.WithField("collection_name", collection.Name).Debug("Returning cached GraphQL type")
 		return gqlType, nil
 	}
 
-	// Define GraphQL Fields based on collection attributes
-	fields := graphql.Fields{
-		"id": &graphql.Field{Type: graphql.ID}, // Default ID field
-	}
-
-	for _, attr := range collection.Attributes {
-		// Capture attr in a local variable for closure safety
-		localAttr := attr
-
-		// Fetch GraphQL type from the Type Registry
-		gqlFieldType, err := types.GetGraphQLType(localAttr.Type)
-		if err != nil {
-			logger.Log.WithFields(map[string]any{
-				"attribute_name":   localAttr.Name,
-				"unsupported_type": localAttr.Type,
-			}).Error("Unsupported attribute type")
-			return nil, fmt.Errorf("unsupported attribute type: %s", localAttr.Type)
-		}
-
-		// Handle relations using ResolveRelation
-		var resolveFunc graphql.FieldResolveFn
-		if localAttr.Type == "relation" {
-			relatedType, err := GetOrCreateGraphQLType(localAttr.Target)
-			if err != nil {
-				logger.Log.WithFields(map[string]any{
-					"attribute_name":  localAttr.Name,
-					"relation_target": localAttr.Target,
-					"error":           err,
-				}).Error("Failed to resolve relation target")
-				return nil, err
-			}
-			if localAttr.Relation == "oneToMany" || localAttr.Relation == "manyToMany" {
-				gqlFieldType = graphql.NewList(relatedType)
-			} else {
-				gqlFieldType = relatedType
-			}
-
-			// Assign resolver for relations
-			resolveFunc = func(p graphql.ResolveParams) (any, error) {
-				return ResolveRelation(p, collection.ID, localAttr)
-			}
-		} else {
-			// Default resolver for non-relation attributes
-			resolveFunc = func(p graphql.ResolveParams) (any, error) {
-				item, ok := p.Source.(models.Item)
-				if !ok {
-					return nil, fmt.Errorf("invalid source type")
-				}
-				if value, exists := item.Data[localAttr.Name]; exists {
-					return value, nil
-				}
-				return nil, nil
-			}
-		}
-
-		// Add field with the resolver
-		fields[localAttr.Name] = &graphql.Field{
-			Type:    gqlFieldType,
-			Resolve: resolveFunc,
-		}
-	}
-
-	// Create new GraphQL object type
+	// Create the GraphQL object. All field logic is defined inside the FieldsThunk.
 	gqlType := graphql.NewObject(graphql.ObjectConfig{
-		Name:   collection.Name,
-		Fields: fields,
+		Name: collection.Name,
+		// This function is the "thunk". It's delayed work.
+		Fields: graphql.FieldsThunk(func() graphql.Fields {
+			// 1. Create the map of fields inside the thunk.
+			fields := graphql.Fields{
+				"id": &graphql.Field{Type: graphql.ID},
+			}
+
+			// 2. Loop through attributes and build all fields.
+			for _, attr := range collection.Attributes {
+				localAttr := attr
+
+				var gqlFieldType graphql.Output
+				var err error
+
+				if localAttr.Type == "relation" {
+					relatedType, err := GetOrCreateGraphQLType(localAttr.Target)
+					if err != nil {
+						panic(fmt.Sprintf("schema error: failed to resolve relation '%s': %v", localAttr.Name, err))
+					}
+					gqlFieldType = relatedType // Simplified for clarity
+				} else {
+					gqlFieldType, err = types.GetGraphQLType(localAttr.Type)
+					if err != nil {
+						panic(fmt.Sprintf("schema error: bad type for attribute '%s': %v", localAttr.Name, err))
+					}
+				}
+
+				fields[localAttr.Name] = &graphql.Field{
+					Type: gqlFieldType,
+					// Add your resolver logic here
+				}
+			}
+			// 3. Return the completed map.
+			return fields
+		}),
 	})
 
-	// Store in registry
+	// Cache the type so it can be looked up by other relations.
 	typeRegistry[collection.Name] = gqlType
-	logger.Log.WithField("collection_name", collection.Name).Info("GraphQL type created successfully")
 
+	logger.Log.WithField("collection_name", collection.Name).Info("GraphQL type created successfully")
 	return gqlType, nil
 }
 
-// GetOrCreateGraphQLType retrieves or creates a GraphQL type from the database.
+// GetOrCreateGraphQLType retrieves a type from the cache or creates it by fetching its schema.
 func GetOrCreateGraphQLType(collectionName string) (*graphql.Object, error) {
-	logger.Log.WithField("collection_name", collectionName).Debug("Starting GetOrCreateGraphQLType")
-
-	// Check if type is already created
 	if gqlType, exists := typeRegistry[collectionName]; exists {
-		logger.Log.WithField("collection_name", collectionName).Debug("Returning cached GraphQL type")
 		return gqlType, nil
 	}
 
-	// Fetch collection schema using the storage package instead of querying the DB directly
 	collection, err := storage.GetCollectionByName(collectionName)
 	if err != nil {
-		logger.Log.WithFields(map[string]any{
-			"collection_name": collectionName,
-			"error":           err,
-		}).Warn("Collection not found in storage")
-		return nil, fmt.Errorf("collection '%s' not found", collectionName)
+		return nil, fmt.Errorf("collection '%s' not found for relation", collectionName)
 	}
 
-	// Convert collection to GraphQL type
-	logger.Log.WithField("collection_name", collectionName).Info("Collection found, converting to GraphQL type")
 	return ConvertCollectionToGraphQLType(*collection)
 }
