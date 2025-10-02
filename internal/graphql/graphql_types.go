@@ -2,6 +2,7 @@ package graphql
 
 import (
 	"fmt"
+
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/internal/types"
 	"github.com/gohead-cms/gohead/pkg/logger"
@@ -47,7 +48,7 @@ func ConvertCollectionToGraphQLType(collection models.Collection) (*graphql.Obje
 		if localAttr.Type == "relation" {
 			relatedType, err := GetOrCreateGraphQLType(localAttr.Target)
 			if err != nil {
-				logger.Log.WithFields(map[string]interface{}{
+				logger.Log.WithFields(map[string]any{
 					"attribute_name":  localAttr.Name,
 					"relation_target": localAttr.Target,
 					"error":           err,
@@ -61,12 +62,12 @@ func ConvertCollectionToGraphQLType(collection models.Collection) (*graphql.Obje
 			}
 
 			// Assign resolver for relations
-			resolveFunc = func(p graphql.ResolveParams) (interface{}, error) {
+			resolveFunc = func(p graphql.ResolveParams) (any, error) {
 				return ResolveRelation(p, collection.ID, localAttr)
 			}
 		} else {
 			// Default resolver for non-relation attributes
-			resolveFunc = func(p graphql.ResolveParams) (interface{}, error) {
+			resolveFunc = func(p graphql.ResolveParams) (any, error) {
 				item, ok := p.Source.(models.Item)
 				if !ok {
 					return nil, fmt.Errorf("invalid source type")
@@ -111,7 +112,7 @@ func GetOrCreateGraphQLType(collectionName string) (*graphql.Object, error) {
 	// Fetch collection schema using the storage package instead of querying the DB directly
 	collection, err := storage.GetCollectionByName(collectionName)
 	if err != nil {
-		logger.Log.WithFields(map[string]interface{}{
+		logger.Log.WithFields(map[string]any{
 			"collection_name": collectionName,
 			"error":           err,
 		}).Warn("Collection not found in storage")
