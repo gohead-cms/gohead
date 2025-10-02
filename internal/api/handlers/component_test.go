@@ -32,7 +32,7 @@ func TestComponentHandlers(t *testing.T) {
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
-	assert.NoError(t, db.AutoMigrate(&models.Component{}, &models.Attribute{}))
+	assert.NoError(t, db.AutoMigrate(&models.Component{}, &models.ComponentAttribute{}))
 
 	// Register component routes
 	router.POST("/components", CreateComponent)
@@ -42,14 +42,14 @@ func TestComponentHandlers(t *testing.T) {
 
 	// --- Test Data ---
 	componentName := "seo"
-	validComponentPayload := map[string]interface{}{
+	validComponentPayload := map[string]any{
 		"name": "seo",
-		"attributes": map[string]interface{}{
-			"meta_title": map[string]interface{}{
+		"attributes": map[string]any{
+			"meta_title": map[string]any{
 				"type":     "string",
 				"required": true,
 			},
-			"meta_description": map[string]interface{}{
+			"meta_description": map[string]any{
 				"type": "text",
 			},
 		},
@@ -66,7 +66,7 @@ func TestComponentHandlers(t *testing.T) {
 
 		assert.Equal(t, http.StatusCreated, rr.Code)
 
-		var response map[string]interface{}
+		var response map[string]any
 		json.Unmarshal(rr.Body.Bytes(), &response)
 		assert.Contains(t, response["message"], "component created successfully")
 		assert.Equal(t, componentName, response["component"])
@@ -101,13 +101,13 @@ func TestComponentHandlers(t *testing.T) {
 
 	// --- Sub-test for Update ---
 	t.Run("Update Component", func(t *testing.T) {
-		updatedPayload := map[string]interface{}{
+		updatedPayload := map[string]any{
 			"name": "seo", // Name usually doesn't change, but attributes do
-			"attributes": map[string]interface{}{
-				"meta_title": map[string]interface{}{
+			"attributes": map[string]any{
+				"meta_title": map[string]any{
 					"type": "string",
 				},
-				"canonical_url": map[string]interface{}{ // Added new attribute
+				"canonical_url": map[string]any{ // Added new attribute
 					"type": "string",
 				},
 			},

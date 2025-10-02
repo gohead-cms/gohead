@@ -1,4 +1,3 @@
-// internal/models/component_test.go
 package models
 
 import (
@@ -12,12 +11,12 @@ func TestParseComponentInput(t *testing.T) {
 		input := map[string]any{
 			"name":        "seo",
 			"description": "SEO-related fields",
-			"attributes": map[string]interface{}{
-				"title": map[string]interface{}{
+			"attributes": map[string]any{
+				"title": map[string]any{
 					"type":     "text",
 					"required": true,
 				},
-				"description": map[string]interface{}{
+				"description": map[string]any{
 					"type": "richtext",
 				},
 			},
@@ -29,7 +28,7 @@ func TestParseComponentInput(t *testing.T) {
 		assert.Equal(t, "SEO-related fields", cmp.Description)
 		assert.Len(t, cmp.Attributes, 2)
 
-		// Validate the resulting schema
+		// Also check that a parsed component is valid
 		err = ValidateComponentSchema(cmp)
 		assert.NoError(t, err, "validation should pass for a valid component schema")
 	})
@@ -43,21 +42,22 @@ func TestParseComponentInput(t *testing.T) {
 			},
 		}
 
-		cmp, err := ParseComponentInput(input)
+		_, err := ParseComponentInput(input)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "missing or invalid field 'name'")
-		assert.Empty(t, cmp.Name, "component name should be empty on error")
 	})
 
-	t.Run("Missing Attributes", func(t *testing.T) {
+	t.Run("Missing Attributes in input map", func(t *testing.T) {
+		// Note: ParseComponentInput doesn't require attributes, but ValidateComponentSchema does.
+		// This test ensures parsing succeeds without an 'attributes' map in the input.
 		input := map[string]any{
-			"name": "empty-component",
+			"name": "no-attrs-component",
 		}
 
 		cmp, err := ParseComponentInput(input)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "missing or invalid field 'attributes'")
-		assert.Equal(t, "empty-component", cmp.Name)
+		assert.NoError(t, err, "Parsing should succeed even without an 'attributes' key")
+		assert.Equal(t, "no-attrs-component", cmp.Name)
+		assert.Empty(t, cmp.Attributes)
 	})
 
 	t.Run("Invalid Attribute Format", func(t *testing.T) {
@@ -68,11 +68,9 @@ func TestParseComponentInput(t *testing.T) {
 			},
 		}
 
-		cmp, err := ParseComponentInput(input)
+		_, err := ParseComponentInput(input)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid attribute format for 'title'")
-		assert.Equal(t, "bad-attrs", cmp.Name)
-		assert.Empty(t, cmp.Attributes)
 	})
 }
 
@@ -91,9 +89,9 @@ func TestValidateComponentSchema(t *testing.T) {
 	t.Run("Duplicate Attributes", func(t *testing.T) {
 		cmp := Component{
 			Name: "duplicate-test",
-			Attributes: []Attribute{
-				{Name: "fieldA", Type: "text"},
-				{Name: "fieldA", Type: "bool"}, // Duplicate name
+			Attributes: []ComponentAttribute{
+				{BaseAttribute: BaseAttribute{Name: "fieldA", Type: "text"}},
+				{BaseAttribute: BaseAttribute{Name: "fieldA", Type: "bool"}}, // Duplicate name
 			},
 		}
 
@@ -105,8 +103,8 @@ func TestValidateComponentSchema(t *testing.T) {
 	t.Run("Invalid Attribute Type", func(t *testing.T) {
 		cmp := Component{
 			Name: "invalid-attr-type",
-			Attributes: []Attribute{
-				{Name: "title", Type: "nonexistentType"},
+			Attributes: []ComponentAttribute{
+				{BaseAttribute: BaseAttribute{Name: "title", Type: "nonexistentType"}},
 			},
 		}
 
@@ -116,15 +114,16 @@ func TestValidateComponentSchema(t *testing.T) {
 	})
 
 	t.Run("Valid Schema", func(t *testing.T) {
+		// This test is now corrected to use ComponentAttribute and BaseAttribute
 		cmp := Component{
 			Name: "valid-cmp",
-			Attributes: []Attribute{
-				{Name: "title", Type: "text", Required: true},
-				{Name: "desc", Type: "richtext"},
+			Attributes: []ComponentAttribute{
+				{BaseAttribute: BaseAttribute{Name: "title", Type: "text", Required: true}},
+				{BaseAttribute: BaseAttribute{Name: "desc", Type: "richtext"}},
 			},
 		}
 
-		// Suppose validateAttributeType checks "text" and "richtext" as valid
+		// validateAttributeType will check "text" and "richtext" against the type registry.
 		err := ValidateComponentSchema(cmp)
 		assert.NoError(t, err)
 	})

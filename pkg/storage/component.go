@@ -1,4 +1,3 @@
-// internal/storage/component.go
 package storage
 
 import (
@@ -33,23 +32,14 @@ func CreateComponent(cmp *models.Component) error {
 		return fmt.Errorf("failed to start transaction: %w", tx.Error)
 	}
 
-	// 4) Create the component record
+	// 4) Create the component record. GORM will automatically handle the nested attributes
+	// because of the foreignKey and constraint tags in the model struct.
 	if err := tx.Create(cmp).Error; err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to create component '%s': %w", cmp.Name, err)
 	}
 
-	// 5) Create each attribute, ensuring ComponentID is set
-	for i := range cmp.Attributes {
-		cmp.Attributes[i].ComponentID = &cmp.ID
-		if err := tx.Create(&cmp.Attributes[i]).Error; err != nil {
-			tx.Rollback()
-			return fmt.Errorf("failed to create attribute '%s' for component '%s': %w",
-				cmp.Attributes[i].Name, cmp.Name, err)
-		}
-	}
-
-	// 6) Commit the transaction
+	// 5) Commit the transaction
 	if err := tx.Commit().Error; err != nil {
 		return fmt.Errorf("failed to commit transaction for component '%s': %w", cmp.Name, err)
 	}
@@ -74,116 +64,113 @@ func GetComponentByName(name string) (*models.Component, error) {
 
 // UpdateComponent updates an existing component definition by name.
 func UpdateComponent(name string, updated *models.Component) error {
-	// Validate schema
+	// Validate schema of the incoming data
 	if err := models.ValidateComponentSchema(*updated); err != nil {
 		return err
 	}
 
-	// Fetch the existing record
+	// Begin a transaction
+	tx := database.DB.Begin()
+	if tx.Error != nil {
+		return fmt.Errorf("failed to start transaction for update: %w", tx.Error)
+	}
+
+	// Fetch the existing record within the transaction
 	var existing models.Component
-	err := database.DB.Preload("Attributes").
+	err := tx.Preload("Attributes").
 		Where("name = ?", name).First(&existing).Error
 	if err != nil {
+		tx.Rollback()
 		return fmt.Errorf("failed to find component '%s': %w", name, err)
 	}
 
-	// If the updated name is different, ensure no conflict
+	// If the name is being changed, ensure no conflict
 	if updated.Name != "" && updated.Name != existing.Name {
 		var conflict models.Component
-		err := database.DB.Where("name = ?", updated.Name).First(&conflict).Error
-		if err == nil {
-			return fmt.Errorf("cannot rename component to '%s': already exists", updated.Name)
+		if err := tx.Where("name = ?", updated.Name).First(&conflict).Error; err == nil {
+			tx.Rollback()
+			return fmt.Errorf("cannot rename component to '%s': name already exists", updated.Name)
 		} else if err != gorm.ErrRecordNotFound {
+			tx.Rollback()
 			return err
 		}
+		existing.Name = updated.Name // Update the name
 	}
 
-	// Start transaction for updating attributes
-	tx := database.DB.Begin()
+	// Update description if provided
+	existing.Description = updated.Description
 
-	// Update basic fields
-	if updated.Name != "" {
-		existing.Name = updated.Name
-	}
-
-	// Update attributes: similar to your existing “updateAssociatedFields”
+	// Handle attribute updates: create, update, delete
 	if err := updateComponentAttributes(tx, &existing, updated.Attributes); err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to update component attributes: %w", err)
 	}
 
+	// Save the parent component changes
 	if err := tx.Save(&existing).Error; err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to save updated component: %w", err)
 	}
 
-	if err := tx.Commit().Error; err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
+	return tx.Commit().Error
 }
 
-// updateComponentAttributes merges the updated attributes
-// with existing ones, handling insert/update/delete.
-func updateComponentAttributes(tx *gorm.DB, existing *models.Component, updatedAttrs []models.Attribute) error {
-	// Fetch existing attributes
-	var current []models.Attribute
-	if err := tx.Where("component_id = ?", existing.ID).Find(&current).Error; err != nil {
-		return err
+// updateComponentAttributes merges the updated attributes with existing ones.
+func updateComponentAttributes(tx *gorm.DB, existing *models.Component, updatedAttrs []models.ComponentAttribute) error {
+	// Index existing attributes by name for easy lookup
+	existingMap := make(map[string]models.ComponentAttribute)
+	for _, attr := range existing.Attributes {
+		existingMap[attr.Name] = attr
 	}
 
-	// Index existing
-	existingMap := make(map[string]models.Attribute)
-	for _, a := range current {
-		existingMap[a.Name] = a
-	}
-
+	// Process incoming attributes
 	for _, newAttr := range updatedAttrs {
 		if oldAttr, ok := existingMap[newAttr.Name]; ok {
-			// update
-			newAttr.ID = oldAttr.ID // preserve ID
-			newAttr.ComponentID = &existing.ID
-			// save
+			// Attribute exists, so update it
+			// GORM's Save will update if the primary key is set
+			newAttr.ID = oldAttr.ID
+			newAttr.ComponentID = existing.ID
 			if err := tx.Save(&newAttr).Error; err != nil {
 				return err
 			}
+			// Remove from map to track which ones are left to be deleted
 			delete(existingMap, newAttr.Name)
 		} else {
-			// create
-			newAttr.ComponentID = &existing.ID
+			// Attribute is new, so create it
+			newAttr.ComponentID = existing.ID
 			if err := tx.Create(&newAttr).Error; err != nil {
 				return err
 			}
 		}
 	}
 
-	// delete leftover
-	for _, attr := range existingMap {
-		if err := tx.Delete(&attr).Error; err != nil {
+	// Any attributes left in existingMap were not in the update, so delete them
+	for _, attrToDelete := range existingMap {
+		if err := tx.Delete(&attrToDelete).Error; err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// DeleteComponent removes a component definition by name, along with its attributes.
+// DeleteComponent removes a component definition by name.
+// GORM's cascading delete will handle the attributes.
 func DeleteComponent(name string) error {
 	var cmp models.Component
-	err := database.DB.Where("name = ?", name).First(&cmp).Error
+	// Using .Select("ID") is efficient as we only need the ID for the delete operation.
+	err := database.DB.Where("name = ?", name).Select("ID").First(&cmp).Error
 	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return fmt.Errorf("component '%s' not found", name)
+		}
 		return fmt.Errorf("failed to find component '%s': %w", name, err)
 	}
 
-	tx := database.DB.Begin()
-	if err := tx.Where("component_id = ?", cmp.ID).Delete(&models.Attribute{}).Error; err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to delete attributes for component '%s': %w", name, err)
-	}
-
-	if err := tx.Delete(&cmp).Error; err != nil {
-		tx.Rollback()
+	// GORM will automatically delete associated ComponentAttributes due to the
+	// `constraint:OnDelete:CASCADE` tag in the Component model.
+	if err := database.DB.Delete(&cmp).Error; err != nil {
 		return fmt.Errorf("failed to delete component '%s': %w", name, err)
 	}
-	return tx.Commit().Error
+
+	return nil
 }
