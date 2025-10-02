@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gohead-cms/gohead/internal/agent/events"
 	"github.com/gohead-cms/gohead/internal/agent/jobs"
+	"github.com/gohead-cms/gohead/internal/agent/triggers"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
 	"github.com/hibiken/asynq"
@@ -34,6 +36,11 @@ func (d *EventDispatcher) HandleCollectionEvent(ctx context.Context, t *asynq.Ta
 	if err := json.Unmarshal(t.Payload(), &payload); err != nil {
 		logger.Log.WithError(err).Error("Failed to unmarshal collection event payload")
 		return fmt.Errorf("could not unmarshal event payload: %w", err)
+	}
+
+	if strings.HasPrefix(string(payload.EventType), "collection:") {
+		logger.Log.Info("Collection schema event detected, triggering GraphQL schema hot reload.")
+		go triggers.TriggerSchemaReload()
 	}
 
 	logger.Log.

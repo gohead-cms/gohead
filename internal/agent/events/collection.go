@@ -16,9 +16,12 @@ type EventType string
 const TaskTypeCollectionEvent = "events:collection"
 
 const (
-	EventTypeItemCreated EventType = "item:created"
-	EventTypeItemUpdated EventType = "item:updated"
-	EventTypeItemDeleted EventType = "item:deleted"
+	EventTypeCollectionCreated EventType = "collection:created"
+	EventTypeCollectionUpdated EventType = "collection:updated"
+	EventTypeCollectionDeleted EventType = "collection:deleted"
+	EventTypeItemCreated       EventType = "item:created"
+	EventTypeItemUpdated       EventType = "item:updated"
+	EventTypeItemDeleted       EventType = "item:deleted"
 )
 
 // CollectionEventPayload is the generic data structure for a collection event.

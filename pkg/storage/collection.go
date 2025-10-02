@@ -1,10 +1,12 @@
 package storage
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/gohead-cms/gohead/internal/agent/events"
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
@@ -63,12 +65,21 @@ func SaveCollection(ct *models.Collection) error {
 		return fmt.Errorf("failed to save collection: %w", err)
 	}
 
+	payload := events.CollectionEventPayload{
+		EventType:      events.EventTypeCollectionCreated,
+		CollectionName: ct.Name,
+	}
+	if err := events.EnqueueCollectionEvent(context.Background(), asynqClient, payload); err != nil {
+		// Log the enqueuing error but don't fail the overall SaveItem operation.
+		logger.Log.WithError(err).Error("Failed to enqueue collection:created event")
+	}
+
 	logger.Log.WithField("collection", ct.Name).Info("Collection created successfully")
 	return nil
 }
 
 // restoreAssociatedRecords restores soft-deleted associated records (attributes, relationships, etc.).
-func restoreAssociatedRecords(model interface{}, collectionID uint) error {
+func restoreAssociatedRecords(model any, collectionID uint) error {
 	return database.DB.Unscoped().
 		Model(model).
 		Where("collection_id = ?", collectionID).
@@ -102,7 +113,7 @@ func GetCollectionByID(id uint) (*models.Collection, error) {
 }
 
 // GetCollectionSchema retrieves the schema definition of a collection by name.
-func GetCollectionSchema(id int) (map[string]interface{}, error) {
+func GetCollectionSchema(id int) (map[string]any, error) {
 	var collection models.Collection
 
 	if err := database.DB.Preload("Attributes").Where("id = ?", id).First(&collection).Error; err != nil {
@@ -140,7 +151,7 @@ func GetCollectionByName(name string) (*models.Collection, error) {
 }
 
 // GetAllCollectionsWithFilters retrieves collections with optional filtering, sorting, and pagination.
-func GetAllCollections(filters map[string]interface{}, sortValues []string, rangeValues []int) ([]models.Collection, int, error) {
+func GetAllCollections(filters map[string]any, sortValues []string, rangeValues []int) ([]models.Collection, int, error) {
 	var collections []models.Collection
 	query := database.DB.Model(&models.Collection{}).Preload("Attributes")
 
@@ -240,6 +251,15 @@ func UpdateCollection(id uint, updated *models.Collection) error {
 	if err := tx.Commit().Error; err != nil {
 		logger.Log.WithError(err).WithField("collection_id", id).Error("Failed to commit transaction for collection update")
 		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	payload := events.CollectionEventPayload{
+		EventType:      events.EventTypeCollectionUpdated,
+		CollectionName: existing.Name,
+	}
+	if err := events.EnqueueCollectionEvent(context.Background(), asynqClient, payload); err != nil {
+		// Log the enqueuing error but don't fail the overall SaveItem operation.
+		logger.Log.WithError(err).Error("Failed to enqueue collection:updated event")
 	}
 
 	logger.Log.WithField("collection_id", id).Info("Collection updated successfully")
@@ -347,6 +367,15 @@ func DeleteCollection(collectionID uint) error {
 	if err := tx.Delete(&Collection).Error; err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to delete collection with ID '%d': %w", collectionID, err)
+	}
+
+	payload := events.CollectionEventPayload{
+		EventType:      events.EventTypeCollectionDeleted,
+		CollectionName: Collection.Name,
+	}
+	if err := events.EnqueueCollectionEvent(context.Background(), asynqClient, payload); err != nil {
+		// Log the enqueuing error but don't fail the overall SaveItem operation.
+		logger.Log.WithError(err).Error("Failed to enqueue collection:deleted event")
 	}
 
 	// Commit the transaction
