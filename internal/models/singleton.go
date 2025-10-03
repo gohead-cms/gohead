@@ -22,7 +22,7 @@ type Singleton struct {
 }
 
 // ParseSingletonInput transforms a generic map input into a Singleton struct.
-func ParseSingletonInput(input map[string]interface{}) (Singleton, error) {
+func ParseSingletonInput(input map[string]any) (Singleton, error) {
 	var singleton Singleton
 
 	// Extract basic fields
@@ -34,13 +34,13 @@ func ParseSingletonInput(input map[string]interface{}) (Singleton, error) {
 	}
 
 	// Attributes are expected to be a map of attributeName -> attributeDefinition
-	rawAttributes, hasAttributes := input["attributes"].(map[string]interface{})
+	rawAttributes, hasAttributes := input["attributes"].(map[string]any)
 	if !hasAttributes {
 		return singleton, fmt.Errorf("missing or invalid 'attributes' field")
 	}
 
 	for attrName, rawAttr := range rawAttributes {
-		attrMap, validMap := rawAttr.(map[string]interface{})
+		attrMap, validMap := rawAttr.(map[string]any)
 		if !validMap {
 			return singleton, fmt.Errorf("invalid attribute format for '%s'", attrName)
 		}
@@ -73,10 +73,6 @@ func ValidateSingletonSchema(singleton Singleton) error {
 		}
 		seen[attr.Name] = true
 
-		if err := validateAttributeType(attr); err != nil {
-			return err
-		}
-
 		if attr.Type == "relation" {
 			if attr.Relation == "" || attr.Target == "" {
 				return fmt.Errorf("relationship '%s' must define 'relation' and 'target'", attr.Name)
@@ -102,7 +98,7 @@ func ValidateSingletonSchema(singleton Singleton) error {
 }
 
 // ValidateSingletonValues checks if provided data conforms to the singleton's schema.
-func ValidateSingletonValues(singleton Singleton, data map[string]interface{}) error {
+func ValidateSingletonValues(singleton Singleton, data map[string]any) error {
 	// 1. Build a set of valid attribute names
 	validAttributes := make(map[string]Attribute, len(singleton.Attributes))
 	for _, attr := range singleton.Attributes {
@@ -148,7 +144,7 @@ func ValidateSingletonValues(singleton Singleton, data map[string]interface{}) e
 	return nil
 }
 
-func ensureString(val interface{}) (string, error) {
+func ensureString(val any) (string, error) {
 	switch v := val.(type) {
 	case string:
 		return v, nil

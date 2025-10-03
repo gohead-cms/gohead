@@ -1,9 +1,11 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"time"
 
@@ -45,9 +47,9 @@ func ParseCollectionInput(input map[string]any) (Collection, error) {
 	}
 
 	// Extract and transform attributes
-	if rawAttributes, ok := input["attributes"].(map[string]interface{}); ok {
+	if rawAttributes, ok := input["attributes"].(map[string]any); ok {
 		for attrName, rawAttr := range rawAttributes {
-			attrMap, ok := rawAttr.(map[string]interface{})
+			attrMap, ok := rawAttr.(map[string]any)
 			if !ok {
 				return collection, fmt.Errorf("invalid attribute format for '%s'", attrName)
 			}
@@ -66,7 +68,7 @@ func ParseCollectionInput(input map[string]any) (Collection, error) {
 	return collection, nil
 }
 
-func mapToAttribute(attrMap map[string]interface{}, attribute *Attribute) error {
+func mapToAttribute(attrMap map[string]any, attribute *Attribute) error {
 	if attrType, ok := attrMap["type"].(string); ok {
 		attribute.Type = attrType
 	} else {
@@ -81,7 +83,7 @@ func mapToAttribute(attrMap map[string]interface{}, attribute *Attribute) error 
 		attribute.Unique = unique
 	}
 
-	if options, ok := attrMap["options"].([]interface{}); ok {
+	if options, ok := attrMap["options"].([]any); ok {
 		for _, option := range options {
 			if strOption, ok := option.(string); ok {
 				attribute.Options = append(attribute.Options, strOption)
@@ -121,69 +123,44 @@ func mapToAttribute(attrMap map[string]interface{}, attribute *Attribute) error 
 	return nil
 }
 
-//
-//
-// -------------------- Schema validator
-//
+// -------------------- Schema validator --------------------
 
+// ValidateCollectionSchema is the single source of truth for validating a collection's structure.
+// It correctly uses the TypeRegistry for all type checks.
 func ValidateCollectionSchema(ct Collection) error {
 	if ct.Name == "" {
 		return errors.New("missing required attribute: 'name'")
 	}
-
 	if len(ct.Attributes) == 0 {
 		return errors.New("attributes array cannot be empty")
 	}
 
 	attributeNames := make(map[string]bool)
 	for _, attribute := range ct.Attributes {
-		// Prevent duplicate attributes
 		if attributeNames[attribute.Name] {
 			return fmt.Errorf("duplicate attribute name: '%s'", attribute.Name)
 		}
 		attributeNames[attribute.Name] = true
 
-		logger.Log.WithField("attribute", attribute.Name).Debug("Validating attribute type:", attribute.Type)
-
-		// --- Handle relationship type FIRST ---
+		// --- Handle the "relation" type as a special case FIRST ---
 		if attribute.Type == "relation" {
-			logger.Log.WithField("attribute", attribute.Name).Debug("Validating relationship attributes")
-
-			// Ensure required fields exist
 			if attribute.Relation == "" || attribute.Target == "" {
 				return fmt.Errorf("relationship '%s' must define 'relation' and 'target'", attribute.Name)
 			}
-
-			// Verify the target collection exists
 			var relatedCollection Collection
 			if err := database.DB.Where("name = ?", attribute.Target).First(&relatedCollection).Error; err != nil {
-				logger.Log.WithField("collection", attribute.Target).
-					WithError(err).
-					Warn("Referenced collection does not exist")
 				return fmt.Errorf("target collection '%s' for relationship '%s' does not exist", attribute.Target, attribute.Name)
 			}
-
-			// Validate relationship types
-			allowedRelationTypes := map[string]struct{}{
-				"oneToOne":   {},
-				"oneToMany":  {},
-				"manyToMany": {},
-			}
+			allowedRelationTypes := map[string]struct{}{"oneToOne": {}, "oneToMany": {}, "manyToMany": {}}
 			if _, isValid := allowedRelationTypes[attribute.Relation]; !isValid {
-				logger.Log.WithFields(map[string]interface{}{
-					"relation_type": attribute.Relation,
-					"attribute":     attribute.Name,
-				}).Error("Invalid relation_type provided")
-				return fmt.Errorf("invalid relation_type '%s' for relationship '%s'; allowed values are: oneToOne, oneToMany, manyToMany", attribute.Relation, attribute.Name)
+				return fmt.Errorf("invalid relation_type '%s' for relationship '%s'", attribute.Relation, attribute.Name)
 			}
-
-			continue // relation is done, go to next attribute!
+			continue // Relation is valid, move to the next attribute.
 		}
 
-		// --- Only call registry/type check for non-relation ---
+		// --- For all other types, use the centralized TypeRegistry ---
 		if _, err := types.GetGraphQLType(attribute.Type); err != nil {
-			logger.Log.WithField("attribute", attribute.Name).WithError(err).Error("Invalid attribute type")
-			return fmt.Errorf("invalid type '%s' for attribute '%s'", attribute.Type, attribute.Name)
+			return fmt.Errorf("invalid type '%s' for attribute '%s': %w", attribute.Type, attribute.Name, err)
 		}
 	}
 
@@ -191,48 +168,16 @@ func ValidateCollectionSchema(ct Collection) error {
 	return nil
 }
 
-//
-//
-// -------------------- Schema validator helpers
-//
+// -------------------- Schema validator helpers --------------------
 
-// validateField checks the attribute schema for constraints and valid types.
-func validateAttributeType(attribute Attribute) error {
-	validTypes := map[string]struct{}{
-		"text":     {},
-		"int":      {},
-		"bool":     {},
-		"date":     {},
-		"richtext": {},
-		"enum":     {},
-		"relation": {},
-	}
-
-	if _, valid := validTypes[attribute.Type]; !valid {
-		return fmt.Errorf("invalid attribute type '%s' for attribute '%s'", attribute.Type, attribute.Name)
-	}
-
-	if attribute.Type == "enum" && len(attribute.Options) == 0 {
-		return fmt.Errorf("attribute '%s' of type 'enum' must have options", attribute.Name)
-	}
-
-	if attribute.Type == "int" && attribute.Min != nil && attribute.Max != nil && *attribute.Min > *attribute.Max {
-		return fmt.Errorf("attribute '%s': min value cannot be greater than max value", attribute.Name)
-	}
-
-	if attribute.Type == "text" && attribute.Pattern != "" {
-		if _, err := regexp.Compile(attribute.Pattern); err != nil {
-			return fmt.Errorf("invalid regex pattern for attribute '%s': %v", attribute.Name, err)
-		}
-	}
-
-	return nil
-}
-
-// GetFieldType returns whether a given attributeName is a "attribute", "relationship", or unknown.
+// GetAttributeType correctly identifies an attribute as a "attribute" or "relationship".
 func (c *Collection) GetAttributeType(attributeName string) (string, error) {
 	for _, attribute := range c.Attributes {
 		if attribute.Name == attributeName {
+			// FIX: Check the attribute's type to determine its kind.
+			if attribute.Type == "relation" {
+				return "relationship", nil
+			}
 			return "attribute", nil
 		}
 	}
@@ -242,15 +187,15 @@ func (c *Collection) GetAttributeType(attributeName string) (string, error) {
 }
 
 // ToFlattenedMap converts the Collection into a flat map structure
-func (c *Collection) ToFlattenedMap() map[string]interface{} {
-	flattened := map[string]interface{}{
+func (c *Collection) ToFlattenedMap() map[string]any {
+	flattened := map[string]any{
 		"id":   c.ID,
 		"name": c.Name,
 	}
 
 	// Flatten attributes
 	for _, attr := range c.Attributes {
-		flattened[attr.Name] = map[string]interface{}{
+		flattened[attr.Name] = map[string]any{
 			"ID":   attr.ID,
 			"name": attr.Name,
 			"type": attr.Type,
@@ -299,7 +244,7 @@ func validateAttributeValue(attribute Attribute, value any) error {
 			return fmt.Errorf("attribute '%s' must be at most %d", attribute.Name, *attribute.Max)
 		}
 
-	case "bool":
+	case "boolean", "bool":
 		if _, err := convertToType(value, "bool"); err != nil {
 			return err
 		}
@@ -308,7 +253,10 @@ func validateAttributeValue(attribute Attribute, value any) error {
 		if _, err := convertToType(value, "date"); err != nil {
 			return err
 		}
-
+	case "datetime":
+		if _, err := convertToType(value, "datetime"); err != nil {
+			return err
+		}
 	case "enum":
 		strValue, err := convertToType(value, "text")
 		if err != nil {
@@ -325,7 +273,10 @@ func validateAttributeValue(attribute Attribute, value any) error {
 		if _, err := convertToType(value, "text"); err != nil {
 			return err
 		}
-
+	case "json":
+		if !isValidJSON(value) {
+			return fmt.Errorf("attribute '%s' must be a valid JSON object", attribute.Name)
+		}
 	default:
 		// If, for example, "relation" or "component" is encountered, we skip or return an error
 		return fmt.Errorf("unsupported or special attribute type '%s'; must be handled separately", attribute.Type)
@@ -393,6 +344,13 @@ func convertToType(value any, targetType string) (any, error) {
 			}
 		}
 		return nil, fmt.Errorf("invalid date format for value: %v", value)
+	case "datetime":
+		if str, ok := value.(string); ok {
+			if dateTimeValue, err := time.Parse(time.RFC3339, str); err == nil {
+				return dateTimeValue, nil
+			}
+		}
+		return nil, fmt.Errorf("invalid datetime format for value: %v (expected ISO 8601 format)", value)
 
 	default:
 		return nil, fmt.Errorf("unsupported target type: %s", targetType)
@@ -401,10 +359,17 @@ func convertToType(value any, targetType string) (any, error) {
 
 // sliceContains checks if 'item' exists in 'slice'.
 func sliceContains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
+	return slices.Contains(slice, item)
+}
+
+func isValidJSON(value any) bool {
+	// If it's a string, we check if the string itself is valid JSON.
+	if str, ok := value.(string); ok {
+		return json.Valid([]byte(str))
 	}
-	return false
+
+	// If it's another type (like map[string]any or []any from the request body),
+	// we try to marshal it. If there's no error, it's a valid JSON structure.
+	_, err := json.Marshal(value)
+	return err == nil
 }

@@ -20,7 +20,7 @@ type Item struct {
 
 // ValidateItemValues validates a single item's data against the Collection's schema (attributes).
 // Now rejects any extra fields not defined in the schema.
-func ValidateItemValues(ct Collection, itemData map[string]interface{}) error {
+func ValidateItemValues(ct Collection, itemData map[string]any) error {
 	// Build a set of valid attribute names from the collection schema
 	validAttributes := make(map[string]bool, len(ct.Attributes))
 	for _, attr := range ct.Attributes {
@@ -64,7 +64,7 @@ func ValidateItemValues(ct Collection, itemData map[string]interface{}) error {
 					"attribute": attribute.Name,
 					"type":      attribute.Type,
 					"value":     value,
-				}).Warn("Validation failed for attribute")
+				}).Warn("Validation failed for attribddute")
 				return fmt.Errorf("validation failed for attribute '%s': %w", attribute.Name, err)
 			}
 		} else {
@@ -81,7 +81,7 @@ func ValidateItemValues(ct Collection, itemData map[string]interface{}) error {
 }
 
 // validateRelationship checks the validity of a relationship field and verifies if referenced collection and IDs exist.
-func validateRelationship(attribute Attribute, value interface{}) error {
+func validateRelationship(attribute Attribute, value any) error {
 	// Ensure the target collection exists and fetch its `collection_id`
 	if attribute.Target == "" {
 		logger.Log.WithField("attribute", attribute.Name).Warn("Missing target collection for relationship")
@@ -109,14 +109,14 @@ func validateRelationship(attribute Attribute, value interface{}) error {
 			if err := checkItemExists(relatedCollection.ID, uint(id)); err != nil {
 				return fmt.Errorf("referenced item with ID '%d' in collection '%s' does not exist", uint(id), attribute.Target)
 			}
-		} else if _, isObject := value.(map[string]interface{}); !isObject {
+		} else if _, isObject := value.(map[string]any); !isObject {
 			logger.Log.WithField("attribute", attribute.Name).Warn("Invalid relationship format: expected ID or object")
 			return fmt.Errorf("invalid relationship format for '%s': expected ID or object", attribute.Name)
 		}
 
 	case "manyToMany":
 		// For many-to-many relationships, validate array of IDs or objects
-		array, ok := value.([]interface{})
+		array, ok := value.([]any)
 		if !ok {
 			logger.Log.WithField("attribute", attribute.Name).Warn("Invalid relationship format: expected array")
 			return fmt.Errorf("invalid relationship format for '%s': expected array", attribute.Name)
@@ -127,7 +127,7 @@ func validateRelationship(attribute Attribute, value interface{}) error {
 				if err := checkItemExists(relatedCollection.ID, uint(id)); err != nil {
 					return fmt.Errorf("referenced item with ID '%d' in collection '%s' does not exist", uint(id), attribute.Target)
 				}
-			} else if _, isObject := element.(map[string]interface{}); !isObject {
+			} else if _, isObject := element.(map[string]any); !isObject {
 				logger.Log.WithField("attribute", attribute.Name).Warn("Invalid element in relationship array")
 				return fmt.Errorf("invalid element in relationship array for '%s'", attribute.Name)
 			}
