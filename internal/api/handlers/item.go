@@ -16,7 +16,7 @@ import (
 func CreateItem(ct models.Collection) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input struct {
-			Data map[string]interface{} `json:"data"`
+			Data map[string]any `json:"data"`
 		}
 		if err := c.ShouldBindJSON(&input); err != nil {
 			c.Set("response", "Invalid input format")

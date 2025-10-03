@@ -1,12 +1,16 @@
 package handlers
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
 	"strconv"
 
 	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
+	"github.com/gohead-cms/gohead/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -70,8 +74,9 @@ func DynamicCollectionHandler(c *gin.Context) {
 	}
 }
 
-// handleCreate handles the creation of an item.
+// handleCreate handles the creation of a single item or a batch of items.
 func handleCreate(c *gin.Context, userRole string, ct *models.Collection) {
+	// 1. Permission Check
 	if !hasPermission(userRole, "create") {
 		logger.Log.WithFields(logrus.Fields{
 			"user_role":  userRole,
@@ -81,7 +86,105 @@ func handleCreate(c *gin.Context, userRole string, ct *models.Collection) {
 		c.Set("status", http.StatusForbidden)
 		return
 	}
-	CreateItem(*ct)(c)
+
+	// 2. Read the raw request body to detect if it's an object or an array
+	var raw json.RawMessage
+	if err := c.ShouldBindJSON(&raw); err != nil {
+		c.Set("response", "Invalid JSON format")
+		c.Set("status", http.StatusBadRequest)
+		return
+	}
+
+	// Trim whitespace and check the first character
+	body := bytes.TrimSpace(raw)
+
+	// ---------------------------------
+	//  CASE 1: Bulk Creation (Array)
+	// ---------------------------------
+	if len(body) > 0 && body[0] == '[' {
+		var inputs []struct {
+			Data map[string]any `json:"data"`
+		}
+		if err := json.Unmarshal(body, &inputs); err != nil {
+			c.Set("response", "Invalid JSON array format. Expecting an array of objects with a 'data' key.")
+			c.Set("status", http.StatusBadRequest)
+			return
+		}
+
+		var createdItems []map[string]any
+		// IMPORTANT: For bulk operations, you should use a database transaction.
+		tx := database.DB.Begin()
+
+		for i, input := range inputs {
+			if err := models.ValidateItemValues(*ct, input.Data); err != nil {
+				// tx.Rollback() // Rollback on the first validation error
+				c.Set("response", gin.H{
+					"error":      "Validation failed for an item in the batch",
+					"details":    err.Error(),
+					"item_index": i,
+				})
+				c.Set("status", http.StatusBadRequest)
+				return
+			}
+
+			item := models.Item{
+				CollectionID: ct.ID,
+				Data:         input.Data,
+			}
+
+			if err := storage.SaveItemWithTransaction(tx, &item); err != nil { // Should be storage.SaveItemInTransaction(&item, tx)
+				tx.Rollback()
+				c.Set("response", "Failed to save an item during bulk operation")
+				c.Set("status", http.StatusInternalServerError)
+				return
+			}
+			createdItems = append(createdItems, utils.FormatCollectionItem(&item, ct))
+		}
+
+		tx.Commit()
+		c.Set("response", createdItems)
+		c.Set("meta", gin.H{"created_count": len(createdItems)})
+		c.Set("status", http.StatusCreated)
+
+		// ---------------------------------
+		//  CASE 2: Single Item Creation (Object)
+		// ---------------------------------
+	} else if len(body) > 0 && body[0] == '{' {
+		var input struct {
+			Data map[string]any `json:"data"`
+		}
+		if err := json.Unmarshal(body, &input); err != nil {
+			c.Set("response", "Invalid JSON object format. Expecting an object with a 'data' key.")
+			c.Set("status", http.StatusBadRequest)
+			return
+		}
+
+		// This logic is directly from your original CreateItem function
+		if err := models.ValidateItemValues(*ct, input.Data); err != nil {
+			c.Set("response", err.Error())
+			c.Set("status", http.StatusBadRequest)
+			return
+		}
+
+		item := models.Item{
+			CollectionID: ct.ID,
+			Data:         input.Data,
+		}
+
+		if err := storage.SaveItem(&item); err != nil {
+			c.Set("response", "Failed to save item")
+			c.Set("status", http.StatusInternalServerError)
+			return
+		}
+
+		c.Set("response", utils.FormatCollectionItem(&item, ct))
+		c.Set("meta", gin.H{})
+		c.Set("status", http.StatusCreated)
+
+	} else {
+		c.Set("response", "Invalid or empty JSON body")
+		c.Set("status", http.StatusBadRequest)
+	}
 }
 
 // handleRead handles fetching items or a single item by ID
