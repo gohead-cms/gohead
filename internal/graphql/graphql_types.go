@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/gohead-cms/gohead/internal/models"
-	"github.com/gohead-cms/gohead/internal/types" // Use your provided types package
+	"github.com/gohead-cms/gohead/internal/types"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
 	"github.com/graphql-go/graphql"

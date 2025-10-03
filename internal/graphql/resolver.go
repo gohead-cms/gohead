@@ -2,6 +2,7 @@ package graphql
 
 import (
 	"fmt"
+
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
@@ -10,7 +11,7 @@ import (
 )
 
 // ResolveRelation handles fetching related items in a GraphQL query.
-func ResolveRelation(p graphql.ResolveParams, collectionID uint, attr models.Attribute) (interface{}, error) {
+func ResolveRelation(p graphql.ResolveParams, collectionID uint, attr models.Attribute) (any, error) {
 	// Get the item source
 	item, ok := p.Source.(models.Item)
 	if !ok {
@@ -24,7 +25,7 @@ func ResolveRelation(p graphql.ResolveParams, collectionID uint, attr models.Att
 		return nil, nil // No relation set
 	}
 
-	logger.Log.WithFields(map[string]interface{}{
+	logger.Log.WithFields(map[string]any{
 		"collection_id": collectionID,
 		"relation":      attr.Name,
 		"value":         relationValue,
@@ -32,7 +33,7 @@ func ResolveRelation(p graphql.ResolveParams, collectionID uint, attr models.Att
 
 	// **Handle Many-to-Many and One-to-Many Relations**
 	if attr.Relation == "oneToMany" || attr.Relation == "manyToMany" {
-		relatedIDs, ok := relationValue.([]interface{})
+		relatedIDs, ok := relationValue.([]any)
 		if !ok {
 			logger.Log.WithField("relation", attr.Name).Warn("Invalid format for many-to-many relation")
 			return nil, fmt.Errorf("invalid relation format for '%s'", attr.Name)

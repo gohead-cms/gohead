@@ -2,140 +2,151 @@ package graphql
 
 import (
 	"fmt"
+
 	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/internal/types" // Use the centralized types package
 	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
 
 	"github.com/graphql-go/graphql"
 )
 
-// GenerateGraphQLMutations creates GraphQL mutations for collections
+// GenerateGraphQLMutations creates the root GraphQL mutation object for all collections.
 func GenerateGraphQLMutations() (*graphql.Object, error) {
 	fields := graphql.Fields{}
 
-	// Fetch all collections from the database
+	// 1. Fetch all collections from the database.
 	var collections []models.Collection
 	if err := database.DB.Preload("Attributes").Find(&collections).Error; err != nil {
 		return nil, err
 	}
 
-	logger.Log.WithField("collections", collections).Debug("Generating GraphQL Mutations")
-
-	// Create a mutation for each collection
+	// 2. Loop through each collection to generate its specific mutations.
 	for _, collection := range collections {
-		gqlType, err := ConvertCollectionToGraphQLType(collection)
+		// We need a local copy for the closure to capture it correctly.
+		localCollection := collection
+
+		// Generate the output type for returning data.
+		gqlOutputType, err := ConvertCollectionToGraphQLType(localCollection)
 		if err != nil {
-			logger.Log.WithError(err).Errorf("Failed to generate GraphQL type for collection: %s", collection.Name)
+			logger.Log.WithError(err).Errorf("Failed to generate GraphQL type for collection: %s", localCollection.Name)
 			return nil, err
 		}
 
-		// Mutation: Create Item
-		fields["create"+collection.Name] = &graphql.Field{
-			Type: gqlType,
-			Args: generateGraphQLInputArgs(collection),
-			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				return createCollectionItem(p, collection)
+		// Generate the InputObject type for mutation arguments.
+		gqlInputType := generateGraphQLInputType(localCollection)
+
+		// --- Mutation: Create Item ---
+		fields["create"+localCollection.Name] = &graphql.Field{
+			Type: gqlOutputType,
+			Args: graphql.FieldConfigArgument{
+				// Use the generated InputObject for the 'input' argument.
+				"input": &graphql.ArgumentConfig{Type: graphql.NewNonNull(gqlInputType)},
+			},
+			Resolve: func(p graphql.ResolveParams) (any, error) {
+				// Extract the input map from the arguments.
+				inputData, _ := p.Args["input"].(map[string]any)
+				return createCollectionItem(inputData, localCollection)
 			},
 		}
 
-		// Mutation: Update Item
-		fields["update"+collection.Name] = &graphql.Field{
-			Type: gqlType,
-			Args: generateGraphQLInputArgs(collection, "id"),
-			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				return updateCollectionItem(p, collection)
+		// --- Mutation: Update Item ---
+		fields["update"+localCollection.Name] = &graphql.Field{
+			Type: gqlOutputType,
+			Args: graphql.FieldConfigArgument{
+				"id":    &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.ID)},
+				"input": &graphql.ArgumentConfig{Type: graphql.NewNonNull(gqlInputType)},
+			},
+			Resolve: func(p graphql.ResolveParams) (any, error) {
+				id, _ := p.Args["id"].(string)
+				inputData, _ := p.Args["input"].(map[string]any)
+				return updateCollectionItem(id, inputData, localCollection)
 			},
 		}
 
-		// Mutation: Delete Item
-		fields["delete"+collection.Name] = &graphql.Field{
+		// --- Mutation: Delete Item ---
+		fields["delete"+localCollection.Name] = &graphql.Field{
 			Type: graphql.Boolean,
 			Args: graphql.FieldConfigArgument{
 				"id": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.ID)},
 			},
-			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				return deleteCollectionItem(p, collection)
+			Resolve: func(p graphql.ResolveParams) (any, error) {
+				return deleteCollectionItem(p, localCollection)
 			},
 		}
 	}
 
-	logger.Log.WithField("collections", collections).Debug("Generating GraphQL Mutations done")
-
-	// Return root mutation object
+	// 3. Return the root mutation object.
 	return graphql.NewObject(graphql.ObjectConfig{
 		Name:   "Mutation",
 		Fields: fields,
 	}), nil
 }
 
-func generateGraphQLInputArgs(collection models.Collection, extraArgs ...string) graphql.FieldConfigArgument {
-	args := graphql.FieldConfigArgument{}
-
-	// Add extra arguments (like ID for update/delete)
-	for _, arg := range extraArgs {
-		args[arg] = &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.ID)}
-	}
-
-	// Map collection attributes to GraphQL arguments
+// generateGraphQLInputType dynamically creates a GraphQL InputObject using the centralized TypeRegistry.
+func generateGraphQLInputType(collection models.Collection) *graphql.InputObject {
+	// (This is the function from the previous step, included here for completeness)
+	fields := graphql.InputObjectConfigFieldMap{}
 	for _, attr := range collection.Attributes {
 		var gqlType graphql.Input
-		switch attr.Type {
-		case "text":
-			gqlType = graphql.String
-		case "int":
-			gqlType = graphql.Int
-		case "bool":
-			gqlType = graphql.Boolean
-		case "float":
-			gqlType = graphql.Float
-		case "date":
-			gqlType = graphql.String
-		case "relation":
-			// Relations can accept IDs or objects
+		if attr.Type == "relation" {
 			gqlType = graphql.ID
-		default:
-			logger.Log.Warnf("Unsupported attribute type: %s", attr.Type)
-			continue
+		} else {
+			outputType, err := types.GetGraphQLType(attr.Type)
+			if err != nil {
+				logger.Log.Warnf("Skipping attribute '%s' in '%sInput': %v", attr.Name, collection.Name, err)
+				continue
+			}
+			var ok bool
+			gqlType, ok = outputType.(graphql.Input)
+			if !ok {
+				logger.Log.Warnf("Skipping attribute '%s': Type '%s' is not a valid GraphQL Input type", attr.Name, attr.Type)
+				continue
+			}
 		}
-		args[attr.Name] = &graphql.ArgumentConfig{Type: gqlType}
+		fieldConfig := &graphql.InputObjectFieldConfig{Type: gqlType}
+		if attr.Required {
+			fieldConfig.Type = graphql.NewNonNull(gqlType)
+		}
+		fields[attr.Name] = fieldConfig
 	}
-	return args
+	return graphql.NewInputObject(graphql.InputObjectConfig{
+		Name:   collection.Name + "Input",
+		Fields: fields,
+	})
 }
 
-func createCollectionItem(p graphql.ResolveParams, collection models.Collection) (interface{}, error) {
-	itemData := map[string]interface{}{}
+// --- Resolver Functions (with security fixes) ---
 
-	for attrName := range p.Args {
-		itemData[attrName] = p.Args[attrName]
+func createCollectionItem(inputData map[string]any, collection models.Collection) (any, error) {
+	itemData := map[string]any{}
+	// FIX: Avoid mass assignment by iterating over defined attributes.
+	for _, attr := range collection.Attributes {
+		if val, ok := inputData[attr.Name]; ok {
+			itemData[attr.Name] = val
+		}
 	}
 
-	newItem := models.Item{
+	item := models.Item{
 		CollectionID: collection.ID,
 		Data:         models.JSONMap(itemData),
 	}
-
-	if err := database.DB.Create(&newItem).Error; err != nil {
-		logger.Log.WithError(err).Errorf("Failed to create item in %s", collection.Name)
-		return nil, err
+	if err := database.DB.Create(&item).Error; err != nil {
+		return nil, fmt.Errorf("failed to create item in %s: %w", collection.Name, err)
 	}
-
-	logger.Log.Infof("Created new item in %s with ID: %d", collection.Name, newItem.ID)
-	return newItem, nil
+	return item, nil
 }
 
-func updateCollectionItem(p graphql.ResolveParams, collection models.Collection) (interface{}, error) {
-	id, _ := p.Args["id"].(string)
-
+func updateCollectionItem(id string, inputData map[string]any, collection models.Collection) (any, error) {
 	var item models.Item
-	if err := database.DB.Where("id = ?", id).First(&item).Error; err != nil {
-		return nil, fmt.Errorf("item not found")
+	if err := database.DB.Where("id = ? AND collection_id = ?", id, collection.ID).First(&item).Error; err != nil {
+		return nil, fmt.Errorf("item with id %s not found in collection %s", id, collection.Name)
 	}
 
-	// Update attributes
 	updatedData := item.Data
-	for attrName := range p.Args {
-		if attrName != "id" {
-			updatedData[attrName] = p.Args[attrName]
+	for _, attr := range collection.Attributes {
+		if val, ok := inputData[attr.Name]; ok {
+			updatedData[attr.Name] = val
 		}
 	}
 
@@ -143,18 +154,21 @@ func updateCollectionItem(p graphql.ResolveParams, collection models.Collection)
 	if err := database.DB.Save(&item).Error; err != nil {
 		return nil, err
 	}
-
-	logger.Log.Infof("Updated item %s ID: %s", collection.Name, id)
 	return item, nil
 }
 
-func deleteCollectionItem(p graphql.ResolveParams, collection models.Collection) (interface{}, error) {
-	id, _ := p.Args["id"].(string)
-
-	if err := database.DB.Where("id = ?", id).Delete(&models.Item{}).Error; err != nil {
-		return nil, fmt.Errorf("failed to delete item")
+func deleteCollectionItem(p graphql.ResolveParams, collection models.Collection) (any, error) {
+	id, ok := p.Args["id"].(string)
+	if !ok {
+		return false, fmt.Errorf("invalid ID format")
 	}
 
-	logger.Log.Infof("Deleted item in %s with ID: %s", collection.Name, id)
+	result := database.DB.Where("id = ? AND collection_id = ?", id, collection.ID).Delete(&models.Item{})
+	if result.Error != nil {
+		return false, fmt.Errorf("failed to delete item")
+	}
+	if result.RowsAffected == 0 {
+		return false, fmt.Errorf("item not found in collection %s", collection.Name)
+	}
 	return true, nil
 }
