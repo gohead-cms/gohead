@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"strconv"
 
 	"github.com/gohead-cms/gohead/internal/agent/events"
 	"github.com/gohead-cms/gohead/internal/models"
@@ -276,29 +277,44 @@ func FetchNestedRelations(collection models.Collection, data models.JSONMap, lev
 	return result, nil
 }
 
-// This is now much simpler: always pass the correct collection!
-func fetchItemWithRelations(collection models.Collection, id uint, level uint) (models.JSONMap, error) {
+func fetchItemWithRelations(collection models.Collection, itemID uint, level uint) (models.JSONMap, error) {
 	var item models.Item
-	err := database.DB.Where("id = ?", id).First(&item).Error
+
+	err := database.DB.Where("id = ? AND collection_id = ?", itemID, collection.ID).First(&item).Error
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch item with ID '%d' in collection '%s': %w", id, collection.Name, err)
+		return nil, err
 	}
+	item.Data["id"] = item.ID
 	return FetchNestedRelations(collection, item.Data, level)
 }
 
-func toUint(val any) uint {
-	switch v := val.(type) {
+func toUint(value any) uint {
+	if value == nil {
+		return 0
+	}
+
+	switch v := value.(type) {
+	case float64:
+		return uint(v)
 	case int:
 		return uint(v)
 	case int64:
-		return uint(v)
-	case float64:
 		return uint(v)
 	case uint:
 		return v
 	case uint64:
 		return uint(v)
-	default:
-		return 0
+	case string:
+		i, err := strconv.ParseUint(v, 10, 32)
+		if err != nil {
+			return 0
+		}
+		return uint(i)
+	case map[string]any:
+		if idVal, exists := v["id"]; exists {
+			// Recursively call toUint on the inner value to handle any type.
+			return toUint(idVal)
+		}
 	}
+	return 0
 }

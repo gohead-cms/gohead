@@ -48,44 +48,51 @@ func CreateItem(ct models.Collection) gin.HandlerFunc {
 	}
 }
 
-// GetItems retrieves items from a collection with optional nested relationships and pagination.
-func GetItems(ct models.Collection, level uint) gin.HandlerFunc {
+// GetItems handles pagination and relation hydrating.
+func GetItems(collection models.Collection, level uint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		pageParam := c.DefaultQuery("page", "1")
-		pageSizeParam := c.DefaultQuery("pageSize", "10")
-		page, _ := strconv.Atoi(pageParam)
-		pageSize, _ := strconv.Atoi(pageSizeParam)
+		// Handle pagination from query params
+		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+		pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
+		if page < 1 {
+			page = 1
+		}
+		if pageSize < 1 || pageSize > 100 {
+			pageSize = 10
+		}
 
-		items, totalItems, err := storage.GetItems(ct.ID, page, pageSize)
+		items, total, err := storage.GetItems(collection.ID, page, pageSize)
 		if err != nil {
-			c.Set("response", "Failed to fetch items")
-			c.Set("status", http.StatusInternalServerError)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch items"})
 			return
 		}
 
-		totalPages := (totalItems + pageSize - 1) / pageSize
-
-		formatted := make([]map[string]any, 0, len(items))
+		var results []models.JSONMap
 		for _, item := range items {
-			nested, err := storage.FetchNestedRelations(ct, item.Data, level)
+			logger.Log.WithField("item_id", item).Debug("Fetch relation")
+			item.Data["id"] = item.ID
+			// Use the storage layer to fetch relations
+			hydratedData, err := storage.FetchNestedRelations(collection, item.Data, level)
 			if err != nil {
-				c.Set("response", "Failed to fetch nested relations")
-				c.Set("status", http.StatusInternalServerError)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to populate relations"})
 				return
 			}
-			formatted = append(formatted, utils.FormatNestedItems(item.ID, nested, &ct))
+			logger.Log.WithField("hydratedData", hydratedData).Debug("Hydrated")
+			results = append(results, hydratedData)
 		}
 
-		c.Set("response", formatted)
-		c.Set("meta", gin.H{
-			"pagination": gin.H{
-				"total":     totalItems,
-				"pageCount": totalPages,
-				"page":      page,
-				"pageSize":  pageSize,
+		// Construct response with pagination metadata
+		c.JSON(http.StatusOK, gin.H{
+			"data": results,
+			"meta": gin.H{
+				"pagination": gin.H{
+					"page":      page,
+					"pageSize":  pageSize,
+					"total":     total,
+					"pageCount": (int(total) + pageSize - 1) / pageSize, // Ceiling division
+				},
 			},
 		})
-		c.Set("status", http.StatusOK)
 	}
 }
 
