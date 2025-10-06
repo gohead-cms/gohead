@@ -32,7 +32,7 @@ var TypeRegistry = map[string]graphql.Output{
 	"relation":    nil,
 }
 
-// GetGraphQLType retrieves the corresponding GraphQL type for a CMS type.
+// GetGraphQLType retrieves the corresponding GraphQL type fors CMS type.
 func GetGraphQLType(cmsType string) (graphql.Output, error) {
 	if gqlType, exists := TypeRegistry[cmsType]; exists {
 		if gqlType == nil {

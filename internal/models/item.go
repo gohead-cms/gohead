@@ -38,7 +38,8 @@ func ValidateItemValues(ct Collection, itemData map[string]any) error {
 	// Now perform the usual checks for required, uniqueness, types, etc.
 	for _, attribute := range ct.Attributes {
 		value, exists := itemData[attribute.Name]
-
+		logger.Log.WithField("item", value).Debug("Validation: item")
+		logger.Log.WithField("item", attribute.Type).Debug("Validation: type")
 		// Check for required attributes
 		if attribute.Required && !exists {
 			logger.Log.WithField("attribute", attribute.Name).Warn("Validation failed: missing required attribute")
@@ -50,7 +51,7 @@ func ValidateItemValues(ct Collection, itemData map[string]any) error {
 
 		// Check uniqueness
 		if attribute.Unique {
-			logger.Log.WithField("item", value).Info("Validation: check uniqueness")
+			logger.Log.WithField("item", value).Debug("Validation: check uniqueness")
 			if err := validation.CheckFieldUniqueness(ct.ID, attribute.Name, value); err != nil {
 				return err
 			}
@@ -58,6 +59,7 @@ func ValidateItemValues(ct Collection, itemData map[string]any) error {
 
 		// Validate attribute value or relationships
 		if attribute.Type != "relation" {
+			logger.Log.WithField("item", value).Debug("Validation: check single type")
 			// Validate regular attributes
 			if err := validateAttributeValue(attribute, value); err != nil {
 				logger.Log.WithFields(logrus.Fields{
@@ -68,6 +70,7 @@ func ValidateItemValues(ct Collection, itemData map[string]any) error {
 				return fmt.Errorf("validation failed for attribute '%s': %w", attribute.Name, err)
 			}
 		} else {
+			logger.Log.WithField("item", value).Debug("Validation: check relation")
 			// Validate relationships
 			if err := validateRelationship(attribute, value); err != nil {
 				logger.Log.WithField("attribute", attribute.Name).Warn("Validation failed for relationship")
@@ -82,61 +85,67 @@ func ValidateItemValues(ct Collection, itemData map[string]any) error {
 
 // validateRelationship checks the validity of a relationship field and verifies if referenced collection and IDs exist.
 func validateRelationship(attribute Attribute, value any) error {
-	// Ensure the target collection exists and fetch its `collection_id`
 	if attribute.Target == "" {
-		logger.Log.WithField("attribute", attribute.Name).Warn("Missing target collection for relationship")
 		return fmt.Errorf("missing target collection for relationship '%s'", attribute.Name)
 	}
 
-	// Query the database directly to fetch the target collection
 	var relatedCollection Collection
-	err := database.DB.Where("name = ?", attribute.Target).First(&relatedCollection).Error
-	if err != nil {
-		if err.Error() == "record not found" {
-			logger.Log.WithField("target", attribute.Target).Warn("Target collection does not exist")
-			return fmt.Errorf("target collection '%s' for relationship '%s' does not exist", attribute.Target, attribute.Name)
+	if err := database.DB.Where("name = ?", attribute.Target).First(&relatedCollection).Error; err != nil {
+		if gorm.ErrRecordNotFound == err {
+			return fmt.Errorf("target collection '%s' does not exist", attribute.Target)
 		}
-		logger.Log.WithError(err).WithField("target", attribute.Target).Error("Database error while checking target collection")
-		return fmt.Errorf("error validating target collection '%s' for relationship '%s': %w", attribute.Target, attribute.Name, err)
+		return fmt.Errorf("db error validating target collection '%s': %w", attribute.Target, err)
 	}
 
-	// Validate relationship values based on type
-	switch attribute.Relation {
-	case "oneToOne", "oneToMany":
-		// For single relationships, validate ID or nested object
-		if id, ok := value.(float64); ok {
-			// Use the related collection's ID to validate the item existence
-			if err := checkItemExists(relatedCollection.ID, uint(id)); err != nil {
-				return fmt.Errorf("referenced item with ID '%d' in collection '%s' does not exist", uint(id), attribute.Target)
+	// This helper function correctly handles both raw IDs (like 3) and nested objects (like {"id": 3})
+	checkValue := func(val any) error {
+		var itemID uint
+		// Case 1: The value is a raw ID (e.g., 3.0 from JSON)
+		if id, ok := val.(float64); ok {
+			itemID = uint(id)
+		} else if obj, ok := val.(map[string]any); ok {
+			// Case 2: The value is a nested object, like {"id": 3}
+			idVal, exists := obj["id"]
+			if !exists {
+				return fmt.Errorf("nested object for relationship '%s' is missing an 'id' field", attribute.Name)
 			}
-		} else if _, isObject := value.(map[string]any); !isObject {
-			logger.Log.WithField("attribute", attribute.Name).Warn("Invalid relationship format: expected ID or object")
-			return fmt.Errorf("invalid relationship format for '%s': expected ID or object", attribute.Name)
+			if idFloat, isFloat := idVal.(float64); isFloat {
+				itemID = uint(idFloat)
+			} else {
+				return fmt.Errorf("nested object 'id' for relationship '%s' must be a number", attribute.Name)
+			}
+		} else {
+			// Case 3: The format is invalid
+			return fmt.Errorf("invalid format for relationship '%s': expected an ID or an object with an 'id'", attribute.Name)
 		}
 
+		// Now, reliably perform the existence check with the extracted ID
+		logger.Log.WithField("id_to_check", itemID).Debug("Validation: checking if related item exists")
+		if err := checkItemExists(relatedCollection.ID, itemID); err != nil {
+			return fmt.Errorf("referenced item with ID '%d' in collection '%s' does not exist", itemID, attribute.Target)
+		}
+		return nil
+	}
+
+	switch attribute.Relation {
+	case "oneToOne", "oneToMany":
+		return checkValue(value)
+
 	case "manyToMany":
-		// For many-to-many relationships, validate array of IDs or objects
 		array, ok := value.([]any)
 		if !ok {
-			logger.Log.WithField("attribute", attribute.Name).Warn("Invalid relationship format: expected array")
-			return fmt.Errorf("invalid relationship format for '%s': expected array", attribute.Name)
+			return fmt.Errorf("invalid format for relationship '%s': expected an array", attribute.Name)
 		}
 		for _, element := range array {
-			if id, isID := element.(float64); isID {
-				// Use the related collection's ID to validate the item existence
-				if err := checkItemExists(relatedCollection.ID, uint(id)); err != nil {
-					return fmt.Errorf("referenced item with ID '%d' in collection '%s' does not exist", uint(id), attribute.Target)
-				}
-			} else if _, isObject := element.(map[string]any); !isObject {
-				logger.Log.WithField("attribute", attribute.Name).Warn("Invalid element in relationship array")
-				return fmt.Errorf("invalid element in relationship array for '%s'", attribute.Name)
+			if err := checkValue(element); err != nil {
+				return err // Return on the first error found in the array
 			}
 		}
 
 	default:
-		logger.Log.WithField("relation", attribute.Relation).Warn("Unsupported relationship type")
-		return fmt.Errorf("unsupported relationship type '%s' for '%s'", attribute.Relation, attribute.Name)
+		return fmt.Errorf("unsupported relationship type '%s'", attribute.Relation)
 	}
+
 	return nil
 }
 
