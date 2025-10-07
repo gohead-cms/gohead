@@ -101,6 +101,7 @@ func handleCreate(c *gin.Context, userRole string, ct *models.Collection) {
 	// ---------------------------------
 	//  CASE 1: Bulk Creation (Array)
 	// ---------------------------------
+	tx := database.DB.Begin()
 	if len(body) > 0 && body[0] == '[' {
 		var inputs []struct {
 			Data map[string]any `json:"data"`
@@ -113,10 +114,9 @@ func handleCreate(c *gin.Context, userRole string, ct *models.Collection) {
 
 		var createdItems []map[string]any
 		// IMPORTANT: For bulk operations, you should use a database transaction.
-		tx := database.DB.Begin()
 
 		for i, input := range inputs {
-			if err := models.ValidateItemValues(*ct, input.Data); err != nil {
+			if _, err := models.ValidateItemValues(*ct, input.Data, tx); err != nil {
 				// tx.Rollback() // Rollback on the first validation error
 				c.Set("response", gin.H{
 					"error":      "Validation failed for an item in the batch",
@@ -160,7 +160,7 @@ func handleCreate(c *gin.Context, userRole string, ct *models.Collection) {
 		}
 
 		// This logic is directly from your original CreateItem function
-		if err := models.ValidateItemValues(*ct, input.Data); err != nil {
+		if _, err := models.ValidateItemValues(*ct, input.Data, tx); err != nil {
 			c.Set("response", err.Error())
 			c.Set("status", http.StatusBadRequest)
 			return

@@ -32,24 +32,35 @@ func ConvertCollectionToGraphQLType(collection models.Collection) (*graphql.Obje
 				localAttr := attr
 
 				var gqlFieldType graphql.Output
+				var resolveFunc graphql.FieldResolveFn
 				var err error
 
 				if localAttr.Type == "relation" {
-					relatedType, err := GetOrCreateGraphQLType(localAttr.Target)
+					gqlFieldType, err = GetOrCreateGraphQLType(localAttr.Target)
 					if err != nil {
 						panic(fmt.Sprintf("schema error: failed to resolve relation '%s': %v", localAttr.Name, err))
 					}
-					gqlFieldType = relatedType // Simplified for clarity
+					resolveFunc = func(p graphql.ResolveParams) (any, error) {
+						return ResolveRelation(p, collection.ID, localAttr)
+					}
 				} else {
 					gqlFieldType, err = types.GetGraphQLType(localAttr.Type)
 					if err != nil {
 						panic(fmt.Sprintf("schema error: bad type for attribute '%s': %v", localAttr.Name, err))
 					}
+					resolveFunc = func(p graphql.ResolveParams) (any, error) {
+						if sourceMap, ok := p.Source.(map[string]any); ok {
+							if value, exists := sourceMap[localAttr.Name]; exists {
+								return value, nil
+							}
+						}
+						return nil, nil // Return null if the key doesn't exist.
+					}
 				}
 
 				fields[localAttr.Name] = &graphql.Field{
-					Type: gqlFieldType,
-					// Add your resolver logic here
+					Type:    gqlFieldType,
+					Resolve: resolveFunc,
 				}
 			}
 			// 3. Return the completed map.

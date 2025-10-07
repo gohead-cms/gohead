@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"maps"
-	"strconv"
 
 	"github.com/gohead-cms/gohead/internal/agent/events"
 	"github.com/gohead-cms/gohead/internal/models"
@@ -233,7 +232,7 @@ func FetchNestedRelations(collection models.Collection, data models.JSONMap, lev
 
 		switch attr.Relation {
 		case "oneToOne", "oneToMany":
-			id := toUint(raw)
+			id := models.ToUint(raw)
 			if id == 0 {
 				result[attr.Name] = nil
 				break
@@ -249,7 +248,7 @@ func FetchNestedRelations(collection models.Collection, data models.JSONMap, lev
 			switch ids := raw.(type) {
 			case []any:
 				for _, elem := range ids {
-					id := toUint(elem)
+					id := models.ToUint(elem)
 					if id == 0 {
 						continue
 					}
@@ -286,35 +285,4 @@ func fetchItemWithRelations(collection models.Collection, itemID uint, level uin
 	}
 	item.Data["id"] = item.ID
 	return FetchNestedRelations(collection, item.Data, level)
-}
-
-func toUint(value any) uint {
-	if value == nil {
-		return 0
-	}
-
-	switch v := value.(type) {
-	case float64:
-		return uint(v)
-	case int:
-		return uint(v)
-	case int64:
-		return uint(v)
-	case uint:
-		return v
-	case uint64:
-		return uint(v)
-	case string:
-		i, err := strconv.ParseUint(v, 10, 32)
-		if err != nil {
-			return 0
-		}
-		return uint(i)
-	case map[string]any:
-		if idVal, exists := v["id"]; exists {
-			// Recursively call toUint on the inner value to handle any type.
-			return toUint(idVal)
-		}
-	}
-	return 0
 }

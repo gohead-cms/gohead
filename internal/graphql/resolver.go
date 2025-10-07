@@ -12,86 +12,63 @@ import (
 
 // ResolveRelation handles fetching related items in a GraphQL query.
 func ResolveRelation(p graphql.ResolveParams, collectionID uint, attr models.Attribute) (any, error) {
-	// Get the item source
-	item, ok := p.Source.(models.Item)
+	sourceMap, ok := p.Source.(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("invalid source type for relation '%s'", attr.Name)
+		return nil, fmt.Errorf("invalid source type for relation '%s', expected map[string]any", attr.Name)
 	}
 
-	// Extract relation ID(s) from item data
-	relationValue, exists := item.Data[attr.Name]
-	if !exists {
-		logger.Log.WithField("relation", attr.Name).Debug("No relation found in item data")
-		return nil, nil // No relation set
+	relationValue, exists := sourceMap[attr.Name]
+	if !exists || relationValue == nil {
+		return nil, nil // No relation set, return null.
 	}
 
-	logger.Log.WithFields(map[string]any{
-		"collection_id": collectionID,
-		"relation":      attr.Name,
-		"value":         relationValue,
-	}).Debug("Resolving relation")
+	targetCollection, err := storage.GetCollectionByName(attr.Target)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch target collection '%s': %w", attr.Target, err)
+	}
 
-	// **Handle Many-to-Many and One-to-Many Relations**
+	// Handle Many-to-Many and One-to-Many Relations
 	if attr.Relation == "oneToMany" || attr.Relation == "manyToMany" {
 		relatedIDs, ok := relationValue.([]any)
 		if !ok {
-			logger.Log.WithField("relation", attr.Name).Warn("Invalid format for many-to-many relation")
-			return nil, fmt.Errorf("invalid relation format for '%s'", attr.Name)
+			return nil, fmt.Errorf("invalid relation format for '%s', expected an array", attr.Name)
 		}
 
-		// Convert IDs to uint slice
-		var relatedItems []models.Item
+		var results []models.JSONMap
 		for _, rawID := range relatedIDs {
-			if idFloat, ok := rawID.(float64); ok {
-				id := uint(idFloat)
 
-				// Fetch target collection
-				targetCollection, err := storage.GetCollectionByName(attr.Target)
-				if err != nil {
-					logger.Log.WithError(err).WithField("target", attr.Target).Warn("Failed to fetch target collection")
-					return nil, fmt.Errorf("failed to fetch target collection '%s': %w", attr.Target, err)
-				}
-
-				// Fetch related item by ID
-				relatedItem, err := storage.GetItemByID(targetCollection.ID, id)
-				if err != nil {
-					logger.Log.WithError(err).WithField("raw_id", rawID).Warn("Failed to fetch related item")
-					continue // Skip this ID but continue processing others
-				}
-				relatedItems = append(relatedItems, *relatedItem)
-			} else {
-				logger.Log.WithField("raw_id", rawID).Warn("Invalid relation ID type")
+			id := models.ToUint(rawID)
+			if id == 0 {
+				continue
 			}
-		}
 
-		return relatedItems, nil
+			relatedItem, err := storage.GetItemByID(targetCollection.ID, id)
+			if err != nil {
+				logger.Log.WithError(err).WithField("id", id).Warn("Failed to fetch related item, skipping.")
+				continue
+			}
+
+			relatedItem.Data["id"] = relatedItem.ID
+			results = append(results, relatedItem.Data)
+		}
+		return results, nil
 	}
 
-	// **Handle One-to-One and Many-to-One Relations**
+	// Handle One-to-One and Many-to-One Relations
 	if attr.Relation == "oneToOne" || attr.Relation == "manyToOne" {
-		relatedID, ok := relationValue.(float64)
-		if !ok {
-			logger.Log.WithField("relation", attr.Name).Warn("Invalid format for one-to-one relation")
-			return nil, fmt.Errorf("invalid relation format for '%s'", attr.Name)
+		id := models.ToUint(relationValue)
+		if id == 0 {
+			return nil, fmt.Errorf("invalid ID format for relation '%s'", attr.Name)
 		}
 
-		// Fetch target collection
-		targetCollection, err := storage.GetCollectionByName(attr.Target)
+		relatedItem, err := storage.GetItemByID(targetCollection.ID, id)
 		if err != nil {
-			logger.Log.WithError(err).WithField("target", attr.Target).Warn("Failed to fetch target collection")
-			return nil, fmt.Errorf("failed to fetch target collection '%s': %w", attr.Target, err)
+			return nil, nil // Return null if the related item isn't found
 		}
 
-		// Fetch related item by ID
-		relatedItem, err := storage.GetItemByID(targetCollection.ID, uint(relatedID))
-		if err != nil {
-			logger.Log.WithError(err).WithField("relation", attr.Name).Error("Failed to resolve related item")
-			return nil, err
-		}
-
-		return relatedItem, nil
+		relatedItem.Data["id"] = relatedItem.ID
+		return relatedItem.Data, nil
 	}
 
-	logger.Log.WithField("relation", attr.Name).Error("Unsupported relation type")
-	return nil, fmt.Errorf("unsupported relation type for '%s'", attr.Name)
+	return nil, fmt.Errorf("unsupported relation type '%s'", attr.Type)
 }

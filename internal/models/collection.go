@@ -215,7 +215,7 @@ func validateAttributeValue(attribute Attribute, value any) error {
 
 	// 2) Proceed with domain-specific validation logic:
 	switch attribute.Type {
-	case "string", "text", "richtext":
+	case "string", "text", "richtext", "email":
 		strValue, err := convertToType(value, "text")
 		if err != nil {
 			return err

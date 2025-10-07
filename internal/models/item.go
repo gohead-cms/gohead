@@ -2,12 +2,12 @@ package models
 
 import (
 	"fmt"
+	"maps"
+	"strconv"
 
-	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/validation"
 
-	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -18,146 +18,182 @@ type Item struct {
 	Data         JSONMap `json:"data" gorm:"type:json"`
 }
 
-// ValidateItemValues validates a single item's data against the Collection's schema (attributes).
-// Now rejects any extra fields not defined in the schema.
-func ValidateItemValues(ct Collection, itemData map[string]any) error {
-	// Build a set of valid attribute names from the collection schema
-	validAttributes := make(map[string]bool, len(ct.Attributes))
+// ValidateItemValues validates item data, creates nested relations, and returns the processed data.
+// It MUST be called within a database transaction.
+func ValidateItemValues(ct Collection, itemData map[string]any, tx *gorm.DB) (JSONMap, error) {
+	processedData := make(JSONMap)
+	maps.Copy(processedData, itemData) // Work on a copy
+
+	validAttributes := make(map[string]bool)
 	for _, attr := range ct.Attributes {
 		validAttributes[attr.Name] = true
 	}
 
-	// Check for unknown fields in itemData
 	for key := range itemData {
 		if !validAttributes[key] {
-			logger.Log.WithField("attribute", key).Warn("Validation failed: unknown attribute")
-			return fmt.Errorf("unknown attribute: '%s'", key)
+			return nil, fmt.Errorf("unknown attribute: '%s'", key)
 		}
 	}
 
-	// Now perform the usual checks for required, uniqueness, types, etc.
 	for _, attribute := range ct.Attributes {
 		value, exists := itemData[attribute.Name]
-		logger.Log.WithField("item", value).Debug("Validation: item")
-		logger.Log.WithField("item", attribute.Type).Debug("Validation: type")
-		// Check for required attributes
+
 		if attribute.Required && !exists {
-			logger.Log.WithField("attribute", attribute.Name).Warn("Validation failed: missing required attribute")
-			return fmt.Errorf("missing required attribute: '%s'", attribute.Name)
+			return nil, fmt.Errorf("missing required attribute: '%s'", attribute.Name)
 		}
 		if !exists {
 			continue
 		}
 
-		// Check uniqueness
 		if attribute.Unique {
-			logger.Log.WithField("item", value).Debug("Validation: check uniqueness")
 			if err := validation.CheckFieldUniqueness(ct.ID, attribute.Name, value); err != nil {
-				return err
+				return nil, err
 			}
 		}
 
-		// Validate attribute value or relationships
-		if attribute.Type != "relation" {
-			logger.Log.WithField("item", value).Debug("Validation: check single type")
-			// Validate regular attributes
-			if err := validateAttributeValue(attribute, value); err != nil {
-				logger.Log.WithFields(logrus.Fields{
-					"attribute": attribute.Name,
-					"type":      attribute.Type,
-					"value":     value,
-				}).Warn("Validation failed for attribddute")
-				return fmt.Errorf("validation failed for attribute '%s': %w", attribute.Name, err)
+		if attribute.Type == "relation" {
+			// This now returns the processed value (with new IDs) and an error.
+			processedValue, err := validateRelationship(attribute, value, tx)
+			if err != nil {
+				return nil, fmt.Errorf("validation failed for relationship '%s': %w", attribute.Name, err)
 			}
+			// Replace the original nested object with the final ID(s).
+			processedData[attribute.Name] = processedValue
 		} else {
-			logger.Log.WithField("item", value).Debug("Validation: check relation")
-			// Validate relationships
-			if err := validateRelationship(attribute, value); err != nil {
-				logger.Log.WithField("attribute", attribute.Name).Warn("Validation failed for relationship")
-				return fmt.Errorf("validation failed for relationship '%s': %w", attribute.Name, err)
+			if err := validateAttributeValue(attribute, value); err != nil {
+				return nil, fmt.Errorf("validation failed for attribute '%s': %w", attribute.Name, err)
 			}
 		}
 	}
 
 	logger.Log.WithField("collection", ct.Name).Info("Item data validation passed")
-	return nil
+	return processedData, nil
 }
 
-// validateRelationship checks the validity of a relationship field and verifies if referenced collection and IDs exist.
-func validateRelationship(attribute Attribute, value any) error {
+// validateRelationship validates and processes a relationship, creating new items if necessary.
+// It returns the final value for the relation (a single ID or an array of IDs).
+func validateRelationship(attribute Attribute, value any, tx *gorm.DB) (any, error) {
 	if attribute.Target == "" {
-		return fmt.Errorf("missing target collection for relationship '%s'", attribute.Name)
+		return nil, fmt.Errorf("missing target collection for relationship '%s'", attribute.Name)
 	}
 
 	var relatedCollection Collection
-	if err := database.DB.Where("name = ?", attribute.Target).First(&relatedCollection).Error; err != nil {
+	if err := tx.Where("name = ?", attribute.Target).Preload("Attributes").First(&relatedCollection).Error; err != nil {
 		if gorm.ErrRecordNotFound == err {
-			return fmt.Errorf("target collection '%s' does not exist", attribute.Target)
+			return nil, fmt.Errorf("target collection '%s' does not exist", attribute.Target)
 		}
-		return fmt.Errorf("db error validating target collection '%s': %w", attribute.Target, err)
+		return nil, fmt.Errorf("db error validating target collection: %w", err)
 	}
 
-	// This helper function correctly handles both raw IDs (like 3) and nested objects (like {"id": 3})
-	checkValue := func(val any) error {
-		var itemID uint
-		// Case 1: The value is a raw ID (e.g., 3.0 from JSON)
-		if id, ok := val.(float64); ok {
-			itemID = uint(id)
-		} else if obj, ok := val.(map[string]any); ok {
-			// Case 2: The value is a nested object, like {"id": 3}
-			idVal, exists := obj["id"]
-			if !exists {
-				return fmt.Errorf("nested object for relationship '%s' is missing an 'id' field", attribute.Name)
+	// This helper function handles the logic for a single relation value.
+	resolveRelationValue := func(val any) (uint, error) {
+		obj, isMap := val.(map[string]any)
+		// Case 1: The value is a raw ID (e.g., 123). We just need to check if it exists.
+		if !isMap {
+			id := ToUint(val)
+			if id == 0 {
+				return 0, fmt.Errorf("invalid ID format for relation '%s'", attribute.Name)
 			}
-			if idFloat, isFloat := idVal.(float64); isFloat {
-				itemID = uint(idFloat)
-			} else {
-				return fmt.Errorf("nested object 'id' for relationship '%s' must be a number", attribute.Name)
+			if err := checkItemExists(relatedCollection.ID, id, tx); err != nil {
+				return 0, err
 			}
+			return id, nil
+		}
+
+		// Case 2: The value is a nested object.
+		if idVal, exists := obj["id"]; exists {
+			// Sub-case 2a: Object has an ID. This is a "connect" operation.
+			id := ToUint(idVal)
+			if err := checkItemExists(relatedCollection.ID, id, tx); err != nil {
+				return 0, err
+			}
+			return id, nil
 		} else {
-			// Case 3: The format is invalid
-			return fmt.Errorf("invalid format for relationship '%s': expected an ID or an object with an 'id'", attribute.Name)
+			// Sub-case 2b: Object has NO ID. This is a "create" operation.
+			logger.Log.WithField("collection", relatedCollection.Name).Info("Performing nested create")
+			// Recursively validate the new data against the target collection's schema.
+			processedNestedData, err := ValidateItemValues(relatedCollection, obj, tx)
+			if err != nil {
+				return 0, fmt.Errorf("invalid data for new item in '%s': %w", attribute.Target, err)
+			}
+			// Create the new item within the transaction.
+			newItem := &Item{
+				CollectionID: relatedCollection.ID,
+				Data:         processedNestedData,
+			}
+			if err := tx.Create(newItem).Error; err != nil {
+				return 0, fmt.Errorf("failed to create nested item in '%s': %w", attribute.Target, err)
+			}
+			// Return the new item's ID.
+			return newItem.ID, nil
 		}
-
-		// Now, reliably perform the existence check with the extracted ID
-		logger.Log.WithField("id_to_check", itemID).Debug("Validation: checking if related item exists")
-		if err := checkItemExists(relatedCollection.ID, itemID); err != nil {
-			return fmt.Errorf("referenced item with ID '%d' in collection '%s' does not exist", itemID, attribute.Target)
-		}
-		return nil
 	}
 
-	switch attribute.Relation {
-	case "oneToOne", "oneToMany":
-		return checkValue(value)
-
-	case "manyToMany":
+	// Process single or multiple relations based on the schema.
+	if attribute.Relation == "manyToMany" {
 		array, ok := value.([]any)
 		if !ok {
-			return fmt.Errorf("invalid format for relationship '%s': expected an array", attribute.Name)
+			return nil, fmt.Errorf("expected an array for many-to-many relation '%s'", attribute.Name)
 		}
+
+		var resolvedIDs []uint
 		for _, element := range array {
-			if err := checkValue(element); err != nil {
-				return err // Return on the first error found in the array
+			id, err := resolveRelationValue(element)
+			if err != nil {
+				return nil, err
 			}
+			resolvedIDs = append(resolvedIDs, id)
 		}
-
-	default:
-		return fmt.Errorf("unsupported relationship type '%s'", attribute.Relation)
+		return resolvedIDs, nil // Return an array of the final IDs
+	} else { // oneToOne, oneToMany, manyToOne
+		id, err := resolveRelationValue(value)
+		if err != nil {
+			return nil, err
+		}
+		return id, nil // Return a single final ID
 	}
-
-	return nil
 }
 
-// checkItemExists verifies if an item exists in a specific collection by ID.
-func checkItemExists(collectionID uint, itemID uint) error {
+// checkItemExists now accepts a transaction object.
+func checkItemExists(collectionID uint, itemID uint, tx *gorm.DB) error {
 	var count int64
-	err := database.DB.Model(&Item{}).Where("collection_id = ? AND id = ?", collectionID, itemID).Count(&count).Error
+	err := tx.Model(&Item{}).Where("collection_id = ? AND id = ?", collectionID, itemID).Count(&count).Error
 	if err != nil {
 		return err
 	}
 	if count == 0 {
-		return fmt.Errorf("item with ID '%d' does not exist in the specified collection", itemID)
+		return fmt.Errorf("referenced item with ID '%d' in collection ID '%d' does not exist", itemID, collectionID)
 	}
 	return nil
+}
+
+func ToUint(value any) uint {
+	if value == nil {
+		return 0
+	}
+
+	switch v := value.(type) {
+	case float64:
+		return uint(v)
+	case int:
+		return uint(v)
+	case int64:
+		return uint(v)
+	case uint:
+		return v
+	case uint64:
+		return uint(v)
+	case string:
+		i, err := strconv.ParseUint(v, 10, 32)
+		if err != nil {
+			return 0
+		}
+		return uint(i)
+	case map[string]any:
+		if idVal, exists := v["id"]; exists {
+			// Recursively call toUint on the inner value to handle any type.
+			return ToUint(idVal)
+		}
+	}
+	return 0
 }

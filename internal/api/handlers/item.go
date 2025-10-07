@@ -5,45 +5,55 @@ import (
 	"strconv"
 
 	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
 	"github.com/gohead-cms/gohead/pkg/utils"
+	"gorm.io/gorm"
 
 	"github.com/gin-gonic/gin"
 )
 
-// CreateItem handles the creation of a new content item.
-func CreateItem(ct models.Collection) gin.HandlerFunc {
+// CreateItem handles nested creations
+func CreateItem(collection models.Collection) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var input struct {
-			Data map[string]any `json:"data"`
+			Data models.JSONMap `json:"data"`
 		}
 		if err := c.ShouldBindJSON(&input); err != nil {
-			c.Set("response", "Invalid input format")
+			c.Set("response", "Invalid request body")
 			c.Set("status", http.StatusBadRequest)
 			return
 		}
 
-		itemData := input.Data
-		if err := models.ValidateItemValues(ct, itemData); err != nil {
-			c.Set("response", err.Error())
+		var finalItem models.Item
+		txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+			processedData, err := models.ValidateItemValues(collection, input.Data, tx)
+			if err != nil {
+				return err
+			}
+			item := models.Item{
+				CollectionID: collection.ID,
+				Data:         processedData,
+			}
+			if err := tx.Create(&item).Error; err != nil {
+				return err
+			}
+			finalItem = item
+			return nil
+		})
+
+		if txErr != nil {
+			c.Set("response", txErr.Error())
 			c.Set("status", http.StatusBadRequest)
 			return
 		}
 
-		item := models.Item{
-			CollectionID: ct.ID,
-			Data:         itemData,
-		}
-
-		if err := storage.SaveItem(&item); err != nil {
-			c.Set("response", "Failed to save item")
-			c.Set("status", http.StatusInternalServerError)
-			return
-		}
-
-		c.Set("response", utils.FormatCollectionItem(&item, &ct))
-		c.Set("meta", gin.H{})
+		finalItem.Data["id"] = finalItem.ID
+		c.Set("response", gin.H{
+			"id":         finalItem.ID,
+			"attributes": finalItem.Data,
+		})
 		c.Set("status", http.StatusCreated)
 	}
 }
@@ -127,40 +137,66 @@ func GetItemByID(ct models.Collection, id uint, level uint) gin.HandlerFunc {
 	}
 }
 
-// UpdateItem updates an existing content item.
-func UpdateItem(ct models.Collection) gin.HandlerFunc {
+// UpdateItem now handles nested creations and uses the c.Set response pattern.
+func UpdateItem(collection models.Collection) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		idStr := c.Param("id")
-		id, err := strconv.Atoi(idStr)
+		itemID, err := strconv.Atoi(c.Param("id"))
 		if err != nil {
-			c.Set("response", "Invalid ID")
-			c.Set("details", err.Error())
+			c.Set("response", "Invalid ID format")
 			c.Set("status", http.StatusBadRequest)
 			return
 		}
 
-		var itemData map[string]any
-		if err := c.ShouldBindJSON(&itemData); err != nil {
-			c.Set("response", "Invalid input")
-			c.Set("details", err.Error())
+		var input struct {
+			Data models.JSONMap `json:"data"`
+		}
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.Set("response", "Invalid request body")
 			c.Set("status", http.StatusBadRequest)
 			return
 		}
 
-		if err := models.ValidateItemValues(ct, itemData); err != nil {
-			c.Set("response", err.Error())
+		var updatedItem models.Item
+		txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+			processedData, err := models.ValidateItemValues(collection, input.Data, tx)
+			if err != nil {
+				return err
+			}
+			var itemToUpdate models.Item
+			if err := tx.Where("id = ? AND collection_id = ?", itemID, collection.ID).First(&itemToUpdate).Error; err != nil {
+				return gorm.ErrRecordNotFound
+			}
+			itemToUpdate.Data = processedData
+			if err := tx.Save(&itemToUpdate).Error; err != nil {
+				return err
+			}
+			updatedItem = itemToUpdate
+			return nil
+		})
+
+		if txErr != nil {
+			if txErr == gorm.ErrRecordNotFound {
+				c.Set("response", "Item not found")
+				c.Set("status", http.StatusNotFound)
+				return
+			}
+			c.Set("response", txErr.Error())
 			c.Set("status", http.StatusBadRequest)
 			return
 		}
 
-		if err := storage.UpdateItem(uint(id), models.JSONMap(itemData)); err != nil {
-			c.Set("response", "Failed to update item")
-			c.Set("details", err.Error())
+		level, _ := strconv.Atoi(c.DefaultQuery("level", "2"))
+		hydratedData, err := storage.FetchNestedRelations(collection, updatedItem.Data, uint(level))
+		if err != nil {
+			c.Set("response", "Failed to populate relations for response")
 			c.Set("status", http.StatusInternalServerError)
 			return
 		}
 
-		c.Set("response", gin.H{"message": "Item updated successfully"})
+		c.Set("response", gin.H{
+			"id":         updatedItem.ID,
+			"attributes": hydratedData,
+		})
 		c.Set("status", http.StatusOK)
 	}
 }

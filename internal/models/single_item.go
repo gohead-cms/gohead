@@ -102,7 +102,7 @@ func validateSingleItemRelationship(attribute Attribute, value interface{}) erro
 		// Expect a single ID (float64 if coming from JSON) or an object
 		if id, ok := value.(float64); ok {
 			// Validate that an item with ID `id` exists in that collection
-			if err := checkItemExists(relatedCollection.ID, uint(id)); err != nil {
+			if err := checkItemExists(relatedCollection.ID, uint(id), database.DB); err != nil {
 				return fmt.Errorf("referenced item with ID '%d' in collection '%s' does not exist",
 					uint(id), attribute.Target)
 			}
@@ -118,7 +118,7 @@ func validateSingleItemRelationship(attribute Attribute, value interface{}) erro
 		}
 		for _, element := range array {
 			if id, isID := element.(float64); isID {
-				if err := checkItemExists(relatedCollection.ID, uint(id)); err != nil {
+				if err := checkItemExists(relatedCollection.ID, uint(id), database.DB); err != nil {
 					return fmt.Errorf("referenced item with ID '%d' in collection '%s' does not exist",
 						uint(id), attribute.Target)
 				}
