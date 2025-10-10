@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/gohead-cms/gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/testutils"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -63,7 +64,7 @@ func TestValidateCollectionSchema(t *testing.T) {
 		}
 		err := ValidateCollectionSchema(collection)
 		assert.Error(t, err)
-		assert.Equal(t, "invalid type 'unknownType' for attribute 'invalid'", err.Error())
+		assert.Contains(t, "invalid type 'unknownType' for attribute 'invalid': registry: unsupported attribute type: unknownType", err.Error())
 	})
 }
 
@@ -111,6 +112,8 @@ func TestValidateItemData(t *testing.T) {
 	min := 1
 	max := 20
 
+	_, db := testutils.SetupTestServer()
+
 	attributes := []Attribute{
 		{Name: "title", Type: "text", Required: true},
 		{Name: "published_date", Type: "date"},
@@ -129,14 +132,16 @@ func TestValidateItemData(t *testing.T) {
 			"published_date": "2024-12-10",
 			"rating":         rating,
 		}
-		assert.NoError(t, ValidateItemValues(collection, data))
+		_, err := ValidateItemValues(collection, data, db)
+		assert.NoError(t, err)
 	})
 
 	t.Run("Missing Required Field", func(t *testing.T) {
 		data := map[string]interface{}{
 			"published_date": "2024-12-10",
 		}
-		_, err := ValidateItemValues(collection, data)
+		_, err := ValidateItemValues(collection, data, db)
+		assert.Error(t, err)
 		assert.Error(t, err)
 		assert.Equal(t, "missing required attribute: 'title'", err.Error())
 	})
@@ -146,7 +151,8 @@ func TestValidateItemData(t *testing.T) {
 			"title":          "An Article",
 			"published_date": "12-10-2024",
 		}
-		_, err := ValidateItemValues(collection, data)
+		_, err := ValidateItemValues(collection, data, db)
+		assert.Error(t, err)
 		assert.Error(t, err)
 		assert.Equal(t, "validation failed for attribute 'published_date': invalid date format for value: 12-10-2024", err.Error())
 	})
@@ -156,7 +162,8 @@ func TestValidateItemData(t *testing.T) {
 			"title":  "An Article",
 			"rating": 30,
 		}
-		_, err := ValidateItemValues(collection, data)
+		_, err := ValidateItemValues(collection, data, db)
+		assert.Error(t, err)
 		assert.Error(t, err)
 		assert.Equal(t, "validation failed for attribute 'rating': attribute 'rating' must be at most 20", err.Error())
 	})
