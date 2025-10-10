@@ -75,7 +75,12 @@ func GenerateGraphQLMutations() (*graphql.Object, error) {
 			},
 		}
 	}
-
+	if len(fields) == 0 {
+		fields["_placeholder"] = &graphql.Field{
+			Type:        graphql.String,
+			Description: "This is a placeholder mutation. Create a collection to see real mutations here.",
+		}
+	}
 	// 3. Return the root mutation object.
 	return graphql.NewObject(graphql.ObjectConfig{
 		Name:   "Mutation",
@@ -110,6 +115,12 @@ func generateGraphQLInputType(collection models.Collection) *graphql.InputObject
 		}
 		fields[attr.Name] = fieldConfig
 	}
+	if len(fields) == 0 {
+		fields["_placeholder"] = &graphql.InputObjectFieldConfig{
+			Type:        graphql.String,
+			Description: "This is a placeholder mutation. Create a collection to see real mutations here.",
+		}
+	}
 	return graphql.NewInputObject(graphql.InputObjectConfig{
 		Name:   collection.Name + "Input",
 		Fields: fields,
@@ -120,7 +131,7 @@ func generateGraphQLInputType(collection models.Collection) *graphql.InputObject
 
 func createCollectionItem(inputData map[string]any, collection models.Collection) (any, error) {
 	itemData := map[string]any{}
-	// FIX: Avoid mass assignment by iterating over defined attributes.
+	// Avoid mass assignment by iterating over defined attributes.
 	for _, attr := range collection.Attributes {
 		if val, ok := inputData[attr.Name]; ok {
 			itemData[attr.Name] = val

@@ -148,6 +148,16 @@ func GenerateGraphQLQueries() (*graphql.Object, error) {
 		}
 	}
 
+	if len(fields) == 0 {
+		fields["_placeholder"] = &graphql.Field{
+			Type:        graphql.String,
+			Description: "This is a placeholder query. Create a collection in your CMS to see real queries here.",
+			Resolve: func(p graphql.ResolveParams) (any, error) {
+				return "No collections found.", nil
+			},
+		}
+	}
+
 	return graphql.NewObject(graphql.ObjectConfig{
 		Name:   "Query",
 		Fields: fields,
