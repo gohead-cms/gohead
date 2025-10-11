@@ -124,7 +124,7 @@ func upsertCollectionItem(ctx context.Context, args any) (string, error) {
 			CollectionID: collection.ID,
 			Data:         data,
 		}
-		err = storage.SaveItem(newItem)
+		newItem, err := storage.SaveItem(*collection, newItem.Data)
 		if err != nil {
 			return fmt.Sprintf(`{"status": "error", "message": "%s"}`, err.Error()), nil
 		}

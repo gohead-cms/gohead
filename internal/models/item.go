@@ -72,6 +72,7 @@ func ValidateItemValues(ct Collection, itemData map[string]any, tx *gorm.DB) (JS
 
 // validateRelationship validates and processes a relationship, creating new items if necessary.
 // It returns the final value for the relation (a single ID or an array of IDs).
+// validateRelationship validates and processes a relationship with smart lookup support.
 func validateRelationship(attribute Attribute, value any, tx *gorm.DB) (any, error) {
 	if attribute.Target == "" {
 		return nil, fmt.Errorf("missing target collection for relationship '%s'", attribute.Name)
@@ -85,10 +86,11 @@ func validateRelationship(attribute Attribute, value any, tx *gorm.DB) (any, err
 		return nil, fmt.Errorf("db error validating target collection: %w", err)
 	}
 
-	// This helper function handles the logic for a single relation value.
+	// Helper function to resolve a single relation value with smart lookup
 	resolveRelationValue := func(val any) (uint, error) {
 		obj, isMap := val.(map[string]any)
-		// Case 1: The value is a raw ID (e.g., 123). We just need to check if it exists.
+
+		// Case 1: Raw ID provided
 		if !isMap {
 			id := ToUint(val)
 			if id == 0 {
@@ -100,36 +102,49 @@ func validateRelationship(attribute Attribute, value any, tx *gorm.DB) (any, err
 			return id, nil
 		}
 
-		// Case 2: The value is a nested object.
+		// Sub-case 2a: Object has an ID → Connect (or update if _upsert: true)
 		if idVal, exists := obj["id"]; exists {
-			// Sub-case 2a: Object has an ID. This is a "connect" operation.
 			id := ToUint(idVal)
 			if err := checkItemExists(relatedCollection.ID, id, tx); err != nil {
 				return 0, err
 			}
+
 			return id, nil
-		} else {
-			// Sub-case 2b: Object has NO ID. This is a "create" operation.
-			logger.Log.WithField("collection", relatedCollection.Name).Info("Performing nested create")
-			// Recursively validate the new data against the target collection's schema.
-			processedNestedData, err := ValidateItemValues(relatedCollection, obj, tx)
-			if err != nil {
-				return 0, fmt.Errorf("invalid data for new item in '%s': %w", attribute.Target, err)
-			}
-			// Create the new item within the transaction.
-			newItem := &Item{
-				CollectionID: relatedCollection.ID,
-				Data:         processedNestedData,
-			}
-			if err := tx.Create(newItem).Error; err != nil {
-				return 0, fmt.Errorf("failed to create nested item in '%s': %w", attribute.Target, err)
-			}
-			// Return the new item's ID.
-			return newItem.ID, nil
 		}
+
+		// Sub-case 2b: No ID provided → Smart Lookup
+		existingID, found, err := lookup(relatedCollection, obj, tx)
+		if err != nil {
+			return 0, fmt.Errorf("smart lookup failed for '%s': %w", attribute.Name, err)
+		}
+
+		if found {
+			logger.Log.WithField("collection", relatedCollection.Name).
+				WithField("id", existingID).
+				Info("Found existing item via smart lookup")
+
+			return existingID, nil
+		}
+
+		// Not found → Create new item
+		logger.Log.WithField("collection", relatedCollection.Name).Info("Creating new nested item")
+		processedNestedData, err := ValidateItemValues(relatedCollection, obj, tx)
+		if err != nil {
+			return 0, fmt.Errorf("invalid data for new item in '%s': %w", attribute.Target, err)
+		}
+
+		newItem := &Item{
+			CollectionID: relatedCollection.ID,
+			Data:         processedNestedData,
+		}
+		if err := tx.Create(newItem).Error; err != nil {
+			return 0, fmt.Errorf("failed to create nested item in '%s': %w", attribute.Target, err)
+		}
+
+		return newItem.ID, nil
 	}
 
-	// Process single or multiple relations based on the schema.
+	// Process single or multiple relations
 	if attribute.Relation == "manyToMany" {
 		array, ok := value.([]any)
 		if !ok {
@@ -144,13 +159,13 @@ func validateRelationship(attribute Attribute, value any, tx *gorm.DB) (any, err
 			}
 			resolvedIDs = append(resolvedIDs, id)
 		}
-		return resolvedIDs, nil // Return an array of the final IDs
-	} else { // oneToOne, oneToMany, manyToOne
+		return resolvedIDs, nil
+	} else {
 		id, err := resolveRelationValue(value)
 		if err != nil {
 			return nil, err
 		}
-		return id, nil // Return a single final ID
+		return id, nil
 	}
 }
 
@@ -196,4 +211,47 @@ func ToUint(value any) uint {
 		}
 	}
 	return 0
+}
+
+// smartLookup attempts to find an existing item based on unique/lookup fields
+func lookup(collection Collection, data map[string]any, tx *gorm.DB) (uint, bool, error) {
+	// Build a query based on unique fields and lookup keys
+	var lookupFields []string
+
+	// First, try to find by unique fields
+	for _, attr := range collection.Attributes {
+		if attr.Unique && data[attr.Name] != nil {
+			lookupFields = append(lookupFields, attr.Name)
+		}
+	}
+
+	// If still no lookup fields, return not found
+	if len(lookupFields) == 0 {
+		return 0, false, nil
+	}
+
+	// Build the query
+	query := tx.Model(&Item{}).Where("collection_id = ?", collection.ID)
+
+	for _, field := range lookupFields {
+		query = query.Where("data ->> ? = ?", field, fmt.Sprintf("%v", data[field]))
+	}
+
+	var items []Item
+	if err := query.Limit(2).Find(&items).Error; err != nil {
+		return 0, false, err
+	}
+
+	// If exactly one match found, return it
+	if len(items) == 1 {
+		return items[0].ID, true, nil
+	}
+
+	// If multiple matches, that's ambiguous
+	if len(items) > 1 {
+		return 0, false, fmt.Errorf("ambiguous lookup: found %d matching items", len(items))
+	}
+
+	// No matches
+	return 0, false, nil
 }

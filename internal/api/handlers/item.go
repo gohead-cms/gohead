@@ -17,6 +17,12 @@ import (
 // CreateItem handles nested creations
 func CreateItem(collection models.Collection) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !hasPermission(c.GetString("role"), "create") {
+			c.Set("response", "Access denied")
+			c.Set("status", http.StatusForbidden)
+			return
+		}
+
 		var input struct {
 			Data models.JSONMap `json:"data"`
 		}
@@ -26,33 +32,18 @@ func CreateItem(collection models.Collection) gin.HandlerFunc {
 			return
 		}
 
-		var finalItem models.Item
-		txErr := database.DB.Transaction(func(tx *gorm.DB) error {
-			processedData, err := models.ValidateItemValues(collection, input.Data, tx)
-			if err != nil {
-				return err
-			}
-			item := models.Item{
-				CollectionID: collection.ID,
-				Data:         processedData,
-			}
-			if err := tx.Create(&item).Error; err != nil {
-				return err
-			}
-			finalItem = item
-			return nil
-		})
-
-		if txErr != nil {
-			c.Set("response", txErr.Error())
-			c.Set("status", http.StatusBadRequest)
+		newItem, err := storage.SaveItem(collection, input.Data)
+		if err != nil {
+			c.Set("response", err.Error())
+			c.Set("status", http.StatusBadRequest) // Validation errors are Bad Request
 			return
 		}
 
-		finalItem.Data["id"] = finalItem.ID
+		// Format the response
+		newItem.Data["id"] = newItem.ID
 		c.Set("response", gin.H{
-			"id":         finalItem.ID,
-			"attributes": finalItem.Data,
+			"id":         newItem.ID,
+			"attributes": newItem.Data,
 		})
 		c.Set("status", http.StatusCreated)
 	}

@@ -23,22 +23,18 @@ func TestSaveItem(t *testing.T) {
 	assert.NoError(t, db.Create(collection).Error)
 
 	// Create a sample content item
-	item := &models.Item{
-		CollectionID: collection.ID,
-		Data: models.JSONMap{
-			"title":   "Sample Article",
-			"content": "This is a test article.",
-		},
+	itemData := models.JSONMap{
+		"title":   "Sample Article",
+		"content": "This is a test article.",
 	}
 
 	// Save the content item
-	err := SaveItem(item)
+	final, err := SaveItem(*collection, itemData)
 	assert.NoError(t, err)
-	assert.NotZero(t, item.ID)
-
+	assert.NotZero(t, final.ID)
 	// Verify the content item exists in the database
 	var result models.Item
-	err = db.First(&result, item.ID).Error
+	err = db.First(&result, final.ID).Error
 	assert.NoError(t, err)
 	assert.Equal(t, "Sample Article", result.Data["title"])
 }

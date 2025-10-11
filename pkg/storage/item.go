@@ -14,44 +14,100 @@ import (
 
 // SaveItem creates a new item in the database and then publishes a generic
 // 'item:created' event to the dispatcher queue.
-func SaveItem(item *models.Item) error {
-	// Step 1: Create the item in the database.
-	// After this call succeeds, GORM will automatically populate the 'ID'
-	// field on the 'item' struct that was passed in.
-	if err := database.DB.Create(item).Error; err != nil {
-		logger.Log.WithError(err).Error("Failed to save new item")
-		return err
+func SaveItem(collection models.Collection, itemData models.JSONMap) (*models.Item, error) {
+	var finalItem models.Item
+
+	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+		// 1. Validate and process the data, which creates nested items.
+		processedData, err := models.ValidateItemValues(collection, itemData, tx)
+		if err != nil {
+			return err // Rolls back transaction.
+		}
+
+		// 2. Create the main item with the processed data.
+		item := models.Item{
+			CollectionID: collection.ID,
+			Data:         processedData,
+		}
+		if err := tx.Create(&item).Error; err != nil {
+			return err
+		}
+
+		finalItem = item
+		return nil // Commits transaction.
+	})
+
+	if txErr != nil {
+		return nil, txErr
 	}
 
-	// Step 2: Publish the creation event.
-	// We check if the asynqClient has been initialized.
-	if asynqClient != nil {
-		// We need the collection name. We can get it efficiently from the item's CollectionID.
-		var collection models.Collection
-		if err := database.DB.First(&collection, item.CollectionID).Error; err != nil {
-			// The item was saved, but we couldn't find its collection to publish the event.
-			// This should be logged, but we don't return an error because the main
-			// operation (saving the item) was successful.
-			logger.Log.WithError(err).
-				WithField("collection_id", item.CollectionID).
-				Error("Failed to find collection for event publishing after item creation")
-			return nil
-		}
+	// 3. Publish event after transaction is successfully committed.
+	publishEvent(database.DB, events.EventTypeItemCreated, &finalItem)
+	return &finalItem, nil
+}
 
-		// Now, item.ID has the correct, non-zero ID from the database.
-		payload := events.CollectionEventPayload{
-			EventType:      events.EventTypeItemCreated,
-			CollectionName: collection.Name,
-			ItemID:         item.ID,
-			ItemData:       item.Data,
-		}
-		if err := events.EnqueueCollectionEvent(context.Background(), asynqClient, payload); err != nil {
-			// Log the enqueuing error but don't fail the overall SaveItem operation.
-			logger.Log.WithError(err).Error("Failed to enqueue item:created event")
-		}
+func publishEvent(db *gorm.DB, eventType events.EventType, item *models.Item) {
+	// 1. Safety Check: If the event system (Asynq) isn't configured, do nothing.
+	if asynqClient == nil {
+		return
 	}
 
-	return nil
+	// 2. Data Enrichment: The event needs the collection's name, not just its ID.
+	// We perform a quick lookup to get it.
+	var collection models.Collection
+	if err := db.First(&collection, item.CollectionID).Error; err != nil {
+		logger.Log.WithError(err).
+			WithField("collection_id", item.CollectionID).
+			Error("Failed to find collection for event publishing")
+		return // Do not fail the entire API request if this lookup fails.
+	}
+
+	// 3. Payload Creation: Construct the event payload with all necessary information.
+	payload := events.CollectionEventPayload{
+		EventType:      eventType,
+		CollectionName: collection.Name,
+		ItemID:         item.ID,
+		ItemData:       item.Data,
+	}
+
+	// 4. Enqueue Event: Send the event to the dispatcher via the Asynq message queue.
+	if err := events.EnqueueCollectionEvent(context.Background(), asynqClient, payload); err != nil {
+		logger.Log.WithError(err).Error("Failed to enqueue event")
+	} else {
+		logger.Log.WithField("event_type", eventType).WithField("item_id", item.ID).Info("Successfully enqueued event")
+	}
+}
+
+func SaveIteem(collection models.Collection, itemData models.JSONMap) (*models.Item, error) {
+	var finalItem models.Item
+
+	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+		// 1. Validate and process the data, which creates nested items.
+		processedData, err := models.ValidateItemValues(collection, itemData, tx)
+		if err != nil {
+			return err // Rolls back transaction.
+		}
+
+		// 2. Create the main item with the processed data.
+		item := models.Item{
+			CollectionID: collection.ID,
+			Data:         processedData,
+		}
+		if err := tx.Create(&item).Error; err != nil {
+			return err
+		}
+
+		finalItem = item
+		return nil // Commits transaction.
+	})
+
+	if txErr != nil {
+		return nil, txErr
+	}
+
+	// 3. Publish event after transaction is successfully committed.
+	publishEvent(database.DB, events.EventTypeItemCreated, &finalItem)
+	return &finalItem, nil
 }
 
 // SaveItem creates a new item in the database and then publishes a generic

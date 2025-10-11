@@ -166,18 +166,14 @@ func handleCreate(c *gin.Context, userRole string, ct *models.Collection) {
 			return
 		}
 
-		item := models.Item{
-			CollectionID: ct.ID,
-			Data:         input.Data,
-		}
-
-		if err := storage.SaveItem(&item); err != nil {
-			c.Set("response", "Failed to save item")
+		newItem, err := storage.SaveItem(*ct, input.Data)
+		if err != nil {
+			c.Set("response", "Failed to save item: "+err.Error())
 			c.Set("status", http.StatusInternalServerError)
 			return
 		}
 
-		c.Set("response", utils.FormatCollectionItem(&item, ct))
+		c.Set("response", utils.FormatCollectionItem(newItem, ct))
 		c.Set("meta", gin.H{})
 		c.Set("status", http.StatusCreated)
 
