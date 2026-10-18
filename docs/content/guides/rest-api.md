@@ -1,8 +1,10 @@
 # REST API
 
 Content lives under `/api/collections/{collection}`. All calls need
-`Authorization: Bearer <token>`; writes need the `create`, `update` or `delete` permission of
-your [role](users-and-roles.md).
+`Authorization: Bearer <token>` (a user JWT, or a long-lived [API token](integrations.md#api-tokens));
+writes need the `create`, `update` or `delete` permission of your [role](users-and-roles.md).
+The whole API is described at `/api/openapi.json`, browsable at
+[`/api/docs`](integrations.md#openapi-and-swagger-ui).
 
 | Method | Path | Does |
 |--------|------|------|
@@ -176,7 +178,9 @@ Response:
 
 ## Webhooks
 
-`POST /agents/webhook/{agentId}` starts an agent whose trigger type is `webhook`. It is
+To *send* content events to other services, see [outbound webhooks](integrations.md#outbound-webhooks).
+
+`POST /agents/webhook/{agentId}` (inbound) starts an agent whose trigger type is `webhook`. It is
 authenticated with the agent's token instead of a user token:
 
 ```bash

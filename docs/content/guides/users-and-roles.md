@@ -34,7 +34,7 @@ curl -X POST $GOHEAD/auth/login -H "$JSON" -d '{"username":"alice","password":"a
 ```
 
 Send the token as `Authorization: Bearer <token>`. Tokens are HS256 JWTs that expire after
-**72 hours**; they are signed with [`jwt_secret`](../getting-started/configuration.md#server).
+**72 hours** (for front-ends and CI, use a long-lived [API token](integrations.md#api-tokens)); they are signed with [`jwt_secret`](../getting-started/configuration.md#server).
 Changing the secret invalidates every token.
 
 A wrong username or password returns `401` with the same message either way. After 5 failed

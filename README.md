@@ -40,6 +40,7 @@ permissions as a human.
 | ⚡ **Schema in, API out** | Define collections over HTTP. REST endpoints and a GraphQL schema appear immediately, no codegen, no restart. |
 | 🤖 **Agents built in** | LLM agents triggered by content events, webhooks or cron, with OpenAI, Anthropic or Ollama, and typed functions to read and write content. |
 | 📝 **Editorial workflow** | Draft and publish per collection, reusable (and repeatable) components, one flat JSON shape for every item. |
+| 🔌 **Integrations** | Long-lived scoped API tokens, an OpenAPI 3.1 spec with Swagger UI for typed clients, and signed outbound webhooks for Slack, Zapier or site rebuilds. |
 | 🖼️ **Media built in** | Upload images, video and documents; store them on disk or in any S3-compatible bucket (S3, MinIO, R2); reference them from content. |
 | 🔎 **Real querying** | Filters (`$eq $ne $lt $gte $contains`…), multi-key sort, pagination, relation population, batch writes in one transaction. |
 | 🔐 **Secure by default** | Roles enforced identically in REST and GraphQL, schema-validated writes, masked secrets, signed images, distroless containers. |

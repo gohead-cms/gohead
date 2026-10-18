@@ -11,6 +11,7 @@ import (
 	"github.com/gohead-cms/gohead/internal/agent/events"
 	"github.com/gohead-cms/gohead/internal/agent/jobs"
 	"github.com/gohead-cms/gohead/internal/agent/triggers"
+	"github.com/gohead-cms/gohead/internal/webhooks"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
 	"github.com/hibiken/asynq"
@@ -48,6 +49,13 @@ func (d *EventDispatcher) HandleCollectionEvent(ctx context.Context, t *asynq.Ta
 		WithField("collection", payload.CollectionName).
 		WithField("item_id", payload.ItemID).
 		Info("Processing collection event")
+
+	// 0. Outbound webhooks: one queued delivery per subscribed webhook. A
+	// failure retries the whole event; deliveries are deduplicated by ID.
+	if err := webhooks.Fanout(ctx, d.asynqClient, payload); err != nil {
+		logger.Log.WithError(err).Error("Failed to enqueue webhook deliveries")
+		return err
+	}
 
 	// 1. Find all agents subscribed to this specific event.
 	subscribedAgents, err := storage.FindAgentsByEventTrigger(payload.CollectionName, string(payload.EventType))

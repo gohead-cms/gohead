@@ -54,6 +54,17 @@ media:
     prefix: ""
     presign_expiry: 1h   # lifetime of download URLs when public_url is empty
 
+# Outbound webhooks (managed under /admin/webhooks).
+webhooks:
+  allow_private_networks: false  # true to call internal services (10.x, 192.168.x, localhost)
+  timeout: 10s
+  max_retries: 8
+
+# OpenAPI document (/api/openapi.json) and Swagger UI (/api/docs).
+openapi:
+  enabled: true
+  public: false   # true serves the document without a token
+
 # Brute-force protection for /auth/login and /auth/register.
 rate_limit:
   enabled: true

@@ -33,6 +33,8 @@ Base URL: your API, e.g. `http://localhost:8080`. **Auth** column: `–` public,
 | `GET` | `/api/media` | token (create) | List the media library (`page`, `pageSize`, `mime`, `search`) |
 | `GET`, `PUT`, `DELETE` | `/api/media/{id}` | token (create / update / delete) | One file; `PUT` changes `name`, `alt`, `caption` |
 | `GET` | `/uploads/{key}` | public | Files of the local media driver |
+| `GET` | `/api/openapi.json` | token (or public with `openapi.public`) | OpenAPI 3.1 description of the API |
+| `GET` | `/api/docs` | public page | Swagger UI |
 | `GET` | `/api/singleton/{name}` | token | Read a singleton's item |
 | `POST`, `PUT` | `/api/singleton/{name}` | token | Write a singleton's item |
 | `POST` | `/api/graphql` | token | [GraphQL](../guides/graphql.md): `query`, `variables`, `operationName` |
@@ -74,3 +76,14 @@ header.
 { "data": … , "meta": { … } }
 { "error": { "status": 400, "name": "ValidationError", "message": "…", "details": … } }
 ```
+
+## Integrations (admin)
+
+| Method | Path | Does |
+|--------|------|------|
+| `POST`, `GET` | `/admin/tokens` | Create (returns the secret once) / list [API tokens](../guides/integrations.md#api-tokens); user session only |
+| `GET`, `DELETE` | `/admin/tokens/{id}` | One token / revoke it; user session only |
+| `POST`, `GET` | `/admin/webhooks` | Create / list [outbound webhooks](../guides/integrations.md#outbound-webhooks) |
+| `GET`, `PUT`, `DELETE` | `/admin/webhooks/{id}` | One webhook |
+| `GET` | `/admin/webhooks/{id}/deliveries` | Last delivery attempts |
+| `POST` | `/admin/webhooks/{id}/test` | Send a test event now |

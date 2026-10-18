@@ -96,6 +96,7 @@ nav:
       - REST API: guides/rest-api.md
       - GraphQL: guides/graphql.md
       - Media: guides/media.md
+      - Integrations: guides/integrations.md
       - Users & roles: guides/users-and-roles.md
       - Admin UI: guides/admin-ui.md
   - Agents:

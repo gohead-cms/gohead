@@ -77,6 +77,11 @@ will not run and you should keep a single API replica.
 Uploads and file storage (local disk or S3-compatible) are configured under `media.*`; see
 [Media → Configuration](../guides/media.md#configuration).
 
+### Webhooks and OpenAPI
+
+Outbound webhooks (`webhooks.*`) and the OpenAPI document (`openapi.*`) are described in
+[Integrations](../guides/integrations.md).
+
 ### Rate limiting
 
 | Key | Env | Default |
