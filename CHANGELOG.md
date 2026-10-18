@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **Per-agent LLM keys**: keys are passed to each client directly instead of through process-wide environment variables.
 - Login no longer logs issued tokens.
 - Collection list `filter`/`sort` parameters are restricted to known columns (they were interpolated into SQL).
+- **Dependencies**: upgraded to fix 15 reachable vulnerabilities reported by govulncheck (golang.org/x/net, x/text, OpenTelemetry, gRPC, pgx, quic-go). Go 1.26 is now the minimum; builds use Go 1.27.
 
 ### Changed
 - Telemetry is off by default.
