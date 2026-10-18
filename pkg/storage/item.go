@@ -12,38 +12,58 @@ import (
 	"gorm.io/gorm"
 )
 
-// SaveItem creates a new item in the database and then publishes a generic
-// 'item:created' event to the dispatcher queue.
+// ItemValidationError wraps a validation failure for an item, as opposed to a
+// database error, so callers can answer 400 instead of 500.
+type ItemValidationError struct {
+	Index int // position in a batch; 0 for single saves
+	Err   error
+}
+
+func (e *ItemValidationError) Error() string { return e.Err.Error() }
+func (e *ItemValidationError) Unwrap() error { return e.Err }
+
+// SaveItem validates and creates a single item, then publishes an
+// 'item:created' event once the transaction has committed.
 func SaveItem(collection models.Collection, itemData models.JSONMap) (*models.Item, error) {
-	var finalItem models.Item
+	items, err := SaveItems(collection, []models.JSONMap{itemData})
+	if err != nil {
+		return nil, err
+	}
+	return items[0], nil
+}
+
+// SaveItems validates and creates several items atomically: either all are
+// stored or none. Nested relations created during validation are part of the
+// same transaction, and the stored data is the processed (validated) data.
+// Events are published only after a successful commit.
+func SaveItems(collection models.Collection, batch []models.JSONMap) ([]*models.Item, error) {
+	created := make([]*models.Item, 0, len(batch))
 
 	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
-		// 1. Validate and process the data, which creates nested items.
-		processedData, err := models.ValidateItemValues(collection, itemData, tx)
-		if err != nil {
-			return err // Rolls back transaction.
+		for i, data := range batch {
+			processedData, err := models.ValidateItemValues(collection, data, tx)
+			if err != nil {
+				return &ItemValidationError{Index: i, Err: err}
+			}
+			item := &models.Item{
+				CollectionID: collection.ID,
+				Data:         processedData,
+			}
+			if err := tx.Create(item).Error; err != nil {
+				return err
+			}
+			created = append(created, item)
 		}
-
-		// 2. Create the main item with the processed data.
-		item := models.Item{
-			CollectionID: collection.ID,
-			Data:         processedData,
-		}
-		if err := tx.Create(&item).Error; err != nil {
-			return err
-		}
-
-		finalItem = item
-		return nil // Commits transaction.
+		return nil
 	})
-
 	if txErr != nil {
 		return nil, txErr
 	}
 
-	// 3. Publish event after transaction is successfully committed.
-	publishEvent(database.DB, events.EventTypeItemCreated, &finalItem)
-	return &finalItem, nil
+	for _, item := range created {
+		publishEvent(database.DB, events.EventTypeItemCreated, item)
+	}
+	return created, nil
 }
 
 func publishEvent(db *gorm.DB, eventType events.EventType, item *models.Item) {
@@ -78,80 +98,6 @@ func publishEvent(db *gorm.DB, eventType events.EventType, item *models.Item) {
 	}
 }
 
-func SaveIteem(collection models.Collection, itemData models.JSONMap) (*models.Item, error) {
-	var finalItem models.Item
-
-	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
-		// 1. Validate and process the data, which creates nested items.
-		processedData, err := models.ValidateItemValues(collection, itemData, tx)
-		if err != nil {
-			return err // Rolls back transaction.
-		}
-
-		// 2. Create the main item with the processed data.
-		item := models.Item{
-			CollectionID: collection.ID,
-			Data:         processedData,
-		}
-		if err := tx.Create(&item).Error; err != nil {
-			return err
-		}
-
-		finalItem = item
-		return nil // Commits transaction.
-	})
-
-	if txErr != nil {
-		return nil, txErr
-	}
-
-	// 3. Publish event after transaction is successfully committed.
-	publishEvent(database.DB, events.EventTypeItemCreated, &finalItem)
-	return &finalItem, nil
-}
-
-// SaveItem creates a new item in the database and then publishes a generic
-// 'item:created' event to the dispatcher queue.
-func SaveItemWithTransaction(tx *gorm.DB, item *models.Item) error {
-	// Step 1: Create the item in the database.
-	// After this call succeeds, GORM will automatically populate the 'ID'
-	// field on the 'item' struct that was passed in.
-	if err := tx.Create(item).Error; err != nil {
-		logger.Log.WithError(err).Error("Failed to save new item")
-		return err
-	}
-
-	// Step 2: Publish the creation event.
-	// We check if the asynqClient has been initialized.
-	if asynqClient != nil {
-		// We need the collection name. We can get it efficiently from the item's CollectionID.
-		var collection models.Collection
-		if err := tx.First(&collection, item.CollectionID).Error; err != nil {
-			// The item was saved, but we couldn't find its collection to publish the event.
-			// This should be logged, but we don't return an error because the main
-			// operation (saving the item) was successful.
-			logger.Log.WithError(err).
-				WithField("collection_id", item.CollectionID).
-				Error("Failed to find collection for event publishing after item creation")
-			return nil
-		}
-
-		// Now, item.ID has the correct, non-zero ID from the database.
-		payload := events.CollectionEventPayload{
-			EventType:      events.EventTypeItemCreated,
-			CollectionName: collection.Name,
-			ItemID:         item.ID,
-			ItemData:       item.Data,
-		}
-		if err := events.EnqueueCollectionEvent(context.Background(), asynqClient, payload); err != nil {
-			// Log the enqueuing error but don't fail the overall SaveItem operation.
-			logger.Log.WithError(err).Error("Failed to enqueue item:created event")
-		}
-	}
-
-	return nil
-}
-
 // GetItemByID fetches an item by its ID and collection ID.
 func GetItemByID(collectionID uint, itemID uint) (*models.Item, error) {
 	var item models.Item
@@ -161,7 +107,31 @@ func GetItemByID(collectionID uint, itemID uint) (*models.Item, error) {
 	return &item, nil
 }
 
+// GetItemsByOffset lists items using offset/limit pagination (as GraphQL does).
+func GetItemsByOffset(collectionID uint, offset, limit int) ([]models.Item, int, error) {
+	if offset < 0 {
+		offset = 0
+	}
+	if limit < 1 || limit > 100 {
+		limit = 25
+	}
+	var items []models.Item
+	var total int64
+	q := database.DB.Model(&models.Item{}).Where("collection_id = ?", collectionID)
+	if err := q.Session(&gorm.Session{}).Count(&total).Error; err != nil {
+		return nil, 0, fmt.Errorf("failed to count items: %w", err)
+	}
+	if err := q.Session(&gorm.Session{}).Order("id ASC").Offset(offset).Limit(limit).Find(&items).Error; err != nil {
+		return nil, 0, fmt.Errorf("failed to fetch items: %w", err)
+	}
+	return items, int(total), nil
+}
+
+// GetItems lists items using page/pageSize pagination (page starts at 1).
 func GetItems(collectionID uint, page, pageSize int) ([]models.Item, int, error) {
+	if page < 1 {
+		page = 1
+	}
 	var items []models.Item
 	var totalItems int64
 
@@ -178,7 +148,7 @@ func GetItems(collectionID uint, page, pageSize int) ([]models.Item, int, error)
 
 	// Fetch paginated data
 	err = database.DB.Where("collection_id = ?", collectionID).
-		Offset(offset).Limit(pageSize).
+		Order("id ASC").Offset(offset).Limit(pageSize).
 		Find(&items).Error
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to fetch items: %w", err)

@@ -179,7 +179,7 @@ func TestValidateAgentSchema(t *testing.T) {
 			name:     "Function with Invalid Parameters JSON",
 			agent:    Agent{Name: "test", SystemPrompt: "...", MaxTurns: 1, LLMConfig: LLMConfig{Provider: "p"}, Memory: MemoryConfig{Type: "in-memory", SessionScope: "user"}, Trigger: TriggerConfig{Type: "manual"}, Functions: FunctionSpecs{{Name: "test_func", ImplKey: "test_impl", Parameters: models.JSONMap{"invalid": make(chan int)}}}},
 			hasError: true,
-			errMsg:   "function parameters cannot be empty",
+			errMsg:   "has invalid parameters",
 		},
 	}
 

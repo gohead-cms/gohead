@@ -12,6 +12,9 @@ import (
 // EnqueueAgentJob creates and enqueues a new agent job.
 // This is the single entry point for all triggers.
 func EnqueueAgentJob(ctx context.Context, client *asynq.Client, payload AgentJobPayload) error {
+	if client == nil {
+		return fmt.Errorf("cannot enqueue agent job: queue client is not configured")
+	}
 	// 1. Marshal the payload into JSON bytes.
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {

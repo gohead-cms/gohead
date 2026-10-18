@@ -214,11 +214,28 @@ func toInt(val interface{}) int {
 	}
 }
 
-// FormatAgentSchema formats a single agent into a schema map for API endpoints.
+// SecretMask replaces stored secrets in API responses. Sending it back
+// unchanged on update keeps the stored value.
+const SecretMask = "********"
+
+func maskSecret(v string) string {
+	if v == "" {
+		return ""
+	}
+	return SecretMask
+}
+
+// FormatAgentSchema formats a single agent into a schema map for API
+// endpoints. Credentials (LLM API key/secret, webhook token) are masked.
 func FormatAgentSchema(agent *agents.Agent) map[string]any {
 	if agent == nil {
 		return nil
 	}
+	llmCfg := agent.LLMConfig
+	llmCfg.APIKey = maskSecret(llmCfg.APIKey)
+	llmCfg.APISecret = maskSecret(llmCfg.APISecret)
+	trigger := agent.Trigger
+	trigger.WebhookToken = maskSecret(trigger.WebhookToken)
 
 	return map[string]any{
 		"id":   agent.ID,
@@ -228,9 +245,9 @@ func FormatAgentSchema(agent *agents.Agent) map[string]any {
 			"name":         agent.Name,
 			"systemPrompt": agent.SystemPrompt,
 			"maxTurns":     agent.MaxTurns,
-			"llmConfig":    agent.LLMConfig,
+			"llmConfig":    llmCfg,
 			"memory":       agent.Memory,
-			"trigger":      agent.Trigger,
+			"trigger":      trigger,
 			"functions":    agent.Functions,
 		},
 	}

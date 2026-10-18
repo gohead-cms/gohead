@@ -48,7 +48,9 @@ func TestConvertCollectionToGraphQLType(t *testing.T) {
 		t.Fatalf("Failed to insert test collection: %v", err)
 	}
 
-	// Convert collection schema to GraphQL type
+	// Convert collection schema to GraphQL type (fresh cache: other tests
+	// build an "authors" type with different attributes).
+	ResetTypeRegistry()
 	gqlType, err := ConvertCollectionToGraphQLType(collection)
 	assert.NoError(t, err)
 	assert.NotNil(t, gqlType)

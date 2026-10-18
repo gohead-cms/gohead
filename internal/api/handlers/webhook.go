@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -45,8 +46,12 @@ func HandleWebhook(c *gin.Context) {
 	}
 
 	// 3. Authenticate the request using the webhook token.
+	// Only webhook-triggered agents with a configured token can be invoked,
+	// and the token is compared in constant time.
 	requestToken := c.GetHeader("Webhook-Token")
-	if requestToken != agent.Trigger.WebhookToken {
+	expected := agent.Trigger.WebhookToken
+	if agent.Trigger.Type != "webhook" || expected == "" ||
+		subtle.ConstantTimeCompare([]byte(requestToken), []byte(expected)) != 1 {
 		logger.Log.WithField("agent_id", agentID).Warn("Invalid webhook token received")
 		c.Set("status", http.StatusUnauthorized)
 		c.Set("response", gin.H{"error": "Unauthorized"})

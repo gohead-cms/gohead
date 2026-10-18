@@ -94,3 +94,17 @@ func DeleteComponent(c *gin.Context) {
 	c.Set("response", "component deleted successfully")
 	c.Set("status", http.StatusOK)
 }
+
+// GetComponents lists all component definitions.
+func GetComponents(c *gin.Context) {
+	cmps, err := storage.GetAllComponents()
+	if err != nil {
+		logger.Log.WithError(err).Error("Failed to list components")
+		c.Set("response", "Failed to fetch components")
+		c.Set("status", http.StatusInternalServerError)
+		return
+	}
+	c.Set("response", cmps)
+	c.Set("meta", gin.H{"total": len(cmps)})
+	c.Set("status", http.StatusOK)
+}

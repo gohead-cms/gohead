@@ -3,6 +3,7 @@ package storage
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/database"
@@ -16,6 +17,9 @@ import (
 //
 // This mimics the "single type" behavior in Strapi (one record per name).
 func SaveOrUpdateSingleton(st *models.Singleton) error {
+	if strings.TrimSpace(st.Name) == "" {
+		return errors.New("single type name is required")
+	}
 	var existing models.Singleton
 
 	logger.Log.WithField("Singleton", st.Name).Info("Attempting to save or update single type")
@@ -64,7 +68,11 @@ func SaveOrUpdateSingleton(st *models.Singleton) error {
 		}
 
 		// Restore associated attributes
-		if err := restoreAssociatedRecords(&models.Attribute{}, existing.ID); err != nil {
+		// Restore this singleton's attributes (keyed on singleton_id, not
+		// collection_id, which would touch another entity's attributes).
+		if err := database.DB.Unscoped().Model(&models.Attribute{}).
+			Where("singleton_id = ?", existing.ID).
+			Update("deleted_at", nil).Error; err != nil {
 			logger.Log.WithError(err).WithField("Singleton", st.Name).Error("Failed to restore associated attributes")
 			return fmt.Errorf("failed to restore associated attributes: %w", err)
 		}
@@ -151,7 +159,7 @@ func DeleteSingleton(SingletonID uint) error {
 	logger.Log.WithField("Singleton", st.Name).Info("DeleteSingleton: successfully retrieved single type")
 
 	// Delete associated attributes
-	if err := tx.Where("single_type_id = ?", SingletonID).Delete(&models.Attribute{}).Error; err != nil {
+	if err := tx.Where("singleton_id = ?", SingletonID).Delete(&models.Attribute{}).Error; err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to delete attributes for single type ID '%d': %w", SingletonID, err)
 	}
@@ -185,7 +193,7 @@ func DeleteSingleton(SingletonID uint) error {
 func updateSingletonAttributes(tx *gorm.DB, existing *models.Singleton, updatedAttributes []models.Attribute) error {
 	// Fetch existing attributes
 	var existingAttrs []models.Attribute
-	if err := tx.Where("single_type_id = ?", existing.ID).Find(&existingAttrs).Error; err != nil {
+	if err := tx.Where("singleton_id = ?", existing.ID).Find(&existingAttrs).Error; err != nil {
 		return fmt.Errorf("failed to fetch existing single type attributes: %w", err)
 	}
 
@@ -224,4 +232,14 @@ func updateSingletonAttributes(tx *gorm.DB, existing *models.Singleton, updatedA
 	}
 
 	return nil
+}
+
+// GetAllSingletons returns every singleton definition with its attributes,
+// ordered by name.
+func GetAllSingletons() ([]models.Singleton, error) {
+	var sts []models.Singleton
+	if err := database.DB.Preload("Attributes").Order("name ASC").Find(&sts).Error; err != nil {
+		return nil, fmt.Errorf("failed to list singletons: %w", err)
+	}
+	return sts, nil
 }

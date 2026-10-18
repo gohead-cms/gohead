@@ -55,6 +55,7 @@ func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Ag
 		Model:     agent.LLMConfig.Model,
 		APIKey:    agent.LLMConfig.APIKey,
 		APISecret: agent.LLMConfig.APISecret,
+		BaseURL:   agent.LLMConfig.BaseURL,
 	}
 
 	llmClient, err := llm.NewAdapter(llmConfigForAdapter)

@@ -218,3 +218,17 @@ func CreateOrUpdateSingletonItem(c *gin.Context) {
 		c.Set("status", http.StatusCreated)
 	}
 }
+
+// GetSingletons lists all singleton definitions.
+func GetSingletons(c *gin.Context) {
+	sts, err := storage.GetAllSingletons()
+	if err != nil {
+		logger.Log.WithError(err).Error("Failed to list singletons")
+		c.Set("response", "Failed to fetch singletons")
+		c.Set("status", http.StatusInternalServerError)
+		return
+	}
+	c.Set("response", sts)
+	c.Set("meta", gin.H{"total": len(sts)})
+	c.Set("status", http.StatusOK)
+}

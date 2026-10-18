@@ -16,7 +16,9 @@ func SeedRoles() {
 	}
 
 	for _, role := range roles {
-		if err := database.DB.FirstOrCreate(&models.UserRole{}, role).Error; err != nil {
+		// Match on name only: matching on the whole struct (including the
+		// JSON permissions) would insert duplicates on every startup.
+		if err := database.DB.Where(models.UserRole{Name: role.Name}).Attrs(role).FirstOrCreate(&models.UserRole{}).Error; err != nil {
 			logger.Log.WithFields(logrus.Fields{
 				"role": role.Name,
 			}).Warn("Failed to seed role : ", err)

@@ -13,7 +13,7 @@ func AuthorizeRole(allowedRoles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, exists := c.Get("role")
 		if !exists {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Role not found"})
+			abortWithError(c, http.StatusForbidden, "", "insufficient permissions")
 			return
 		}
 
@@ -25,7 +25,7 @@ func AuthorizeRole(allowedRoles ...string) gin.HandlerFunc {
 			}
 		}
 
-		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		abortWithError(c, http.StatusForbidden, "", "insufficient permissions")
 	}
 }
 
@@ -35,8 +35,7 @@ func AdminOnly() gin.HandlerFunc {
 		role, exists := c.Get("role")
 		if !exists || role != "admin" {
 			logger.Log.Warn("Unauthorized access attempt by non-admin user")
-			c.JSON(http.StatusForbidden, gin.H{"error": "Only admins can perform this action"})
-			c.Abort()
+			abortWithError(c, http.StatusForbidden, "", "Only admins can perform this action")
 			return
 		}
 		c.Next()

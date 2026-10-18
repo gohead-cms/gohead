@@ -32,6 +32,7 @@ type LLMConfig struct {
 	Model     string `json:"model"`
 	APIKey    string `json:"api_key"`
 	APISecret string `json:"api_secret"`
+	BaseURL   string `json:"base_url,omitempty"` // optional API endpoint override
 }
 
 // Value implements the Valuer interface for `LLMConfig`.
@@ -292,8 +293,11 @@ func validateFunctionSpecs(funcs []FunctionSpec) error {
 		if f.Parameters == nil {
 			return fmt.Errorf("function '%s' must have 'parameters' defined, even if empty (e.g., {})", f.Name)
 		}
-		// The rest of your parameter validation logic can go here...
-		// For example, ensuring it's a valid JSON schema object.
+		// Parameters are sent to the LLM as a JSON schema, so they must
+		// serialize cleanly.
+		if _, err := json.Marshal(f.Parameters); err != nil {
+			return fmt.Errorf("function '%s' has invalid parameters: %v", f.Name, err)
+		}
 	}
 
 	return nil

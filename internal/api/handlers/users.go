@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -10,44 +11,57 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
-// CreateUser handles creating a new user.
+// CreateUser lets an admin create an account with any existing role.
 func CreateUser(c *gin.Context) {
-	var user models.User
-	if err := c.ShouldBindJSON(&user); err != nil {
+	var input struct {
+		Username string `json:"username" binding:"required"`
+		Password string `json:"password" binding:"required"`
+		Email    string `json:"email" binding:"required"`
+		RoleName string `json:"role_name"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
 		logger.Log.WithError(err).Warn("Failed to bind JSON for user creation")
 		c.Set("response", "Invalid input")
 		c.Set("details", err.Error())
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
+	if input.RoleName == "" {
+		input.RoleName = DefaultRegistrationRole
+	}
 
-	// Use ValidateUser from models package
-	if err := models.ValidateUser(user); err != nil {
-		logger.Log.WithFields(logrus.Fields{
-			"username": user.Username,
-			"email":    user.Email,
-		}).Warn("User validation failed")
+	role, err := storage.GetRoleByName(input.RoleName)
+	if err != nil {
 		c.Set("response", "User validation failed")
-		c.Set("details", err.Error())
+		c.Set("details", "unknown role: "+input.RoleName)
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
 
-	if err := storage.CreateUser(&user); err != nil {
-		logger.Log.WithError(err).Error("Failed to save user")
-		c.Set("response", "Failed to create user")
+	user, status, err := buildUser(input.Username, input.Email, input.Password, role)
+	if err != nil {
+		c.Set("response", "User validation failed")
 		c.Set("details", err.Error())
-		c.Set("status", http.StatusInternalServerError)
+		c.Set("status", status)
+		return
+	}
+
+	if status, msg, details := saveNewUser(user); status != 0 {
+		c.Set("response", msg)
+		c.Set("details", details)
+		c.Set("status", status)
 		return
 	}
 
 	logger.Log.WithFields(logrus.Fields{
 		"username": user.Username,
-		"role":     user.Role.Name,
+		"role":     role.Name,
 	}).Info("User created successfully")
-	c.Set("response", "User created successfully")
+	c.Set("response", user)
 	c.Set("status", http.StatusCreated)
 }
 
@@ -93,56 +107,94 @@ func GetUser(c *gin.Context) {
 		"user_id": id,
 	}).Info("Fetched user successfully")
 	c.Set("response", user)
-	c.Set("details", err)
 	c.Set("status", http.StatusOK)
 }
 
-// UpdateUser handles updating a user's details.
+// UpdateUser lets an admin change a user's username, email, password or role.
+// Unknown fields are rejected so that arbitrary columns cannot be written.
 func UpdateUser(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		logger.Log.WithError(err).Warn("Invalid user ID in request")
 		c.Set("response", "Invalid user ID")
 		c.Set("details", err.Error())
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
 
-	var updates map[string]interface{}
-	if err := c.ShouldBindJSON(&updates); err != nil {
-		logger.Log.WithError(err).Warn("Failed to bind JSON for user updates")
+	var raw map[string]interface{}
+	if err := c.ShouldBindJSON(&raw); err != nil {
 		c.Set("response", "Invalid input")
 		c.Set("details", err.Error())
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
 
-	// Use ValidateUserUpdates from models package
+	// role_name is resolved to a foreign key; everything else goes through
+	// the model's field whitelist.
+	updates := map[string]interface{}{}
+	var roleName string
+	for k, v := range raw {
+		if k == "role_name" {
+			name, ok := v.(string)
+			if !ok || name == "" {
+				c.Set("response", "User updates validation failed")
+				c.Set("details", "role_name must be a non-empty string")
+				c.Set("status", http.StatusBadRequest)
+				return
+			}
+			roleName = name
+			continue
+		}
+		updates[k] = v
+	}
+	delete(updates, "role") // roles change only through role_name
+
 	if err := models.ValidateUserUpdates(updates); err != nil {
-		logger.Log.WithFields(logrus.Fields{
-			"user_id": id,
-			"updates": updates,
-		}).Warn("User updates validation failed")
 		c.Set("response", "User updates validation failed")
 		c.Set("details", err.Error())
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
 
-	if err := storage.UpdateUser(uint(id), updates); err != nil {
-		logger.Log.WithFields(logrus.Fields{
-			"user_id": id,
-		}).Error("Failed to update user")
-		c.Set("response", "Failed to update user")
-		c.Set("details", err.Error())
-		c.Set("status", http.StatusInternalServerError)
+	if pw, ok := updates["password"].(string); ok {
+		hashed, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
+		if err != nil {
+			c.Set("response", "Failed to update user")
+			c.Set("status", http.StatusInternalServerError)
+			return
+		}
+		updates["password"] = string(hashed)
+	}
+	if roleName != "" {
+		role, err := storage.GetRoleByName(roleName)
+		if err != nil {
+			c.Set("response", "User updates validation failed")
+			c.Set("details", "unknown role: "+roleName)
+			c.Set("status", http.StatusBadRequest)
+			return
+		}
+		updates["user_role_id"] = role.ID
+	}
+	if len(updates) == 0 {
+		c.Set("response", "User updates validation failed")
+		c.Set("details", "no fields to update")
+		c.Set("status", http.StatusBadRequest)
 		return
 	}
 
-	logger.Log.WithFields(logrus.Fields{
-		"user_id": id,
-		"updates": updates,
-	}).Info("User updated successfully")
+	if err := storage.UpdateUser(uint(id), updates); err != nil {
+		logger.Log.WithError(err).WithField("user_id", id).Error("Failed to update user")
+		status := http.StatusInternalServerError
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			status = http.StatusNotFound
+		}
+		c.Set("response", "Failed to update user")
+		c.Set("details", err.Error())
+		c.Set("status", status)
+		return
+	}
+
+	logger.Log.WithField("user_id", id).Info("User updated successfully")
 	c.Set("response", gin.H{"message": "User updated successfully"})
 	c.Set("status", http.StatusOK)
 }
@@ -156,6 +208,15 @@ func DeleteUser(c *gin.Context) {
 		c.Set("details", err.Error())
 		c.Set("status", http.StatusBadRequest)
 		return
+	}
+
+	// Prevent an admin from locking themselves out.
+	if target, err := storage.GetUserByID(uint(id)); err == nil {
+		if current, ok := c.Get("username"); ok && current == target.Username {
+			c.Set("response", "Cannot delete your own account")
+			c.Set("status", http.StatusBadRequest)
+			return
+		}
 	}
 
 	if err := storage.DeleteUser(uint(id)); err != nil {

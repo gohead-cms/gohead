@@ -10,7 +10,16 @@ import (
 	"github.com/graphql-go/graphql"
 )
 
+// typeRegistry caches the GraphQL object built for each collection during a
+// schema build, so that relations can refer to the same type. It is reset on
+// every (re)build so that schema changes are picked up; builds are serialized
+// by buildMu in InitializeGraphQLSchema.
 var typeRegistry = make(map[string]*graphql.Object)
+
+// ResetTypeRegistry drops all cached collection types.
+func ResetTypeRegistry() {
+	typeRegistry = make(map[string]*graphql.Object)
+}
 
 func ConvertCollectionToGraphQLType(collection models.Collection) (*graphql.Object, error) {
 	if gqlType, exists := typeRegistry[collection.Name]; exists {
@@ -36,9 +45,16 @@ func ConvertCollectionToGraphQLType(collection models.Collection) (*graphql.Obje
 				var err error
 
 				if localAttr.Type == "relation" {
-					gqlFieldType, err = GetOrCreateGraphQLType(localAttr.Target)
+					targetType, err := GetOrCreateGraphQLType(localAttr.Target)
 					if err != nil {
-						panic(fmt.Sprintf("schema error: failed to resolve relation '%s': %v", localAttr.Name, err))
+						// Skip the field rather than crash schema generation.
+						logger.Log.WithError(err).WithField("attribute", localAttr.Name).
+							Warn("GraphQL: skipping relation with unknown target")
+						continue
+					}
+					gqlFieldType = targetType
+					if localAttr.Relation == "oneToMany" || localAttr.Relation == "manyToMany" {
+						gqlFieldType = graphql.NewList(targetType)
 					}
 					resolveFunc = func(p graphql.ResolveParams) (any, error) {
 						return ResolveRelation(p, collection.ID, localAttr)
@@ -46,7 +62,11 @@ func ConvertCollectionToGraphQLType(collection models.Collection) (*graphql.Obje
 				} else {
 					gqlFieldType, err = types.GetGraphQLType(localAttr.Type)
 					if err != nil {
-						panic(fmt.Sprintf("schema error: bad type for attribute '%s': %v", localAttr.Name, err))
+						// e.g. component / dynamiczone attributes are not exposed
+						// yet; skip them instead of crashing schema generation.
+						logger.Log.WithError(err).WithField("attribute", localAttr.Name).
+							Debug("GraphQL: skipping attribute with unsupported type")
+						continue
 					}
 					resolveFunc = func(p graphql.ResolveParams) (any, error) {
 						if sourceMap, ok := p.Source.(map[string]any); ok {

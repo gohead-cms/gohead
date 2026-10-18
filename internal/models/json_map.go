@@ -23,9 +23,14 @@ func (j *JSONMap) Scan(value interface{}) error {
 		return nil
 	}
 
-	bytes, ok := value.([]byte)
-	if !ok {
-		return errors.New("failed to scan JSONMap: type assertion to []byte failed")
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string: // some drivers (e.g. SQLite for TEXT columns) return strings
+		bytes = []byte(v)
+	default:
+		return errors.New("failed to scan JSONMap: unsupported source type")
 	}
 
 	var result map[string]interface{}

@@ -58,4 +58,5 @@ nav:
   - 'Welcome': 'index.md'
   - 'Getting Started':
       - 'Overview': 'getting-started/overview.md'
+      - 'Content API': 'getting-started/content-api.md'
 

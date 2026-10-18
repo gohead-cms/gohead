@@ -56,7 +56,7 @@ func CreateSingleItem(st *models.Singleton, itemData map[string]any) (*models.Si
 func GetSingleItemByType(SingletonName string) (*models.SingleItem, error) {
 	// First, find the single type
 	var st models.Singleton
-	if err := database.DB.Where("name = ?", SingletonName).First(&st).Error; err != nil {
+	if err := database.DB.Preload("Attributes").Where("name = ?", SingletonName).First(&st).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, fmt.Errorf("single type '%s' not found", SingletonName)
 		}
@@ -81,7 +81,7 @@ func GetSingleItemByType(SingletonName string) (*models.SingleItem, error) {
 func UpdateSingleItem(SingletonName string, newData map[string]any) (*models.SingleItem, error) {
 	// Retrieve the single type
 	var st models.Singleton
-	if err := database.DB.Where("name = ?", SingletonName).First(&st).Error; err != nil {
+	if err := database.DB.Preload("Attributes").Where("name = ?", SingletonName).First(&st).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, fmt.Errorf("single type '%s' not found", SingletonName)
 		}
@@ -120,7 +120,7 @@ func UpdateSingleItem(SingletonName string, newData map[string]any) (*models.Sin
 func DeleteSingleItem(SingletonName string) error {
 	// Find the single type
 	var st models.Singleton
-	if err := database.DB.Where("name = ?", SingletonName).First(&st).Error; err != nil {
+	if err := database.DB.Preload("Attributes").Where("name = ?", SingletonName).First(&st).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("single type '%s' not found", SingletonName)
 		}

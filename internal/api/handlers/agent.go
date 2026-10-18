@@ -157,6 +157,15 @@ func CreateAgent(c *gin.Context) {
 func UpdateAgent(c *gin.Context) {
 	name := c.Param("name")
 
+	// Fetch the existing agent by name
+	existing, err := storage.GetAgentByName(name)
+	if err != nil {
+		logger.Log.WithError(err).Warn("UpdateAgent: Agent not found")
+		c.Set("response", "Agent not found")
+		c.Set("status", http.StatusNotFound)
+		return
+	}
+
 	var input map[string]any
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.Set("response", "Invalid JSON input")
@@ -178,13 +187,15 @@ func UpdateAgent(c *gin.Context) {
 		return
 	}
 
-	// Fetch the existing agent by name
-	existing, err := storage.GetAgentByName(name)
-	if err != nil {
-		logger.Log.WithError(err).Warn("UpdateAgent: Agent not found")
-		c.Set("response", "Agent not found")
-		c.Set("status", http.StatusNotFound)
-		return
+	// Masked secrets echoed back from a GET keep their stored values.
+	if agent.LLMConfig.APIKey == utils.SecretMask {
+		agent.LLMConfig.APIKey = existing.LLMConfig.APIKey
+	}
+	if agent.LLMConfig.APISecret == utils.SecretMask {
+		agent.LLMConfig.APISecret = existing.LLMConfig.APISecret
+	}
+	if agent.Trigger.WebhookToken == utils.SecretMask {
+		agent.Trigger.WebhookToken = existing.Trigger.WebhookToken
 	}
 
 	// Update in DB

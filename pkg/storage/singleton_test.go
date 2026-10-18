@@ -19,12 +19,16 @@ import (
 func setupTestDB(t *testing.T) *gorm.DB {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err, "Failed to connect to in-memory database")
+	// ":memory:" is per-connection: pin the pool to a single connection.
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
 
 	// Assign test DB to the global package variable
 	database.DB = db
 
 	// Automigrate the necessary models
-	err = db.AutoMigrate(&models.Singleton{}, &models.Attribute{})
+	err = db.AutoMigrate(&models.Singleton{}, &models.Attribute{}, &models.SingleItem{})
 	require.NoError(t, err, "Failed to migrate database")
 
 	return db
@@ -67,15 +71,24 @@ func TestSingletonStorage(t *testing.T) {
 		assert.Len(t, fetched.Attributes, 2)
 	})
 
-	t.Run("SaveSingleton - conflict with existing name", func(t *testing.T) {
-		st := &models.Singleton{
-			Name:        "homepage", // already created in previous test
-			Description: "Attempting duplicate creation",
-		}
+	t.Run("SaveSingleton - existing name updates in place", func(t *testing.T) {
+		// SaveOrUpdateSingleton is an upsert: saving under an existing name
+		// updates that singleton instead of failing.
+		before, err := storage.GetSingletonByName("homepage")
+		require.NoError(t, err)
 
-		err := storage.SaveOrUpdateSingleton(st)
-		assert.Error(t, err, "Should fail when creating single type with existing non-deleted name")
-		assert.Contains(t, err.Error(), "already exists")
+		st := &models.Singleton{
+			Name:        "homepage",
+			Description: "Updated description",
+			Attributes:  before.Attributes,
+		}
+		require.NoError(t, storage.SaveOrUpdateSingleton(st))
+
+		after, err := storage.GetSingletonByName("homepage")
+		require.NoError(t, err)
+		assert.Equal(t, before.ID, after.ID, "upsert must keep the same record")
+		assert.Equal(t, "Updated description", after.Description)
+		assert.Len(t, after.Attributes, 2)
 	})
 
 	t.Run("GetSingletonByName - success", func(t *testing.T) {
@@ -95,6 +108,7 @@ func TestSingletonStorage(t *testing.T) {
 	t.Run("UpdateSingleton - success", func(t *testing.T) {
 		// Prepare updated data
 		update := &models.Singleton{
+			Name:        "homepage",
 			Description: "Updated homepage description",
 			Attributes: []models.Attribute{
 				{
@@ -130,13 +144,13 @@ func TestSingletonStorage(t *testing.T) {
 		assert.True(t, hasSubtitle, "Should have inserted new 'subtitle' attribute")
 	})
 
-	t.Run("UpdateSingleton - single type not found", func(t *testing.T) {
+	t.Run("SaveSingleton - missing name", func(t *testing.T) {
 		update := &models.Singleton{
 			Description: "Should not matter",
 		}
 		err := storage.SaveOrUpdateSingleton(update)
-		assert.Error(t, err, "Should fail for non-existent single type name")
-		assert.Contains(t, err.Error(), "not found")
+		require.Error(t, err, "Should refuse a single type without a name")
+		assert.Contains(t, err.Error(), "name is required")
 	})
 
 	t.Run("DeleteSingleton - success", func(t *testing.T) {

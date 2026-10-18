@@ -80,11 +80,13 @@ func TestSingletonHandlers(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 
-		var response models.Singleton
-		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		var envelope struct {
+			Data models.Singleton `json:"data"`
+		}
+		err := json.Unmarshal(rr.Body.Bytes(), &envelope)
 		assert.NoError(t, err)
-		assert.Equal(t, SingletonName, response.Name)
-		assert.Len(t, response.Attributes, 2, "Expected single type to have 2 attributes")
+		assert.Equal(t, SingletonName, envelope.Data.Name)
+		assert.Len(t, envelope.Data.Attributes, 2, "Expected single type to have 2 attributes")
 	})
 
 	// --- Sub-test for Get Not Found ---
@@ -116,6 +118,6 @@ func TestSingletonHandlers(t *testing.T) {
 		router.ServeHTTP(rr, req)
 
 		// This status code might depend on your handler's implementation (e.g., 404 or 400)
-		assert.Equal(t, http.StatusBadRequest, rr.Code, "Expected bad request for deleting non-existent single type")
+		assert.Equal(t, http.StatusNotFound, rr.Code, "Expected not found for deleting non-existent single type")
 	})
 }

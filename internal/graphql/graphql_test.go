@@ -2,9 +2,11 @@ package graphql
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
 	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/testutils"
@@ -81,10 +83,14 @@ func TestGenerateGraphQLQueries(t *testing.T) {
 				email
 			}
 		}`
-	params := graphql.Params{Schema: schema, RequestString: query}
+	params := graphql.Params{Schema: schema, RequestString: query, Context: auth.WithRole(context.Background(), "viewer")}
 	result := graphql.Do(params)
 
 	// Validate response
 	assert.Empty(t, result.Errors, "Expected no errors in GraphQL query execution")
 	assert.NotNil(t, result.Data, "Expected valid data in GraphQL response")
+	authors, _ := result.Data.(map[string]any)["authors"].([]any)
+	if assert.Len(t, authors, 1) {
+		assert.Equal(t, "John Doe", authors[0].(map[string]any)["name"])
+	}
 }

@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
@@ -19,11 +20,17 @@ import (
 var (
 	Schema      graphql.Schema
 	schemaMutex sync.RWMutex
+	// buildMu serializes schema builds, which share typeRegistry.
+	buildMu sync.Mutex
 )
 
 // InitializeGraphQLSchema dynamically generates the GraphQL schema and protects it with a write lock.
 // This function can be called again at runtime to "hot-reload" the schema if collections change.
 func InitializeGraphQLSchema() error {
+	buildMu.Lock()
+	defer buildMu.Unlock()
+	ResetTypeRegistry() // pick up attribute changes on hot reload
+
 	rootQuery, err := GenerateGraphQLQueries()
 	if err != nil {
 		return err
@@ -110,6 +117,9 @@ func GenerateGraphQLQueries() (*graphql.Object, error) {
 			},
 			Resolve: func(p graphql.ResolveParams) (any, error) {
 				logger.Log.WithField("collection", coll.Name).Debug("Resolver triggered")
+				if err := requirePermission(p, auth.ActionRead); err != nil {
+					return nil, err
+				}
 
 				// Case 1: Fetch a single item by ID
 				if idArg, ok := p.Args["id"].(string); ok && idArg != "" {
@@ -132,7 +142,7 @@ func GenerateGraphQLQueries() (*graphql.Object, error) {
 				limit := p.Args["limit"].(int)
 				offset := p.Args["offset"].(int)
 
-				items, _, err := storage.GetItems(coll.ID, offset, limit)
+				items, _, err := storage.GetItemsByOffset(coll.ID, offset, limit)
 				if err != nil {
 					logger.Log.WithError(err).Warn("Failed to fetch items for collection", coll.Name)
 					return nil, fmt.Errorf("failed to fetch items")
