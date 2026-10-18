@@ -13,12 +13,14 @@ import {
   Input,
   Textarea,
   Switch,
+  Select,
   VStack,
 } from "@chakra-ui/react";
 import { Attribute, Schema } from "../../../shared/types";
 import { ContentItem } from "../hooks/useCollectionContent";
 import { MediaField, MediaValue } from "./MediaField";
 import { toMediaRef } from "./mediaRef";
+import { blankValue, inputType, isBooleanType, toItemData } from "./entryValues";
 
 interface EntryFormDrawerProps {
   isOpen: boolean;
@@ -36,6 +38,23 @@ const renderFormField = (key: string, attr: Attribute, value: unknown, handleCha
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => handleChange(key, e.target.value),
   };
 
+  if (isBooleanType(attr.type)) {
+    return (
+      <Switch
+        id={key}
+        isChecked={value === true}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange(key, e.target.checked)}
+      />
+    );
+  }
+  if (attr.type === 'enum' && attr.options?.length) {
+    return (
+      <Select id={key} value={typeof value === 'string' ? value : ''} placeholder="Choose…"
+        onChange={(e) => handleChange(key, e.target.value)}>
+        {attr.options.map((o) => <option key={o} value={o}>{o}</option>)}
+      </Select>
+    );
+  }
   switch (attr.type) {
     case 'media':
       return (
@@ -51,21 +70,8 @@ const renderFormField = (key: string, attr: Attribute, value: unknown, handleCha
       return <Textarea {...commonProps} placeholder={`Enter ${key}`} />;
     case 'richtext':
       return <Textarea {...commonProps} placeholder={`Enter ${key}`} rows={8} />;
-    case 'number':
-      return <Input type="number" {...commonProps} />;
-    case 'date':
-        return <Input type="date" {...commonProps} />;
-    case 'boolean':
-      return (
-        <Switch
-          id={key}
-          isChecked={value === true}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange(key, e.target.checked)}
-        />
-      );
-    case 'string':
     default:
-      return <Input type="text" {...commonProps} placeholder={`Enter ${key}`} />;
+      return <Input type={inputType(attr.type)} {...commonProps} placeholder={`Enter ${key}`} />;
   }
 };
 
@@ -84,7 +90,7 @@ function initialFormData(schema: Schema, itemToEdit?: ContentItem | null): Parti
       if (attr.multiple) acc[key] = [];
       return acc;
     }
-    acc[key] = attr.type === 'boolean' ? false : '';
+    acc[key] = blankValue(attr);
     return acc;
   }, {} as Record<string, unknown>);
 }
@@ -104,12 +110,12 @@ export function EntryFormModal({ isOpen, onClose, schema, itemToEdit, onSubmit }
   const handleSubmit = async () => {
     setIsSubmitting(true);
 try {
-      // Media fields hold uploaded files; the API wants their IDs. Empty
-      // optional media fields are left out.
-      const data: Record<string, unknown> = { ...formData };
+      // Empty fields are left out and numbers converted; media fields hold
+      // uploaded files, and the API wants their IDs.
+      const data = toItemData(schema.attributes, formData);
       Object.entries(schema.attributes).forEach(([key, attr]) => {
         if (attr.type !== 'media') return;
-        if (data[key] === null || data[key] === undefined || data[key] === '') delete data[key];
+        if (data[key] === null || data[key] === undefined) delete data[key];
         else data[key] = toMediaRef(data[key]);
       });
       await onSubmit({ data: data as Partial<ContentItem> }, itemToEdit?.id);

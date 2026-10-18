@@ -28,6 +28,7 @@ import { PageLoader } from "../../../shared/ui/page-loader";
 import { apiFetchWithAuth } from "../../../services/api"
 import { Attribute, FieldValue, Schema } from "../../../shared/types";
 import { useCollectionSchema } from "../../collections/hook/useCollectionSchema";
+import { blankValue, inputType, isBooleanType, toItemData } from "./entryValues";
 
 
 type ChangeHandler = (key: string, value: FieldValue) => void;
@@ -41,12 +42,7 @@ const renderSidebarField = (key: string, attr: Attribute, value: FieldValue | un
       size: 'sm',
     };
   
-    switch (attr.type) {
-      case 'number':
-        return <Input type="number" {...commonProps} />;
-      case 'date':
-        return <Input type="date" {...commonProps} />;
-      case 'boolean':
+    if (isBooleanType(attr.type)) {
         return (
           <Flex justify="space-between" align="center">
             <FormLabel htmlFor={key} mb="0" fontSize="sm">
@@ -59,9 +55,8 @@ const renderSidebarField = (key: string, attr: Attribute, value: FieldValue | un
             />
           </Flex>
         );
-      default:
-        return <Input type="text" {...commonProps} />;
     }
+    return <Input type={inputType(attr.type)} {...commonProps} />;
 };
 
 type Field = { key: string; attr: Attribute };
@@ -82,7 +77,7 @@ function layoutFields(schema: Schema) {
     } else {
       sidebar[key] = attr;
     }
-    initialData[key] = attr.type === 'boolean' ? false : '';
+    initialData[key] = blankValue(attr) as FieldValue;
   });
   return { mainField: main as Field | null, titleField: title as Field | null, sidebarFields: sidebar, initialData };
 }
@@ -111,7 +106,8 @@ function ContributionEditor({ collectionName, schema }: { collectionName: string
     try {
         const response = await apiFetchWithAuth(`/api/collections/${collectionName}`, {
             method: 'POST',
-            body: JSON.stringify(formData),
+            // The API takes the attributes under "data"; empty fields are left out.
+            body: JSON.stringify({ data: toItemData(schema.attributes, formData) }),
         });
         if (!response.ok) throw new Error("Failed to save entry.");
         toast({ title: "Entry Saved", status: "success", duration: 3000, isClosable: true });

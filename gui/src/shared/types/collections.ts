@@ -7,6 +7,7 @@ export interface Attribute {
   enum?: string[];
   target?: string;
   relation?: string;
+  options?: string[];
   component?: string;
   repeatable?: boolean;
   multiple?: boolean;

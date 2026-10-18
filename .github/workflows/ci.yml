@@ -214,43 +214,54 @@ jobs:
       - name: Install kubeconform
         run: |
           curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz \
-            | tar xz -C /usr/local/bin kubeconform
+            | sudo tar xz -C /usr/local/bin kubeconform
 
       - name: Lint and validate every values set
+        shell: bash
         run: |
+          set -o pipefail
           for values in charts/gohead/ci/*-values.yaml; do
-            echo "::group::$values"
+            echo "== $values"
             helm lint --strict charts/gohead -f "$values"
             # ServiceMonitor is a CRD: no schema in the default catalog.
             helm template ci charts/gohead -f "$values" \
               | kubeconform -strict -summary -ignore-missing-schemas -kubernetes-version 1.31.0
-            echo "::endgroup::"
-          done
+          done 2>&1 | tee -a helm.log
 
       - name: Missing database fails with a clear message
+        shell: bash
         run: |
           if out=$(helm template ci charts/gohead 2>&1); then
             echo "::error::rendering without a database should fail"; exit 1
           fi
-          echo "$out" | grep -q "set database.url"
+          echo "$out" | tee -a helm.log | grep -q "set database.url"
 
       # Install on a real cluster with the released images of the chart's
       # appVersion, then run `helm test`.
       - uses: helm/kind-action@v1.15.1
       - name: Install on kind
+        shell: bash
         run: |
+          set -o pipefail
           kubectl create deployment postgres --image=postgres:17-alpine --port=5432
           kubectl set env deployment/postgres POSTGRES_USER=gohead POSTGRES_PASSWORD=gohead POSTGRES_DB=gohead
           kubectl expose deployment postgres --port=5432
           kubectl rollout status deployment/postgres --timeout=180s
-          helm install gohead charts/gohead -f charts/gohead/ci/default-values.yaml --wait --timeout 6m
-          helm test gohead --logs
+          helm install gohead charts/gohead -f charts/gohead/ci/default-values.yaml --wait --timeout 6m 2>&1 | tee -a helm.log
+          helm test gohead --logs 2>&1 | tee -a helm.log
       - name: Diagnostics
         if: failure()
+        shell: bash
         run: |
-          kubectl get pods -o wide
-          kubectl describe pods | tail -120
-          for d in $(kubectl get deploy -o name); do echo "== $d"; kubectl logs "$d" --tail=60 --all-containers || true; done
+          {
+            helm version; kubeconform -v
+            kubectl get pods -o wide
+            kubectl get events --sort-by=.lastTimestamp | tail -30
+            for d in $(kubectl get deploy -o name); do echo "== $d"; kubectl logs "$d" --tail=15 --all-containers; done
+          } >> helm.log 2>&1 || true
+          grep -vE '^\s*$' helm.log | grep -vE '^(Summary|==> Linting|1 chart|ci/|$)' | tail -150 > helm.fail
+          split -l 50 helm.fail helm.chunk.
+          for c in helm.chunk.*; do echo "::error title=helm::$(sed -e 's/%/%25/g' "$c" | awk 'BEGIN{ORS="%0A"} {print}')"; done
 
   docs:
     name: Docs build

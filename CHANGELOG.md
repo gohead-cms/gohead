@@ -16,12 +16,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **Per-agent limits**: `max_runs_per_hour`, `max_runs_per_day`, `max_tokens_per_run`, `max_tokens_per_day` and `max_cost_per_day`, over rolling windows, shared by all workers. Runs over a limit are skipped or stopped, recorded as `limited` and not retried.
 - Token usage is read from OpenAI-compatible, Anthropic and Ollama responses, including calls made by `llm.*` helper functions. Costs use `input_cost_per_million` / `output_cost_per_million` set in an agent's `llm_config` or in the `llm` defaults (no built-in price list).
 
+- **Helm chart** (`oci://ghcr.io/gohead-cms/charts/gohead`, released with every version): API with ingress, autoscaling, disruption budget and ServiceMonitor, worker, dispatcher, single scheduler, admin UI, optional bundled Redis; secrets from values or an existing Secret.
+- **MySQL support is tested**: CI runs the database test suite on MySQL 8.4 as well as PostgreSQL 17 (and SQLite).
+- Playwright smoke test of the admin UI (login, schema designer, content creation, agents) against the real API in CI.
+
 ### Changed
+- MySQL: JSON columns are created as `JSON` (they used PostgreSQL's `JSONB`, which MySQL rejects), and unique text columns (collection, component, singleton, agent and user slug names, token hashes, media keys) have a length. On PostgreSQL these columns become `varchar(191)` (`varchar(64)` and `varchar(255)` for token hashes and media keys) instead of `text`, applied by the automatic migration.
+- Use `loc=UTC` in MySQL URLs (the examples did not), so times are stored in UTC like on the other databases.
+- The admin UI lint (ESLint, React hooks rules) is clean and blocks CI.
 - `/admin/users` requires a user session (not an API token).
 - Usernames cannot contain `:` (reserved for `token:<name>` attribution).
 - Deleting an agent deletes its run history and conversation.
 
 ### Fixed
+- MySQL: updating a collection, component or singleton failed (`Incorrect datetime value`), looking up related items by unique fields used PostgreSQL-only SQL, and finding the agents of a collection event failed (`trigger` is a reserved word).
+- Admin UI: the workspace's Edit action on a node opened nothing; the relation dialog sent `oneToMny` and labelled many-to-many as many-to-one; hooks were called conditionally in the sidebar and the collection list.
 - Re-creating an agent with the name of a deleted one restored the old configuration instead of the new one.
 - The admin UI's **Agents** link led to an empty page.
 

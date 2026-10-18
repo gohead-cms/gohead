@@ -45,6 +45,20 @@ test.describe("signed in", () => {
     expect(errors).toEqual([]);
   });
 
+  test("full-page editor creates an entry", async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto("/contrib");
+    await page.getByRole("button", { name: "Contrib" }).click();
+    await expect(page).toHaveURL(/\/contrib\/edit\/articles$/);
+    await page.getByPlaceholder("Your post title...").fill("From the full editor");
+    await page.getByPlaceholder("Begin writing your content...").fill("Long form");
+    await page.getByRole("button", { name: "Save Entry" }).click();
+
+    await expect(page).toHaveURL(/\/contrib$/);
+    await expect(page.getByRole("cell", { name: "From the full editor" })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
   test("agents page shows the agent, its limits and runs", async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto("/agents");
@@ -61,7 +75,7 @@ test.describe("signed in", () => {
   test("dashboard renders", async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto("/dashboard");
-    await expect(page.getByRole("navigation").or(page.locator("nav")).first()).toBeVisible();
+    await expect(page.getByText("Overview of your GoHead CMS system")).toBeVisible();
     expect(errors).toEqual([]);
   });
 
