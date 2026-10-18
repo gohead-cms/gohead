@@ -98,7 +98,7 @@ jobs:
           provenance: mode=max
           sbom: true
 
-      - uses: sigstore/cosign-installer@v4
+      - uses: sigstore/cosign-installer@v4.1.2
         if: env.PUSH == 'true'
 
       - name: Sign image (keyless)
