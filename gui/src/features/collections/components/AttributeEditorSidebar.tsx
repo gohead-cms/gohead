@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Drawer,
   DrawerBody,
@@ -43,15 +43,11 @@ export const AttributeEditorSidebar: React.FC<AttributeEditorProps> = ({
   onSave,
 }) => {
   const toast = useToast();
-  const [currentAttributes, setCurrentAttributes] = useState<AttributeItem[]>([]);
+  // Starts from the node's attributes; the canvas remounts the editor (key)
+  // for each node.
+  const [currentAttributes, setCurrentAttributes] = useState<AttributeItem[]>(() => node?.data.attributes ?? []);
   const [newAttribute, setNewAttribute] = useState({ name: '', type: 'Text' });
 
-  // Update attributes state when the node changes
-  useEffect(() => {
-    if (node) {
-      setCurrentAttributes(node.data.attributes);
-    }
-  }, [node]);
 
   const handleAddAttribute = () => {
     if (!newAttribute.name.trim()) {

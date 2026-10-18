@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useState } from "react";
 import { Flex, Box, Spinner, Text, Alert, AlertIcon } from "@chakra-ui/react";
 import { useAgentsList } from "../hook/useAgentList";
 import { useAgentDetails } from "../hook/useAgentDetails";
@@ -6,22 +6,15 @@ import { AgentSidebar } from "./AgentSidebar";
 import { AgentDetails } from "./AgentDetails";
 
 export default function AgentsPage() {
-  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
-
-  // Use the custom hooks to manage data and state
+  const [chosenAgent, setSelectedAgent] = useState<string | null>(null);
   const { agents, loading: listLoading, error: listError } = useAgentsList();
+  // The first agent is shown until another is chosen.
+  const selectedAgent = chosenAgent ?? agents[0]?.name ?? null;
   const {
     agentDetails,
     loading: detailsLoading,
     error: detailsError,
   } = useAgentDetails(selectedAgent);
-
-  // Effect to select the first agent in the list by default
-  useEffect(() => {
-    if (!selectedAgent && agents.length > 0) {
-      setSelectedAgent(agents[0].name);
-    }
-  }, [agents, selectedAgent]);
 
   const error = listError || detailsError;
 

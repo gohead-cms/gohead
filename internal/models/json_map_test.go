@@ -34,10 +34,11 @@ func TestJSONMap_Value(t *testing.T) {
 			value, err := tt.jsonMap.Value()
 			assert.NoError(t, err)
 
-			jsonString, ok := value.([]byte)
+			// Text, not bytes: MySQL refuses binary strings in JSON columns.
+			jsonString, ok := value.(string)
 			assert.True(t, ok)
 
-			assert.JSONEq(t, tt.expected, string(jsonString))
+			assert.JSONEq(t, tt.expected, jsonString)
 		})
 	}
 }

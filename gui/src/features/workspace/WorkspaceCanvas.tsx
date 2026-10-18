@@ -635,6 +635,7 @@ export default function WorkspaceCanvas() {
       </Modal>
       
        <AttributeEditorSidebar
+        key={editingCollection?.id ?? "none"}
         isOpen={collectionEditorModal.isOpen}
         onClose={collectionEditorModal.onClose}
         node={editingCollection}

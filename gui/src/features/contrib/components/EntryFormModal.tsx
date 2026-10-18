@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Drawer,
   DrawerOverlay,
@@ -69,35 +69,33 @@ const renderFormField = (key: string, attr: Attribute, value: unknown, handleCha
   }
 };
 
-export function EntryFormModal({ isOpen, onClose, schema, itemToEdit, onSubmit }: EntryFormDrawerProps) {
-  const [formData, setFormData] = useState<Partial<ContentItem>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-
-  useEffect(() => {
-    if (isOpen) {
-      if (itemToEdit) {
-        // If editing, pre-fill the form with the item's attributes (items
-        // are flat; drop the system fields).
-        const systemFields = ['id', 'createdAt', 'updatedAt', 'publishedAt', 'status'];
-        setFormData(Object.fromEntries(
-          Object.entries(itemToEdit).filter(([key]) => !systemFields.includes(key) || key in schema.attributes),
-        ));
-      } else {
-        // If creating, initialize a blank form
-        const initialData = Object.entries(schema.attributes).reduce((acc, [key, attr]) => {
-            if (attr.type === 'relation') return acc;
-            if (attr.type === 'media') {
-              if (attr.multiple) acc[key] = [];
-              return acc;
-            }
-            acc[key] = attr.type === 'boolean' ? false : '';
-            return acc;
-        }, {} as Record<string, unknown>);
-        setFormData(initialData);
-      }
+// The form's starting values: the item's attributes when editing (items are
+// flat; system fields are dropped), blank values when creating.
+function initialFormData(schema: Schema, itemToEdit?: ContentItem | null): Partial<ContentItem> {
+  if (itemToEdit) {
+    const systemFields = ['id', 'createdAt', 'updatedAt', 'publishedAt', 'status'];
+    return Object.fromEntries(
+      Object.entries(itemToEdit).filter(([key]) => !systemFields.includes(key) || key in schema.attributes),
+    );
+  }
+  return Object.entries(schema.attributes).reduce((acc, [key, attr]) => {
+    if (attr.type === 'relation') return acc;
+    if (attr.type === 'media') {
+      if (attr.multiple) acc[key] = [];
+      return acc;
     }
-  }, [isOpen, schema, itemToEdit]);
+    acc[key] = attr.type === 'boolean' ? false : '';
+    return acc;
+  }, {} as Record<string, unknown>);
+}
+
+/**
+ * Creates or edits an entry. The form starts from schema and itemToEdit when
+ * it mounts: give it a new key each time it is opened for another entry.
+ */
+export function EntryFormModal({ isOpen, onClose, schema, itemToEdit, onSubmit }: EntryFormDrawerProps) {
+  const [formData, setFormData] = useState<Partial<ContentItem>>(() => initialFormData(schema, itemToEdit));
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (key: string, value: unknown) => {
     setFormData(prev => ({ ...prev, [key]: value }));

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useState } from "react";
 import { Flex, Box, Heading, Text, Button, Icon, useDisclosure, useToast, HStack } from "@chakra-ui/react";
 import { FiPlus } from "react-icons/fi";
 import { 
@@ -14,24 +14,20 @@ import { useNavigate } from "react-router-dom";
 import { FaPenNib } from "react-icons/fa6";
 
 export function ContributionsPage() {
-  const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
+  const [chosenCollection, setSelectedCollection] = useState<string | null>(null);
   const { isOpen, onOpen, onClose } = useDisclosure(); // For the form drawer
   const toast = useToast();
   const navigate = useNavigate();
 
   const { collections, loading: collectionsLoading } = useCollectionsList();
+  // The first collection is shown until another is chosen.
+  const selectedCollection = chosenCollection ?? collections[0]?.schema.collectionName ?? null;
   const { content, loading: contentLoading, refetch } = useCollectionContent(selectedCollection);
 
   const [editingItem, setEditingItem] = useState<ContentItem | null>(null);
+  // Bumped on every open, so the form starts from the entry it opens for.
+  const [formKey, setFormKey] = useState(0);
 
-  useEffect(() => {
-    if (!selectedCollection && collections.length > 0) {
-      const firstCollectionName = collections[0].schema.collectionName;
-      if (firstCollectionName) {
-        setSelectedCollection(firstCollectionName);
-      }
-    }
-  }, [collections, selectedCollection]);
 
   const currentCollectionSchema = collections.find(c => c.schema.collectionName === selectedCollection)?.schema;
 
@@ -79,11 +75,13 @@ export function ContributionsPage() {
 
   const handleEditClick = (item: ContentItem) => {
     setEditingItem(item);
+    setFormKey((k) => k + 1);
     onOpen();
   };
 
   const handleQuickAdd = () => {
     setEditingItem(null);
+    setFormKey((k) => k + 1);
     onOpen();
   };
 
@@ -141,6 +139,7 @@ export function ContributionsPage() {
 
         {currentCollectionSchema && (
             <EntryFormModal
+                key={`${selectedCollection}-${formKey}`}
                 isOpen={isOpen}
                 onClose={onClose}
                 schema={currentCollectionSchema}

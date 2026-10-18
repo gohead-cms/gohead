@@ -1,45 +1,19 @@
-import React, { useEffect, useState } from "react";
+import { useState } from "react";
 import { Flex, Box, Spinner, Text, Badge, Link, Icon, List, ListItem } from "@chakra-ui/react";
 import {
   FiPlus} from "react-icons/fi";
-import { apiFetchWithAuth } from "../../../services/api";
+import { useCollectionsList } from "../../contrib/hooks/useCollectionList";
 import CollectionSchema from "./CollectionSchema";
 import { PageLoader } from "../../../shared/ui/page-loader";
-import type { Schema } from "../../../shared/types";
 
 export function CollectionsPage() {
-  const [collections, setCollections] = useState<{ name: string }[]>([]);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [schema, setSchema] = useState<Schema | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [schemaLoading, setSchemaLoading] = useState(false);
+  const { collections: list, loading } = useCollectionsList();
+  const collections = list.map((c) => ({ name: c.schema.collectionName ?? "" })).filter((c) => c.name);
+  const [chosen, setSelected] = useState<string | null>(null);
+  // The first collection is shown until another is chosen.
+  const selected = chosen ?? collections[0]?.name ?? null;
 
-  useEffect(() => {
-    setLoading(true);
-    apiFetchWithAuth("/admin/collections")
-      .then(async (res) => {
-        if (!res.ok) throw new Error("Failed to fetch collections");
-        const json = await res.json();
-        const list = Array.isArray(json.data) ? json.data : [];
-        setCollections(list.map((c: { schema: Schema }) => ({ name: c.schema.collectionName ?? "" })));
-        setSelected(list.length ? list[0].schema.collectionName : null);
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    if (!selected) return;
-    setSchemaLoading(true);
-    apiFetchWithAuth(`/admin/collections/${selected}`)
-      .then(async (res) => {
-        if (!res.ok) throw new Error("Failed to fetch collection schema");
-        const json = await res.json();
-        setSchema(json.data?.schema || null);
-      })
-      .finally(() => setSchemaLoading(false));
-  }, [selected]);
-
-   if (schemaLoading || loading) {
+  if (loading) {
     return <PageLoader text="Fetching your collections..." />;
   }
 
@@ -128,10 +102,8 @@ export function CollectionsPage() {
         bg="gray.50"
         minH="100%"
       >
-        {schemaLoading ? (
-          <Spinner />
-        ) : selected && schema ? (
-          <CollectionSchema collectionName={schema.collectionName ?? selected} />
+        {selected ? (
+          <CollectionSchema collectionName={selected} />
         ) : (
           <Text color="gray.400">Select a collection to view its schema</Text>
         )}

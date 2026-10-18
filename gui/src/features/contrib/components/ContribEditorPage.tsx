@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Box,
   Flex,
@@ -26,7 +26,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { FiSave, FiX } from "react-icons/fi";
 import { PageLoader } from "../../../shared/ui/page-loader";
 import { apiFetchWithAuth } from "../../../services/api"
-import { Attribute, FieldValue } from "../../../shared/types";
+import { Attribute, FieldValue, Schema } from "../../../shared/types";
 import { useCollectionSchema } from "../../collections/hook/useCollectionSchema";
 
 
@@ -64,45 +64,43 @@ const renderSidebarField = (key: string, attr: Attribute, value: FieldValue | un
     }
 };
 
+type Field = { key: string; attr: Attribute };
+
+// Places a collection's fields: the title on top, the first long text as the
+// main editor, everything else (but relations) in the sidebar.
+function layoutFields(schema: Schema) {
+  let main: Field | null = null;
+  let title: Field | null = null;
+  const sidebar: Record<string, Attribute> = {};
+  const initialData: Record<string, FieldValue> = {};
+  Object.entries(schema.attributes).forEach(([key, attr]) => {
+    if (attr.type === 'relation') return;
+    if (!title && key.toLowerCase() === 'title') {
+      title = { key, attr };
+    } else if (!main && (attr.type === 'richtext' || attr.type === 'text')) {
+      main = { key, attr };
+    } else {
+      sidebar[key] = attr;
+    }
+    initialData[key] = attr.type === 'boolean' ? false : '';
+  });
+  return { mainField: main as Field | null, titleField: title as Field | null, sidebarFields: sidebar, initialData };
+}
+
 export function ContributionEditorPage() {
   const { collectionName } = useParams<{ collectionName: string }>();
+  const { schema, loading } = useCollectionSchema(collectionName);
+  if (loading || !schema || !collectionName) return <PageLoader text="Loading editor..." />;
+  // A new collection starts a new, empty form.
+  return <ContributionEditor key={collectionName} collectionName={collectionName} schema={schema} />;
+}
+
+function ContributionEditor({ collectionName, schema }: { collectionName: string; schema: Schema }) {
   const navigate = useNavigate();
   const toast = useToast();
-
-  const { schema, loading } = useCollectionSchema(collectionName!);
-  const [formData, setFormData] = useState<Record<string, FieldValue>>({});
+  const { mainField, titleField, sidebarFields, initialData } = useMemo(() => layoutFields(schema), [schema]);
+  const [formData, setFormData] = useState<Record<string, FieldValue>>(initialData);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const [mainField, setMainField] = useState<{ key: string, attr: Attribute } | null>(null);
-  const [titleField, setTitleField] = useState<{ key: string, attr: Attribute } | null>(null);
-  const [sidebarFields, setSidebarFields] = useState<Record<string, Attribute>>({});
-
-  
-  useEffect(() => {
-    if (schema) {
-      const attributes = schema.attributes;
-      let main: { key: string, attr: Attribute } | null = null;
-      let title: { key: string, attr: Attribute } | null = null;
-      const sidebar: Record<string, Attribute> = {};
-      const initialData: Record<string, FieldValue> = {};
-
-      Object.entries(attributes).forEach(([key, attr]) => {
-        if (attr.type === 'relation') return;
-        if (!title && key.toLowerCase() === 'title') {
-          title = { key, attr };
-        } else if (!main && (attr.type === 'richtext' || attr.type === 'text')) {
-          main = { key, attr };
-        } else {
-          sidebar[key] = attr;
-        }
-        initialData[key] = attr.type === 'boolean' ? false : '';
-      });
-      setTitleField(title);
-      setMainField(main);
-      setSidebarFields(sidebar);
-      setFormData(initialData);
-    }
-  }, [schema]);
 
   const handleChange: ChangeHandler = (key, value) => {
     setFormData(prev => ({ ...prev, [key]: value }));
@@ -124,8 +122,6 @@ export function ContributionEditorPage() {
         setIsSubmitting(false);
     }
   };
-
-  if (loading || !schema) return <PageLoader text="Loading editor..." />;
 
   return (
     <Box bg="gray.50" minH="calc(100vh - 64px)">
