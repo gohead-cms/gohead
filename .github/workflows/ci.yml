@@ -74,7 +74,7 @@ jobs:
           go-version: "1.27.x"
           check-latest: true
       # Packages share one database, so run them one at a time.
-      - run: go test -count=1 -p 1 ./pkg/... ./internal/...
+      - run: scripts/go-test-annotate.sh -count=1 -p 1 ./pkg/... ./internal/...
 
   mysql:
     name: Go tests on MySQL
@@ -98,7 +98,7 @@ jobs:
           go-version: "1.27.x"
           check-latest: true
       # Packages share one database, so run them one at a time.
-      - run: go test -count=1 -p 1 ./pkg/... ./internal/...
+      - run: scripts/go-test-annotate.sh -count=1 -p 1 ./pkg/... ./internal/...
 
   vulncheck:
     name: govulncheck
