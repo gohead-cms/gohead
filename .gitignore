@@ -44,14 +44,12 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package-lock.json
 .pnpm-debug.log
 
 *.db# Added by goreleaser init:
 dist/
 
 gui/node_modules/
-gui/package-lock.json
 gui/yarn.lock
 
 gui/npm-debug.log*
@@ -61,3 +59,7 @@ gui/yarn-error.log*
 gui/.env*
 !gui/.env.example
 tree
+# Docs build output
+/site/
+docs/site/
+gui/*.tsbuildinfo

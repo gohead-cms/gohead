@@ -34,16 +34,10 @@ func init() {
 	StaticFunctionMap["llm.extract_structured_data"] = extractStructuredData
 }
 
-// getLLMClient creates an LLM client instance
-// You might want to cache this or pass it through context for better performance
+// getLLMClient creates a client from the instance-wide `llm` configuration
+// (see llm.SetDefaultConfig).
 func getLLMClient() (llm.Client, error) {
-	// Use default config or get from environment/config
-	// You may need to adjust this based on your config management
-	cfg := llm.Config{
-		Provider: "openai", // or get from config
-		Model:    "gpt-4o", // or get from config
-	}
-	return llm.NewAdapter(cfg)
+	return llm.NewAdapter(llm.Config{})
 }
 
 // parseArgs handles both string and map arguments

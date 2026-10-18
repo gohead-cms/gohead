@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"github.com/gohead-cms/gohead/pkg/llm"
 	"log"
 	"net/http"
 	"os"
@@ -101,6 +102,7 @@ func InitializeServer(cfgPath string) (*gin.Engine, *config.Config, func(), erro
 		return nil, nil, func() {}, err
 	}
 	logger.InitLogger(cfg.LogLevel)
+	llm.SetDefaultConfig(cfg.LLM)
 
 	var gormLogLevel gormlogger.LogLevel
 	switch cfg.LogLevel {
@@ -138,7 +140,7 @@ func InitializeServer(cfgPath string) (*gin.Engine, *config.Config, func(), erro
 
 	// --- Asynq Client Initialization for Producers ---
 	// The API server acts as a producer, enqueuing jobs for workers.
-	asynqClient := asynq.NewClient(asynq.RedisClientOpt{Addr: cfg.Redis.Address})
+	asynqClient := asynq.NewClient(cfg.RedisClientOpt())
 	storage.InitAsynqClient(asynqClient)
 	triggers.InitAsynqClient(asynqClient)
 	handlers.InitAsynqClient(asynqClient) // used by the agent webhook endpoint

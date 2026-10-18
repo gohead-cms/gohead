@@ -59,7 +59,7 @@ func runScheduler(cfgPath string) {
 	}
 
 	// The scheduler needs an Asynq client to enqueue jobs.
-	asynqClient := asynq.NewClient(asynq.RedisClientOpt{Addr: cfg.Redis.Address})
+	asynqClient := asynq.NewClient(cfg.RedisClientOpt())
 	triggers.InitAsynqClient(asynqClient)
 
 	// Start the actual cron scheduler.
