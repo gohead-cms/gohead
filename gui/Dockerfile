@@ -2,7 +2,7 @@
 # GoHead admin UI: static build served by unprivileged nginx.
 # Point it at the API at runtime with GOHEAD_API_URL.
 
-FROM node:22-alpine AS builder
+FROM node:26-alpine AS builder
 WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN --mount=type=cache,target=/root/.npm \
