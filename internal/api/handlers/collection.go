@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	gqlschema "github.com/gohead-cms/gohead/internal/graphql"
 	"net/http"
 	"strconv"
@@ -72,6 +73,12 @@ func GetCollections(c *gin.Context) {
 
 	// Retrieve collections from storage with optional filters, sorting, and pagination
 	collections, total, err := storage.GetAllCollections(filters, sortValues, rangeValues)
+	var qe *storage.QueryFieldError
+	if errors.As(err, &qe) {
+		c.Set("response", qe.Error())
+		c.Set("status", http.StatusBadRequest)
+		return
+	}
 	if err != nil {
 		logger.Log.WithError(err).Warn("GetCollections: failed to retrieve collections")
 		c.Set("response", "Failed to fetch collections")

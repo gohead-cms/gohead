@@ -103,3 +103,19 @@ func TestSaveCollection_EnumOptionsRoundTrip(t *testing.T) {
 		}
 	}
 }
+
+func TestGetAllCollections_RejectsUnknownColumns(t *testing.T) {
+	_, db := testutils.SetupTestServer()
+	defer testutils.CleanupTestDB()
+	assert.NoError(t, db.AutoMigrate(&models.Collection{}, &models.Attribute{}))
+
+	_, _, err := storage.GetAllCollections(map[string]any{"name = name OR 1": 1}, nil, nil)
+	var qe *storage.QueryFieldError
+	assert.ErrorAs(t, err, &qe)
+
+	_, _, err = storage.GetAllCollections(nil, []string{"id; DROP TABLE collections", "ASC"}, nil)
+	assert.ErrorAs(t, err, &qe)
+
+	_, _, err = storage.GetAllCollections(map[string]any{"name": "x"}, []string{"name", "DESC"}, nil)
+	assert.NoError(t, err)
+}

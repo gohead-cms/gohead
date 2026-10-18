@@ -151,20 +151,30 @@ func GetCollectionByName(name string) (*models.Collection, error) {
 }
 
 // GetAllCollectionsWithFilters retrieves collections with optional filtering, sorting, and pagination.
+// collectionListColumns are the columns GetAllCollections may filter or sort on.
+var collectionListColumns = map[string]bool{
+	"id": true, "name": true, "kind": true, "description": true, "created_at": true, "updated_at": true,
+}
+
 func GetAllCollections(filters map[string]any, sortValues []string, rangeValues []int) ([]models.Collection, int, error) {
 	var collections []models.Collection
 	query := database.DB.Model(&models.Collection{}).Preload("Attributes")
 
-	// Apply filtering dynamically
-	if len(filters) > 0 {
-		for key, value := range filters {
-			query = query.Where(fmt.Sprintf("%s = ?", key), value)
+	// Apply filtering dynamically. Column names come from the request, so
+	// only whitelisted columns are accepted.
+	for key, value := range filters {
+		if !collectionListColumns[key] {
+			return nil, 0, &QueryFieldError{Msg: fmt.Sprintf("cannot filter collections by '%s'", key)}
 		}
+		query = query.Where(fmt.Sprintf("%s = ?", key), value)
 	}
 
 	// Apply sorting (e.g., ["name", "ASC"])
 	if len(sortValues) == 2 {
 		sortField := sortValues[0]
+		if !collectionListColumns[sortField] {
+			return nil, 0, &QueryFieldError{Msg: fmt.Sprintf("cannot sort collections by '%s'", sortField)}
+		}
 		sortOrder := strings.ToUpper(sortValues[1])
 
 		if sortOrder != "ASC" && sortOrder != "DESC" {
