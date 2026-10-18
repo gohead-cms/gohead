@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.4.0]
 
 ### Breaking changes
 - GraphQL: `media` attributes are now `Media` objects instead of strings. Query `cover { url }` instead of `cover`. REST still returns URL values as they were stored.
