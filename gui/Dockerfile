@@ -10,7 +10,7 @@ RUN --mount=type=cache,target=/root/.npm \
 COPY . .
 RUN npm run build
 
-FROM nginxinc/nginx-unprivileged:1.27-alpine
+FROM nginxinc/nginx-unprivileged:1.31-alpine
 LABEL org.opencontainers.image.title="GoHead Admin UI" \
       org.opencontainers.image.source="https://github.com/gohead-cms/gohead" \
       org.opencontainers.image.licenses="MIT"
