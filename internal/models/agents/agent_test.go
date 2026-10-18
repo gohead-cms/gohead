@@ -263,3 +263,35 @@ func TestFunctionSpecsScan(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateLimitsAndScopes(t *testing.T) {
+	base := func() Agent {
+		return Agent{
+			Name: "a", SystemPrompt: "p", MaxTurns: 2,
+			LLMConfig: LLMConfig{Provider: "openai"},
+			Memory:    MemoryConfig{Type: "in-memory", SessionScope: "agent"},
+			Trigger:   TriggerConfig{Type: "manual"},
+		}
+	}
+	a := base()
+	a.Limits = Limits{MaxRunsPerHour: 10, MaxTokensPerRun: 5000}
+	assert.NoError(t, ValidateAgentSchema(a))
+
+	a = base()
+	a.Limits = Limits{MaxCostPerDay: 1}
+	assert.ErrorContains(t, ValidateAgentSchema(a), "needs prices", "a cost limit without prices could never trigger")
+	a.LLMConfig.InputCostPerMillion = 2.5
+	assert.NoError(t, ValidateAgentSchema(a))
+
+	a = base()
+	a.Limits = Limits{MaxRunsPerDay: -1}
+	assert.Error(t, ValidateAgentSchema(a))
+
+	a = base()
+	a.Functions = FunctionSpecs{{Name: "rm", ImplKey: "collections.delete_item", Parameters: models.JSONMap{}, Collections: []string{"drafts"}}}
+	assert.NoError(t, ValidateAgentSchema(a))
+	a.Functions = FunctionSpecs{{Name: "sum", ImplKey: "llm.summarize", Parameters: models.JSONMap{}, Collections: []string{"drafts"}}}
+	assert.ErrorContains(t, ValidateAgentSchema(a), "only applies to collections")
+	a.Functions = FunctionSpecs{{Name: "rm", ImplKey: "collections.delete_item", Parameters: models.JSONMap{}, Collections: []string{" "}}}
+	assert.Error(t, ValidateAgentSchema(a))
+}

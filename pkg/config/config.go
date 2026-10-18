@@ -29,6 +29,10 @@ type LLMConfig struct {
 	APIKey    string `mapstructure:"api_key" yaml:"api_key"`
 	APISecret string `mapstructure:"api_secret" yaml:"api_secret"`
 	BaseURL   string `mapstructure:"base_url" yaml:"base_url"` // optional API endpoint override
+	// Prices in USD per million tokens, used to estimate run costs and
+	// enforce cost limits. Zero: cost is not tracked.
+	InputCostPerMillion  float64 `mapstructure:"input_cost_per_million" yaml:"input_cost_per_million" json:"input_cost_per_million,omitempty"`
+	OutputCostPerMillion float64 `mapstructure:"output_cost_per_million" yaml:"output_cost_per_million" json:"output_cost_per_million,omitempty"`
 }
 
 // RateLimitConfig protects the authentication endpoints.
@@ -133,6 +137,15 @@ type Config struct {
 
 	// OpenAPI description and Swagger UI
 	OpenAPI OpenAPIConfig `mapstructure:"openapi" yaml:"openapi"`
+
+	// Agents
+	Agents AgentsConfig `mapstructure:"agents" yaml:"agents"`
+}
+
+// AgentsConfig controls agent run history.
+type AgentsConfig struct {
+	// RunsKept is how many runs (with their steps) are kept per agent.
+	RunsKept int `mapstructure:"runs_kept" yaml:"runs_kept"`
 }
 
 // LoadConfig loads the configuration from file and environment variables.
@@ -197,6 +210,11 @@ func LoadConfig(configPath string) (Config, error) {
 	viper.SetDefault("llm.model", "gpt-4o")
 	viper.SetDefault("llm.api_key", os.Getenv("OPENAI_API_KEY"))
 	viper.SetDefault("llm.base_url", "")
+	viper.SetDefault("llm.input_cost_per_million", 0)
+	viper.SetDefault("llm.output_cost_per_million", 0)
+
+	// Agent run history
+	viper.SetDefault("agents.runs_kept", 200)
 
 	// Set the config file path
 	viper.SetConfigFile(configPath)

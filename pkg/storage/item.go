@@ -535,3 +535,19 @@ func reloadItem(tx *gorm.DB, item *models.Item) error {
 	*item = fresh
 	return nil
 }
+
+// ItemCollectionName returns the name of the collection an item belongs to.
+func ItemCollectionName(itemID uint) (string, error) {
+	var names []string
+	err := database.DB.Table("items").
+		Joins("JOIN collections ON collections.id = items.collection_id").
+		Where("items.id = ? AND items.deleted_at IS NULL AND collections.deleted_at IS NULL", itemID).
+		Pluck("collections.name", &names).Error
+	if err != nil {
+		return "", err
+	}
+	if len(names) == 0 {
+		return "", ErrItemNotFound
+	}
+	return names[0], nil
+}

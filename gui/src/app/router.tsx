@@ -11,6 +11,7 @@ import { CollectionsPage } from "../features/collections";
 import { SettingsPage } from "../features/settings";
 import { DashboardPage } from "../features/dashboard";
 import { ContributionEditorPage, ContributionsPage } from "../features/contrib/components";
+import AgentsPage from "../features/agents/components/AgentPage";
 
 const ContentBrowserPage = () => <Box p={8}><Heading>Content Browser</Heading></Box>;
 const PrimitivesPage = () => <Box p={8}><Heading>LLM Primitives</Heading></Box>;
@@ -51,6 +52,8 @@ export function AppRouter() {
         <Route path="/contrib/edit/:collectionName" element={<ContributionEditorPage />} />
         {/* Agent Management */}
         <Route path="/primitives" element={<PrimitivesPage />} />
+
+        <Route path="/agents" element={<AgentsPage />} />
 
         {/* Automation */}
         <Route path="/automation" element={<AutomationPage />} />

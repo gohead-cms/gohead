@@ -90,3 +90,11 @@ llm:
   model: gpt-4o
   api_key: ""             # falls back to OPENAI_API_KEY / ANTHROPIC_API_KEY
   base_url: ""            # optional: Azure/OpenAI-compatible endpoint, Ollama URL
+  # Prices of the default model in USD per million tokens, used to show run
+  # costs and enforce max_cost_per_day. 0 = cost not tracked.
+  input_cost_per_million: 0
+  output_cost_per_million: 0
+
+# Agent run history.
+agents:
+  runs_kept: 200          # newest runs kept per agent (older ones are pruned)

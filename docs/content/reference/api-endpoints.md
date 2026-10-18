@@ -68,6 +68,9 @@ header.
 |--------|------|------|
 | `GET`, `POST` | `/admin/agents` | admin |
 | `GET`, `PUT`, `DELETE` | `/admin/agents/{name}` | admin |
+| `GET` | `/admin/agents/{name}/runs` | admin |
+| `GET` | `/admin/agents/{name}/runs/{id}` | admin |
+| `GET` | `/admin/agents/{name}/usage` | admin |
 | `POST` | `/agents/webhook/{id}` | webhook |
 
 ## Response envelope

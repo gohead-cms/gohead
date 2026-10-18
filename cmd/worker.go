@@ -79,6 +79,9 @@ func runWorker(cfgPath string) {
 
 	// 4. Create an instance of your agent runner
 	agentRunner := runner.NewAgentRunner()
+	if cfg.Agents.RunsKept > 0 {
+		runner.RunsKept = cfg.Agents.RunsKept
+	}
 
 	// 5. Create a new ServeMux to map task types to handlers
 	mux := asynq.NewServeMux()

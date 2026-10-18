@@ -40,8 +40,9 @@ func (t *RegistryTool) Call(ctx context.Context, input string) (string, error) {
 // NewRegistry creates a new tool registry from a list of agent function specs.
 func NewRegistry(agentFuncs agentModels.FunctionSpecs) *Registry {
 	r := &Registry{
-		tools: make(map[string]ToolFunc),
-		specs: make([]agentModels.FunctionSpec, 0, len(agentFuncs)),
+		tools:    make(map[string]ToolFunc),
+		implKeys: make(map[string]string),
+		specs:    make([]agentModels.FunctionSpec, 0, len(agentFuncs)),
 	}
 
 	logger.Log.WithField("input_specs_count", len(agentFuncs)).Info("Creating function registry")
@@ -78,10 +79,9 @@ func NewRegistry(agentFuncs agentModels.FunctionSpecs) *Registry {
 			continue
 		}
 
-		// Register the executable function
-		r.tools[spec.Name] = toolFunc
-
-		r.tools[spec.Name] = toolFunc
+		// Register the executable function, limited to its collections.
+		r.tools[spec.Name] = scoped(spec.Collections, toolFunc)
+		r.implKeys[spec.Name] = spec.ImplKey
 		r.specs = append(r.specs, spec)
 
 		registeredFunctions = append(registeredFunctions, spec.Name)
@@ -104,6 +104,9 @@ func (r *Registry) Get(name string) (ToolFunc, bool) {
 	fn, ok := r.tools[name]
 	return fn, ok
 }
+
+// ImplKey returns the implementation key of a registered tool.
+func (r *Registry) ImplKey(name string) string { return r.implKeys[name] }
 
 // ListFunctions returns a list of registered function names (for debugging)
 func (r *Registry) ListFunctions() []string {

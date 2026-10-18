@@ -308,6 +308,8 @@ func TestChatOpenAI(t *testing.T) {
 				}
 			} else {
 				require.NoError(t, err)
+				assert.Equal(t, 1, resp.Usage.Calls, "every call reports its usage")
+				resp.Usage = tt.expectedResponse.Usage
 				assert.Equal(t, tt.expectedResponse, resp)
 			}
 		})
@@ -467,6 +469,8 @@ func TestChatAnthropic(t *testing.T) {
 				}
 			} else {
 				require.NoError(t, err)
+				assert.Equal(t, 1, resp.Usage.Calls, "every call reports its usage")
+				resp.Usage = tt.expectedResponse.Usage
 				assert.Equal(t, tt.expectedResponse, resp)
 			}
 		})
@@ -583,6 +587,8 @@ func TestChatOllama(t *testing.T) {
 				}
 			} else {
 				require.NoError(t, err)
+				assert.Equal(t, 1, resp.Usage.Calls, "every call reports its usage")
+				resp.Usage = tt.expectedResponse.Usage
 				assert.Equal(t, tt.expectedResponse, resp)
 			}
 		})

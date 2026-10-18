@@ -37,9 +37,13 @@ func SaveAgent(agent *models.Agent) error {
 			return fmt.Errorf("an agent with the name '%s' already exists", agent.Name)
 		}
 
-		// The agent is soft-deleted; restore it.
+		// The agent is soft-deleted: reuse its row (and ID) with the new
+		// configuration, and clear the deletion mark.
 		logger.Log.WithField("agent", agent.Name).Info("Found soft-deleted agent, restoring")
-		if err := database.DB.Unscoped().Save(&existing).Error; err != nil {
+		agent.ID = existing.ID
+		agent.CreatedAt = existing.CreatedAt
+		agent.DeletedAt = gorm.DeletedAt{}
+		if err := database.DB.Unscoped().Save(agent).Error; err != nil {
 			logger.Log.WithError(err).WithField("agent", agent.Name).Error("Failed to restore agent")
 			return fmt.Errorf("failed to restore agent: %w", err)
 		}
@@ -161,6 +165,7 @@ func UpdateAgent(id uint, updated *models.Agent) error {
 	existing.Trigger = updated.Trigger
 	existing.Functions = updated.Functions
 	existing.Config = updated.Config
+	existing.Limits = updated.Limits
 
 	if err := database.DB.Save(&existing).Error; err != nil {
 		logger.Log.WithError(err).WithField("agent_id", id).Error("Failed to save updated agent")
@@ -189,6 +194,14 @@ func DeleteAgent(agentID uint) error {
 	if err := database.DB.Delete(&agent).Error; err != nil {
 		logger.Log.WithError(err).WithField("agent_id", agentID).Error("Failed to delete agent")
 		return fmt.Errorf("failed to delete agent with ID '%d': %w", agentID, err)
+	}
+	// A re-created agent with the same name reuses this row, so its old
+	// runs and conversation go now.
+	if err := DeleteAgentRuns(agentID); err != nil {
+		logger.Log.WithError(err).WithField("agent_id", agentID).Warn("Failed to delete agent runs")
+	}
+	if err := database.DB.Where("agent_id = ?", agentID).Delete(&models.AgentMessage{}).Error; err != nil {
+		logger.Log.WithError(err).WithField("agent_id", agentID).Warn("Failed to delete agent conversation")
 	}
 
 	logger.Log.WithField("agent_id", agentID).Info("Agent deleted successfully")
