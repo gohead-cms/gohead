@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { apiFetchWithAuth } from "../../../services/api";
-import { Schema } from "../../../shared/types/schema"
+import { Schema } from "../../../shared/types"
 
 export function useCollectionSchema(collectionName: string) {
   const [schema, setSchema] = useState<Schema | null>(null);

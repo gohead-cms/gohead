@@ -111,12 +111,8 @@ jobs:
           cache: npm
           cache-dependency-path: gui/package-lock.json
       - run: npm ci
+      - run: npm run lint
       - run: npm run build
-      # The UI still has pre-existing lint findings; report them without
-      # blocking until they are cleaned up.
-      - name: Lint (advisory)
-        run: npm run lint
-        continue-on-error: true
 
   docs:
     name: Docs build

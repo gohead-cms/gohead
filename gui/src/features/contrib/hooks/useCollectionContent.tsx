@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { apiFetchWithAuth } from "../../../services/api";
+import { errorMessage } from "../../../shared/utils/errors";
 
 export interface ContentItem {
     id: string | number;
-    [key: string]: any;
+    status?: "draft" | "published";
+    [key: string]: unknown;
 }
 
 interface ContentResponse {
@@ -34,8 +36,8 @@ export function useCollectionContent(collectionName: string | null) {
             const json = await res.json();
             const items = json.data || [];
             setContent({ items: Array.isArray(items) ? items : [] });
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(errorMessage(err));
         } finally {
             setLoading(false);
         }

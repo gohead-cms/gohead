@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
-import { Box, Heading, Text } from "@chakra-ui/react";
+import { Box, Heading } from "@chakra-ui/react";
 
 // Layout and Auth
 import { Layout } from "./Layout";
@@ -11,9 +11,8 @@ import { CollectionsPage } from "../features/collections";
 import { SettingsPage } from "../features/settings";
 import { DashboardPage } from "../features/dashboard";
 import { ContributionEditorPage, ContributionsPage } from "../features/contrib/components";
-import AgentsPage from "../features/agents/components/AgentPage";
+import { AgentsPage } from "../features/agents";
 
-const ContentBrowserPage = () => <Box p={8}><Heading>Content Browser</Heading></Box>;
 const PrimitivesPage = () => <Box p={8}><Heading>LLM Primitives</Heading></Box>;
 const AutomationPage = () => <Box p={8}><Heading>Automation</Heading></Box>;
 

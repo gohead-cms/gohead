@@ -24,7 +24,7 @@ export function useDashboardStats() {
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         setStats(mockStats);
-      } catch (err) {
+      } catch {
         setError("Failed to fetch dashboard stats");
       } finally {
         setIsLoading(false);

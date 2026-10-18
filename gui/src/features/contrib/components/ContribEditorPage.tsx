@@ -26,17 +26,17 @@ import { useNavigate, useParams } from "react-router-dom";
 import { FiSave, FiX } from "react-icons/fi";
 import { PageLoader } from "../../../shared/ui/page-loader";
 import { apiFetchWithAuth } from "../../../services/api"
-import { Attribute } from "../../../shared/types";
+import { Attribute, FieldValue } from "../../../shared/types";
 import { useCollectionSchema } from "../../collections/hook/useCollectionSchema";
 
 
-// Helper to render form fields in the sidebar
+type ChangeHandler = (key: string, value: FieldValue) => void;
 
 // Helper to render form fields in the sidebar
-const renderSidebarField = (key: string, attr: Attribute, value: any, handleChange: any) => {
+const renderSidebarField = (key: string, attr: Attribute, value: FieldValue | undefined, handleChange: ChangeHandler) => {
     const commonProps = {
       id: key,
-      value: value || '',
+      value: typeof value === 'boolean' ? '' : (value ?? ''),
       onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => handleChange(key, e.target.value),
       size: 'sm',
     };
@@ -54,7 +54,7 @@ const renderSidebarField = (key: string, attr: Attribute, value: any, handleChan
             </FormLabel>
             <Switch
               id={key}
-              isChecked={value || false}
+              isChecked={value === true}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange(key, e.target.checked)}
             />
           </Flex>
@@ -70,12 +70,12 @@ export function ContributionEditorPage() {
   const toast = useToast();
 
   const { schema, loading } = useCollectionSchema(collectionName!);
-  const [formData, setFormData] = useState<Record<string, any>>({});
+  const [formData, setFormData] = useState<Record<string, FieldValue>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [mainField, setMainField] = useState<{ key: string, attr: any } | null>(null);
-  const [titleField, setTitleField] = useState<{ key: string, attr: any } | null>(null);
-  const [sidebarFields, setSidebarFields] = useState<Record<string, any>>({});
+  const [mainField, setMainField] = useState<{ key: string, attr: Attribute } | null>(null);
+  const [titleField, setTitleField] = useState<{ key: string, attr: Attribute } | null>(null);
+  const [sidebarFields, setSidebarFields] = useState<Record<string, Attribute>>({});
 
   
   useEffect(() => {
@@ -84,10 +84,9 @@ export function ContributionEditorPage() {
       let main: { key: string, attr: Attribute } | null = null;
       let title: { key: string, attr: Attribute } | null = null;
       const sidebar: Record<string, Attribute> = {};
-      const initialData: Record<string, any> = {};
+      const initialData: Record<string, FieldValue> = {};
 
-      Object.entries(attributes).forEach(([key, rawAttr]) => {
-        const attr = rawAttr as Attribute; // Add type assertion
+      Object.entries(attributes).forEach(([key, attr]) => {
         if (attr.type === 'relation') return;
         if (!title && key.toLowerCase() === 'title') {
           title = { key, attr };
@@ -105,7 +104,7 @@ export function ContributionEditorPage() {
     }
   }, [schema]);
 
-  const handleChange = (key: string, value: any) => {
+  const handleChange: ChangeHandler = (key, value) => {
     setFormData(prev => ({ ...prev, [key]: value }));
   };
 
@@ -119,8 +118,8 @@ export function ContributionEditorPage() {
         if (!response.ok) throw new Error("Failed to save entry.");
         toast({ title: "Entry Saved", status: "success", duration: 3000, isClosable: true });
         navigate('/contrib');
-    } catch (error: any) {
-        toast({ title: "Error", description: error.message, status: "error", duration: 5000, isClosable: true });
+    } catch (error: unknown) {
+        toast({ title: "Error", description: error instanceof Error ? error.message : String(error), status: "error", duration: 5000, isClosable: true });
     } finally {
         setIsSubmitting(false);
     }
@@ -144,12 +143,12 @@ export function ContributionEditorPage() {
         <GridItem as={VStack} spacing={6} align="stretch">
           {titleField && (
             <FormControl isRequired={titleField.attr.required}>
-              <Input value={formData[titleField.key] || ''} onChange={(e) => handleChange(titleField.key, e.target.value)} placeholder="Your post title..." variant="unstyled" fontSize="4xl" fontWeight="bold"/>
+              <Input value={String(formData[titleField.key] ?? '')} onChange={(e) => handleChange(titleField.key, e.target.value)} placeholder="Your post title..." variant="unstyled" fontSize="4xl" fontWeight="bold"/>
             </FormControl>
           )}
           {mainField && (
             <FormControl isRequired={mainField.attr.required}>
-              <Textarea value={formData[mainField.key] || ''} onChange={(e) => handleChange(mainField.key, e.target.value)} placeholder="Begin writing your content..." variant="unstyled" fontSize="lg" rows={20}/>
+              <Textarea value={String(formData[mainField.key] ?? '')} onChange={(e) => handleChange(mainField.key, e.target.value)} placeholder="Begin writing your content..." variant="unstyled" fontSize="lg" rows={20}/>
             </FormControl>
           )}
         </GridItem>

@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Text, VStack, ListItem, List, Spinner, useColorModeValue } from "@chakra-ui/react";
+import { Box, Text, ListItem, List, Spinner, useColorModeValue } from "@chakra-ui/react";
 import { Schema } from "../../../shared/types";
 
 interface CollectionSelectorProps {
@@ -20,6 +20,7 @@ export function CollectionSelector({
   const activeBg = useColorModeValue("purple.50", "purple.900");
   const activeColor = useColorModeValue("purple.700", "white");
   const hoverBg = useColorModeValue("gray.100", "gray.700");
+  const borderColor = useColorModeValue("gray.200", "gray.700");
 
   // It is now safe to return early for the loading state.
   if (isLoading) {
@@ -28,7 +29,7 @@ export function CollectionSelector({
             w="280px"
             bg={sidebarBg}
             borderRight="1px solid"
-            borderColor={useColorModeValue("gray.200", "gray.700")}
+            borderColor={borderColor}
             p={4}
         >
             <Text fontSize="lg" fontWeight="bold" mb={4}>
@@ -44,7 +45,7 @@ export function CollectionSelector({
       w="280px"
       bg={sidebarBg}
       borderRight="1px solid"
-      borderColor={useColorModeValue("gray.200", "gray.700")}
+      borderColor={borderColor}
       p={4}
     >
       <Text fontSize="lg" fontWeight="bold" mb={4}>

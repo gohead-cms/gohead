@@ -15,9 +15,9 @@ import {
   Switch,
   VStack,
 } from "@chakra-ui/react";
-import { Schema } from "../../../shared/types";
+import { Attribute, Schema } from "../../../shared/types";
 import { ContentItem } from "../hooks/useCollectionContent";
-import { MediaField } from "./MediaField";
+import { MediaField, MediaValue } from "./MediaField";
 import { toMediaRef } from "./mediaRef";
 
 interface EntryFormDrawerProps {
@@ -29,10 +29,10 @@ interface EntryFormDrawerProps {
 }
 
 // Helper function to render the correct form field based on attribute type
-const renderFormField = (key: string, attr: any, value: any, handleChange: any) => {
+const renderFormField = (key: string, attr: Attribute, value: unknown, handleChange: (key: string, value: unknown) => void) => {
   const commonProps = {
     id: key,
-    value: value || '',
+    value: typeof value === 'string' || typeof value === 'number' ? value : '',
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => handleChange(key, e.target.value),
   };
 
@@ -41,7 +41,7 @@ const renderFormField = (key: string, attr: any, value: any, handleChange: any) 
       return (
         <MediaField
           id={key}
-          value={value}
+          value={value as MediaValue | MediaValue[]}
           multiple={attr.multiple}
           accept={attr.allowed_types}
           onChange={(v) => handleChange(key, v)}
@@ -59,7 +59,7 @@ const renderFormField = (key: string, attr: any, value: any, handleChange: any) 
       return (
         <Switch
           id={key}
-          isChecked={value || false}
+          isChecked={value === true}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange(key, e.target.checked)}
         />
       );
@@ -93,7 +93,7 @@ export function EntryFormModal({ isOpen, onClose, schema, itemToEdit, onSubmit }
             }
             acc[key] = attr.type === 'boolean' ? false : '';
             return acc;
-        }, {} as any);
+        }, {} as Record<string, unknown>);
         setFormData(initialData);
       }
     }
@@ -106,7 +106,6 @@ export function EntryFormModal({ isOpen, onClose, schema, itemToEdit, onSubmit }
   const handleSubmit = async () => {
     setIsSubmitting(true);
 try {
-      // FIX: Wrap the form data in a 'data' object before submitting
       // Media fields hold uploaded files; the API wants their IDs. Empty
       // optional media fields are left out.
       const data: Record<string, unknown> = { ...formData };
@@ -117,7 +116,7 @@ try {
       });
       await onSubmit({ data: data as Partial<ContentItem> }, itemToEdit?.id);
       onClose();
-    } catch (error) {
+    } catch {
       // Parent component handles error toast
     } finally {
       setIsSubmitting(false);

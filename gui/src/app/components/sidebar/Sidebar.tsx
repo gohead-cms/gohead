@@ -1,4 +1,4 @@
-import React, { ReactNode } from "react";
+import React from "react";
 import {
   Box,
   Flex,
@@ -18,7 +18,6 @@ import {
 import {
   FiHome,
   FiDatabase,
-  FiCpu,
   FiSettings,
   FiMenu,
   FiGrid,
@@ -185,10 +184,14 @@ function NavItem({ icon, children, href, childrenItems, onNavItemClick }: { icon
     fontSize: "sm",
   };
 
+  // Hooks first, before any branch.
   const hoverStyles = {
     bg: useColorModeValue('gray.100', 'gray.700'),
     color: useColorModeValue('gray.900', 'white'),
   };
+  const activeBg = useColorModeValue('purple.50', 'purple.900');
+  const activeColor = useColorModeValue('purple.700', 'white');
+  const childBorder = useColorModeValue('gray.200', 'gray.700');
 
   if (childrenItems) {
     return (
@@ -197,8 +200,8 @@ function NavItem({ icon, children, href, childrenItems, onNavItemClick }: { icon
           {...commonStyles}
           onClick={handleLinkClick}
           justifyContent="space-between"
-          bg={isParentActive ? useColorModeValue('purple.50', 'purple.900') : 'transparent'}
-          color={isParentActive ? useColorModeValue('purple.700', 'white') : 'inherit'}
+          bg={isParentActive ? activeBg : 'transparent'}
+          color={isParentActive ? activeColor : 'inherit'}
           fontWeight={isParentActive ? 'semibold' : 'medium'}
           _hover={hoverStyles}
         >
@@ -213,7 +216,7 @@ function NavItem({ icon, children, href, childrenItems, onNavItemClick }: { icon
           />
         </Flex>
         <Collapse in={isOpen} animateOpacity style={{ marginTop: '0!' }}>
-          <Box pl={1} py={1} borderLeft="1px solid" borderColor={useColorModeValue('gray.200', 'gray.700')} ml={2} mr={4}>
+          <Box pl={1} py={1} borderLeft="1px solid" borderColor={childBorder} ml={2} mr={4}>
             {childrenItems.map((child) => (
               <NavItem
                 key={child.name}
@@ -239,8 +242,8 @@ function NavItem({ icon, children, href, childrenItems, onNavItemClick }: { icon
       _hover={hoverStyles}
       onClick={handleLinkClick}
       _activeLink={{
-        bg: useColorModeValue('purple.50', 'purple.900'),
-        color: useColorModeValue('purple.700', 'white'),
+        bg: activeBg,
+        color: activeColor,
         fontWeight: 'semibold',
       }}
     >

@@ -8,10 +8,10 @@ import {
 import { CollectionSelector, ContentTable, EntryFormModal } from ".";
 import { PageLoader } from "../../../shared/ui/page-loader";
 import { apiFetchWithAuth } from "../../../services/api";
+import { errorMessage } from "../../../shared/utils/errors";
 import { ContentItem } from "../hooks/useCollectionContent";
 import { useNavigate } from "react-router-dom";
 import { FaPenNib } from "react-icons/fa6";
-import { CiPen } from "react-icons/ci";
 
 export function ContributionsPage() {
   const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
@@ -58,10 +58,10 @@ export function ContributionsPage() {
       });
 
       await refetch();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "An error occurred.",
-        description: error.message,
+        description: errorMessage(error),
         status: "error",
         duration: 5000,
         isClosable: true,

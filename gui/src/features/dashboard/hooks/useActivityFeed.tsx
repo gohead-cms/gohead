@@ -50,7 +50,7 @@ export function useActivityFeed() {
         
         await new Promise(resolve => setTimeout(resolve, 800));
         setActivities(mockActivities);
-      } catch (err) {
+      } catch {
         setError("Failed to fetch activity feed");
       } finally {
         setIsLoading(false);

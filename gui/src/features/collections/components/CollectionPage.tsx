@@ -5,11 +5,12 @@ import {
 import { apiFetchWithAuth } from "../../../services/api";
 import CollectionSchema from "./CollectionSchema";
 import { PageLoader } from "../../../shared/ui/page-loader";
+import type { Schema } from "../../../shared/types";
 
 export function CollectionsPage() {
   const [collections, setCollections] = useState<{ name: string }[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
-  const [schema, setSchema] = useState<any | null>(null);
+  const [schema, setSchema] = useState<Schema | null>(null);
   const [loading, setLoading] = useState(true);
   const [schemaLoading, setSchemaLoading] = useState(false);
 
@@ -20,7 +21,7 @@ export function CollectionsPage() {
         if (!res.ok) throw new Error("Failed to fetch collections");
         const json = await res.json();
         const list = Array.isArray(json.data) ? json.data : [];
-        setCollections(list.map((c: any) => ({ name: c.schema.collectionName })));
+        setCollections(list.map((c: { schema: Schema }) => ({ name: c.schema.collectionName ?? "" })));
         setSelected(list.length ? list[0].schema.collectionName : null);
       })
       .finally(() => setLoading(false));
@@ -130,7 +131,7 @@ export function CollectionsPage() {
         {schemaLoading ? (
           <Spinner />
         ) : selected && schema ? (
-          <CollectionSchema collectionName={schema.collectionName} />
+          <CollectionSchema collectionName={schema.collectionName ?? selected} />
         ) : (
           <Text color="gray.400">Select a collection to view its schema</Text>
         )}

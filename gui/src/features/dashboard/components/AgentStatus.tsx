@@ -17,7 +17,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import {
-  FiCheckCircle,
   FiClock,
   FiAlertTriangle,
   FiActivity,

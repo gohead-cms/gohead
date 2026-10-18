@@ -47,7 +47,7 @@ export function useSystemHealth() {
         
         await new Promise(resolve => setTimeout(resolve, 700));
         setMetrics(mockMetrics);
-      } catch (err) {
+      } catch {
         setError("Failed to fetch system health");
       } finally {
         setIsLoading(false);

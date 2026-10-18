@@ -10,7 +10,6 @@ import {
   HStack,
 } from "@chakra-ui/react";
 import {
-  FiPlus,
   FiDatabase,
   FiCpu,
   FiUpload,

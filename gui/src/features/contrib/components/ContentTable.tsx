@@ -26,7 +26,7 @@ interface ContentTableProps {
 }
 
 // Function to get a displayable value from an item
-const getDisplayValue = (value: any): string => {
+const getDisplayValue = (value: unknown): string => {
     if (typeof value === 'object' && value !== null) {
         return JSON.stringify(value).substring(0, 30) + '...';
     }

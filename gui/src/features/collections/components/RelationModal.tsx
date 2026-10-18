@@ -10,7 +10,6 @@ import {
   Button,
   FormControl,
   FormLabel,
-  Input,
   Select, 
   HStack,
   Text,
@@ -27,8 +26,11 @@ type RelationModalProps = {
   onSave: (sourceId: string, targetId: string, relation: { type: string; label: string }) => void;
 };
 
+// Relation types accepted by the API.
+type RelationType = 'oneToOne' | 'oneToMany' | 'manyToMany';
+
 export function RelationModal({ isOpen, onClose, sourceNodeLabel, targetNodeLabel, allNodeLabels, onSave }: RelationModalProps) {
-  const [relationType, setRelationType] = useState<'one-to-one' | 'one-to-many' | 'many-to-one' | 'many-to-many'>('one-to-one');
+  const [relationType, setRelationType] = useState<RelationType>('oneToOne');
   const [relationLabel, setRelationLabel] = useState<string | null>(null);
 
   const handleSave = () => {
@@ -54,10 +56,10 @@ export function RelationModal({ isOpen, onClose, sourceNodeLabel, targetNodeLabe
 
           <FormControl id="relationType" mb={4}>
             <FormLabel>Relation Type</FormLabel>
-            <Select value={relationType} onChange={(e) => setRelationType(e.target.value as any)}>
+            <Select value={relationType} onChange={(e) => setRelationType(e.target.value as RelationType)}>
               <option value="oneToOne">One-to-One</option>
-              <option value="oneToMny">One-to-Many</option>
-              <option value="manyToMany">Many-to-One</option>
+              <option value="oneToMany">One-to-Many</option>
+              <option value="manyToMany">Many-to-Many</option>
             </Select>
           </FormControl>
           

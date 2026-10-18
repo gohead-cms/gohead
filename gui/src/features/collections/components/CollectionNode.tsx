@@ -2,7 +2,7 @@ import React from 'react';
 import { Handle, NodeProps, Position } from '@xyflow/react';
 import { Box, VStack, HStack, Text, Icon, Divider } from '@chakra-ui/react';
 import { FaDatabase, FaQuoteLeft, FaHashtag, FaToggleOn, FaLink, FaCalendarAlt, FaCheckSquare, FaImage } from 'react-icons/fa';
-import { CollectionNodeData, AttributeItem, CollectionNodeType } from '../../../shared/types';
+import { AttributeItem, CollectionNodeType } from '../../../shared/types';
 
 // Map attribute types to specific icons for a better visual representation
 const attributeIcons: Record<string, React.ElementType> = {

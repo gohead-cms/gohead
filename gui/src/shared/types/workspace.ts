@@ -1,5 +1,5 @@
 import { Node } from '@xyflow/react';
-import { AgentNodeData, AgentNodeType } from './agents';
+import { AgentNodeData } from './agents';
 
 export interface AttributeItem {
   name: string;
