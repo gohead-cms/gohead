@@ -22,7 +22,10 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version-file: go.mod
+          # Latest 1.25 patch: go.mod says 1.25.0, which would pin a toolchain
+          # with known (since fixed) standard-library vulnerabilities.
+          go-version: "1.25.x"
+          check-latest: true
 
       - name: Install Syft (SBOMs)
         uses: anchore/sbom-action/download-syft@v0
