@@ -28,6 +28,10 @@ type BaseAttribute struct {
 	// Component-specific fields
 	ComponentRef string `json:"component,omitempty"`  // Name of the referenced component if Type="component"
 	Repeatable   bool   `json:"repeatable,omitempty"` // Type="component": the value is a list of components
+
+	// Media-specific fields
+	Multiple     bool     `json:"multiple,omitempty"`                                       // Type="media": a list of files
+	AllowedTypes []string `gorm:"type:json;serializer:json" json:"allowed_types,omitempty"` // Type="media": MIME patterns, e.g. "image/*"
 }
 
 // Attribute defines the structure for fields in a collection, single type, or component.
@@ -50,6 +54,10 @@ type Attribute struct {
 	Relation     string `json:"relation,omitempty"`   // e.g., "oneToOne", "oneToMany", "manyToMany", for relationships
 	ComponentRef string `json:"component,omitempty"`  // If Type="component", which component is referenced
 	Repeatable   bool   `json:"repeatable,omitempty"` // Type="component": the value is a list of components
+
+	// Media-specific fields
+	Multiple     bool     `json:"multiple,omitempty"`                                       // Type="media": a list of files
+	AllowedTypes []string `gorm:"type:json;serializer:json" json:"allowed_types,omitempty"` // Type="media": MIME patterns, e.g. "image/*"
 
 	// Foreign keys (an attribute can belong to either a Collection, a SingleType, or a Component)
 	CollectionID *uint       `json:"collection_id,omitempty"`
@@ -83,12 +91,14 @@ func mapToBaseAttribute(data map[string]interface{}, attr *BaseAttribute) error 
 	attr.Relation = full.Relation
 	attr.ComponentRef = full.ComponentRef
 	attr.Repeatable = full.Repeatable
+	attr.Multiple = full.Multiple
+	attr.AllowedTypes = full.AllowedTypes
 	return nil
 }
 
-// toAttribute converts a component attribute so it can go through the same
+// ToAttribute converts a component attribute so it can go through the same
 // value validation as collection attributes.
-func (b BaseAttribute) toAttribute() Attribute {
+func (b BaseAttribute) ToAttribute() Attribute {
 	return Attribute{
 		Name:         b.Name,
 		Type:         b.Type,
@@ -99,6 +109,8 @@ func (b BaseAttribute) toAttribute() Attribute {
 		Pattern:      b.Pattern,
 		ComponentRef: b.ComponentRef,
 		Repeatable:   b.Repeatable,
+		Multiple:     b.Multiple,
+		AllowedTypes: b.AllowedTypes,
 	}
 }
 

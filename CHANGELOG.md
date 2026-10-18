@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+- **Media uploads**: `POST /api/media` (multipart, several files, atomic) stores files on local disk or in any S3-compatible bucket (AWS S3, MinIO, Cloudflare R2, Garage…), with a media library (`GET/PUT/DELETE /api/media/{id}`, list with `mime` and `search` filters). Types are detected from the content and checked against an allow-list (no SVG/HTML by default), sizes are limited (`media.max_size_mb`), and image dimensions, SHA-256 hash, alt text and caption are recorded.
+- `media` attributes reference uploaded files by ID (`multiple`, `allowed_types`, `min`/`max`) and are returned as file objects with their URL, including inside components, singletons and related items; GraphQL exposes them as `Media` objects. Existing URL values keep working.
+- Local files are served at `/uploads/<key>` with safe headers (`nosniff`, sandboxing CSP, attachments for non-media types) and range requests; S3 files use `media.public_url` (public bucket or CDN) or presigned URLs.
+- `docker-compose.yml` runs MinIO with a ready-to-use public bucket; the container image stores local uploads in `/data/uploads`.
+- Admin UI: upload fields for media attributes.
+
+## [0.3.0] - 2026-10-18
+
 ### Breaking changes
 - **One response shape for items.** Every item response (lists, single items, create, update, populated relations, singletons) is a flat object: the attributes at the top level next to `id`, `createdAt` and `updatedAt`. Single items, create/update responses and singletons used `{id, attributes}`, and create responses nested relations as `{data: {id}}`. Clients that read `data.attributes.x` must read `data.x`.
 - Attribute names `id`, `createdAt`, `updatedAt` and `publishedAt` are reserved for new and updated collections.

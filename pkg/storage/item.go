@@ -449,7 +449,7 @@ func PopulateRelations(collection models.Collection, data models.JSONMap, level 
 			result[attr.Name] = nestedItems
 		}
 	}
-	return result, nil
+	return PopulateMedia(context.Background(), collection.Attributes, result), nil
 }
 
 // fetchItemWithRelations returns the related item in the flat API shape, or
@@ -465,6 +465,10 @@ func fetchItemWithRelations(collection models.Collection, itemID uint, level uin
 	data, err := PopulateRelations(collection, item.Data, level, publishedOnly)
 	if err != nil {
 		return nil, err
+	}
+	if level == 0 {
+		// A related item is shown as an object, so its files are too.
+		data = PopulateMedia(context.Background(), collection.Attributes, data)
 	}
 	return models.ItemResponse(collection, *item, data), nil
 }

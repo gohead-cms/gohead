@@ -72,6 +72,11 @@ changes are broadcast to every replica, and rate limits are shared. The API keep
 without it (events are dropped with an error log, limits are counted per process), but agents
 will not run and you should keep a single API replica.
 
+### Media
+
+Uploads and file storage (local disk or S3-compatible) are configured under `media.*`; see
+[Media → Configuration](../guides/media.md#configuration).
+
 ### Rate limiting
 
 | Key | Env | Default |

@@ -17,6 +17,8 @@ import {
 } from "@chakra-ui/react";
 import { Schema } from "../../../shared/types";
 import { ContentItem } from "../hooks/useCollectionContent";
+import { MediaField } from "./MediaField";
+import { toMediaRef } from "./mediaRef";
 
 interface EntryFormDrawerProps {
   isOpen: boolean;
@@ -35,6 +37,16 @@ const renderFormField = (key: string, attr: any, value: any, handleChange: any) 
   };
 
   switch (attr.type) {
+    case 'media':
+      return (
+        <MediaField
+          id={key}
+          value={value}
+          multiple={attr.multiple}
+          accept={attr.allowed_types}
+          onChange={(v) => handleChange(key, v)}
+        />
+      );
     case 'text':
       return <Textarea {...commonProps} placeholder={`Enter ${key}`} />;
     case 'richtext':
@@ -75,6 +87,10 @@ export function EntryFormModal({ isOpen, onClose, schema, itemToEdit, onSubmit }
         // If creating, initialize a blank form
         const initialData = Object.entries(schema.attributes).reduce((acc, [key, attr]) => {
             if (attr.type === 'relation') return acc;
+            if (attr.type === 'media') {
+              if (attr.multiple) acc[key] = [];
+              return acc;
+            }
             acc[key] = attr.type === 'boolean' ? false : '';
             return acc;
         }, {} as any);
@@ -83,7 +99,7 @@ export function EntryFormModal({ isOpen, onClose, schema, itemToEdit, onSubmit }
     }
   }, [isOpen, schema, itemToEdit]);
 
-  const handleChange = (key: string, value: string | boolean) => {
+  const handleChange = (key: string, value: unknown) => {
     setFormData(prev => ({ ...prev, [key]: value }));
   };
 
@@ -91,7 +107,15 @@ export function EntryFormModal({ isOpen, onClose, schema, itemToEdit, onSubmit }
     setIsSubmitting(true);
 try {
       // FIX: Wrap the form data in a 'data' object before submitting
-      await onSubmit({ data: formData }, itemToEdit?.id);
+      // Media fields hold uploaded files; the API wants their IDs. Empty
+      // optional media fields are left out.
+      const data: Record<string, unknown> = { ...formData };
+      Object.entries(schema.attributes).forEach(([key, attr]) => {
+        if (attr.type !== 'media') return;
+        if (data[key] === null || data[key] === undefined || data[key] === '') delete data[key];
+        else data[key] = toMediaRef(data[key]);
+      });
+      await onSubmit({ data: data as Partial<ContentItem> }, itemToEdit?.id);
       onClose();
     } catch (error) {
       // Parent component handles error toast

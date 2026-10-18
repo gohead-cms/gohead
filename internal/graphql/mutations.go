@@ -135,6 +135,8 @@ func generateGraphQLInputType(collection models.Collection, partial bool) *graph
 			if attr.Relation == "manyToMany" {
 				gqlType = graphql.NewList(graphql.ID)
 			}
+		} else if attr.Type == "media" {
+			gqlType = mediaFieldInput(attr.Multiple)
 		} else if attr.Type == "component" {
 			in, err := componentFieldInput(models.BaseAttribute{
 				Type: "component", ComponentRef: attr.ComponentRef, Repeatable: attr.Repeatable,

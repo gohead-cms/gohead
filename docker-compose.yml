@@ -1,9 +1,11 @@
-# GoHead full stack: API, background workers, admin UI, PostgreSQL and Redis.
+# GoHead full stack: API, background workers, admin UI, PostgreSQL, Redis
+# and MinIO (S3-compatible storage for uploads).
 #
 #   docker compose up -d            # pull published images
 #   docker compose up -d --build    # build from this checkout
 #
 # API: http://localhost:8080   Admin UI: http://localhost:3000
+# Uploaded files: http://localhost:9000/gohead/…  MinIO console: http://localhost:9001
 # Set GOHEAD_JWT_SECRET (e.g. in a .env file) before exposing it anywhere.
 
 x-gohead-env: &gohead-env
@@ -11,6 +13,15 @@ x-gohead-env: &gohead-env
   GOHEAD_REDIS_ADDRESS: redis:6379
   GOHEAD_JWT_SECRET: ${GOHEAD_JWT_SECRET:-change-me-to-a-long-random-string-0123456789}
   GOHEAD_LOG_LEVEL: ${GOHEAD_LOG_LEVEL:-info}
+  # Uploads go to the MinIO bucket below; files are served from its public URL.
+  GOHEAD_MEDIA_DRIVER: s3
+  GOHEAD_MEDIA_S3_ENDPOINT: http://minio:9000
+  GOHEAD_MEDIA_S3_BUCKET: gohead
+  GOHEAD_MEDIA_S3_REGION: us-east-1
+  GOHEAD_MEDIA_S3_PATH_STYLE: "true"
+  GOHEAD_MEDIA_S3_ACCESS_KEY: ${MINIO_ROOT_USER:-gohead}
+  GOHEAD_MEDIA_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-gohead-minio-secret}
+  GOHEAD_MEDIA_PUBLIC_URL: ${GOHEAD_PUBLIC_MEDIA_URL:-http://localhost:9000/gohead}
   # Needed by agents that use OpenAI (or set api_key per agent).
   OPENAI_API_KEY: ${OPENAI_API_KEY:-}
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
@@ -33,6 +44,13 @@ services:
     command: ["start", "--config", "/app/config.yaml"]
     ports:
       - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-setup:
+        condition: service_completed_successfully
 
   worker:
     <<: *gohead
@@ -85,6 +103,42 @@ services:
       retries: 20
     restart: unless-stopped
 
+  minio:
+    image: minio/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-gohead}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-gohead-minio-secret}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  # Creates the bucket and makes its files publicly readable (like media
+  # URLs on a CDN). Runs once, then exits.
+  minio-setup:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-gohead}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-gohead-minio-secret}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" &&
+        mc mb --ignore-existing local/gohead &&
+        mc anonymous set download local/gohead
+
 volumes:
   postgres-data:
   redis-data:
+  minio-data:

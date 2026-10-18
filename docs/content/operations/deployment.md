@@ -18,6 +18,8 @@ You need PostgreSQL (recommended) or MySQL, and Redis if you use agents.
 - [ ] TLS terminated in front of the API and the admin UI
 - [ ] Admin account registered right after the first start
 - [ ] `GOHEAD_TRUSTED_PROXIES` set to your ingress/load balancer addresses
+- [ ] Media stored in S3-compatible storage (`GOHEAD_MEDIA_DRIVER=s3`), or on a persistent
+      volume at `GOHEAD_MEDIA_LOCAL_PATH` with a single API replica
 - [ ] Exactly one `scheduler` replica
 - [ ] Database backups scheduled
 
@@ -105,7 +107,7 @@ pinning `newTag`.
 - **API:** scales horizontally when every replica shares the same database, Redis and
   `GOHEAD_JWT_SECRET`. Collection changes are broadcast over Redis, so every replica rebuilds
   its GraphQL schema (missed messages are caught up within 30 s), and auth rate limits are
-  counted across replicas. Set `GOHEAD_TRUSTED_PROXIES` to your ingress's IPs/CIDRs so limits
+  counted across replicas. Store media in S3 so every replica serves the same files. Set `GOHEAD_TRUSTED_PROXIES` to your ingress's IPs/CIDRs so limits
   apply per user rather than per ingress pod. Without Redis, keep one API replica.
 - **SQLite** supports a single writer: use it only with one API replica and no separate
   workers on other hosts.
