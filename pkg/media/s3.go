@@ -30,8 +30,13 @@ func NewS3(ctx context.Context, cfg S3Config, publicURL string) (*S3, error) {
 	}
 	endpoint := cfg.Endpoint
 	useSSL := cfg.UseSSL
-	// Accept a full URL too ("https://s3.eu-west-1.amazonaws.com").
-	if u, err := url.Parse(endpoint); err == nil && u.Host != "" {
+	// Accept a full URL too ("https://s3.eu-west-1.amazonaws.com"); a bare
+	// "host:port" keeps UseSSL.
+	if strings.Contains(endpoint, "://") {
+		u, err := url.Parse(endpoint)
+		if err != nil || u.Host == "" {
+			return nil, fmt.Errorf("invalid media.s3.endpoint %q", cfg.Endpoint)
+		}
 		endpoint = u.Host
 		useSSL = u.Scheme == "https"
 	}

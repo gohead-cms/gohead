@@ -11,7 +11,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/database"
@@ -143,11 +145,16 @@ func cleanFileName(name string) string {
 		}
 		return r
 	}, name)
-	if name == "" || name == "." || name == "/" {
+	if name == "" || name == "." || name == ".." || name == "/" {
 		return "file"
 	}
 	if len(name) > 200 {
-		name = name[len(name)-200:]
+		// Keep the end (with the extension), cut on a character boundary.
+		start := len(name) - 200
+		for start < len(name) && !utf8.RuneStart(name[start]) {
+			start++
+		}
+		name = name[start:]
 	}
 	return name
 }
@@ -281,32 +288,141 @@ func UpdateMedia(id uint, info MediaInfo) (*models.Media, error) {
 }
 
 // DeleteMedia removes a media file and its content. Items that referenced
-// it then show null, like a deleted related item.
+// it then show null, like a deleted related item. The record goes first, so
+// a failure to delete the content leaves an orphan object (logged), never a
+// record pointing at nothing.
 func DeleteMedia(ctx context.Context, id uint) error {
 	m, err := GetMedia(id)
 	if err != nil {
 		return err
 	}
+	if err := database.DB.Unscoped().Delete(m).Error; err != nil {
+		return err
+	}
 	if mediaStore != nil {
-		if err := mediaStore.Delete(ctx, m.Key); err != nil {
-			return fmt.Errorf("cannot delete stored file: %w", err)
+		if err := mediaStore.Delete(context.WithoutCancel(ctx), m.Key); err != nil {
+			logger.Log.WithError(err).WithField("key", m.Key).Warn("Media record deleted but its stored file could not be removed")
 		}
 	}
-	return database.DB.Unscoped().Delete(m).Error
+	return nil
 }
 
 // ---------------------------------------------------------------- reads
 
-// mediaResolver turns stored media values into API objects, caching
-// lookups for the duration of one response.
+// componentCache keeps component definitions for media population, so
+// reading items does not query components every time. Local writes clear
+// it; other replicas see changes within componentCacheTTL.
+var componentCache = struct {
+	sync.Mutex
+	at     time.Time
+	byName map[string]*models.Component
+}{byName: map[string]*models.Component{}}
+
+const componentCacheTTL = 30 * time.Second
+
+// InvalidateComponentCache drops cached component definitions.
+func InvalidateComponentCache() {
+	componentCache.Lock()
+	componentCache.byName = map[string]*models.Component{}
+	componentCache.Unlock()
+}
+
+func cachedComponent(name string) *models.Component {
+	componentCache.Lock()
+	defer componentCache.Unlock()
+	if time.Since(componentCache.at) > componentCacheTTL {
+		componentCache.byName = map[string]*models.Component{}
+		componentCache.at = time.Now()
+	}
+	if c, ok := componentCache.byName[name]; ok {
+		return c
+	}
+	c, err := GetComponentByName(name)
+	if err != nil {
+		c = nil
+	}
+	componentCache.byName[name] = c
+	return c
+}
+
+// componentHasMedia reports whether a component (or one nested in it) has
+// media attributes.
+func componentHasMedia(name string, depth int) bool {
+	c := cachedComponent(name)
+	if c == nil || depth > 5 {
+		return false
+	}
+	for _, a := range c.Attributes {
+		if a.Type == "media" || (a.Type == "component" && componentHasMedia(a.ComponentRef, depth+1)) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasMediaFields reports whether population has anything to do.
+func hasMediaFields(attrs []models.Attribute) bool {
+	for _, a := range attrs {
+		if a.Type == "media" || (a.Type == "component" && componentHasMedia(a.ComponentRef, 1)) {
+			return true
+		}
+	}
+	return false
+}
+
+// mediaResolver turns stored media values into API objects. It loads all
+// the files a value set references with one query.
 type mediaResolver struct {
-	ctx        context.Context
-	media      map[uint]map[string]any
-	components map[string]*models.Component
+	ctx   context.Context
+	media map[uint]map[string]any // nil value: deleted file
 }
 
 func newMediaResolver(ctx context.Context) *mediaResolver {
-	return &mediaResolver{ctx: ctx, media: map[uint]map[string]any{}, components: map[string]*models.Component{}}
+	return &mediaResolver{ctx: ctx, media: map[uint]map[string]any{}}
+}
+
+// mediaID returns the file ID a stored value references (0 for URLs).
+func mediaID(v any) uint {
+	if s, ok := v.(string); ok && !isDigits(s) {
+		return 0
+	}
+	return models.ToUint(v)
+}
+
+func listOf(v any) []any {
+	switch t := v.(type) {
+	case []any:
+		return t
+	case []uint:
+		out := make([]any, len(t))
+		for i, id := range t {
+			out[i] = id
+		}
+		return out
+	}
+	return nil
+}
+
+// load fetches the files not loaded yet.
+func (r *mediaResolver) load(ids []uint) {
+	var missing []uint
+	for _, id := range ids {
+		if _, ok := r.media[id]; !ok && id != 0 {
+			missing = append(missing, id)
+			r.media[id] = nil
+		}
+	}
+	if len(missing) == 0 {
+		return
+	}
+	var files []models.Media
+	if err := database.DB.Where("id IN ?", missing).Find(&files).Error; err != nil {
+		logger.Log.WithError(err).Warn("Failed to load media")
+		return
+	}
+	for _, m := range files {
+		r.media[m.ID] = models.MediaResponse(m, MediaURL(r.ctx, m))
+	}
 }
 
 // value resolves one stored value: an ID becomes the media object (nil if
@@ -319,32 +435,23 @@ func (r *mediaResolver) value(v any) any {
 	if id == 0 {
 		return nil
 	}
-	if obj, ok := r.media[id]; ok {
+	r.load([]uint{id})
+	if obj := r.media[id]; obj != nil {
 		return obj
 	}
-	var obj map[string]any
-	if m, err := GetMedia(id); err == nil {
-		obj = models.MediaResponse(*m, MediaURL(r.ctx, *m))
-	}
-	r.media[id] = obj
-	if obj == nil {
-		return nil
-	}
-	return obj
+	return nil
 }
 
 func (r *mediaResolver) field(v any, multiple bool) any {
 	if !multiple {
 		return r.value(v)
 	}
-	list, ok := v.([]any)
-	if !ok {
-		if ids, isUints := v.([]uint); isUints {
-			for _, id := range ids {
-				list = append(list, id)
-			}
-		}
+	list := listOf(v)
+	ids := make([]uint, 0, len(list))
+	for _, el := range list {
+		ids = append(ids, mediaID(el))
 	}
+	r.load(ids)
 	out := []any{}
 	for _, el := range list {
 		if resolved := r.value(el); resolved != nil {
@@ -366,9 +473,9 @@ func isDigits(s string) bool {
 	return true
 }
 
-// populate replaces media values of attrs in data, descending into
-// components (up to the same depth limit as validation).
-func (r *mediaResolver) populate(attrs []models.Attribute, data map[string]any, depth int) map[string]any {
+// walk applies fn to every media value of attrs in data, descending into
+// components, and returns the data with fn's results.
+func (r *mediaResolver) walk(attrs []models.Attribute, data map[string]any, depth int, fn func(v any, multiple bool) any) map[string]any {
 	if depth > 5 || data == nil {
 		return data
 	}
@@ -383,12 +490,12 @@ func (r *mediaResolver) populate(attrs []models.Attribute, data map[string]any, 
 		}
 		switch attr.Type {
 		case "media":
-			out[attr.Name] = r.field(v, attr.Multiple)
+			out[attr.Name] = fn(v, attr.Multiple)
 		case "component":
-			cmp := r.component(attr.ComponentRef)
-			if cmp == nil {
+			if !componentHasMedia(attr.ComponentRef, 1) {
 				continue
 			}
+			cmp := cachedComponent(attr.ComponentRef)
 			sub := make([]models.Attribute, 0, len(cmp.Attributes))
 			for _, a := range cmp.Attributes {
 				sub = append(sub, a.ToAttribute())
@@ -398,40 +505,36 @@ func (r *mediaResolver) populate(attrs []models.Attribute, data map[string]any, 
 				nl := make([]any, 0, len(list))
 				for _, el := range list {
 					if obj, ok := el.(map[string]any); ok {
-						nl = append(nl, r.populate(sub, obj, depth+1))
+						nl = append(nl, r.walk(sub, obj, depth+1, fn))
 					} else {
 						nl = append(nl, el)
 					}
 				}
 				out[attr.Name] = nl
 			} else if obj, ok := v.(map[string]any); ok {
-				out[attr.Name] = r.populate(sub, obj, depth+1)
+				out[attr.Name] = r.walk(sub, obj, depth+1, fn)
 			}
 		}
 	}
 	return out
 }
 
-func (r *mediaResolver) component(name string) *models.Component {
-	if c, ok := r.components[name]; ok {
-		return c
-	}
-	c, err := GetComponentByName(name)
-	if err != nil {
-		c = nil
-	}
-	r.components[name] = c
-	return c
-}
-
-// hasMediaFields reports whether populate has anything to do.
-func hasMediaFields(attrs []models.Attribute) bool {
-	for _, a := range attrs {
-		if a.Type == "media" || a.Type == "component" {
-			return true
+// populate collects every referenced file, loads them in one query, then
+// replaces the values.
+func (r *mediaResolver) populate(attrs []models.Attribute, data map[string]any) map[string]any {
+	var ids []uint
+	r.walk(attrs, data, 0, func(v any, multiple bool) any {
+		if multiple {
+			for _, el := range listOf(v) {
+				ids = append(ids, mediaID(el))
+			}
+		} else {
+			ids = append(ids, mediaID(v))
 		}
-	}
-	return false
+		return v
+	})
+	r.load(ids)
+	return r.walk(attrs, data, 0, r.field)
 }
 
 // PopulateMedia replaces media IDs in an item's data (including inside
@@ -440,7 +543,7 @@ func PopulateMedia(ctx context.Context, attrs []models.Attribute, data models.JS
 	if !hasMediaFields(attrs) {
 		return data
 	}
-	return models.JSONMap(newMediaResolver(ctx).populate(attrs, data, 0))
+	return models.JSONMap(newMediaResolver(ctx).populate(attrs, data))
 }
 
 // ResolveMediaValue converts one stored media value (an ID, a list of IDs,

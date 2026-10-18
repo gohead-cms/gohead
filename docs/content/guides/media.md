@@ -56,10 +56,13 @@ your domain they can run scripts. Allow them explicitly only if you trust every 
 
 | Method | Path | Permission | Does |
 |--------|------|------------|------|
-| `GET` | `/api/media` | read | List files, newest first: `page`, `pageSize` (≤ 100), `mime=image/`, `search=cover` |
-| `GET` | `/api/media/{id}` | read | One file |
+| `GET` | `/api/media` | create | List files, newest first: `page`, `pageSize` (≤ 100), `mime=image/`, `search=cover` |
+| `GET` | `/api/media/{id}` | create | One file |
 | `PUT` | `/api/media/{id}` | update | Change `name`, `alt` or `caption`: `{"data": {"alt": "…"}}` |
 | `DELETE` | `/api/media/{id}` | delete | Delete the file and its content |
+
+Browsing the library needs the `create` permission (editors and admins): it includes files
+that only drafts use. Viewers reach files through the content that references them.
 
 Deleting a file that content still uses is allowed: those fields then read as `null` (or
 drop the file from a list), like a deleted related item.
@@ -103,8 +106,9 @@ related items are expanded too:
 
 !!! note "Existing URL values"
     Before uploads existed, `media` attributes held URLs. Any value that is not an ID is still
-    accepted as an external URL and returned as is, unless the attribute sets
-    `allowed_types` (then only uploaded files are accepted).
+    accepted as an external URL and returned as is in REST (and `unique` still applies to
+    them), unless the attribute sets `allowed_types` (then only uploaded files are accepted).
+    In GraphQL the field becomes a `Media` object: query `cover { url }` instead of `cover`.
 
 In GraphQL, media fields are `Media` objects (`id url name mime size width height alt caption`;
 a URL-only value has just `url`) and take file IDs as input:
@@ -127,6 +131,7 @@ mutation { createarticles(input: { title: "Summit", cover: "12" }) { cover { url
 | `media.s3.region` | `GOHEAD_MEDIA_S3_REGION` | |
 | `media.s3.bucket` | `GOHEAD_MEDIA_S3_BUCKET` | |
 | `media.s3.access_key` / `secret_key` | `GOHEAD_MEDIA_S3_ACCESS_KEY` / `_SECRET_KEY` | empty: `AWS_*` variables or the instance/pod role |
+| `media.s3.use_ssl` | `GOHEAD_MEDIA_S3_USE_SSL` | `true`; used when `endpoint` has no `http://`/`https://` |
 | `media.s3.path_style` | `GOHEAD_MEDIA_S3_PATH_STYLE` | `false`; `true` for MinIO and most self-hosted stores |
 | `media.s3.prefix` | `GOHEAD_MEDIA_S3_PREFIX` | key prefix, to share a bucket |
 | `media.s3.presign_expiry` | `GOHEAD_MEDIA_S3_PRESIGN_EXPIRY` | `1h` |
@@ -169,6 +174,10 @@ inline get `Content-Disposition: attachment`.
 
 The provided `docker-compose.yml` runs MinIO with a public `gohead` bucket, so uploads work
 out of the box at `http://localhost:9000/gohead/…`.
+
+!!! note "Changing driver"
+    Records keep their keys. To move from local disk to S3, copy the `uploads` directory
+    into the bucket (under `prefix`, if set) with the same paths before switching.
 
 !!! tip "Cloudflare R2 and others"
     R2: `endpoint: https://<account>.r2.cloudflarestorage.com`, `region: auto`. MinIO,

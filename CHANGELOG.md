@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Breaking changes
+- GraphQL: `media` attributes are now `Media` objects instead of strings. Query `cover { url }` instead of `cover`. REST still returns URL values as they were stored.
+
 ### Added
 - **Media uploads**: `POST /api/media` (multipart, several files, atomic) stores files on local disk or in any S3-compatible bucket (AWS S3, MinIO, Cloudflare R2, Garage…), with a media library (`GET/PUT/DELETE /api/media/{id}`, list with `mime` and `search` filters). Types are detected from the content and checked against an allow-list (no SVG/HTML by default), sizes are limited (`media.max_size_mb`), and image dimensions, SHA-256 hash, alt text and caption are recorded.
 - `media` attributes reference uploaded files by ID (`multiple`, `allowed_types`, `min`/`max`) and are returned as file objects with their URL, including inside components, singletons and related items; GraphQL exposes them as `Media` objects. Existing URL values keep working.

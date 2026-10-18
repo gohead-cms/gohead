@@ -109,9 +109,10 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-gohead}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-gohead-minio-secret}
+    # Published on localhost only: the root credentials above are defaults.
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     volumes:
       - minio-data:/data
     healthcheck:
@@ -121,8 +122,8 @@ services:
       retries: 20
     restart: unless-stopped
 
-  # Creates the bucket and makes its files publicly readable (like media
-  # URLs on a CDN). Runs once, then exits.
+  # Creates the bucket and lets anyone download a file whose URL they have
+  # (like media URLs on a CDN), without listing the bucket. Runs once.
   minio-setup:
     image: minio/mc:latest
     depends_on:
@@ -136,7 +137,8 @@ services:
       - >
         mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" &&
         mc mb --ignore-existing local/gohead &&
-        mc anonymous set download local/gohead
+        printf '%s' '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":["*"]},"Action":["s3:GetObject"],"Resource":["arn:aws:s3:::gohead/*"]}]}' > /tmp/policy.json &&
+        mc anonymous set-json /tmp/policy.json local/gohead
 
 volumes:
   postgres-data:

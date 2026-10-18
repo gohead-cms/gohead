@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/gohead-cms/gohead/internal/api/middleware"
 	"github.com/gohead-cms/gohead/pkg/auth"
@@ -157,6 +158,16 @@ func TestMediaUploads(t *testing.T) {
 
 		code, _ = a.upload("viewer", []upload{{"a.png", img}}, nil)
 		assert.Equal(t, http.StatusForbidden, code)
+		code, _ = a.do("viewer", "GET", "/api/media", nil)
+		assert.Equal(t, http.StatusForbidden, code, "viewers cannot browse the library (files of drafts)")
+		code, _ = a.do("viewer", "GET", fmt.Sprintf("/api/media/%d", id), nil)
+		assert.Equal(t, http.StatusForbidden, code)
+
+		long := strings.Repeat("€", 100) + ".png"
+		m := a.uploadOK(upload{long, img})[0]
+		name := m["name"].(string)
+		assert.True(t, utf8.ValidString(name), "long names are cut on a character boundary")
+		assert.True(t, strings.HasSuffix(name, ".png"))
 
 		code, out = a.upload("editor", nil, map[string]string{"alt": "x"})
 		assert.Equal(t, http.StatusBadRequest, code)
@@ -167,25 +178,25 @@ func TestMediaUploads(t *testing.T) {
 	})
 
 	t.Run("a batch is stored entirely or not at all", func(t *testing.T) {
-		before := len(a.ok("viewer", "GET", "/api/media?pageSize=100", nil).([]any))
+		before := len(a.ok("editor", "GET", "/api/media?pageSize=100", nil).([]any))
 		code, _ := a.upload("editor", []upload{{"ok.png", img}, {"bad.exe", []byte("MZ\x90\x00binary")}}, nil)
 		assert.Equal(t, http.StatusUnsupportedMediaType, code)
-		assert.Len(t, a.ok("viewer", "GET", "/api/media?pageSize=100", nil), before)
+		assert.Len(t, a.ok("editor", "GET", "/api/media?pageSize=100", nil), before)
 
 		two := a.uploadOK(upload{"one.png", img}, upload{"two.png", img})
 		assert.Len(t, two, 2)
 	})
 
 	t.Run("library: list, filter, update, delete", func(t *testing.T) {
-		images := a.ok("viewer", "GET", "/api/media?mime=image/", nil).([]any)
+		images := a.ok("editor", "GET", "/api/media?mime=image/", nil).([]any)
 		for _, it := range images {
 			assert.True(t, strings.HasPrefix(it.(map[string]any)["mime"].(string), "image/"))
 		}
-		found := a.ok("viewer", "GET", "/api/media?search=holiday", nil).([]any)
+		found := a.ok("editor", "GET", "/api/media?search=holiday", nil).([]any)
 		require.Len(t, found, 1)
 
 		path := fmt.Sprintf("/api/media/%d", id)
-		got := a.ok("viewer", "GET", path, nil).(map[string]any)
+		got := a.ok("editor", "GET", path, nil).(map[string]any)
 		assert.Equal(t, "Beach", got["alt"])
 		upd := a.ok("editor", "PUT", path, map[string]any{"data": map[string]any{"alt": "Sunny beach"}}).(map[string]any)
 		assert.Equal(t, "Sunny beach", upd["alt"])
@@ -201,7 +212,7 @@ func TestMediaUploads(t *testing.T) {
 		a.ok("editor", "DELETE", path, nil)
 		_, err = os.Stat(file)
 		assert.True(t, os.IsNotExist(err), "the stored file is removed")
-		code, _ = a.do("viewer", "GET", path, nil)
+		code, _ = a.do("editor", "GET", path, nil)
 		assert.Equal(t, http.StatusNotFound, code)
 	})
 }
@@ -291,6 +302,16 @@ func TestMediaAttributes(t *testing.T) {
 		files := got["files"].([]any)
 		require.Len(t, files, 1, "the deleted file is left out of the list")
 		assert.Equal(t, "image/png", files[0].(map[string]any)["mime"])
+	})
+
+	t.Run("unique still applies to URL values", func(t *testing.T) {
+		a.ok("admin", "POST", "/admin/collections", map[string]any{
+			"name": "links", "kind": "collection",
+			"attributes": map[string]any{"image": map[string]any{"type": "media", "unique": true}},
+		})
+		a.ok("editor", "POST", "/api/collections/links", map[string]any{"data": map[string]any{"image": "https://x.example/a.png"}})
+		code, _ := a.do("editor", "POST", "/api/collections/links", map[string]any{"data": map[string]any{"image": "https://x.example/a.png"}})
+		assert.Equal(t, http.StatusBadRequest, code)
 	})
 
 	t.Run("singletons", func(t *testing.T) {

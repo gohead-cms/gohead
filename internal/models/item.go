@@ -103,7 +103,10 @@ func validateItem(ct Collection, itemData map[string]any, tx *gorm.DB, excludeID
 			continue
 		}
 
-		if attribute.Unique && attribute.Type != "relation" && attribute.Type != "component" && attribute.Type != "media" {
+		_, isText := value.(string)
+		uniqueApplies := attribute.Type != "relation" && attribute.Type != "component" &&
+			(attribute.Type != "media" || isText) // URL values, as before uploads existed
+		if attribute.Unique && uniqueApplies {
 			if err := validation.CheckFieldUniqueness(tx, ct.ID, attribute.Name, value, excludeID); err != nil {
 				return nil, err
 			}

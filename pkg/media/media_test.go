@@ -170,6 +170,17 @@ func TestS3Store(t *testing.T) {
 	assert.ErrorIs(t, s.Put(ctx, "../x", strings.NewReader("x"), 1, ObjectMeta{}), ErrInvalidKey)
 }
 
+func TestS3BareEndpoint(t *testing.T) {
+	endpoint := fakeS3(t, "media")
+	host := strings.TrimPrefix(endpoint, "http://")
+	s, err := NewS3(context.Background(), S3Config{
+		Endpoint: host, Bucket: "media", AccessKey: "k", SecretKey: "s", PathStyle: true, UseSSL: false,
+	}, "")
+	require.NoError(t, err, "host:port uses UseSSL")
+	u, _ := s.URL(context.Background(), "a/b.png")
+	assert.True(t, strings.HasPrefix(u, "http://"+host+"/media/a/b.png"))
+}
+
 func TestS3StoreChecksTheBucket(t *testing.T) {
 	endpoint := fakeS3(t, "media")
 	_, err := NewS3(context.Background(), S3Config{

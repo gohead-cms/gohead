@@ -53,7 +53,7 @@ type LocalConfig struct {
 
 // S3Config configures the S3-compatible driver.
 type S3Config struct {
-	Endpoint  string // host[:port], e.g. "s3.amazonaws.com", "minio:9000"
+	Endpoint  string // URL ("https://s3.amazonaws.com") or host[:port] with UseSSL
 	Region    string
 	Bucket    string
 	AccessKey string

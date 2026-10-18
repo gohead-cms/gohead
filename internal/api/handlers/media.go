@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"mime"
@@ -90,8 +91,10 @@ func UploadMedia(c *gin.Context) {
 
 	saved := make([]*models.Media, 0, len(headers))
 	rollback := func() {
+		// The request may have been cancelled (client gone): clean up anyway.
+		ctx := context.WithoutCancel(c.Request.Context())
 		for _, m := range saved {
-			if err := storage.DeleteMedia(c.Request.Context(), m.ID); err != nil {
+			if err := storage.DeleteMedia(ctx, m.ID); err != nil {
 				logger.Log.WithError(err).WithField("media_id", m.ID).Warn("Failed to roll back upload")
 			}
 		}
@@ -136,9 +139,11 @@ func saveUploadedFile(c *gin.Context, fh *multipart.FileHeader, alt, caption str
 }
 
 // ListMedia lists the media library: page, pageSize, mime (type prefix such
-// as "image/") and search (file name). Requires the read permission.
+// as "image/") and search (file name). Browsing the library needs the
+// create permission: it includes files only drafts use, so readers only
+// reach files through the content that references them.
 func ListMedia(c *gin.Context) {
-	if !hasPermission(c.GetString("role"), "read") {
+	if !hasPermission(c.GetString("role"), "create") {
 		c.Set("response", "Access denied")
 		c.Set("status", http.StatusForbidden)
 		return
@@ -199,9 +204,10 @@ func mediaLookupError(c *gin.Context, err error) {
 	c.Set("status", http.StatusInternalServerError)
 }
 
-// GetMedia returns one media file. Requires the read permission.
+// GetMedia returns one media file. Requires the create permission, like
+// ListMedia.
 func GetMedia(c *gin.Context) {
-	if !hasPermission(c.GetString("role"), "read") {
+	if !hasPermission(c.GetString("role"), "create") {
 		c.Set("response", "Access denied")
 		c.Set("status", http.StatusForbidden)
 		return
@@ -257,6 +263,9 @@ func DeleteMedia(c *gin.Context) {
 		c.Set("response", "Access denied")
 		c.Set("status", http.StatusForbidden)
 		return
+	}
+	if mediaUnavailable(c) {
+		return // without a store the file itself could not be removed
 	}
 	id, ok := mediaID(c)
 	if !ok {
