@@ -48,7 +48,7 @@ func TestCheckFieldUniqueness(t *testing.T) {
 
 	// Seed the database with mock data
 	testDB.Exec(`INSERT INTO items (id, collection_id, data, deleted_at) VALUES
-		(1, 1, '{"field_name": "existing_value", "n": 5}', NULL),
+		(1, 1, '{"field_name": "existing_value", "n": 5, "big": 1000000, "small": 0.00001, "flag": true, "my-field": "x"}', NULL),
 		(2, 1, '{"field_name": "another_value"}', NULL),
 		(3, 1, '{"field_name": "deleted_value"}', '2026-01-01 00:00:00');`)
 
@@ -80,6 +80,14 @@ func TestCheckFieldUniqueness(t *testing.T) {
 	t.Run("Numbers compare by value", func(t *testing.T) {
 		assert.Error(t, CheckFieldUniqueness(nil, 1, "n", float64(5), 0))
 		assert.NoError(t, CheckFieldUniqueness(nil, 1, "n", 6, 0))
+		assert.Error(t, CheckFieldUniqueness(nil, 1, "big", float64(1000000), 0), "no exponent formatting")
+		assert.Error(t, CheckFieldUniqueness(nil, 1, "small", 0.00001, 0))
+	})
+
+	t.Run("Booleans and unusual names", func(t *testing.T) {
+		assert.Error(t, CheckFieldUniqueness(nil, 1, "flag", true, 0))
+		assert.NoError(t, CheckFieldUniqueness(nil, 1, "flag", false, 0))
+		assert.Error(t, CheckFieldUniqueness(nil, 1, "my-field", "x", 0))
 	})
 
 	t.Run("Error during validation - malformed JSON", func(t *testing.T) {

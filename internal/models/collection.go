@@ -26,6 +26,10 @@ type Collection struct {
 	// drafts and only published items are visible to readers.
 	DraftAndPublish bool        `json:"draft_and_publish" gorm:"not null;default:false"`
 	Attributes      []Attribute `json:"attributes" gorm:"constraint:OnDelete:CASCADE;"`
+
+	// DraftAndPublishSet records whether the input named the option, so an
+	// update that leaves it out keeps the current value.
+	DraftAndPublishSet bool `json:"-" gorm:"-"`
 }
 
 // ReservedAttributeNames are system fields included in every item response;
@@ -56,13 +60,22 @@ func ParseCollectionInput(input map[string]any) (Collection, error) {
 		collection.Description = description
 	}
 
-	for _, key := range []string{"draft_and_publish", "draftAndPublish"} {
-		if v, ok := input[key]; ok {
-			b, isBool := v.(bool)
-			if !isBool {
-				return collection, fmt.Errorf("field '%s' must be a boolean", key)
+	// Accept the option at the top level, or under "options" as the admin
+	// schema endpoints return it.
+	sources := []map[string]any{input}
+	if opts, ok := input["options"].(map[string]any); ok {
+		sources = append(sources, opts)
+	}
+	for _, src := range sources {
+		for _, key := range []string{"draft_and_publish", "draftAndPublish"} {
+			if v, ok := src[key]; ok {
+				b, isBool := v.(bool)
+				if !isBool {
+					return collection, fmt.Errorf("field '%s' must be a boolean", key)
+				}
+				collection.DraftAndPublish = b
+				collection.DraftAndPublishSet = true
 			}
-			collection.DraftAndPublish = b
 		}
 	}
 

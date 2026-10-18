@@ -122,9 +122,17 @@ func UpdateItemContent(collection models.Collection, itemID uint, data models.JS
 		if err != nil {
 			return &ItemValidationError{Err: err}
 		}
-		item.Data = processed
-		transition = applyPublish(&item, publish)
-		return tx.Save(&item).Error
+		// Write only what this request changes, so a concurrent publish or
+		// unpublish of the same item is not overwritten.
+		if err := tx.Model(&item).Updates(map[string]any{"data": processed}).Error; err != nil {
+			return err
+		}
+		if publish != nil {
+			if transition, err = setPublishedTx(tx, &item, *publish); err != nil {
+				return err
+			}
+		}
+		return reloadItem(tx, &item)
 	})
 	if txErr != nil {
 		return nil, txErr
@@ -143,38 +151,50 @@ func SetItemPublished(collection models.Collection, itemID uint, publish bool) (
 		return nil, ErrDraftAndPublishDisabled
 	}
 	var item models.Item
-	if err := database.DB.Where("id = ? AND collection_id = ?", itemID, collection.ID).First(&item).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrItemNotFound
+	var transition events.EventType
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("id = ? AND collection_id = ?", itemID, collection.ID).First(&item).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrItemNotFound
+			}
+			return err
 		}
+		var err error
+		if transition, err = setPublishedTx(tx, &item, publish); err != nil {
+			return err
+		}
+		return reloadItem(tx, &item)
+	})
+	if err != nil {
 		return nil, err
 	}
-	transition := applyPublish(&item, &publish)
-	if transition == "" {
-		return &item, nil
+	if transition != "" {
+		publishEvent(database.DB, transition, &item)
 	}
-	if err := database.DB.Model(&item).Update("published_at", item.PublishedAt).Error; err != nil {
-		return nil, fmt.Errorf("failed to update item: %w", err)
-	}
-	publishEvent(database.DB, transition, &item)
 	return &item, nil
 }
 
-// applyPublish sets item.PublishedAt according to publish and returns the
-// event to emit, if the state changed.
-func applyPublish(item *models.Item, publish *bool) events.EventType {
-	switch {
-	case publish == nil:
-		return ""
-	case *publish && item.PublishedAt == nil:
-		now := models.APITime(time.Now())
-		item.PublishedAt = &now
-		return events.EventTypeItemPublished
-	case !*publish && item.PublishedAt != nil:
-		item.PublishedAt = nil
-		return events.EventTypeItemUnpublished
+// setPublishedTx changes the publication state with a conditional update,
+// so that of two concurrent requests only the one that actually changes
+// the state reports a transition (and emits the event).
+func setPublishedTx(tx *gorm.DB, item *models.Item, publish bool) (events.EventType, error) {
+	q := tx.Model(&models.Item{}).Where("id = ?", item.ID)
+	var res *gorm.DB
+	var event events.EventType
+	if publish {
+		res = q.Where("published_at IS NULL").Update("published_at", models.APITime(time.Now()))
+		event = events.EventTypeItemPublished
+	} else {
+		res = q.Where("published_at IS NOT NULL").Update("published_at", nil)
+		event = events.EventTypeItemUnpublished
 	}
-	return ""
+	if res.Error != nil {
+		return "", fmt.Errorf("failed to update item: %w", res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return "", nil
+	}
+	return event, nil
 }
 
 func publishEvent(db *gorm.DB, eventType events.EventType, item *models.Item) {
@@ -366,6 +386,9 @@ func FetchNestedRelations(collection models.Collection, data models.JSONMap, lev
 // related items that no longer exist.
 func PopulateRelations(collection models.Collection, data models.JSONMap, level uint, publishedOnly bool) (models.JSONMap, error) {
 	if level == 0 {
+		if publishedOnly {
+			return hideDraftIDs(collection, data)
+		}
 		return data, nil
 	}
 	// We'll mutate a copy
@@ -444,4 +467,67 @@ func fetchItemWithRelations(collection models.Collection, itemID uint, level uin
 		return nil, err
 	}
 	return models.ItemResponse(collection, *item, data), nil
+}
+
+// hideDraftIDs removes, from unpopulated relation values, the IDs of drafts
+// (and of items that no longer exist) in draft-and-publish targets, so even
+// IDs of hidden items do not reach readers.
+func hideDraftIDs(collection models.Collection, data models.JSONMap) (models.JSONMap, error) {
+	result := make(models.JSONMap, len(data))
+	maps.Copy(result, data)
+	for _, attr := range collection.Attributes {
+		raw, exists := data[attr.Name]
+		if attr.Type != "relation" || !exists || raw == nil {
+			continue
+		}
+		var target models.Collection
+		if err := database.DB.Where("name = ?", attr.Target).First(&target).Error; err != nil {
+			return nil, fmt.Errorf("failed to fetch target collection '%s': %w", attr.Target, err)
+		}
+		if !target.DraftAndPublish {
+			continue
+		}
+		ids := models.ToUintSlice(raw)
+		if attr.Relation != "manyToMany" {
+			ids = nil
+			if id := models.ToUint(raw); id != 0 {
+				ids = []uint{id}
+			}
+		}
+		var visible []uint
+		if len(ids) > 0 {
+			if err := database.DB.Model(&models.Item{}).
+				Where("collection_id = ? AND id IN ? AND published_at IS NOT NULL", target.ID, ids).
+				Pluck("id", &visible).Error; err != nil {
+				return nil, err
+			}
+		}
+		keep := make(map[uint]bool, len(visible))
+		for _, id := range visible {
+			keep[id] = true
+		}
+		if attr.Relation == "manyToMany" {
+			out := []uint{}
+			for _, id := range ids {
+				if keep[id] {
+					out = append(out, id)
+				}
+			}
+			result[attr.Name] = out
+		} else if len(ids) == 0 || !keep[ids[0]] {
+			result[attr.Name] = nil
+		}
+	}
+	return result, nil
+}
+
+// reloadItem re-reads an item into a fresh struct, so columns set to NULL
+// (such as published_at after unpublishing) are not left at old values.
+func reloadItem(tx *gorm.DB, item *models.Item) error {
+	var fresh models.Item
+	if err := tx.First(&fresh, item.ID).Error; err != nil {
+		return err
+	}
+	*item = fresh
+	return nil
 }

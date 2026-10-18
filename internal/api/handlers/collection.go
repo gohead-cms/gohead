@@ -186,19 +186,23 @@ func UpdateCollection(c *gin.Context) {
 		return
 	}
 
-	if err := models.ValidateCollectionSchema(collection); err != nil {
-		logger.Log.WithError(err).Warn("UpdateCollection: Validation failed")
-		c.Set("response", err.Error())
-		c.Set("status", http.StatusBadRequest)
-		return
-	}
-
 	// Fetch the existing collection by name
 	existing, err := storage.GetCollectionByName(name)
 	if err != nil {
 		logger.Log.WithError(err).Warn("UpdateCollection: Collection not found")
 		c.Set("response", "Collection not found")
 		c.Set("status", http.StatusNotFound)
+		return
+	}
+	// Leaving the option out keeps the current setting (and its reserved names).
+	if !collection.DraftAndPublishSet {
+		collection.DraftAndPublish = existing.DraftAndPublish
+	}
+
+	if err := models.ValidateCollectionSchema(collection); err != nil {
+		logger.Log.WithError(err).Warn("UpdateCollection: Validation failed")
+		c.Set("response", err.Error())
+		c.Set("status", http.StatusBadRequest)
 		return
 	}
 

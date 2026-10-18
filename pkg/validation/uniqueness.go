@@ -2,13 +2,21 @@
 package validation
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
 
 	"gorm.io/gorm"
 )
+
+// JSONPath returns the SQLite/MySQL JSON path of a top-level key. The key is
+// quoted, so names with dots, dashes or spaces address the right member.
+func JSONPath(key string) string {
+	return `$."` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(key) + `"`
+}
 
 // CheckFieldUniqueness checks that no other live item of the collection has
 // the same value for fieldName. excludeID (the item being updated, or 0) is
@@ -17,20 +25,29 @@ func CheckFieldUniqueness(tx *gorm.DB, collectionID uint, fieldName string, valu
 	if tx == nil {
 		tx = database.DB
 	}
+	// Compare typed JSON values, so numbers match by value (1e6 = 1000000)
+	// and strings never match numbers.
 	var expr string
-	var path any
+	var args []any
 	switch tx.Dialector.Name() {
 	case "mysql":
-		expr, path = "JSON_UNQUOTE(JSON_EXTRACT(data, ?)) = ?", "$."+fieldName
+		expr, args = "JSON_EXTRACT(data, ?) = CAST(? AS JSON)", []any{JSONPath(fieldName), jsonText(value)}
 	case "postgres":
-		expr, path = "data->>CAST(? AS TEXT) = ?", fieldName
-	default: // sqlite
-		expr, path = "CAST(json_extract(data, ?) AS TEXT) = ?", "$."+fieldName
+		expr, args = "(CAST(data AS JSONB) -> CAST(? AS TEXT)) = CAST(? AS JSONB)", []any{fieldName, jsonText(value)}
+	default: // sqlite: json_extract returns SQL values (true/false as 1/0)
+		v := value
+		if b, ok := value.(bool); ok {
+			v = 0
+			if b {
+				v = 1
+			}
+		}
+		expr, args = "json_extract(data, ?) = ?", []any{JSONPath(fieldName), v}
 	}
 
 	q := tx.Table("items").
 		Where("collection_id = ? AND deleted_at IS NULL", collectionID).
-		Where(expr, path, fmt.Sprintf("%v", value))
+		Where(expr, args...)
 	if excludeID != 0 {
 		q = q.Where("id <> ?", excludeID)
 	}
@@ -44,4 +61,13 @@ func CheckFieldUniqueness(tx *gorm.DB, collectionID uint, fieldName string, valu
 		return fmt.Errorf("value for field '%s' must be unique", fieldName)
 	}
 	return nil
+}
+
+// jsonText encodes value as a JSON literal.
+func jsonText(value any) string {
+	b, err := json.Marshal(value)
+	if err != nil {
+		return fmt.Sprintf("%q", fmt.Sprint(value))
+	}
+	return string(b)
 }

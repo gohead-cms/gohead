@@ -77,6 +77,8 @@ mutation Launch($id: ID!) {
 - Writes go through the same validation, nested-relation handling and events as REST,
   so agents react to GraphQL writes too.
 - Relation inputs take IDs (`author: "1"`; a list of IDs for manyToMany).
+- `date` and `datetime` attributes are strings (`"2026-10-18"`, `"2026-10-18T09:00:00Z"`),
+  as in REST.
 - Dynamic-zone attributes are not supported yet.
 
 ## Errors

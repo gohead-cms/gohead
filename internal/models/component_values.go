@@ -57,6 +57,9 @@ func validateComponentValue(attr Attribute, value any, tx *gorm.DB, depth int) (
 	if !ok {
 		return nil, fmt.Errorf("expected an array of '%s' components", cmp.Name)
 	}
+	if attr.Required && len(list) == 0 {
+		return nil, fmt.Errorf("at least one '%s' component is required", cmp.Name)
+	}
 	if attr.Min != nil && len(list) < *attr.Min {
 		return nil, fmt.Errorf("at least %d '%s' components are required", *attr.Min, cmp.Name)
 	}

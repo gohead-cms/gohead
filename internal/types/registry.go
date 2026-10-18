@@ -19,8 +19,8 @@ var TypeRegistry = map[string]graphql.Output{
 	"decimal":     graphql.Float,
 	"bool":        graphql.Boolean,
 	"boolean":     graphql.Boolean,
-	"date":        graphql.DateTime,
-	"datetime":    graphql.DateTime,
+	"date":        graphql.String, // stored as "YYYY-MM-DD" strings
+	"datetime":    graphql.String, // stored as RFC 3339 strings
 	"time":        graphql.String,
 	"json":        graphql.String,
 	"enum":        graphql.String,

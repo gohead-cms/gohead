@@ -234,8 +234,14 @@ func UpdateCollection(id uint, updated *models.Collection) error {
 	// Update the basic attributes of the collection
 	existing.Name = updated.Name
 	existing.Description = updated.Description
-	enablingDrafts := updated.DraftAndPublish && !existing.DraftAndPublish
-	existing.DraftAndPublish = updated.DraftAndPublish
+	// An update that does not name the option keeps it as it is.
+	wantDrafts := existing.DraftAndPublish
+	if updated.DraftAndPublishSet {
+		wantDrafts = updated.DraftAndPublish
+	}
+	enablingDrafts := wantDrafts && !existing.DraftAndPublish
+	disablingDrafts := !wantDrafts && existing.DraftAndPublish
+	existing.DraftAndPublish = wantDrafts
 
 	// Start a transaction for updating associated attributes and relationships
 	tx := database.DB.Begin()
@@ -254,9 +260,11 @@ func UpdateCollection(id uint, updated *models.Collection) error {
 		return fmt.Errorf("failed to update fields: %w", err)
 	}
 
-	// Items created while draft and publish was off were visible to
-	// everyone: keep them visible by publishing them.
-	if enablingDrafts {
+	// Without draft and publish every item is visible, so drafts become
+	// published when the option is turned off, and items created while it
+	// was off are published when it is turned on again. Either way,
+	// published_at IS NULL always means "a draft readers cannot see".
+	if enablingDrafts || disablingDrafts {
 		if err := tx.Model(&models.Item{}).
 			Where("collection_id = ? AND published_at IS NULL", existing.ID).
 			Update("published_at", models.APITime(time.Now())).Error; err != nil {

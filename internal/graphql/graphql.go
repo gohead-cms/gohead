@@ -122,6 +122,7 @@ func GenerateGraphQLQueries() (*graphql.Object, error) {
 			},
 			Resolve: func(p graphql.ResolveParams) (any, error) {
 				logger.Log.WithField("collection", coll.Name).Debug("Resolver triggered")
+				coll := currentCollection(coll)
 				if err := requirePermission(p, auth.ActionRead); err != nil {
 					return nil, err
 				}
@@ -196,6 +197,16 @@ func GenerateGraphQLQueries() (*graphql.Object, error) {
 		Name:   "Query",
 		Fields: fields,
 	}), nil
+}
+
+// currentCollection reloads a collection captured when the schema was
+// built, so settings such as draft and publish apply immediately, even
+// before this replica has rebuilt its schema.
+func currentCollection(c models.Collection) models.Collection {
+	if fresh, err := storage.GetCollectionByName(c.Name); err == nil {
+		return *fresh
+	}
+	return c
 }
 
 // publishedOnlyKey is a hidden key in result maps telling relation

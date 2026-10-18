@@ -20,7 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 - One-to-many relations were missing from single-item and create responses.
-- Updating an item with a `unique` attribute failed when the value did not change; soft-deleted items no longer block unique values.
+- GraphQL: `date`/`datetime` attributes are strings, as stored (they were declared `DateTime`, so values read back as `null` and plain dates were rejected).
+- Updating an item with a `unique` attribute failed when the value did not change; soft-deleted items no longer block unique values; numbers are compared by value (`1000000` was not seen as a duplicate of `1e+06`), and names with dots or dashes work on MySQL/SQLite.
 - REST `PUT` did not emit `item:updated`.
 - Relations nested deeper than one level were not populated, and a deleted related item made the whole read fail.
 - Viewers could write singleton content; singleton writes now need the `update` permission.

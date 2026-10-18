@@ -211,6 +211,7 @@ func statusArg(p graphql.ResolveParams) (*bool, error) {
 }
 
 func createCollectionItem(p graphql.ResolveParams, inputData map[string]any, collection models.Collection) (any, error) {
+	collection = currentCollection(collection)
 	if err := requirePermission(p, auth.ActionCreate); err != nil {
 		return nil, err
 	}
@@ -234,6 +235,7 @@ func createCollectionItem(p graphql.ResolveParams, inputData map[string]any, col
 }
 
 func updateCollectionItem(p graphql.ResolveParams, id string, inputData map[string]any, collection models.Collection) (any, error) {
+	collection = currentCollection(collection)
 	if err := requirePermission(p, auth.ActionUpdate); err != nil {
 		return nil, err
 	}
@@ -272,6 +274,7 @@ func updateCollectionItem(p graphql.ResolveParams, id string, inputData map[stri
 }
 
 func setPublished(p graphql.ResolveParams, collection models.Collection, publish bool) (any, error) {
+	collection = currentCollection(collection)
 	if err := requirePermission(p, auth.ActionUpdate); err != nil {
 		return nil, err
 	}

@@ -32,6 +32,7 @@ func TestGraphQLComponentsAndDrafts(t *testing.T) {
 		Attributes: []models.ComponentAttribute{
 			{BaseAttribute: models.BaseAttribute{Name: "metaTitle", Type: "string", Required: true}},
 			{BaseAttribute: models.BaseAttribute{Name: "priority", Type: "int"}},
+			{BaseAttribute: models.BaseAttribute{Name: "reviewed", Type: "date"}},
 		},
 	}))
 	authors := models.Collection{Name: "authors", Kind: "collection", DraftAndPublish: true,
@@ -55,13 +56,13 @@ func TestGraphQLComponentsAndDrafts(t *testing.T) {
 	post := gqlData(t, "editor", fmt.Sprintf(`mutation {
 		createposts(status: "published", input: {
 			title: "Hello", author: "%v",
-			seo: {metaTitle: "Hi", priority: 2},
+			seo: {metaTitle: "Hi", priority: 2, reviewed: "2026-10-01"},
 			faq: [{metaTitle: "Q1"}, {metaTitle: "Q2"}]
-		}) { id status publishedAt seo { metaTitle priority } faq { metaTitle } }
+		}) { id status publishedAt seo { metaTitle priority reviewed } faq { metaTitle } }
 	}`, authorID))["createposts"].(map[string]any)
 	assert.Equal(t, "published", post["status"])
 	assert.NotNil(t, post["publishedAt"])
-	assert.Equal(t, map[string]any{"metaTitle": "Hi", "priority": 2}, post["seo"])
+	assert.Equal(t, map[string]any{"metaTitle": "Hi", "priority": 2, "reviewed": "2026-10-01"}, post["seo"])
 	assert.Len(t, post["faq"], 2)
 
 	// Invalid component values are rejected by the same validation as REST.

@@ -6,6 +6,7 @@ import (
 
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/database"
+	"github.com/gohead-cms/gohead/pkg/validation"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -139,19 +140,19 @@ func jsonValueExpr(dialect string, f resolvedField) (string, any) {
 	case "mysql":
 		switch f.kind {
 		case "number":
-			return "CAST(JSON_UNQUOTE(JSON_EXTRACT(data, ?)) AS DECIMAL(65,10))", "$." + f.path
+			return "CAST(JSON_UNQUOTE(JSON_EXTRACT(data, ?)) AS DECIMAL(65,10))", validation.JSONPath(f.path)
 		default:
-			return "JSON_UNQUOTE(JSON_EXTRACT(data, ?))", "$." + f.path
+			return "JSON_UNQUOTE(JSON_EXTRACT(data, ?))", validation.JSONPath(f.path)
 		}
 	default: // sqlite
 		switch f.kind {
 		case "number":
-			return "CAST(json_extract(data, ?) AS REAL)", "$." + f.path
+			return "CAST(json_extract(data, ?) AS REAL)", validation.JSONPath(f.path)
 		case "bool":
 			// SQLite stores JSON booleans as 1/0.
-			return "json_extract(data, ?)", "$." + f.path
+			return "json_extract(data, ?)", validation.JSONPath(f.path)
 		default:
-			return "CAST(json_extract(data, ?) AS TEXT)", "$." + f.path
+			return "CAST(json_extract(data, ?) AS TEXT)", validation.JSONPath(f.path)
 		}
 	}
 }

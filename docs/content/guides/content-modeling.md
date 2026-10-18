@@ -183,7 +183,12 @@ An item has a single version: editing a published item changes what readers see 
 away. To prepare changes privately, unpublish first, or keep drafts in a separate item.
 
 Turning the option on for an existing collection publishes its existing items, so nothing
-disappears. Turning it off makes every item visible again.
+disappears. Turning it off makes every item visible again (drafts become published). An
+update that does not mention `draft_and_publish` keeps the current setting; the option is
+also accepted as `options.draftAndPublish`, the shape `GET /admin/collections/{name}` returns.
+
+Items created inline through a [nested relation](#relations) are drafts too: publish them
+separately, or readers will see the relation as empty.
 
 ## Naming tips
 

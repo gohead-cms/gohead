@@ -265,6 +265,10 @@ func TestDraftAndPublish(t *testing.T) {
 		pagePath = fmt.Sprintf("/api/collections/pages/%d", int(page["id"].(float64)))
 		got := a.ok("viewer", "GET", pagePath, nil).(map[string]any)
 		assert.Nil(t, got["featured"], "viewer does not see the draft")
+		raw := a.ok("viewer", "GET", pagePath+"?level=0", nil).(map[string]any)
+		assert.Nil(t, raw["featured"], "not even the draft's ID reaches viewers")
+		raw = a.ok("editor", "GET", pagePath+"?level=0", nil).(map[string]any)
+		assert.Equal(t, draftID, raw["featured"])
 		got = a.ok("editor", "GET", pagePath, nil).(map[string]any)
 		require.NotNil(t, got["featured"], "editor fetching by ID sees it")
 		assert.Equal(t, "draft", got["featured"].(map[string]any)["status"])
@@ -303,6 +307,29 @@ func TestEnablingDraftAndPublishKeepsItemsVisible(t *testing.T) {
 
 	d := a.ok("editor", "POST", "/api/collections/news", map[string]any{"data": map[string]any{"title": "New"}}).(map[string]any)
 	assert.Equal(t, "draft", d["status"])
+
+	t.Run("updates that leave the option out keep it", func(t *testing.T) {
+		delete(def, "draft_and_publish")
+		def["attributes"] = map[string]any{"title": map[string]any{"type": "string"}, "body": map[string]any{"type": "text"}}
+		a.ok("admin", "PUT", "/admin/collections/news", def)
+		assert.Len(t, a.ok("viewer", "GET", "/api/collections/news", nil), 1, "the draft stays hidden")
+
+		// The shape GET /admin/collections returns is accepted too.
+		def["options"] = map[string]any{"draftAndPublish": true}
+		a.ok("admin", "PUT", "/admin/collections/news", def)
+		assert.Len(t, a.ok("viewer", "GET", "/api/collections/news", nil), 1)
+		delete(def, "options")
+	})
+
+	t.Run("turning the option off publishes drafts", func(t *testing.T) {
+		def["draft_and_publish"] = false
+		a.ok("admin", "PUT", "/admin/collections/news", def)
+		assert.Len(t, a.ok("viewer", "GET", "/api/collections/news", nil), 2)
+		def["draft_and_publish"] = true
+		a.ok("admin", "PUT", "/admin/collections/news", def)
+		list := a.ok("viewer", "GET", "/api/collections/news", nil).([]any)
+		assert.Len(t, list, 2, "what was visible stays visible")
+	})
 
 	t.Run("status becomes a reserved name", func(t *testing.T) {
 		def["attributes"] = map[string]any{"status": map[string]any{"type": "string"}}
