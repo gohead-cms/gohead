@@ -215,7 +215,7 @@ func validateAttributeValue(attribute Attribute, value any) error {
 
 	// 2) Proceed with domain-specific validation logic:
 	switch attribute.Type {
-	case "string", "text", "richtext", "email":
+	case "string", "text", "richtext", "email", "password":
 		strValue, err := convertToType(value, "text")
 		if err != nil {
 			return err
@@ -231,7 +231,7 @@ func validateAttributeValue(attribute Attribute, value any) error {
 			}
 		}
 
-	case "int":
+	case "int", "integer":
 		intValue, err := convertToType(value, "int")
 		if err != nil {
 			return err
@@ -257,7 +257,11 @@ func validateAttributeValue(attribute Attribute, value any) error {
 		if _, err := convertToType(value, "datetime"); err != nil {
 			return err
 		}
-	case "enum":
+	case "float", "decimal":
+		if _, err := convertToType(value, "float"); err != nil {
+			return err
+		}
+	case "enum", "enumeration":
 		strValue, err := convertToType(value, "text")
 		if err != nil {
 			return err

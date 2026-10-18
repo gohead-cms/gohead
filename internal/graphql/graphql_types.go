@@ -53,7 +53,8 @@ func ConvertCollectionToGraphQLType(collection models.Collection) (*graphql.Obje
 						continue
 					}
 					gqlFieldType = targetType
-					if localAttr.Relation == "oneToMany" || localAttr.Relation == "manyToMany" {
+					// Matches storage: only manyToMany holds a list of IDs.
+					if localAttr.Relation == "manyToMany" {
 						gqlFieldType = graphql.NewList(targetType)
 					}
 					resolveFunc = func(p graphql.ResolveParams) (any, error) {

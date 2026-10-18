@@ -31,7 +31,7 @@ func TestResolveRelation(t *testing.T) {
 	require.NoError(t, db.Create(&jane).Error)
 
 	oneToOne := models.Attribute{Name: "author", Type: "relation", Target: "authors", Relation: "oneToOne"}
-	oneToMany := models.Attribute{Name: "authors", Type: "relation", Target: "authors", Relation: "oneToMany"}
+	manyToMany := models.Attribute{Name: "authors", Type: "relation", Target: "authors", Relation: "manyToMany"}
 
 	t.Run("one-to-one", func(t *testing.T) {
 		p := graphql.ResolveParams{Source: map[string]any{"author": float64(john.ID)}}
@@ -43,9 +43,9 @@ func TestResolveRelation(t *testing.T) {
 		assert.EqualValues(t, john.ID, related["id"])
 	})
 
-	t.Run("one-to-many skips missing ids", func(t *testing.T) {
+	t.Run("many-to-many skips missing ids", func(t *testing.T) {
 		p := graphql.ResolveParams{Source: map[string]any{"authors": []any{float64(john.ID), float64(jane.ID), float64(9999)}}}
-		result, err := ResolveRelation(p, 2, oneToMany)
+		result, err := ResolveRelation(p, 2, manyToMany)
 		require.NoError(t, err)
 		related, ok := result.([]map[string]any)
 		require.True(t, ok, "expected a list, got %T", result)

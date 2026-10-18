@@ -28,7 +28,9 @@ func ResolveRelation(p graphql.ResolveParams, collectionID uint, attr models.Att
 	}
 
 	// Handle Many-to-Many and One-to-Many Relations
-	if attr.Relation == "oneToMany" || attr.Relation == "manyToMany" {
+	// Only manyToMany stores a list of IDs (see models.ValidateItemValues);
+	// the other kinds store a single ID.
+	if attr.Relation == "manyToMany" {
 		relatedIDs, ok := relationValue.([]any)
 		if !ok {
 			return nil, fmt.Errorf("invalid relation format for '%s', expected an array", attr.Name)
@@ -56,7 +58,7 @@ func ResolveRelation(p graphql.ResolveParams, collectionID uint, attr models.Att
 	}
 
 	// Handle One-to-One and Many-to-One Relations
-	if attr.Relation == "oneToOne" || attr.Relation == "manyToOne" {
+	if attr.Relation == "oneToOne" || attr.Relation == "oneToMany" || attr.Relation == "manyToOne" {
 		id := models.ToUint(relationValue)
 		if id == 0 {
 			return nil, fmt.Errorf("invalid ID format for relation '%s'", attr.Name)
