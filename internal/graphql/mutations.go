@@ -243,7 +243,7 @@ func updateCollectionItem(p graphql.ResolveParams, id string, inputData map[stri
 	if err != nil {
 		return nil, err
 	}
-	itemID, err := strconv.ParseUint(id, 10, 64)
+	itemID, err := strconv.ParseUint(id, 10, 32)
 	if err != nil {
 		return nil, fmt.Errorf("invalid id '%s'", id)
 	}
@@ -279,7 +279,7 @@ func setPublished(p graphql.ResolveParams, collection models.Collection, publish
 		return nil, err
 	}
 	id, _ := p.Args["id"].(string)
-	itemID, err := strconv.ParseUint(id, 10, 64)
+	itemID, err := strconv.ParseUint(id, 10, 32)
 	if err != nil {
 		return nil, fmt.Errorf("invalid id '%s'", id)
 	}
@@ -300,7 +300,7 @@ func deleteCollectionItem(p graphql.ResolveParams, collection models.Collection)
 	if !ok {
 		return false, fmt.Errorf("invalid ID format")
 	}
-	itemID, err := strconv.ParseUint(id, 10, 64)
+	itemID, err := strconv.ParseUint(id, 10, 32)
 	if err != nil {
 		return false, fmt.Errorf("invalid id '%s'", id)
 	}

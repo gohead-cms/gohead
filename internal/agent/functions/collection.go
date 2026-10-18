@@ -89,7 +89,7 @@ func upsertCollectionItem(ctx context.Context, args any) (string, error) {
 		return fmt.Sprintf(`{"status": "error", "message": "%s"}`, err.Error()), nil
 	}
 
-	itemID, _ := strconv.ParseUint(itemIDStr, 10, 64)
+	itemID, _ := strconv.ParseUint(itemIDStr, 10, 32)
 
 	// 2. Decide whether to UPDATE or CREATE
 	if itemID > 0 {
@@ -185,7 +185,7 @@ func deleteCollectionItem(ctx context.Context, args any) (string, error) {
 		return `{"status": "error", "message": "missing required parameter: item_id"}`, nil
 	}
 
-	itemID, err := strconv.ParseUint(itemIDStr, 10, 64)
+	itemID, err := strconv.ParseUint(itemIDStr, 10, 32)
 	if err != nil || itemID == 0 {
 		return `{"status": "error", "message": "invalid item_id format"}`, nil
 	}
