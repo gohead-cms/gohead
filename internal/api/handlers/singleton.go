@@ -11,34 +11,49 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// GetSingleItem retrieves the content (single item) for a given single type name.
+// GetSingleItem returns a singleton's content in the flat item shape, with
+// relations populated down to "level" (default 1).
 func GetSingleItem(c *gin.Context) {
-	SingletonName := c.Param("name")
-	logger.Log.Debugf("Fetching single item for type: %s", SingletonName)
-
-	// Attempt to get the SingleItem corresponding to this SingletonName
-	item, err := storage.GetSingleItemByType(SingletonName)
+	if !hasPermission(c.GetString("role"), "read") {
+		c.Set("response", "Access denied")
+		c.Set("status", http.StatusForbidden)
+		return
+	}
+	level, ok := parseLevel(c)
+	if !ok {
+		return
+	}
+	name := c.Param("name")
+	st, err := storage.GetSingletonByName(name)
 	if err != nil {
-		c.Set("response", gin.H{
-			"data": nil,
-			"error": gin.H{
-				"status":  http.StatusNotFound,
-				"name":    "NotFoundError",
-				"message": err.Error(),
-				"details": gin.H{},
-			},
-		})
+		c.Set("response", "Singleton not found")
 		c.Set("status", http.StatusNotFound)
 		return
 	}
-
-	response := map[string]any{
-		"id":         item.ID,
-		"attributes": item.Data,
+	item, err := storage.GetSingleItemByType(name)
+	if err != nil {
+		c.Set("response", err.Error())
+		c.Set("status", http.StatusNotFound)
+		return
 	}
-
-	c.Set("response", response)
+	out, err := singleItemResponse(st, item, level)
+	if err != nil {
+		c.Set("response", "Failed to populate relations")
+		c.Set("status", http.StatusInternalServerError)
+		return
+	}
+	c.Set("response", out)
 	c.Set("status", http.StatusOK)
+}
+
+// singleItemResponse populates relations (published related items only)
+// and builds the flat response.
+func singleItemResponse(st *models.Singleton, item *models.SingleItem, level uint) (map[string]any, error) {
+	data, err := storage.PopulateRelations(models.Collection{Attributes: st.Attributes}, item.Data, level, true)
+	if err != nil {
+		return nil, err
+	}
+	return models.SingleItemResponse(*item, data), nil
 }
 
 // GetSingleton retrieves a single type by its name.
@@ -145,78 +160,63 @@ func DeleteSingleton(c *gin.Context) {
 	c.Set("status", http.StatusOK)
 }
 
-// CreateOrUpdateSingletonValue handles the creation or update of a single type content item.
+// CreateOrUpdateSingletonItem creates or replaces a singleton's content.
+// Requires the update permission.
 func CreateOrUpdateSingletonItem(c *gin.Context) {
-	// The single type name from URL (e.g. /single-types/:name)
-	SingletonName := c.Param("name")
-
-	// Fetch the single type schema
-	st, err := storage.GetSingletonByName(SingletonName)
+	if !hasPermission(c.GetString("role"), "update") {
+		c.Set("response", "Access denied")
+		c.Set("status", http.StatusForbidden)
+		return
+	}
+	level, ok := parseLevel(c)
+	if !ok {
+		return
+	}
+	name := c.Param("name")
+	st, err := storage.GetSingletonByName(name)
 	if err != nil {
-		logger.Log.WithError(err).WithField("Singleton", SingletonName).
-			Error("Failed to retrieve single type")
-		c.Set("response", gin.H{"message": "Single type not found", "details": err})
+		c.Set("response", "Singleton not found")
 		c.Set("status", http.StatusNotFound)
 		return
 	}
-	logger.Log.WithField("single_type", st).Debug("handler:CreateOrUpdateSingletonItem")
 
-	// Parse the input JSON -> { "data": { ... } }
 	var input struct {
 		Data map[string]any `json:"data"`
 	}
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.Set("response", gin.H{"message": "Invalid input format", "details": err})
+	if err := c.ShouldBindJSON(&input); err != nil || input.Data == nil {
+		c.Set("response", "Invalid request body. Expecting an object with a 'data' key.")
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
-	valueData := input.Data
-
-	// Validate user-provided data against the single type’s schema
-	if err := models.ValidateSingleItemValues(*st, valueData); err != nil {
-		c.Set("response", gin.H{"message": "Failed to validate single type value", "details": err.Error()})
+	if err := models.ValidateSingleItemValues(*st, input.Data); err != nil {
+		c.Set("response", err.Error())
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
 
-	// Check if a SingleItem already exists for this Singleton
-	existingItem, err := storage.GetSingleItemByType(SingletonName)
-	if err != nil {
-		// If the error indicates "no single item found", we proceed to create a new one
-		// If it's another DB error, handle accordingly
-		logger.Log.WithError(err).WithField("Singleton", SingletonName).
-			Warn("Could not retrieve single item - may not exist yet")
-		existingItem = nil
-	}
-
-	if existingItem != nil {
-		// Update the existing single item
-		updatedItem, updateErr := storage.UpdateSingleItem(SingletonName, valueData)
-		if updateErr != nil {
-			logger.Log.WithError(updateErr).WithField("Singleton", SingletonName).
-				Error("Failed to update single type item")
-			c.Set("response", gin.H{"message": "Failed to update single type value", "details": err})
-			c.Set("status", http.StatusInternalServerError)
-			return
-		}
-
-		c.Set("response", gin.H{"message": "single type updated successfully", "single_type": updatedItem})
-		c.Set("detail", updatedItem)
-		c.Set("status", http.StatusOK)
+	var item *models.SingleItem
+	status := http.StatusOK
+	if _, getErr := storage.GetSingleItemByType(name); getErr == nil {
+		item, err = storage.UpdateSingleItem(name, input.Data)
 	} else {
-		// Create a new SingleItem if one does not exist
-		newItem, createErr := storage.CreateSingleItem(st, valueData)
-		if createErr != nil {
-			logger.Log.WithError(createErr).WithField("Singleton", SingletonName).
-				Error("Failed to create single type item")
-			c.Set("response", gin.H{"message": "Failed to save single type value", "details": err})
-			c.Set("status", http.StatusInternalServerError)
-			return
-		}
-
-		c.Set("response", gin.H{"message": "single type updated successfully", "single_type": newItem})
-		c.Set("status", http.StatusCreated)
+		item, err = storage.CreateSingleItem(st, input.Data)
+		status = http.StatusCreated
 	}
+	if err != nil {
+		logger.Log.WithError(err).WithField("singleton", name).Error("Failed to save singleton content")
+		c.Set("response", "Failed to save singleton content")
+		c.Set("status", http.StatusInternalServerError)
+		return
+	}
+
+	out, err := singleItemResponse(st, item, level)
+	if err != nil {
+		c.Set("response", "Failed to populate relations")
+		c.Set("status", http.StatusInternalServerError)
+		return
+	}
+	c.Set("response", out)
+	c.Set("status", status)
 }
 
 // GetSingletons lists all singleton definitions.

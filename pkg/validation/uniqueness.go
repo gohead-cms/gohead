@@ -1,32 +1,73 @@
-// pkg/validation/uniqueness.go
+// Package validation holds checks that need the database.
 package validation
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
+
+	"gorm.io/gorm"
 )
 
-// CheckFieldUniqueness checks if a field value is unique within a collection.
-func CheckFieldUniqueness(collectionID uint, fieldName string, value interface{}) error {
-	var count int64
-	query := database.DB.Table("items").
-		Where("collection_id = ? AND data ->> ? = ?", collectionID, fieldName, value).
-		Count(&count)
+// JSONPath returns the SQLite/MySQL JSON path of a top-level key. The key is
+// quoted, so names with dots, dashes or spaces address the right member.
+func JSONPath(key string) string {
+	return `$."` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(key) + `"`
+}
 
-	if query.Error != nil {
-		logger.Log.WithError(query.Error).Error("Failed to check field uniqueness")
+// CheckFieldUniqueness checks that no other live item of the collection has
+// the same value for fieldName. excludeID (the item being updated, or 0) is
+// ignored, and so are soft-deleted items. tx may be nil.
+func CheckFieldUniqueness(tx *gorm.DB, collectionID uint, fieldName string, value any, excludeID uint) error {
+	if tx == nil {
+		tx = database.DB
+	}
+	// Compare typed JSON values, so numbers match by value (1e6 = 1000000)
+	// and strings never match numbers.
+	var expr string
+	var args []any
+	switch tx.Dialector.Name() {
+	case "mysql":
+		expr, args = "JSON_EXTRACT(data, ?) = CAST(? AS JSON)", []any{JSONPath(fieldName), jsonText(value)}
+	case "postgres":
+		expr, args = "(CAST(data AS JSONB) -> CAST(? AS TEXT)) = CAST(? AS JSONB)", []any{fieldName, jsonText(value)}
+	default: // sqlite: json_extract returns SQL values (true/false as 1/0)
+		v := value
+		if b, ok := value.(bool); ok {
+			v = 0
+			if b {
+				v = 1
+			}
+		}
+		expr, args = "json_extract(data, ?) = ?", []any{JSONPath(fieldName), v}
+	}
+
+	q := tx.Table("items").
+		Where("collection_id = ? AND deleted_at IS NULL", collectionID).
+		Where(expr, args...)
+	if excludeID != 0 {
+		q = q.Where("id <> ?", excludeID)
+	}
+	var count int64
+	if err := q.Count(&count).Error; err != nil {
+		logger.Log.WithError(err).Error("Failed to check field uniqueness")
 		return fmt.Errorf("could not validate uniqueness for field '%s'", fieldName)
 	}
-
 	if count > 0 {
-		logger.Log.WithFields(map[string]interface{}{
-			"field": fieldName,
-			"value": value,
-		}).Warn("Uniqueness validation failed")
+		logger.Log.WithField("field", fieldName).Warn("Uniqueness validation failed")
 		return fmt.Errorf("value for field '%s' must be unique", fieldName)
 	}
-
 	return nil
+}
+
+// jsonText encodes value as a JSON literal.
+func jsonText(value any) string {
+	b, err := json.Marshal(value)
+	if err != nil {
+		return fmt.Sprintf("%q", fmt.Sprint(value))
+	}
+	return string(b)
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/database"
+	"github.com/gohead-cms/gohead/pkg/validation"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -45,14 +46,40 @@ type ItemQuery struct {
 	PageSize int
 	Filters  []ItemFilter
 	Sort     []ItemSort
+	// Status filters draft-and-publish collections: "" (all items),
+	// models.StatusPublished or models.StatusDraft. Ignored otherwise.
+	Status string
+}
+
+// withStatus restricts q to published or draft items of a draft-and-publish
+// collection.
+func withStatus(q *gorm.DB, ct models.Collection, status string) *gorm.DB {
+	if !ct.DraftAndPublish {
+		return q
+	}
+	switch status {
+	case models.StatusPublished:
+		return q.Where("published_at IS NOT NULL")
+	case models.StatusDraft:
+		return q.Where("published_at IS NULL")
+	}
+	return q
 }
 
 // builtinColumns are real columns on the items table that can be filtered
 // and sorted on, mapped to their kind.
 var builtinColumns = map[string]string{
-	"id":         "int",
-	"created_at": "datetime",
-	"updated_at": "datetime",
+	"id":           "int",
+	"created_at":   "datetime",
+	"updated_at":   "datetime",
+	"published_at": "datetime",
+}
+
+// builtinAliases maps the field names used in responses to their columns.
+var builtinAliases = map[string]string{
+	"createdAt":   "created_at",
+	"updatedAt":   "updated_at",
+	"publishedAt": "published_at",
 }
 
 // filterableTypes lists attribute types whose stored JSON value is a scalar
@@ -79,6 +106,9 @@ type resolvedField struct {
 }
 
 func resolveField(ct models.Collection, name string) (resolvedField, error) {
+	if col, ok := builtinAliases[name]; ok {
+		name = col
+	}
 	if kind, ok := builtinColumns[name]; ok {
 		return resolvedField{column: name, kind: kind}, nil
 	}
@@ -110,19 +140,19 @@ func jsonValueExpr(dialect string, f resolvedField) (string, any) {
 	case "mysql":
 		switch f.kind {
 		case "number":
-			return "CAST(JSON_UNQUOTE(JSON_EXTRACT(data, ?)) AS DECIMAL(65,10))", "$." + f.path
+			return "CAST(JSON_UNQUOTE(JSON_EXTRACT(data, ?)) AS DECIMAL(65,10))", validation.JSONPath(f.path)
 		default:
-			return "JSON_UNQUOTE(JSON_EXTRACT(data, ?))", "$." + f.path
+			return "JSON_UNQUOTE(JSON_EXTRACT(data, ?))", validation.JSONPath(f.path)
 		}
 	default: // sqlite
 		switch f.kind {
 		case "number":
-			return "CAST(json_extract(data, ?) AS REAL)", "$." + f.path
+			return "CAST(json_extract(data, ?) AS REAL)", validation.JSONPath(f.path)
 		case "bool":
 			// SQLite stores JSON booleans as 1/0.
-			return "json_extract(data, ?)", "$." + f.path
+			return "json_extract(data, ?)", validation.JSONPath(f.path)
 		default:
-			return "CAST(json_extract(data, ?) AS TEXT)", "$." + f.path
+			return "CAST(json_extract(data, ?) AS TEXT)", validation.JSONPath(f.path)
 		}
 	}
 }
@@ -251,7 +281,7 @@ func QueryItems(ct models.Collection, q ItemQuery) ([]models.Item, int, error) {
 	}
 	dialect := database.DB.Dialector.Name()
 
-	base := database.DB.Model(&models.Item{}).Where("collection_id = ?", ct.ID)
+	base := withStatus(database.DB.Model(&models.Item{}).Where("collection_id = ?", ct.ID), ct, q.Status)
 	var err error
 	for _, flt := range q.Filters {
 		if base, err = applyFilter(base, dialect, ct, flt); err != nil {

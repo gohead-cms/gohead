@@ -188,23 +188,23 @@ func TestCheckFieldUniqueness(t *testing.T) {
 
 	// Test cases
 	t.Run("Unique Value in Collection", func(t *testing.T) {
-		err := validation.CheckFieldUniqueness(1, "email", "new@example.com")
+		err := validation.CheckFieldUniqueness(nil, 1, "email", "new@example.com", 0)
 		assert.NoError(t, err, "Expected no error for unique value")
 	})
 
 	t.Run("Duplicate Value in Same Collection", func(t *testing.T) {
-		err := validation.CheckFieldUniqueness(1, "email", "duplicate@example.com")
+		err := validation.CheckFieldUniqueness(nil, 1, "email", "duplicate@example.com", 0)
 		assert.Error(t, err, "Expected an error for duplicate value")
 		assert.Equal(t, "value for field 'email' must be unique", err.Error())
 	})
 
 	t.Run("Duplicate Value in Different Collection", func(t *testing.T) {
-		err := validation.CheckFieldUniqueness(2, "email", "duplicate@example.com")
+		err := validation.CheckFieldUniqueness(nil, 2, "email", "duplicate@example.com", 0)
 		assert.NoError(t, err, "Expected no error for duplicate value in a different collection")
 	})
 
 	t.Run("Non-Existent Field", func(t *testing.T) {
-		err := validation.CheckFieldUniqueness(1, "nonexistent_field", "value")
+		err := validation.CheckFieldUniqueness(nil, 1, "nonexistent_field", "value", 0)
 		assert.NoError(t, err, "Expected no error for non-existent field")
 	})
 }

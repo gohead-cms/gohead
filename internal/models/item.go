@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"strconv"
+	"time"
 
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/validation"
@@ -16,11 +17,68 @@ type Item struct {
 	ID           uint    `json:"id"`
 	CollectionID uint    `json:"collection"`
 	Data         JSONMap `json:"data" gorm:"type:json"`
+	// PublishedAt is set when the item is published. It is only meaningful
+	// for collections with DraftAndPublish; nil means draft.
+	PublishedAt *time.Time `json:"publishedAt" gorm:"index"`
+}
+
+// Item statuses in draft-and-publish collections.
+const (
+	StatusDraft     = "draft"
+	StatusPublished = "published"
+)
+
+// Status returns StatusPublished or StatusDraft.
+func (i Item) Status() string {
+	if i.PublishedAt != nil {
+		return StatusPublished
+	}
+	return StatusDraft
+}
+
+// ItemResponse is the JSON shape of an item in every API response: its
+// attributes at the top level, plus id, createdAt and updatedAt, and
+// publishedAt and status for draft-and-publish collections. data is the
+// (possibly relation-populated) item data; nil means item.Data.
+func ItemResponse(ct Collection, item Item, data JSONMap) map[string]any {
+	if data == nil {
+		data = item.Data
+	}
+	out := make(map[string]any, len(data)+5)
+	maps.Copy(out, data)
+	out["id"] = item.ID
+	out["createdAt"] = APITime(item.CreatedAt)
+	out["updatedAt"] = APITime(item.UpdatedAt)
+	if ct.DraftAndPublish {
+		out["publishedAt"] = nil
+		if item.PublishedAt != nil {
+			out["publishedAt"] = APITime(*item.PublishedAt)
+		}
+		out["status"] = item.Status()
+	}
+	return out
+}
+
+// APITime normalizes a timestamp for responses: UTC, microsecond precision
+// (what PostgreSQL and MySQL store), so a value reads the same whether it
+// comes from memory right after a write or from the database later.
+func APITime(t time.Time) time.Time {
+	return t.UTC().Truncate(time.Microsecond)
 }
 
 // ValidateItemValues validates item data, creates nested relations, and returns the processed data.
 // It MUST be called within a database transaction.
 func ValidateItemValues(ct Collection, itemData map[string]any, tx *gorm.DB) (JSONMap, error) {
+	return validateItem(ct, itemData, tx, 0)
+}
+
+// ValidateItemUpdate is ValidateItemValues for an existing item: unique
+// attributes may keep the item's own current values.
+func ValidateItemUpdate(ct Collection, itemData map[string]any, tx *gorm.DB, itemID uint) (JSONMap, error) {
+	return validateItem(ct, itemData, tx, itemID)
+}
+
+func validateItem(ct Collection, itemData map[string]any, tx *gorm.DB, excludeID uint) (JSONMap, error) {
 	processedData := make(JSONMap)
 	maps.Copy(processedData, itemData) // Work on a copy
 
@@ -45,13 +103,25 @@ func ValidateItemValues(ct Collection, itemData map[string]any, tx *gorm.DB) (JS
 			continue
 		}
 
-		if attribute.Unique {
-			if err := validation.CheckFieldUniqueness(ct.ID, attribute.Name, value); err != nil {
+		if attribute.Unique && attribute.Type != "relation" && attribute.Type != "component" {
+			if err := validation.CheckFieldUniqueness(tx, ct.ID, attribute.Name, value, excludeID); err != nil {
 				return nil, err
 			}
 		}
 
-		if attribute.Type == "relation" {
+		if attribute.Type == "component" {
+			if value == nil {
+				if attribute.Required {
+					return nil, fmt.Errorf("missing required attribute: '%s'", attribute.Name)
+				}
+				continue
+			}
+			processedValue, err := validateComponentValue(attribute, value, tx, 1)
+			if err != nil {
+				return nil, fmt.Errorf("validation failed for component '%s': %w", attribute.Name, err)
+			}
+			processedData[attribute.Name] = processedValue
+		} else if attribute.Type == "relation" {
 			// This now returns the processed value (with new IDs) and an error.
 			processedValue, err := validateRelationship(attribute, value, tx)
 			if err != nil {
@@ -180,6 +250,37 @@ func checkItemExists(collectionID uint, itemID uint, tx *gorm.DB) error {
 		return fmt.Errorf("referenced item with ID '%d' in collection ID '%d' does not exist", itemID, collectionID)
 	}
 	return nil
+}
+
+// ToUintSlice converts a stored many-to-many value to IDs. It accepts the
+// shapes found before and after a JSON round-trip ([]uint right after
+// validation, []any of float64 once read back). Invalid entries are dropped.
+func ToUintSlice(value any) []uint {
+	var out []uint
+	add := func(v any) {
+		if id := ToUint(v); id != 0 {
+			out = append(out, id)
+		}
+	}
+	switch vs := value.(type) {
+	case []any:
+		for _, v := range vs {
+			add(v)
+		}
+	case []uint:
+		for _, v := range vs {
+			add(v)
+		}
+	case []int:
+		for _, v := range vs {
+			add(v)
+		}
+	case []float64:
+		for _, v := range vs {
+			add(v)
+		}
+	}
+	return out
 }
 
 func ToUint(value any) uint {

@@ -6,11 +6,16 @@ export interface Attribute {
   required?: boolean;
   enum?: string[];
   target?: string;
+  component?: string;
+  repeatable?: boolean;
 }
 
 export interface Schema {
   attributes: Record<string, Attribute>;
   collectionName?: string;
+  options?: {
+    draftAndPublish?: boolean;
+  };
   info?: {
     displayName?: string;
     pluralName?: string;

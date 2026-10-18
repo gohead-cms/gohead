@@ -24,9 +24,11 @@ Base URL: your API, e.g. `http://localhost:8080`. **Auth** column: `–` public,
 |--------|------|------|-------------|
 | `GET` | `/api/collections/{collection}` | token | List items. [Filters, sort, pagination](../guides/rest-api.md#filtering-and-sorting) |
 | `POST` | `/api/collections/{collection}` | token | Create one item (`{"data":…}`) or a batch (array) |
-| `GET` | `/api/collections/{collection}/{id}` | token | Get an item; `?level=1..5` |
-| `PUT` | `/api/collections/{collection}/{id}` | token | Replace an item's data |
+| `GET` | `/api/collections/{collection}/{id}` | token | Get an item; `?level=0..5`, `?status=` |
+| `PUT` | `/api/collections/{collection}/{id}` | token | Replace an item's data (optional `"status"`) |
 | `DELETE` | `/api/collections/{collection}/{id}` | token | Delete an item |
+| `POST` | `/api/collections/{collection}/{id}/publish` | token (update) | Publish a draft |
+| `POST` | `/api/collections/{collection}/{id}/unpublish` | token (update) | Unpublish an item |
 | `GET` | `/api/singleton/{name}` | token | Read a singleton's item |
 | `POST`, `PUT` | `/api/singleton/{name}` | token | Write a singleton's item |
 | `POST` | `/api/graphql` | token | [GraphQL](../guides/graphql.md): `query`, `variables`, `operationName` |

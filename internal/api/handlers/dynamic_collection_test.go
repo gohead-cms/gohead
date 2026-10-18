@@ -198,6 +198,9 @@ func TestRetrieveContentItem(t *testing.T) {
 	data, ok := response["data"].(map[string]any)
 	assert.True(t, ok, "Response should have a 'data' key")
 
-	attrs, _ := data["attributes"].(map[string]any)
-	assert.Equal(t, "Existing Article", attrs["title"])
+	// Items are flat: attributes sit next to id and the timestamps.
+	assert.Equal(t, "Existing Article", data["title"])
+	assert.NotNil(t, data["id"])
+	assert.NotNil(t, data["createdAt"])
+	assert.NotContains(t, data, "attributes")
 }

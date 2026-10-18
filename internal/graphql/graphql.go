@@ -3,6 +3,7 @@ package graphql
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"strconv"
 
@@ -114,14 +115,29 @@ func GenerateGraphQLQueries() (*graphql.Object, error) {
 					DefaultValue: 0,
 					Description:  "The number of items to skip for pagination.",
 				},
+				"status": &graphql.ArgumentConfig{
+					Type:        graphql.String,
+					Description: "published (default for lists), draft or all. Drafts need the update permission; this also applies to populated relations.",
+				},
 			},
 			Resolve: func(p graphql.ResolveParams) (any, error) {
 				logger.Log.WithField("collection", coll.Name).Debug("Resolver triggered")
+				coll := currentCollection(coll)
 				if err := requirePermission(p, auth.ActionRead); err != nil {
 					return nil, err
 				}
+				status, _ := p.Args["status"].(string)
+				switch status {
+				case "", models.StatusPublished, models.StatusDraft, "all":
+				default:
+					return nil, fmt.Errorf("invalid status '%s' (expected published, draft or all)", status)
+				}
+				canSeeDrafts := auth.HasPermission(auth.RoleFromContext(p.Context), auth.ActionUpdate)
+				if (status == models.StatusDraft || status == "all") && !canSeeDrafts {
+					return nil, fmt.Errorf("drafts are only visible to roles that can edit content")
+				}
 
-				// Case 1: Fetch a single item by ID
+				// Case 1: Fetch a single item by ID (drafts included for editors)
 				if idArg, ok := p.Args["id"].(string); ok && idArg != "" {
 					parsedID, err := strconv.ParseUint(idArg, 10, 32)
 					if err != nil {
@@ -129,20 +145,29 @@ func GenerateGraphQLQueries() (*graphql.Object, error) {
 						return nil, fmt.Errorf("invalid 'id' argument")
 					}
 
-					item, err := storage.GetItemByID(coll.ID, uint(parsedID))
+					publishedOnly := !canSeeDrafts || status == models.StatusPublished
+					item, err := storage.GetVisibleItem(coll, uint(parsedID), publishedOnly)
 					if err != nil {
 						// For "not found", GraphQL typically returns null data and no error.
 						return nil, nil
 					}
 
-					return []any{mapItemToGraphQLResult(*item, coll.Attributes)}, nil
+					return []any{mapItemToGraphQLResult(*item, coll, publishedOnly)}, nil
 				}
 
-				// Case 2: Fetch a list of items with pagination
+				// Case 2: Fetch a list of items with pagination (published by default)
 				limit := p.Args["limit"].(int)
 				offset := p.Args["offset"].(int)
+				publishedOnly := !canSeeDrafts || status == "" || status == models.StatusPublished
+				listStatus := ""
+				switch status {
+				case "", models.StatusPublished:
+					listStatus = models.StatusPublished
+				case models.StatusDraft:
+					listStatus = models.StatusDraft
+				}
 
-				items, _, err := storage.GetItemsByOffset(coll.ID, offset, limit)
+				items, _, err := storage.GetItemsByOffset(coll, offset, limit, listStatus)
 				if err != nil {
 					logger.Log.WithError(err).Warn("Failed to fetch items for collection", coll.Name)
 					return nil, fmt.Errorf("failed to fetch items")
@@ -150,7 +175,7 @@ func GenerateGraphQLQueries() (*graphql.Object, error) {
 
 				results := make([]map[string]any, 0, len(items))
 				for _, item := range items {
-					results = append(results, mapItemToGraphQLResult(item, coll.Attributes))
+					results = append(results, mapItemToGraphQLResult(item, coll, publishedOnly))
 				}
 
 				return results, nil
@@ -174,11 +199,38 @@ func GenerateGraphQLQueries() (*graphql.Object, error) {
 	}), nil
 }
 
-// mapItemToGraphQLResult is a helper function to convert a storage item
-// into a map suitable for a GraphQL response, reducing code duplication.
-func mapItemToGraphQLResult(item models.Item, attributes []models.Attribute) map[string]any {
-	result := map[string]any{"id": item.ID}
-	for _, attr := range attributes {
+// currentCollection reloads a collection captured when the schema was
+// built, so settings such as draft and publish apply immediately, even
+// before this replica has rebuilt its schema.
+func currentCollection(c models.Collection) models.Collection {
+	if fresh, err := storage.GetCollectionByName(c.Name); err == nil {
+		return *fresh
+	}
+	return c
+}
+
+// publishedOnlyKey is a hidden key in result maps telling relation
+// resolvers whether drafts must stay hidden. It is not a schema field, so it
+// is never returned to clients.
+const publishedOnlyKey = "__publishedOnly"
+
+// mapItemToGraphQLResult converts a stored item into the map GraphQL field
+// resolvers read: the collection's attributes plus system fields.
+func mapItemToGraphQLResult(item models.Item, ct models.Collection, publishedOnly bool) map[string]any {
+	result := map[string]any{
+		"id":             item.ID,
+		"createdAt":      item.CreatedAt.UTC().Format(time.RFC3339),
+		"updatedAt":      item.UpdatedAt.UTC().Format(time.RFC3339),
+		publishedOnlyKey: publishedOnly,
+	}
+	if ct.DraftAndPublish {
+		result["status"] = item.Status()
+		result["publishedAt"] = nil
+		if item.PublishedAt != nil {
+			result["publishedAt"] = item.PublishedAt.UTC().Format(time.RFC3339)
+		}
+	}
+	for _, attr := range ct.Attributes {
 		if value, exists := item.Data[attr.Name]; exists {
 			result[attr.Name] = value
 		}

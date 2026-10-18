@@ -11,49 +11,11 @@ import (
 	"strings"
 
 	"github.com/gohead-cms/gohead/internal/models"
-	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
-	"github.com/gohead-cms/gohead/pkg/utils"
-	"gorm.io/gorm"
 
 	"github.com/gin-gonic/gin"
 )
-
-// CreateItem handles nested creations
-func CreateItem(collection models.Collection) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if !hasPermission(c.GetString("role"), "create") {
-			c.Set("response", "Access denied")
-			c.Set("status", http.StatusForbidden)
-			return
-		}
-
-		var input struct {
-			Data models.JSONMap `json:"data"`
-		}
-		if err := c.ShouldBindJSON(&input); err != nil {
-			c.Set("response", "Invalid request body")
-			c.Set("status", http.StatusBadRequest)
-			return
-		}
-
-		newItem, err := storage.SaveItem(collection, input.Data)
-		if err != nil {
-			c.Set("response", err.Error())
-			c.Set("status", http.StatusBadRequest) // Validation errors are Bad Request
-			return
-		}
-
-		// Format the response
-		newItem.Data["id"] = newItem.ID
-		c.Set("response", gin.H{
-			"id":         newItem.ID,
-			"attributes": newItem.Data,
-		})
-		c.Set("status", http.StatusCreated)
-	}
-}
 
 // GetItems lists a collection's items with pagination, filtering and sorting.
 //
@@ -63,51 +25,70 @@ func CreateItem(collection models.Collection) gin.HandlerFunc {
 //	filters[<field>][<op>]=<value> op: $eq $ne $lt $lte $gt $gte $contains
 //	filters[<field>]=<value>       shorthand for $eq
 //	sort=<field>[:asc|:desc],...   multiple keys allowed
+//	status=published|draft|all     draft-and-publish collections (default published)
 //
-// <field> is a collection attribute or one of id, created_at, updated_at.
-func GetItems(collection models.Collection, level uint) gin.HandlerFunc {
+// <field> is a collection attribute or one of id, createdAt, updatedAt,
+// publishedAt (snake_case also accepted).
+func GetItems(collection models.Collection, rc readContext) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		q, err := parseItemQuery(c.Request.URL.Query())
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"status": http.StatusBadRequest, "name": "ValidationError", "message": err.Error(), "details": nil}})
+			validationError(c, err.Error())
 			return
 		}
+		q.Status = rc.listStatus
 
 		items, total, err := storage.QueryItems(collection, q)
 		if err != nil {
 			var qe *storage.QueryFieldError
 			if errors.As(err, &qe) {
-				c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"status": http.StatusBadRequest, "name": "ValidationError", "message": qe.Error(), "details": nil}})
+				validationError(c, qe.Error())
 				return
 			}
 			logger.Log.WithError(err).Error("Failed to fetch items")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch items"})
+			c.Set("response", "Failed to fetch items")
+			c.Set("status", http.StatusInternalServerError)
 			return
 		}
 
-		results := make([]models.JSONMap, 0, len(items))
+		results := make([]map[string]any, 0, len(items))
 		for _, item := range items {
-			item.Data["id"] = item.ID
-			hydratedData, err := storage.FetchNestedRelations(collection, item.Data, level)
+			out, err := itemResponse(collection, item, rc.level, rc.publishedOnly)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to populate relations"})
+				logger.Log.WithError(err).Error("Failed to populate relations")
+				c.Set("response", "Failed to populate relations")
+				c.Set("status", http.StatusInternalServerError)
 				return
 			}
-			results = append(results, hydratedData)
+			results = append(results, out)
 		}
 
-		c.JSON(http.StatusOK, gin.H{
-			"data": results,
-			"meta": gin.H{
-				"pagination": gin.H{
-					"page":      q.Page,
-					"pageSize":  q.PageSize,
-					"total":     total,
-					"pageCount": (total + q.PageSize - 1) / q.PageSize, // Ceiling division
-				},
+		c.Set("response", results)
+		c.Set("meta", gin.H{
+			"pagination": gin.H{
+				"page":      q.Page,
+				"pageSize":  q.PageSize,
+				"total":     total,
+				"pageCount": (total + q.PageSize - 1) / q.PageSize, // Ceiling division
 			},
 		})
+		c.Set("status", http.StatusOK)
 	}
+}
+
+// itemResponse builds the flat API representation of an item, with its
+// relations populated down to level.
+func itemResponse(ct models.Collection, item models.Item, level uint, publishedOnly bool) (map[string]any, error) {
+	data, err := storage.PopulateRelations(ct, item.Data, level, publishedOnly)
+	if err != nil {
+		return nil, err
+	}
+	return models.ItemResponse(ct, item, data), nil
+}
+
+func validationError(c *gin.Context, msg string) {
+	c.Set("response", msg)
+	c.Set("status", http.StatusBadRequest)
 }
 
 var filterParamRe = regexp.MustCompile(`^filters\[([^\[\]]+)\](?:\[(\$[a-z]+)\])?$`)
@@ -176,121 +157,173 @@ func parseItemQuery(values url.Values) (storage.ItemQuery, error) {
 }
 
 // GetItemByID retrieves a single item by ID.
-func GetItemByID(ct models.Collection, id uint, level uint) gin.HandlerFunc {
+func GetItemByID(ct models.Collection, id uint, rc readContext) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		idStr := c.Param("id")
-		id, err := strconv.Atoi(idStr)
+		item, err := storage.GetVisibleItem(ct, id, rc.publishedOnly)
 		if err != nil {
-			c.Set("response", "Invalid item ID format")
-			c.Set("status", http.StatusBadRequest)
+			if errors.Is(err, storage.ErrItemNotFound) {
+				c.Set("response", "Item not found")
+				c.Set("status", http.StatusNotFound)
+				return
+			}
+			logger.Log.WithError(err).Error("Failed to fetch item")
+			c.Set("response", "Failed to fetch item")
+			c.Set("status", http.StatusInternalServerError)
 			return
 		}
 
-		item, err := storage.GetItemByID(uint(ct.ID), uint(id))
-		if err != nil {
-			c.Set("response", "Item not found")
-			c.Set("status", http.StatusNotFound)
-			return
-		}
-
-		data, err := storage.FetchNestedRelations(ct, item.Data, level)
+		out, err := itemResponse(ct, *item, rc.level, rc.publishedOnly)
 		if err != nil {
 			c.Set("response", "Failed to fetch item relations")
 			c.Set("status", http.StatusInternalServerError)
 			return
 		}
-
-		c.Set("response", utils.FormatNestedItems(item.ID, data, &ct))
+		c.Set("response", out)
 		c.Set("status", http.StatusOK)
-		c.Set("meta", gin.H{})
 	}
 }
 
-// UpdateItem now handles nested creations and uses the c.Set response pattern.
+// itemWriteBody is the body of item create and update requests.
+type itemWriteBody struct {
+	Data   map[string]any `json:"data"`
+	Status *string        `json:"status"`
+}
+
+// publishFlag converts the optional "status" of a write request.
+func publishFlag(ct models.Collection, status *string) (*bool, error) {
+	if status == nil {
+		return nil, nil
+	}
+	if !ct.DraftAndPublish {
+		return nil, storage.ErrDraftAndPublishDisabled
+	}
+	switch *status {
+	case models.StatusPublished:
+		t := true
+		return &t, nil
+	case models.StatusDraft:
+		f := false
+		return &f, nil
+	}
+	return nil, fmt.Errorf("invalid status '%s' (expected 'draft' or 'published')", *status)
+}
+
+// UpdateItem replaces an item's data. The body's optional "status" publishes
+// or unpublishes it in draft-and-publish collections.
 func UpdateItem(collection models.Collection) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		itemID, err := strconv.Atoi(c.Param("id"))
+		if err != nil || itemID < 1 {
+			validationError(c, "Invalid ID format")
+			return
+		}
+		level, ok := parseLevel(c)
+		if !ok {
+			return
+		}
+
+		var input itemWriteBody
+		if err := c.ShouldBindJSON(&input); err != nil || input.Data == nil {
+			validationError(c, "Invalid request body. Expecting an object with a 'data' key.")
+			return
+		}
+		publish, err := publishFlag(collection, input.Status)
 		if err != nil {
-			c.Set("response", "Invalid ID format")
-			c.Set("status", http.StatusBadRequest)
+			validationError(c, err.Error())
 			return
 		}
 
-		var input struct {
-			Data models.JSONMap `json:"data"`
-		}
-		if err := c.ShouldBindJSON(&input); err != nil {
-			c.Set("response", "Invalid request body")
-			c.Set("status", http.StatusBadRequest)
+		item, err := storage.UpdateItemContent(collection, uint(itemID), input.Data, publish)
+		if err != nil {
+			writeItemError(c, collection, err)
 			return
 		}
 
-		var updatedItem models.Item
-		txErr := database.DB.Transaction(func(tx *gorm.DB) error {
-			processedData, err := models.ValidateItemValues(collection, input.Data, tx)
-			if err != nil {
-				return err
-			}
-			var itemToUpdate models.Item
-			if err := tx.Where("id = ? AND collection_id = ?", itemID, collection.ID).First(&itemToUpdate).Error; err != nil {
-				return gorm.ErrRecordNotFound
-			}
-			itemToUpdate.Data = processedData
-			if err := tx.Save(&itemToUpdate).Error; err != nil {
-				return err
-			}
-			updatedItem = itemToUpdate
-			return nil
-		})
-
-		if txErr != nil {
-			if txErr == gorm.ErrRecordNotFound {
-				c.Set("response", "Item not found")
-				c.Set("status", http.StatusNotFound)
-				return
-			}
-			c.Set("response", txErr.Error())
-			c.Set("status", http.StatusBadRequest)
-			return
-		}
-
-		level, _ := strconv.Atoi(c.DefaultQuery("level", "2"))
-		hydratedData, err := storage.FetchNestedRelations(collection, updatedItem.Data, uint(level))
+		out, err := itemResponse(collection, *item, level, false)
 		if err != nil {
 			c.Set("response", "Failed to populate relations for response")
 			c.Set("status", http.StatusInternalServerError)
 			return
 		}
-
-		c.Set("response", gin.H{
-			"id":         updatedItem.ID,
-			"attributes": hydratedData,
-		})
+		c.Set("response", out)
 		c.Set("status", http.StatusOK)
+	}
+}
+
+// PublishItem publishes (publish=true) or unpublishes an item of a
+// draft-and-publish collection: POST /api/collections/:collection/:id/publish
+// and /unpublish. Requires the update permission.
+func PublishItem(publish bool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !hasPermission(c.GetString("role"), "update") {
+			c.Set("response", "Access denied")
+			c.Set("status", http.StatusForbidden)
+			return
+		}
+		ct, err := storage.GetCollectionByName(c.Param("collection"))
+		if err != nil {
+			c.Set("response", "Collection not found")
+			c.Set("status", http.StatusNotFound)
+			return
+		}
+		itemID, err := strconv.Atoi(c.Param("id"))
+		if err != nil || itemID < 1 {
+			validationError(c, "Invalid ID format")
+			return
+		}
+		level, ok := parseLevel(c)
+		if !ok {
+			return
+		}
+		item, err := storage.SetItemPublished(*ct, uint(itemID), publish)
+		if err != nil {
+			writeItemError(c, *ct, err)
+			return
+		}
+		out, err := itemResponse(*ct, *item, level, false)
+		if err != nil {
+			c.Set("response", "Failed to populate relations for response")
+			c.Set("status", http.StatusInternalServerError)
+			return
+		}
+		c.Set("response", out)
+		c.Set("status", http.StatusOK)
+	}
+}
+
+// writeItemError maps storage write errors to HTTP responses.
+func writeItemError(c *gin.Context, ct models.Collection, err error) {
+	var verr *storage.ItemValidationError
+	switch {
+	case errors.Is(err, storage.ErrItemNotFound):
+		c.Set("response", "Item not found")
+		c.Set("status", http.StatusNotFound)
+	case errors.Is(err, storage.ErrDraftAndPublishDisabled):
+		validationError(c, fmt.Sprintf("collection '%s' does not use draft and publish", ct.Name))
+	case errors.As(err, &verr):
+		validationError(c, verr.Error())
+	default:
+		logger.Log.WithError(err).WithField("collection", ct.Name).Error("Failed to write item")
+		c.Set("response", "Failed to save item")
+		c.Set("status", http.StatusInternalServerError)
 	}
 }
 
 func DeleteItem(ct models.Collection) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		idStr := c.Param("id")
-		id, err := strconv.Atoi(idStr)
-		if err != nil {
-			c.Set("response", "Invalid ID")
-			c.Set("details", err.Error())
-			c.Set("status", http.StatusBadRequest)
+		id, err := strconv.Atoi(c.Param("id"))
+		if err != nil || id < 1 {
+			validationError(c, "Invalid ID")
 			return
 		}
 
-		// Make sure the item belongs to this collection!
-		_, err = storage.GetItemByID(ct.ID, uint(id))
-		if err != nil {
+		// Make sure the item belongs to this collection.
+		if _, err := storage.GetItemByID(ct.ID, uint(id)); err != nil {
 			c.Set("response", "Item not found in this collection")
-			c.Set("details", err.Error())
 			c.Set("status", http.StatusNotFound)
 			return
 		}
 
-		// Now it is safe to delete!
 		if err := storage.DeleteItem(uint(id)); err != nil {
 			c.Set("response", "Failed to delete item")
 			c.Set("details", err.Error())
@@ -298,7 +331,7 @@ func DeleteItem(ct models.Collection) gin.HandlerFunc {
 			return
 		}
 
-		logger.Log.WithField("iem of ", ct.Name).Info("Collection deleted successfully")
+		logger.Log.WithField("collection", ct.Name).WithField("item_id", id).Info("Item deleted")
 		c.Set("response", nil)
 		c.Set("meta", gin.H{})
 		c.Set("status", http.StatusOK)

@@ -9,6 +9,9 @@ interface Attribute {
 export interface Schema {
     attributes: Record<string, any>;
     collectionName?: string;
+    options?: {
+        draftAndPublish?: boolean;
+    };
     info?: {
         displayName?: string;
         pluralName?: string;

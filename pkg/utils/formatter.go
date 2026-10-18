@@ -26,6 +26,10 @@ func FormatCollectionSchema(collection *models.Collection) map[string]any {
 			attrDef["target"] = "api::" + attr.Target + "." + attr.Target
 			attrDef["relation"] = attr.Relation
 		}
+		if attr.Type == "component" {
+			attrDef["component"] = attr.ComponentRef
+			attrDef["repeatable"] = attr.Repeatable
+		}
 		attrSchema[attr.Name] = attrDef
 	}
 
@@ -39,6 +43,7 @@ func FormatCollectionSchema(collection *models.Collection) map[string]any {
 				"pluralName":   plural,
 				"displayName":  capitalize(collection.Name),
 			},
+			"options":    map[string]any{"draftAndPublish": collection.DraftAndPublish},
 			"attributes": attrSchema,
 		},
 	}

@@ -18,12 +18,26 @@ import (
 
 type Collection struct {
 	gorm.Model
-	ID          uint        `json:"id"`
-	Name        string      `json:"name" gorm:"uniqueIndex"`
-	Kind        string      `json:"kind" gorm:"type:varchar(50);not null"`
-	Description string      `json:"description"`
-	Attributes  []Attribute `json:"attributes" gorm:"constraint:OnDelete:CASCADE;"`
+	ID          uint   `json:"id"`
+	Name        string `json:"name" gorm:"uniqueIndex"`
+	Kind        string `json:"kind" gorm:"type:varchar(50);not null"`
+	Description string `json:"description"`
+	// DraftAndPublish enables the draft/publish workflow: items start as
+	// drafts and only published items are visible to readers.
+	DraftAndPublish bool        `json:"draft_and_publish" gorm:"not null;default:false"`
+	Attributes      []Attribute `json:"attributes" gorm:"constraint:OnDelete:CASCADE;"`
+
+	// DraftAndPublishSet records whether the input named the option, so an
+	// update that leaves it out keeps the current value.
+	DraftAndPublishSet bool `json:"-" gorm:"-"`
 }
+
+// ReservedAttributeNames are system fields included in every item response;
+// attributes cannot use them.
+var ReservedAttributeNames = []string{"id", "createdAt", "updatedAt", "publishedAt"}
+
+// ReservedDraftAttributeNames are also reserved when draft and publish is on.
+var ReservedDraftAttributeNames = []string{"status"}
 
 func ParseCollectionInput(input map[string]any) (Collection, error) {
 	// Initialize a Collection struct
@@ -44,6 +58,25 @@ func ParseCollectionInput(input map[string]any) (Collection, error) {
 
 	if description, ok := input["description"].(string); ok {
 		collection.Description = description
+	}
+
+	// Accept the option at the top level, or under "options" as the admin
+	// schema endpoints return it.
+	sources := []map[string]any{input}
+	if opts, ok := input["options"].(map[string]any); ok {
+		sources = append(sources, opts)
+	}
+	for _, src := range sources {
+		for _, key := range []string{"draft_and_publish", "draftAndPublish"} {
+			if v, ok := src[key]; ok {
+				b, isBool := v.(bool)
+				if !isBool {
+					return collection, fmt.Errorf("field '%s' must be a boolean", key)
+				}
+				collection.DraftAndPublish = b
+				collection.DraftAndPublishSet = true
+			}
+		}
 	}
 
 	// Extract and transform attributes
@@ -105,6 +138,17 @@ func mapToAttribute(attrMap map[string]any, attribute *Attribute) error {
 		attribute.Pattern = pattern
 	}
 
+	if attribute.Type == "component" {
+		ref, ok := attrMap["component"].(string)
+		if !ok || ref == "" {
+			return fmt.Errorf("missing or invalid field 'component' for type 'component'")
+		}
+		attribute.ComponentRef = ref
+		if repeatable, ok := attrMap["repeatable"].(bool); ok {
+			attribute.Repeatable = repeatable
+		}
+	}
+
 	// Handle relation-specific fields
 	if attribute.Type == "relation" {
 		if relation, ok := attrMap["relation"].(string); ok {
@@ -142,6 +186,20 @@ func ValidateCollectionSchema(ct Collection) error {
 		}
 		attributeNames[attribute.Name] = true
 
+		if slices.Contains(ReservedAttributeNames, attribute.Name) {
+			return fmt.Errorf("attribute name '%s' is reserved", attribute.Name)
+		}
+		if ct.DraftAndPublish && slices.Contains(ReservedDraftAttributeNames, attribute.Name) {
+			return fmt.Errorf("attribute name '%s' is reserved when draft and publish is enabled", attribute.Name)
+		}
+
+		if attribute.Type == "component" {
+			if err := validateComponentReference(attribute.Name, attribute.ComponentRef); err != nil {
+				return err
+			}
+			continue
+		}
+
 		// --- Handle the "relation" type as a special case FIRST ---
 		if attribute.Type == "relation" {
 			if attribute.Relation == "" || attribute.Target == "" {
@@ -159,6 +217,9 @@ func ValidateCollectionSchema(ct Collection) error {
 		}
 
 		// --- For all other types, use the centralized TypeRegistry ---
+		if attribute.Type == "dynamiczone" {
+			return fmt.Errorf("attribute '%s': type 'dynamiczone' is not supported yet", attribute.Name)
+		}
 		if _, err := types.GetGraphQLType(attribute.Type); err != nil {
 			return fmt.Errorf("invalid type '%s' for attribute '%s': %w", attribute.Type, attribute.Name, err)
 		}
@@ -282,7 +343,7 @@ func validateAttributeValue(attribute Attribute, value any) error {
 			return fmt.Errorf("attribute '%s' must be a valid JSON object", attribute.Name)
 		}
 	default:
-		// If, for example, "relation" or "component" is encountered, we skip or return an error
+		// Relations and components are validated by their own functions.
 		return fmt.Errorf("unsupported or special attribute type '%s'; must be handled separately", attribute.Type)
 	}
 

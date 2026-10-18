@@ -95,18 +95,22 @@ curl -s -X POST $GOHEAD/api/collections/articles -H "$JSON" -H "$AUTH" \
 {
   "data": {
     "id": 2,
-    "attributes": {
-      "author": { "data": { "id": 1 } },
-      "body": "<p>First post</p>",
-      "category": "news",
-      "published": true,
-      "title": "Hello GoHead",
-      "views": 42
-    }
-  },
-  "meta": {}
+    "title": "Hello GoHead",
+    "body": "<p>First post</p>",
+    "views": 42,
+    "published": true,
+    "category": "news",
+    "author": { "id": 1, "name": "Ada Lovelace", "bio": "First programmer.",
+                "createdAt": "2026-10-18T09:00:00Z", "updatedAt": "2026-10-18T09:00:00Z" },
+    "createdAt": "2026-10-18T09:00:01Z",
+    "updatedAt": "2026-10-18T09:00:01Z"
+  }
 }
 ```
+
+Every item has this flat shape, in lists and single reads alike. Here `published` is an
+ordinary attribute; for a real review workflow, enable
+[draft and publish](../guides/content-modeling.md#draft-and-publish) on the collection.
 
 !!! note "Item IDs are global"
     Items of every collection share one ID sequence, which is why the first article is `2`.
@@ -156,10 +160,11 @@ curl -s -G $GOHEAD/api/collections/articles -H "$AUTH" \
 ```json
 {
   "data": [
-    { "id": 3, "title": "Filtering 101", "views": 250, "published": true, "category": "tutorial", "author": null },
+    { "id": 3, "title": "Filtering 101", "views": 250, "published": true, "category": "tutorial",
+      "author": null, "createdAt": "…", "updatedAt": "…" },
     { "id": 2, "title": "Hello GoHead", "views": 42, "published": true, "category": "news",
-      "body": "<p>First post</p>",
-      "author": { "id": 1, "name": "Ada Lovelace", "bio": "First programmer." } }
+      "body": "<p>First post</p>", "createdAt": "…", "updatedAt": "…",
+      "author": { "id": 1, "name": "Ada Lovelace", "bio": "First programmer.", "createdAt": "…", "updatedAt": "…" } }
   ],
   "meta": { "pagination": { "page": 1, "pageSize": 10, "pageCount": 1, "total": 2 } }
 }

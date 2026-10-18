@@ -39,6 +39,7 @@ permissions as a human.
 |---|---|
 | ⚡ **Schema in, API out** | Define collections over HTTP. REST endpoints and a GraphQL schema appear immediately, no codegen, no restart. |
 | 🤖 **Agents built in** | LLM agents triggered by content events, webhooks or cron, with OpenAI, Anthropic or Ollama, and typed functions to read and write content. |
+| 📝 **Editorial workflow** | Draft and publish per collection, reusable (and repeatable) components, one flat JSON shape for every item. |
 | 🔎 **Real querying** | Filters (`$eq $ne $lt $gte $contains`…), multi-key sort, pagination, relation population, batch writes in one transaction. |
 | 🔐 **Secure by default** | Roles enforced identically in REST and GraphQL, schema-validated writes, masked secrets, signed images, distroless containers. |
 | 🪶 **One binary** | API, worker, dispatcher and scheduler in one Go binary. SQLite on your laptop, PostgreSQL or MySQL in production. |
@@ -153,8 +154,7 @@ The **[GoHead Handbook](https://gohead-cms.github.io/gohead/)** covers everythin
 ## Status
 
 GoHead is **pre-1.0**: the API is usable and tested, and may still change between minor
-versions (see the [changelog](CHANGELOG.md)). Known gaps: media uploads, draft/publish workflow,
-and component values in items.
+versions (see the [changelog](CHANGELOG.md)). Known gaps: media uploads and dynamic zones.
 
 ## Contributing
 

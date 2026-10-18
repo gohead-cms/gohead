@@ -10,8 +10,10 @@ import {
   IconButton,
   HStack,
   Box,
+  Badge,
+  Tooltip,
 } from "@chakra-ui/react";
-import { FiEdit, FiTrash2 } from "react-icons/fi";
+import { FiEdit, FiTrash2, FiEye, FiEyeOff } from "react-icons/fi";
 import { Schema } from "../../../shared/types";
 import { ContentItem } from "../hooks";
 import { EmptyState } from "./EmptyState";
@@ -19,7 +21,8 @@ import { EmptyState } from "./EmptyState";
 interface ContentTableProps {
   schema: Schema;
   items: ContentItem[];
-  onEdit: (item: ContentItem) => void; 
+  onEdit: (item: ContentItem) => void;
+  onTogglePublish?: (item: ContentItem) => void;
 }
 
 // Function to get a displayable value from an item
@@ -36,7 +39,8 @@ const getDisplayValue = (value: any): string => {
     return String(value);
 }
 
-export function ContentTable({ schema, items, onEdit }: ContentTableProps) {
+export function ContentTable({ schema, items, onEdit, onTogglePublish }: ContentTableProps) {
+  const drafts = !!schema.options?.draftAndPublish;
   // Determine table headers from the schema, prioritizing common fields
   const getHeaders = () => {
     const attributes = Object.keys(schema.attributes);
@@ -66,6 +70,7 @@ export function ContentTable({ schema, items, onEdit }: ContentTableProps) {
               {headers.map((header) => (
                 <Th key={header} textTransform="capitalize">{header.replace(/_/g, ' ')}</Th>
               ))}
+              {drafts && <Th>Status</Th>}
               <Th isNumeric>Actions</Th>
             </Tr>
           </Thead>
@@ -74,12 +79,30 @@ export function ContentTable({ schema, items, onEdit }: ContentTableProps) {
               <Tr key={item.id}>
                 {headers.map((header) => (
                   <Td key={`${item.id}-${header}`}>
-                    {/* FIX: Access the id directly, and other properties from the nested 'attributes' object */}
-                    {getDisplayValue(header === 'id' ? item.id : item.attributes?.[header])}
+                    {/* Items are flat: attributes sit next to id. */}
+                    {getDisplayValue(item[header])}
                   </Td>
                 ))}
+                {drafts && (
+                  <Td>
+                    <Badge colorScheme={item.status === 'published' ? 'green' : 'gray'}>
+                      {item.status}
+                    </Badge>
+                  </Td>
+                )}
                 <Td isNumeric>
                   <HStack spacing={1} justify="flex-end">
+                    {drafts && onTogglePublish && (
+                      <Tooltip label={item.status === 'published' ? 'Unpublish' : 'Publish'}>
+                        <IconButton
+                          aria-label={item.status === 'published' ? 'Unpublish item' : 'Publish item'}
+                          icon={item.status === 'published' ? <FiEyeOff /> : <FiEye />}
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => onTogglePublish(item)}
+                        />
+                      </Tooltip>
+                    )}
                     <IconButton
                       aria-label="Edit item"
                       icon={<FiEdit />}

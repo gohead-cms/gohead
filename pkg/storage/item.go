@@ -2,8 +2,10 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
+	"time"
 
 	"github.com/gohead-cms/gohead/internal/agent/events"
 	"github.com/gohead-cms/gohead/internal/models"
@@ -32,22 +34,51 @@ func SaveItem(collection models.Collection, itemData models.JSONMap) (*models.It
 	return items[0], nil
 }
 
-// SaveItems validates and creates several items atomically: either all are
+// SaveItems validates and creates several items atomically, as drafts in
+// draft-and-publish collections. See CreateItems.
+func SaveItems(collection models.Collection, batch []models.JSONMap) ([]*models.Item, error) {
+	inputs := make([]ItemInput, len(batch))
+	for i, data := range batch {
+		inputs[i] = ItemInput{Data: data}
+	}
+	return CreateItems(collection, inputs)
+}
+
+// ItemInput is one item to create.
+type ItemInput struct {
+	Data models.JSONMap
+	// Publish creates the item as published. It is ignored unless the
+	// collection uses draft and publish (other items are always visible).
+	Publish bool
+}
+
+// ErrItemNotFound is returned when an item does not exist in a collection.
+var ErrItemNotFound = errors.New("item not found")
+
+// ErrDraftAndPublishDisabled is returned when publishing an item of a
+// collection that does not use draft and publish.
+var ErrDraftAndPublishDisabled = errors.New("this collection does not use draft and publish")
+
+// CreateItems validates and creates several items atomically: either all are
 // stored or none. Nested relations created during validation are part of the
 // same transaction, and the stored data is the processed (validated) data.
 // Events are published only after a successful commit.
-func SaveItems(collection models.Collection, batch []models.JSONMap) ([]*models.Item, error) {
-	created := make([]*models.Item, 0, len(batch))
+func CreateItems(collection models.Collection, inputs []ItemInput) ([]*models.Item, error) {
+	created := make([]*models.Item, 0, len(inputs))
+	now := models.APITime(time.Now())
 
 	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
-		for i, data := range batch {
-			processedData, err := models.ValidateItemValues(collection, data, tx)
+		for i, in := range inputs {
+			processedData, err := models.ValidateItemValues(collection, in.Data, tx)
 			if err != nil {
 				return &ItemValidationError{Index: i, Err: err}
 			}
 			item := &models.Item{
 				CollectionID: collection.ID,
 				Data:         processedData,
+			}
+			if collection.DraftAndPublish && in.Publish {
+				item.PublishedAt = &now
 			}
 			if err := tx.Create(item).Error; err != nil {
 				return err
@@ -62,8 +93,108 @@ func SaveItems(collection models.Collection, batch []models.JSONMap) ([]*models.
 
 	for _, item := range created {
 		publishEvent(database.DB, events.EventTypeItemCreated, item)
+		if item.PublishedAt != nil {
+			publishEvent(database.DB, events.EventTypeItemPublished, item)
+		}
 	}
 	return created, nil
+}
+
+// UpdateItemContent validates data (the item's complete new data) and saves
+// it. publish changes the publication state of a draft-and-publish item
+// (nil leaves it unchanged). It returns ErrItemNotFound when the item is not
+// in the collection, an *ItemValidationError for invalid data, and publishes
+// item:updated (plus item:published / item:unpublished on a state change).
+func UpdateItemContent(collection models.Collection, itemID uint, data models.JSONMap, publish *bool) (*models.Item, error) {
+	if publish != nil && !collection.DraftAndPublish {
+		return nil, ErrDraftAndPublishDisabled
+	}
+	var item models.Item
+	var transition events.EventType
+	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("id = ? AND collection_id = ?", itemID, collection.ID).First(&item).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrItemNotFound
+			}
+			return err
+		}
+		processed, err := models.ValidateItemUpdate(collection, data, tx, item.ID)
+		if err != nil {
+			return &ItemValidationError{Err: err}
+		}
+		// Write only what this request changes, so a concurrent publish or
+		// unpublish of the same item is not overwritten.
+		if err := tx.Model(&item).Updates(map[string]any{"data": processed}).Error; err != nil {
+			return err
+		}
+		if publish != nil {
+			if transition, err = setPublishedTx(tx, &item, *publish); err != nil {
+				return err
+			}
+		}
+		return reloadItem(tx, &item)
+	})
+	if txErr != nil {
+		return nil, txErr
+	}
+	publishEvent(database.DB, events.EventTypeItemUpdated, &item)
+	if transition != "" {
+		publishEvent(database.DB, transition, &item)
+	}
+	return &item, nil
+}
+
+// SetItemPublished publishes or unpublishes an item of a draft-and-publish
+// collection. Publishing an already published item keeps its publishedAt.
+func SetItemPublished(collection models.Collection, itemID uint, publish bool) (*models.Item, error) {
+	if !collection.DraftAndPublish {
+		return nil, ErrDraftAndPublishDisabled
+	}
+	var item models.Item
+	var transition events.EventType
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("id = ? AND collection_id = ?", itemID, collection.ID).First(&item).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrItemNotFound
+			}
+			return err
+		}
+		var err error
+		if transition, err = setPublishedTx(tx, &item, publish); err != nil {
+			return err
+		}
+		return reloadItem(tx, &item)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if transition != "" {
+		publishEvent(database.DB, transition, &item)
+	}
+	return &item, nil
+}
+
+// setPublishedTx changes the publication state with a conditional update,
+// so that of two concurrent requests only the one that actually changes
+// the state reports a transition (and emits the event).
+func setPublishedTx(tx *gorm.DB, item *models.Item, publish bool) (events.EventType, error) {
+	q := tx.Model(&models.Item{}).Where("id = ?", item.ID)
+	var res *gorm.DB
+	var event events.EventType
+	if publish {
+		res = q.Where("published_at IS NULL").Update("published_at", models.APITime(time.Now()))
+		event = events.EventTypeItemPublished
+	} else {
+		res = q.Where("published_at IS NOT NULL").Update("published_at", nil)
+		event = events.EventTypeItemUnpublished
+	}
+	if res.Error != nil {
+		return "", fmt.Errorf("failed to update item: %w", res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return "", nil
+	}
+	return event, nil
 }
 
 func publishEvent(db *gorm.DB, eventType events.EventType, item *models.Item) {
@@ -107,8 +238,27 @@ func GetItemByID(collectionID uint, itemID uint) (*models.Item, error) {
 	return &item, nil
 }
 
-// GetItemsByOffset lists items using offset/limit pagination (as GraphQL does).
-func GetItemsByOffset(collectionID uint, offset, limit int) ([]models.Item, int, error) {
+// GetVisibleItem fetches an item of the collection. With publishedOnly, a
+// draft of a draft-and-publish collection is reported as not found.
+func GetVisibleItem(ct models.Collection, itemID uint, publishedOnly bool) (*models.Item, error) {
+	q := database.DB.Where("id = ? AND collection_id = ?", itemID, ct.ID)
+	if publishedOnly && ct.DraftAndPublish {
+		q = q.Where("published_at IS NOT NULL")
+	}
+	var item models.Item
+	if err := q.First(&item).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrItemNotFound
+		}
+		return nil, err
+	}
+	return &item, nil
+}
+
+// GetItemsByOffset lists items using offset/limit pagination (as GraphQL
+// does). status filters draft-and-publish collections: "" (all),
+// models.StatusPublished or models.StatusDraft.
+func GetItemsByOffset(ct models.Collection, offset, limit int, status string) ([]models.Item, int, error) {
 	if offset < 0 {
 		offset = 0
 	}
@@ -117,7 +267,7 @@ func GetItemsByOffset(collectionID uint, offset, limit int) ([]models.Item, int,
 	}
 	var items []models.Item
 	var total int64
-	q := database.DB.Model(&models.Item{}).Where("collection_id = ?", collectionID)
+	q := withStatus(database.DB.Model(&models.Item{}).Where("collection_id = ?", ct.ID), ct, status)
 	if err := q.Session(&gorm.Session{}).Count(&total).Error; err != nil {
 		return nil, 0, fmt.Errorf("failed to count items: %w", err)
 	}
@@ -224,8 +374,21 @@ func DeleteItem(id uint) error {
 	return nil
 }
 
+// FetchNestedRelations replaces relation IDs in data with the related items,
+// down to level levels, including drafts. See PopulateRelations.
 func FetchNestedRelations(collection models.Collection, data models.JSONMap, level uint) (models.JSONMap, error) {
+	return PopulateRelations(collection, data, level, false)
+}
+
+// PopulateRelations replaces relation IDs in data with the related items
+// (in the API's flat item shape), down to level levels. With publishedOnly,
+// drafts of draft-and-publish target collections are left out, as are
+// related items that no longer exist.
+func PopulateRelations(collection models.Collection, data models.JSONMap, level uint, publishedOnly bool) (models.JSONMap, error) {
 	if level == 0 {
+		if publishedOnly {
+			return hideDraftIDs(collection, data)
+		}
 		return data, nil
 	}
 	// We'll mutate a copy
@@ -249,9 +412,9 @@ func FetchNestedRelations(collection models.Collection, data models.JSONMap, lev
 			continue
 		}
 
-		// Fetch target collection
+		// Fetch target collection (with attributes, for deeper levels)
 		var targetCollection models.Collection
-		err := database.DB.Where("name = ?", attr.Target).First(&targetCollection).Error
+		err := database.DB.Preload("Attributes").Where("name = ?", attr.Target).First(&targetCollection).Error
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch target collection '%s': %w", attr.Target, err)
 		}
@@ -263,38 +426,25 @@ func FetchNestedRelations(collection models.Collection, data models.JSONMap, lev
 				result[attr.Name] = nil
 				break
 			}
-			nested, err := fetchItemWithRelations(targetCollection, id, level-1)
+			nested, err := fetchItemWithRelations(targetCollection, id, level-1, publishedOnly)
 			if err != nil {
 				return nil, fmt.Errorf("failed to fetch nested item for '%s': %w", attr.Name, err)
 			}
-			result[attr.Name] = nested
+			if nested == nil {
+				result[attr.Name] = nil
+			} else {
+				result[attr.Name] = nested
+			}
 		case "manyToMany":
-			var nestedItems []models.JSONMap
-			logger.Log.WithField("netste", nestedItems)
-			switch ids := raw.(type) {
-			case []any:
-				for _, elem := range ids {
-					id := models.ToUint(elem)
-					if id == 0 {
-						continue
-					}
-					nested, err := fetchItemWithRelations(targetCollection, id, level-1)
-					if err != nil {
-						return nil, fmt.Errorf("failed to fetch nested item for '%s': %w", attr.Name, err)
-					}
+			nestedItems := []models.JSONMap{}
+			for _, id := range models.ToUintSlice(raw) {
+				nested, err := fetchItemWithRelations(targetCollection, id, level-1, publishedOnly)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch nested item for '%s': %w", attr.Name, err)
+				}
+				if nested != nil {
 					nestedItems = append(nestedItems, nested)
 				}
-			case []float64:
-				for _, elem := range ids {
-					id := uint(elem)
-					nested, err := fetchItemWithRelations(targetCollection, id, level-1)
-					if err != nil {
-						return nil, fmt.Errorf("failed to fetch nested item for '%s': %w", attr.Name, err)
-					}
-					nestedItems = append(nestedItems, nested)
-				}
-			default:
-				// If not an array, just output empty array
 			}
 			result[attr.Name] = nestedItems
 		}
@@ -302,13 +452,82 @@ func FetchNestedRelations(collection models.Collection, data models.JSONMap, lev
 	return result, nil
 }
 
-func fetchItemWithRelations(collection models.Collection, itemID uint, level uint) (models.JSONMap, error) {
-	var item models.Item
-
-	err := database.DB.Where("id = ? AND collection_id = ?", itemID, collection.ID).First(&item).Error
+// fetchItemWithRelations returns the related item in the flat API shape, or
+// nil when it does not exist (or is a hidden draft).
+func fetchItemWithRelations(collection models.Collection, itemID uint, level uint, publishedOnly bool) (models.JSONMap, error) {
+	item, err := GetVisibleItem(collection, itemID, publishedOnly)
+	if errors.Is(err, ErrItemNotFound) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
-	item.Data["id"] = item.ID
-	return FetchNestedRelations(collection, item.Data, level)
+	data, err := PopulateRelations(collection, item.Data, level, publishedOnly)
+	if err != nil {
+		return nil, err
+	}
+	return models.ItemResponse(collection, *item, data), nil
+}
+
+// hideDraftIDs removes, from unpopulated relation values, the IDs of drafts
+// (and of items that no longer exist) in draft-and-publish targets, so even
+// IDs of hidden items do not reach readers.
+func hideDraftIDs(collection models.Collection, data models.JSONMap) (models.JSONMap, error) {
+	result := make(models.JSONMap, len(data))
+	maps.Copy(result, data)
+	for _, attr := range collection.Attributes {
+		raw, exists := data[attr.Name]
+		if attr.Type != "relation" || !exists || raw == nil {
+			continue
+		}
+		var target models.Collection
+		if err := database.DB.Where("name = ?", attr.Target).First(&target).Error; err != nil {
+			return nil, fmt.Errorf("failed to fetch target collection '%s': %w", attr.Target, err)
+		}
+		if !target.DraftAndPublish {
+			continue
+		}
+		ids := models.ToUintSlice(raw)
+		if attr.Relation != "manyToMany" {
+			ids = nil
+			if id := models.ToUint(raw); id != 0 {
+				ids = []uint{id}
+			}
+		}
+		var visible []uint
+		if len(ids) > 0 {
+			if err := database.DB.Model(&models.Item{}).
+				Where("collection_id = ? AND id IN ? AND published_at IS NOT NULL", target.ID, ids).
+				Pluck("id", &visible).Error; err != nil {
+				return nil, err
+			}
+		}
+		keep := make(map[uint]bool, len(visible))
+		for _, id := range visible {
+			keep[id] = true
+		}
+		if attr.Relation == "manyToMany" {
+			out := []uint{}
+			for _, id := range ids {
+				if keep[id] {
+					out = append(out, id)
+				}
+			}
+			result[attr.Name] = out
+		} else if len(ids) == 0 || !keep[ids[0]] {
+			result[attr.Name] = nil
+		}
+	}
+	return result, nil
+}
+
+// reloadItem re-reads an item into a fresh struct, so columns set to NULL
+// (such as published_at after unpublishing) are not left at old values.
+func reloadItem(tx *gorm.DB, item *models.Item) error {
+	var fresh models.Item
+	if err := tx.First(&fresh, item.ID).Error; err != nil {
+		return err
+	}
+	*item = fresh
+	return nil
 }

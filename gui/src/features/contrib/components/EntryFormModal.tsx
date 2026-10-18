@@ -65,8 +65,12 @@ export function EntryFormModal({ isOpen, onClose, schema, itemToEdit, onSubmit }
   useEffect(() => {
     if (isOpen) {
       if (itemToEdit) {
-        // If editing, pre-fill the form with the item's attributes
-        setFormData(itemToEdit.attributes || {});
+        // If editing, pre-fill the form with the item's attributes (items
+        // are flat; drop the system fields).
+        const systemFields = ['id', 'createdAt', 'updatedAt', 'publishedAt', 'status'];
+        setFormData(Object.fromEntries(
+          Object.entries(itemToEdit).filter(([key]) => !systemFields.includes(key) || key in schema.attributes),
+        ));
       } else {
         // If creating, initialize a blank form
         const initialData = Object.entries(schema.attributes).reduce((acc, [key, attr]) => {

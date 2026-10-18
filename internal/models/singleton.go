@@ -73,6 +73,16 @@ func ValidateSingletonSchema(singleton Singleton) error {
 		}
 		seen[attr.Name] = true
 
+		if attr.Name == "id" || attr.Name == "createdAt" || attr.Name == "updatedAt" {
+			return fmt.Errorf("attribute name '%s' is reserved", attr.Name)
+		}
+		if attr.Type == "component" {
+			if err := validateComponentReference(attr.Name, attr.ComponentRef); err != nil {
+				return err
+			}
+			continue
+		}
+
 		if attr.Type == "relation" {
 			if attr.Relation == "" || attr.Target == "" {
 				return fmt.Errorf("relationship '%s' must define 'relation' and 'target'", attr.Name)

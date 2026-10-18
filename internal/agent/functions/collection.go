@@ -3,13 +3,13 @@ package functions
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/storage"
 	"github.com/gohead-cms/gohead/pkg/utils"
-	"gorm.io/gorm"
 )
 
 var StaticFunctionMap = make(map[string]ToolFunc)
@@ -89,22 +89,17 @@ func upsertCollectionItem(ctx context.Context, args any) (string, error) {
 		return fmt.Sprintf(`{"status": "error", "message": "%s"}`, err.Error()), nil
 	}
 
-	itemID, _ := strconv.ParseUint(itemIDStr, 10, 64)
+	itemID, _ := strconv.ParseUint(itemIDStr, 10, 32)
 
 	// 2. Decide whether to UPDATE or CREATE
 	if itemID > 0 {
-		// Attempt to UPDATE an existing item
-		_, err := storage.GetItemByID(collection.ID, uint(itemID))
-		if err != nil {
-			if err == gorm.ErrRecordNotFound {
+		// UPDATE an existing item, validated like API writes.
+		if _, err := storage.UpdateItemContent(*collection, uint(itemID), data, nil); err != nil {
+			if errors.Is(err, storage.ErrItemNotFound) {
 				return fmt.Sprintf(`{"status": "error", "message": "item with ID %d not found in collection '%s' for update"}`, itemID, collectionName), nil
 			}
-			return fmt.Sprintf(`{"status": "error", "message": "error checking for item: %s"}`, err.Error()), nil
-		}
-
-		err = storage.UpdateItem(uint(itemID), data)
-		if err != nil {
-			return fmt.Sprintf(`{"status": "error", "message": "%s"}`, err.Error()), nil
+			msg, _ := json.Marshal(err.Error())
+			return fmt.Sprintf(`{"status": "error", "message": %s}`, msg), nil
 		}
 
 		result := map[string]any{"status": "success", "item_id": itemID, "action": "updated"}
@@ -190,7 +185,7 @@ func deleteCollectionItem(ctx context.Context, args any) (string, error) {
 		return `{"status": "error", "message": "missing required parameter: item_id"}`, nil
 	}
 
-	itemID, err := strconv.ParseUint(itemIDStr, 10, 64)
+	itemID, err := strconv.ParseUint(itemIDStr, 10, 32)
 	if err != nil || itemID == 0 {
 		return `{"status": "error", "message": "invalid item_id format"}`, nil
 	}

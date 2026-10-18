@@ -2,6 +2,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gohead-cms/gohead/internal/models"
@@ -74,9 +75,10 @@ func UpdateComponent(c *gin.Context) {
 
 	if err := storage.UpdateComponent(name, &updatedCmp); err != nil {
 		c.Set("response", err.Error())
-		c.Set("status", http.StatusBadRequest)
+		c.Set("status", componentErrorStatus(err))
 		return
 	}
+	reloadGraphQLSchema() // component types are part of the GraphQL schema
 
 	c.Set("response", "component updated successfully")
 	c.Set("status", http.StatusOK)
@@ -87,9 +89,10 @@ func DeleteComponent(c *gin.Context) {
 	name := c.Param("name")
 	if err := storage.DeleteComponent(name); err != nil {
 		c.Set("response", err.Error())
-		c.Set("status", http.StatusBadRequest)
+		c.Set("status", componentErrorStatus(err))
 		return
 	}
+	reloadGraphQLSchema()
 
 	c.Set("response", "component deleted successfully")
 	c.Set("status", http.StatusOK)
@@ -107,4 +110,11 @@ func GetComponents(c *gin.Context) {
 	c.Set("response", cmps)
 	c.Set("meta", gin.H{"total": len(cmps)})
 	c.Set("status", http.StatusOK)
+}
+
+func componentErrorStatus(err error) int {
+	if errors.Is(err, storage.ErrComponentInUse) {
+		return http.StatusConflict
+	}
+	return http.StatusBadRequest
 }

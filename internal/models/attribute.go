@@ -25,8 +25,9 @@ type BaseAttribute struct {
 	Target   string `json:"target,omitempty"`   // Target collection name for relationships
 	Relation string `json:"relation,omitempty"` // e.g., "oneToOne", "oneToMany"
 
-	// Component-specific field
-	ComponentRef string `json:"component,omitempty"` // Name of the referenced component if Type="component"
+	// Component-specific fields
+	ComponentRef string `json:"component,omitempty"`  // Name of the referenced component if Type="component"
+	Repeatable   bool   `json:"repeatable,omitempty"` // Type="component": the value is a list of components
 }
 
 // Attribute defines the structure for fields in a collection, single type, or component.
@@ -45,9 +46,10 @@ type Attribute struct {
 	CustomErrors JSONMap  `gorm:"type:json" json:"custom_errors,omitempty"`
 
 	// Relationship-specific fields
-	Target       string `json:"target,omitempty"`    // Target collection for relationships, or component name
-	Relation     string `json:"relation,omitempty"`  // e.g., "oneToOne", "oneToMany", "manyToMany", for relationships
-	ComponentRef string `json:"component,omitempty"` // If Type="component", which component is referenced
+	Target       string `json:"target,omitempty"`     // Target collection for relationships, or component name
+	Relation     string `json:"relation,omitempty"`   // e.g., "oneToOne", "oneToMany", "manyToMany", for relationships
+	ComponentRef string `json:"component,omitempty"`  // If Type="component", which component is referenced
+	Repeatable   bool   `json:"repeatable,omitempty"` // Type="component": the value is a list of components
 
 	// Foreign keys (an attribute can belong to either a Collection, a SingleType, or a Component)
 	CollectionID *uint       `json:"collection_id,omitempty"`
@@ -60,22 +62,44 @@ type Attribute struct {
 	Component   *Component `json:"-" gorm:"constraint:OnDelete:CASCADE;"`
 }
 
-// mapToAttribute populates a BaseAttribute struct from a map.
+// mapToBaseAttribute populates a BaseAttribute (used by components) from a
+// map, accepting the same keys as collection attributes.
 func mapToBaseAttribute(data map[string]interface{}, attr *BaseAttribute) error {
-	if t, ok := data["type"].(string); ok {
-		attr.Type = t
-	} else {
+	if _, ok := data["type"].(string); !ok {
 		return fmt.Errorf("attribute is missing 'type'")
 	}
-	// ... map other fields like required, unique, etc.
-	if r, ok := data["required"].(bool); ok {
-		attr.Required = r
+	full := Attribute{Name: attr.Name}
+	if err := mapToAttribute(data, &full); err != nil {
+		return err
 	}
-	if c, ok := data["component"].(string); ok {
-		attr.ComponentRef = c
-	}
-	// Add other fields as needed
+	attr.Type = full.Type
+	attr.Required = full.Required
+	attr.Unique = full.Unique
+	attr.Options = full.Options
+	attr.Min = full.Min
+	attr.Max = full.Max
+	attr.Pattern = full.Pattern
+	attr.Target = full.Target
+	attr.Relation = full.Relation
+	attr.ComponentRef = full.ComponentRef
+	attr.Repeatable = full.Repeatable
 	return nil
+}
+
+// toAttribute converts a component attribute so it can go through the same
+// value validation as collection attributes.
+func (b BaseAttribute) toAttribute() Attribute {
+	return Attribute{
+		Name:         b.Name,
+		Type:         b.Type,
+		Required:     b.Required,
+		Options:      b.Options,
+		Min:          b.Min,
+		Max:          b.Max,
+		Pattern:      b.Pattern,
+		ComponentRef: b.ComponentRef,
+		Repeatable:   b.Repeatable,
+	}
 }
 
 // validateAttributeType checks the attribute schema for constraints and valid types

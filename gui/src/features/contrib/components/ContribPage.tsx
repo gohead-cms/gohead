@@ -35,23 +35,23 @@ export function ContributionsPage() {
 
   const currentCollectionSchema = collections.find(c => c.schema.collectionName === selectedCollection)?.schema;
 
-  const handleAddItem = async (data: Partial<ContentItem>) => {
+  const handleSaveItem = async (data: Partial<ContentItem>, id?: string | number) => {
     if (!selectedCollection) return;
 
     try {
-      const response = await apiFetchWithAuth(`/api/collections/${selectedCollection}`, {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
+      const response = await apiFetchWithAuth(
+        id ? `/api/collections/${selectedCollection}/${id}` : `/api/collections/${selectedCollection}`,
+        { method: id ? 'PUT' : 'POST', body: JSON.stringify(data) },
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error?.message || "Failed to create entry.");
+        throw new Error(errorData.error?.message || "Failed to save entry.");
       }
-      
+
       toast({
-        title: "Entry Created",
-        description: "The new entry was saved successfully.",
+        title: id ? "Entry Updated" : "Entry Created",
+        description: "The entry was saved successfully.",
         status: "success",
         duration: 5000,
         isClosable: true,
@@ -79,7 +79,24 @@ export function ContributionsPage() {
 
   const handleEditClick = (item: ContentItem) => {
     setEditingItem(item);
-    onOpen(); 
+    onOpen();
+  };
+
+  const handleQuickAdd = () => {
+    setEditingItem(null);
+    onOpen();
+  };
+
+  const handleTogglePublish = async (item: ContentItem) => {
+    if (!selectedCollection) return;
+    const action = item.status === 'published' ? 'unpublish' : 'publish';
+    const response = await apiFetchWithAuth(`/api/collections/${selectedCollection}/${item.id}/${action}`, { method: 'POST' });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      toast({ title: `Could not ${action}`, description: errorData.error?.message, status: "error", duration: 5000, isClosable: true });
+      return;
+    }
+    await refetch();
   };
 
   return (
@@ -105,7 +122,7 @@ export function ContributionsPage() {
               </Box>
               {/* Button Group for adding content */}
               <HStack>
-                <Button bg="white" variant="outline"  size="sm" leftIcon={<Icon as={FiPlus} />} onClick={onOpen}>
+                <Button bg="white" variant="outline"  size="sm" leftIcon={<Icon as={FiPlus} />} onClick={handleQuickAdd}>
                   Quick Add
                 </Button>
                 <Button colorScheme="purple" size="sm" leftIcon={<Icon as={FaPenNib} />} onClick={handleContribClick}>
@@ -117,6 +134,7 @@ export function ContributionsPage() {
               schema={currentCollectionSchema}
               items={content.items}
               onEdit={handleEditClick}
+              onTogglePublish={handleTogglePublish}
             />
           </>
         )}
@@ -126,7 +144,8 @@ export function ContributionsPage() {
                 isOpen={isOpen}
                 onClose={onClose}
                 schema={currentCollectionSchema}
-                onSubmit={handleAddItem}
+                itemToEdit={editingItem}
+                onSubmit={handleSaveItem}
             />
         )}
 
