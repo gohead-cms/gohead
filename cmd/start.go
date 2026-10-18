@@ -384,6 +384,9 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *medi
 			agents.GET("/:name", handlers.GetAgent)
 			agents.PUT("/:name", handlers.UpdateAgent)
 			agents.DELETE("/:name", handlers.DeleteAgent)
+			agents.GET("/:name/runs", handlers.ListAgentRuns)
+			agents.GET("/:name/runs/:run", handlers.GetAgentRun)
+			agents.GET("/:name/usage", handlers.GetAgentUsage)
 		}
 	}
 

@@ -6,6 +6,71 @@ import type { Node } from '@xyflow/react';
 export interface AgentFunction {
   name: string;
   description: string;
+  impl_key?: string;
+  /** collections.* functions: the collections they may use (empty: all). */
+  collections?: string[];
+}
+
+export interface AgentLimits {
+  max_runs_per_hour?: number;
+  max_runs_per_day?: number;
+  max_tokens_per_run?: number;
+  max_tokens_per_day?: number;
+  max_cost_per_day?: number;
+}
+
+export type RunStatus = 'running' | 'succeeded' | 'failed' | 'limited';
+
+export interface AgentRunStep {
+  id: number;
+  seq: number;
+  type: 'llm' | 'tool';
+  name: string;
+  implKey?: string;
+  arguments: string;
+  result: string;
+  error: string;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  durationMs: number;
+  createdAt: string;
+}
+
+export interface AgentRun {
+  id: number;
+  status: RunStatus;
+  triggerType: string;
+  trigger: string;
+  input: string;
+  output: string;
+  error: string;
+  attempt: number;
+  turns: number;
+  toolCalls: number;
+  provider: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  startedAt: string;
+  finishedAt: string | null;
+  durationMs: number;
+  steps?: AgentRunStep[];
+}
+
+export interface AgentUsageWindow {
+  runs: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+}
+
+export interface AgentUsage {
+  lastHour: AgentUsageWindow;
+  lastDay: AgentUsageWindow;
+  limits: AgentLimits;
+  costKnown: boolean;
 }
 
 /**
@@ -21,6 +86,8 @@ export interface AgentNodeData {
     llmConfig: {
       provider: string;
       model: string;
+      input_cost_per_million?: number;
+      output_cost_per_million?: number;
     };
     trigger: {
       type: string;
@@ -30,6 +97,7 @@ export interface AgentNodeData {
       };
     };
     systemPrompt?: string;
+    limits?: AgentLimits;
   };
   [key: string]: unknown;
 }

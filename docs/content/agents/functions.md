@@ -33,7 +33,7 @@ the LLM can correct itself.
 | `collections.get_schema` | `collection_name` | Attributes and types of a collection |
 | `collections.list_items` | `collection_name`, `page`, `pageSize` | A page of items |
 | `collections.upsert_item` | `collection_name`, `data` (object), optional `item_id` (string) | Creates an item, or replaces item `item_id` |
-| `collections.delete_item` | `item_id` (string) | Deletes an item **by ID, in any collection** |
+| `collections.delete_item` | `item_id` (string), optional `collection_name` | Deletes an item by ID |
 | `system.log` | `message`, optional `data` | Writes to the worker log |
 
 In [draft-and-publish](../guides/content-modeling.md#draft-and-publish) collections, items
@@ -44,9 +44,39 @@ Creates through `collections.upsert_item` are validated like API writes (require
 types, unique values), and so are updates with `item_id`, which replace the item's data.
 Agent writes do not emit content events.
 
-!!! danger "Grant deletes deliberately"
-    `collections.delete_item` is not scoped to a collection. Only give it to agents that need
-    it, and say in the system prompt exactly what they may delete.
+## Limiting functions to collections
+
+Without a scope, a `collections.*` function works on every collection: an agent with
+`collections.delete_item` can delete any item. Add `collections` to restrict it:
+
+```json
+{
+  "name": "delete_spam_comment",
+  "description": "Delete a comment flagged as spam",
+  "impl_key": "collections.delete_item",
+  "collections": ["comments"],
+  "parameters": {
+    "type": "object",
+    "properties": { "item_id": { "type": "string" } },
+    "required": ["item_id"]
+  }
+}
+```
+
+- The check runs in the server, not in the prompt: a call outside the scope returns
+  `{"status": "error", "message": "this function is not allowed to access collection '…'"}`
+  and changes nothing, whatever the model was told.
+- `collections.delete_item` checks the collection the item **actually belongs to**, so an
+  item ID from another collection is refused. If the model also passes `collection_name`, it
+  must match.
+- `collections.list` only returns the collections in scope.
+- `collections` is only accepted on `collections.*` functions. Scope each function on its
+  own: two functions can share an `impl_key` with different scopes.
+
+!!! tip "Scope every write"
+    Give `collections` to every `collections.upsert_item` and `collections.delete_item` an
+    agent has. A run's [history](runs-and-limits.md#run-history) shows refused calls as
+    failed steps.
 
 ## LLM helper functions
 

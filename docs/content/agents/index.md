@@ -74,10 +74,11 @@ Create an article and, a moment later, the summary appears in `summaries`.
 | `name` | yes | Unique name. |
 | `system_prompt` | yes | Instructions. Be explicit about which function to call and when. |
 | `max_turns` | yes | Maximum LLM round-trips per run (each tool call uses one). |
-| `llm_config` | yes | `provider` (required), `model`, `api_key`, `base_url`. See [LLM providers](llm-providers.md). |
+| `llm_config` | yes | `provider` (required), `model`, `api_key`, `base_url`, and optional `input_cost_per_million` / `output_cost_per_million` (USD) to track cost. See [LLM providers](llm-providers.md). |
 | `memory` | yes | `type` and `session_scope` (e.g. `in-memory` / `user`). |
 | `trigger` | yes | See [Triggers](triggers.md). |
-| `functions` | no | Tools the LLM may call. See [Functions](functions.md). |
+| `functions` | no | Tools the LLM may call, optionally limited to some collections. See [Functions](functions.md). |
+| `limits` | no | Rate, token and cost limits. See [Runs and limits](runs-and-limits.md#limits). |
 
 ## How a run works
 
@@ -89,6 +90,9 @@ Create an article and, a moment later, the summary appears in `summaries`.
    with plain text or `max_turns` is reached.
 4. The conversation is saved. The last 40 messages are replayed on the next run so the agent
    keeps context without growing forever.
+5. Every step is recorded as it happens: the trigger, each model call and function call with
+   its arguments, result, tokens and duration, and how the run ended. See
+   [Runs and limits](runs-and-limits.md).
 
 ## Managing agents
 
@@ -97,6 +101,9 @@ Create an article and, a moment later, the summary appears in `summaries`.
 | `GET` | `/admin/agents` |
 | `POST` | `/admin/agents` |
 | `GET` / `PUT` / `DELETE` | `/admin/agents/{name}` |
+| `GET` | `/admin/agents/{name}/runs` |
+| `GET` | `/admin/agents/{name}/runs/{id}` |
+| `GET` | `/admin/agents/{name}/usage` |
 
 Responses mask `llm_config.api_key`, `api_secret` and `trigger.webhook_token` as
 `********`. Sending the mask back in a `PUT` keeps the stored value.
@@ -108,3 +115,6 @@ Responses mask `llm_config.api_key`, `api_secret` and `trigger.webhook_token` as
 - Writes made by agents do not emit events, so an agent can safely update the item that
   triggered it.
 - Start with a small `max_turns` (3–5) and a cheap model, then tune.
+- Set [`limits`](runs-and-limits.md#limits) on event-driven agents before pointing them at a
+  busy collection.
+- Scope `collections.*` functions to the collections the agent needs.

@@ -30,9 +30,11 @@ func listCollections(ctx context.Context, args any) (string, error) {
 		return fmt.Sprintf(`{"status": "error", "message": "failed to retrieve collections: %s"}`, err.Error()), nil
 	}
 
-	collectionNames := make([]string, len(collections))
-	for i, c := range collections {
-		collectionNames[i] = c.Name
+	collectionNames := make([]string, 0, len(collections))
+	for _, c := range collections {
+		if collectionAllowed(ctx, c.Name) {
+			collectionNames = append(collectionNames, c.Name)
+		}
 	}
 
 	resultBytes, _ := json.Marshal(collectionNames)
@@ -49,6 +51,9 @@ func getCollectionSchema(ctx context.Context, args any) (string, error) {
 	collectionName, _ := argMap["collection_name"].(string)
 	if collectionName == "" {
 		return `{"status": "error", "message": "missing required parameter: collection_name"}`, nil
+	}
+	if !collectionAllowed(ctx, collectionName) {
+		return scopeError(collectionName), nil
 	}
 
 	collection, err := storage.GetCollectionByName(collectionName)
@@ -81,6 +86,9 @@ func upsertCollectionItem(ctx context.Context, args any) (string, error) {
 
 	if collectionName == "" || data == nil {
 		return `{"status": "error", "message": "missing required parameters: collection_name and data"}`, nil
+	}
+	if !collectionAllowed(ctx, collectionName) {
+		return scopeError(collectionName), nil
 	}
 
 	// 1. Get Collection ID from Name
@@ -133,6 +141,9 @@ func listCollectionItems(ctx context.Context, args any) (string, error) {
 	collectionName, _ := argMap["collection_name"].(string)
 	if collectionName == "" {
 		return `{"status": "error", "message": "missing required parameter: collection_name"}`, nil
+	}
+	if !collectionAllowed(ctx, collectionName) {
+		return scopeError(collectionName), nil
 	}
 
 	// Handle optional pagination parameters
@@ -188,6 +199,19 @@ func deleteCollectionItem(ctx context.Context, args any) (string, error) {
 	itemID, err := strconv.ParseUint(itemIDStr, 10, 32)
 	if err != nil || itemID == 0 {
 		return `{"status": "error", "message": "invalid item_id format"}`, nil
+	}
+
+	// The scope applies to the collection the item really belongs to, and
+	// an optional collection_name must match it.
+	owner, err := storage.ItemCollectionName(uint(itemID))
+	if err != nil {
+		return fmt.Sprintf(`{"status": "error", "message": "item '%d' not found"}`, itemID), nil
+	}
+	if want, _ := argMap["collection_name"].(string); want != "" && want != owner {
+		return fmt.Sprintf(`{"status": "error", "message": "item '%d' is not in collection '%s'"}`, itemID, want), nil
+	}
+	if !collectionAllowed(ctx, owner) {
+		return scopeError(owner), nil
 	}
 
 	err = storage.DeleteItem(uint(itemID))

@@ -23,6 +23,7 @@ type Agent struct {
 	Memory       MemoryConfig   `json:"memory" gorm:"type:jsonb"`
 	Trigger      TriggerConfig  `json:"trigger" gorm:"type:jsonb"`
 	Functions    FunctionSpecs  `json:"functions" gorm:"type:jsonb"`
+	Limits       Limits         `json:"limits" gorm:"type:json;serializer:json"`
 	Config       models.JSONMap `json:"-" gorm:"type:jsonb"`
 }
 
@@ -33,6 +34,9 @@ type LLMConfig struct {
 	APIKey    string `json:"api_key"`
 	APISecret string `json:"api_secret"`
 	BaseURL   string `json:"base_url,omitempty"` // optional API endpoint override
+	// Prices in USD per million tokens (for cost tracking and limits).
+	InputCostPerMillion  float64 `json:"input_cost_per_million,omitempty"`
+	OutputCostPerMillion float64 `json:"output_cost_per_million,omitempty"`
 }
 
 // Value implements the Valuer interface for `LLMConfig`.
@@ -129,6 +133,9 @@ type FunctionSpec struct {
 	Description string         `json:"description"` // A description for the LLM
 	Parameters  models.JSONMap `json:"parameters"`  // JSON schema for the function's parameters
 	ImplKey     string         `json:"impl_key"`    // Key used to look up the actual implementation
+	// Collections restricts the collections.* functions to these
+	// collections. Empty: every collection (not recommended for writes).
+	Collections []string `json:"collections,omitempty"`
 }
 
 type FunctionSpecs []FunctionSpec
@@ -257,6 +264,18 @@ func ValidateAgentSchema(agent Agent) error {
 		return err
 	}
 
+	// 6. Limits
+	l := agent.Limits
+	if l.MaxRunsPerHour < 0 || l.MaxRunsPerDay < 0 || l.MaxTokensPerRun < 0 || l.MaxTokensPerDay < 0 || l.MaxCostPerDay < 0 {
+		return errors.New("limits cannot be negative")
+	}
+	if l.MaxCostPerDay > 0 && agent.LLMConfig.InputCostPerMillion == 0 && agent.LLMConfig.OutputCostPerMillion == 0 {
+		return errors.New("limits.max_cost_per_day needs prices in llm_config (input_cost_per_million, output_cost_per_million)")
+	}
+	if agent.LLMConfig.InputCostPerMillion < 0 || agent.LLMConfig.OutputCostPerMillion < 0 {
+		return errors.New("llm_config prices cannot be negative")
+	}
+
 	return nil
 }
 
@@ -297,6 +316,14 @@ func validateFunctionSpecs(funcs []FunctionSpec) error {
 		// serialize cleanly.
 		if _, err := json.Marshal(f.Parameters); err != nil {
 			return fmt.Errorf("function '%s' has invalid parameters: %v", f.Name, err)
+		}
+		if len(f.Collections) > 0 && !strings.HasPrefix(f.ImplKey, "collections.") {
+			return fmt.Errorf("function '%s': 'collections' only applies to collections.* functions", f.Name)
+		}
+		for _, c := range f.Collections {
+			if strings.TrimSpace(c) == "" {
+				return fmt.Errorf("function '%s': empty collection name in 'collections'", f.Name)
+			}
 		}
 	}
 

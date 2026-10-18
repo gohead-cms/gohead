@@ -24,8 +24,9 @@ type ToolSpec struct {
 
 // Registry maps a tool's name to its executable function.
 type Registry struct {
-	tools map[string]ToolFunc
-	specs []agentModels.FunctionSpec
+	tools    map[string]ToolFunc
+	implKeys map[string]string
+	specs    []agentModels.FunctionSpec
 }
 
 // RegistryTool implements langchain's tools.Tool interface

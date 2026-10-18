@@ -256,6 +256,7 @@ func FormatAgentSchema(agent *agents.Agent) map[string]any {
 			"memory":       agent.Memory,
 			"trigger":      trigger,
 			"functions":    agent.Functions,
+			"limits":       agent.Limits,
 		},
 	}
 }

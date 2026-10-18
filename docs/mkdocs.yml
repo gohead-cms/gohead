@@ -103,6 +103,7 @@ nav:
       - Overview: agents/index.md
       - Triggers: agents/triggers.md
       - Functions: agents/functions.md
+      - Runs and limits: agents/runs-and-limits.md
       - LLM providers: agents/llm-providers.md
   - Operations:
       - Architecture: operations/architecture.md

@@ -55,6 +55,7 @@ type Response struct {
 	Type     ResponseType
 	Content  string
 	ToolCall *llms.ToolCall
+	Usage    Usage // tokens of this call, and its estimated cost
 }
 
 // Client is the interface that all LLM providers must implement.
@@ -89,6 +90,7 @@ func WithToolChoice(choice any) Option {
 // langChainAdapter is a wrapper around a langchaingo LLM client.
 type langChainAdapter struct {
 	client llms.Model
+	cfg    Config
 }
 
 // Chat implements the Client interface using the langchaingo library.
@@ -180,12 +182,17 @@ func (a *langChainAdapter) Chat(ctx context.Context, messages []Message, opts ..
 	}
 
 	choice := res.Choices[0]
+	usage := usageFrom(choice.GenerationInfo, a.cfg)
+	if rec := RecorderFrom(ctx); rec != nil {
+		rec.Add(usage)
+	}
 
 	// Modern tool-calling path
 	if len(choice.ToolCalls) > 0 {
 		return &Response{
 			Type:     ResponseTypeToolCall,
 			ToolCall: &choice.ToolCalls[0],
+			Usage:    usage,
 		}, nil
 	}
 
@@ -193,6 +200,7 @@ func (a *langChainAdapter) Chat(ctx context.Context, messages []Message, opts ..
 	return &Response{
 		Type:    ResponseTypeText,
 		Content: choice.Content,
+		Usage:   usage,
 	}, nil
 }
 
@@ -252,6 +260,12 @@ func withDefaults(cfg Config) Config {
 			cfg.BaseURL = d.BaseURL
 		}
 	}
+	// Prices of the default model apply when the model is the default one
+	// and no price was given.
+	if cfg.InputCostPerMillion == 0 && cfg.OutputCostPerMillion == 0 &&
+		cfg.Provider == d.Provider && cfg.Model == d.Model {
+		cfg.InputCostPerMillion, cfg.OutputCostPerMillion = d.InputCostPerMillion, d.OutputCostPerMillion
+	}
 	return cfg
 }
 
@@ -277,5 +291,5 @@ func NewAdapter(cfg Config) (Client, error) {
 		return nil, fmt.Errorf("failed to create client for provider %s: %w", cfg.Provider, err)
 	}
 
-	return &langChainAdapter{client: client}, nil
+	return &langChainAdapter{client: client, cfg: cfg}, nil
 }

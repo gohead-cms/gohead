@@ -10,10 +10,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **API tokens**: long-lived, role-scoped (`viewer`, `editor`, `admin`), optionally expiring and revocable keys (`ght_…`) for front-ends, CI and integrations, managed under `/admin/tokens`. Only a SHA-256 hash is stored; last use is recorded. Tokens cannot manage tokens or users.
 - **OpenAPI 3.1** description generated from the content model (collections, components, singletons, media, auth, GraphQL) at `/api/openapi.json`, with Swagger UI at `/api/docs`. Behind a token unless `openapi.public` is on.
 - **Outbound webhooks** on content events (`item:created|updated|deleted|published|unpublished`), filtered by event and collection, in JSON or Slack format, with custom headers, HMAC-SHA256 signatures, retries with backoff, a delivery log and a test endpoint (`/admin/webhooks`). Private and link-local addresses are refused by default.
+- **Agent run history**: every run records its trigger, input, each model and function call (arguments, results, errors, tokens, duration), output, status (`succeeded`, `failed`, `limited`), tokens and cost. Runs are saved as they progress, the newest `agents.runs_kept` (200) per agent are kept, and they are available at `/admin/agents/{name}/runs`, `/runs/{id}` and `/usage`.
+- Admin UI: an agent page (**AI Management → Agents**) with an overview (model, prices, trigger, limits, function scopes) and a **Runs** tab: usage against limits, a filterable run list and a step-by-step view of each run.
+- **Collection-scoped functions**: `collections.*` functions accept `"collections": [...]`. Calls outside the scope are refused by the server; `collections.delete_item` checks the collection the item actually belongs to, and `collections.list` only shows collections in scope.
+- **Per-agent limits**: `max_runs_per_hour`, `max_runs_per_day`, `max_tokens_per_run`, `max_tokens_per_day` and `max_cost_per_day`, over rolling windows, shared by all workers. Runs over a limit are skipped or stopped, recorded as `limited` and not retried.
+- Token usage is read from OpenAI-compatible, Anthropic and Ollama responses, including calls made by `llm.*` helper functions. Costs use `input_cost_per_million` / `output_cost_per_million` set in an agent's `llm_config` or in the `llm` defaults (no built-in price list).
 
 ### Changed
 - `/admin/users` requires a user session (not an API token).
 - Usernames cannot contain `:` (reserved for `token:<name>` attribution).
+- Deleting an agent deletes its run history.
+
+### Fixed
+- Re-creating an agent with the name of a deleted one restored the old configuration instead of the new one.
+- The admin UI's **Agents** link led to an empty page.
 
 ## [0.4.0] - 2026-10-18
 

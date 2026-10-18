@@ -127,6 +127,9 @@ its own `llm_config`.
 | `llm.model` | `GOHEAD_LLM_MODEL` | `gpt-4o` |
 | `llm.api_key` | `GOHEAD_LLM_API_KEY` | `$OPENAI_API_KEY` |
 | `llm.base_url` | `GOHEAD_LLM_BASE_URL` | *(provider default)* |
+| `llm.input_cost_per_million` | `GOHEAD_LLM_INPUT_COST_PER_MILLION` | `0` (cost not tracked) |
+| `llm.output_cost_per_million` | `GOHEAD_LLM_OUTPUT_COST_PER_MILLION` | `0` |
+| `agents.runs_kept` | `GOHEAD_AGENTS_RUNS_KEPT` | `200` runs per agent ([run history](../agents/runs-and-limits.md)) |
 
 Provider keys can also come from `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`.
 
