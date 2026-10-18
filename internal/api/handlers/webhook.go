@@ -32,7 +32,7 @@ func HandleWebhook(c *gin.Context) {
 	agentID, err := strconv.ParseUint(agentIDStr, 10, 32)
 	if err != nil {
 		c.Set("status", http.StatusBadRequest)
-		c.Set("response", gin.H{"error": "Invalid agent ID format"})
+		c.Set("response", "Invalid agent ID format")
 		return
 	}
 
@@ -41,7 +41,7 @@ func HandleWebhook(c *gin.Context) {
 	if err != nil {
 		logger.Log.WithError(err).WithField("agent_id", agentID).Warn("Webhook handler could not find agent")
 		c.Set("status", http.StatusNotFound)
-		c.Set("response", gin.H{"error": "Agent not found"})
+		c.Set("response", "Agent not found")
 		return
 	}
 
@@ -54,7 +54,7 @@ func HandleWebhook(c *gin.Context) {
 		subtle.ConstantTimeCompare([]byte(requestToken), []byte(expected)) != 1 {
 		logger.Log.WithField("agent_id", agentID).Warn("Invalid webhook token received")
 		c.Set("status", http.StatusUnauthorized)
-		c.Set("response", gin.H{"error": "Unauthorized"})
+		c.Set("response", "Unauthorized")
 		return
 	}
 
@@ -62,7 +62,7 @@ func HandleWebhook(c *gin.Context) {
 	var requestData map[string]any
 	if err := c.ShouldBindJSON(&requestData); err != nil {
 		c.Set("status", http.StatusBadRequest)
-		c.Set("response", gin.H{"error": "Invalid JSON payload"})
+		c.Set("response", "Invalid JSON payload")
 		return
 	}
 
@@ -80,7 +80,7 @@ func HandleWebhook(c *gin.Context) {
 	if err := jobs.EnqueueAgentJob(context.Background(), asynqClient, payload); err != nil {
 		logger.Log.WithError(err).WithField("agent_id", agentID).Error("Failed to enqueue webhook job")
 		c.Set("status", http.StatusInternalServerError)
-		c.Set("response", gin.H{"error": "Failed to process webhook"})
+		c.Set("response", "Failed to process webhook")
 		return
 	}
 

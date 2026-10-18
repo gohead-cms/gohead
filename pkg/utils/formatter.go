@@ -200,18 +200,9 @@ func capitalize(s string) string {
 }
 
 func toInt(val interface{}) int {
-	switch v := val.(type) {
-	case int:
-		return v
-	case int64:
-		return int(v)
-	case float64:
-		return int(v)
-	case float32:
-		return int(v)
-	default:
-		return 0
-	}
+	// Relation IDs may be stored as any numeric type (uint after a nested
+	// create, float64 after a JSON round-trip, ...).
+	return int(models.ToUint(val))
 }
 
 // SecretMask replaces stored secrets in API responses. Sending it back

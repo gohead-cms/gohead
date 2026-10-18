@@ -37,7 +37,7 @@ func TestResolveRelation(t *testing.T) {
 		p := graphql.ResolveParams{Source: map[string]any{"author": float64(john.ID)}}
 		result, err := ResolveRelation(p, 2, oneToOne)
 		require.NoError(t, err)
-		related, ok := result.(models.JSONMap)
+		related, ok := result.(map[string]any)
 		require.True(t, ok, "expected a JSON map, got %T", result)
 		assert.Equal(t, "John Doe", related["name"])
 		assert.EqualValues(t, john.ID, related["id"])
@@ -47,7 +47,7 @@ func TestResolveRelation(t *testing.T) {
 		p := graphql.ResolveParams{Source: map[string]any{"authors": []any{float64(john.ID), float64(jane.ID), float64(9999)}}}
 		result, err := ResolveRelation(p, 2, oneToMany)
 		require.NoError(t, err)
-		related, ok := result.([]models.JSONMap)
+		related, ok := result.([]map[string]any)
 		require.True(t, ok, "expected a list, got %T", result)
 		require.Len(t, related, 2)
 		assert.Equal(t, "John Doe", related[0]["name"])

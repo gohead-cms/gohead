@@ -34,7 +34,8 @@ func ResolveRelation(p graphql.ResolveParams, collectionID uint, attr models.Att
 			return nil, fmt.Errorf("invalid relation format for '%s', expected an array", attr.Name)
 		}
 
-		var results []models.JSONMap
+		// Field resolvers expect plain map[string]any sources.
+		var results []map[string]any
 		for _, rawID := range relatedIDs {
 
 			id := models.ToUint(rawID)
@@ -49,7 +50,7 @@ func ResolveRelation(p graphql.ResolveParams, collectionID uint, attr models.Att
 			}
 
 			relatedItem.Data["id"] = relatedItem.ID
-			results = append(results, relatedItem.Data)
+			results = append(results, map[string]any(relatedItem.Data))
 		}
 		return results, nil
 	}
@@ -67,7 +68,7 @@ func ResolveRelation(p graphql.ResolveParams, collectionID uint, attr models.Att
 		}
 
 		relatedItem.Data["id"] = relatedItem.ID
-		return relatedItem.Data, nil
+		return map[string]any(relatedItem.Data), nil
 	}
 
 	return nil, fmt.Errorf("unsupported relation type '%s'", attr.Type)
