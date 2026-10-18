@@ -14,6 +14,8 @@ your [role](users-and-roles.md).
 | `POST` | `/api/collections/{c}/{id}/publish` | Publish a draft ([draft and publish](content-modeling.md#draft-and-publish)) |
 | `POST` | `/api/collections/{c}/{id}/unpublish` | Turn a published item back into a draft |
 | `GET` / `PUT` | `/api/singleton/{name}` | Read / write a singleton's item |
+| `POST`, `GET` | `/api/media` | Upload files, list the [media library](media.md) |
+| `GET`, `PUT`, `DELETE` | `/api/media/{id}` | One file |
 
 ## Responses
 

@@ -14,3 +14,13 @@ data:
   # Pod CIDR of your ingress controller, so per-IP rate limits see real clients.
   # GOHEAD_TRUSTED_PROXIES: 10.0.0.0/8
   # OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector.observability:4317
+  # Uploads: use S3-compatible storage so every API replica sees the same
+  # files (the container's root filesystem is read-only). Put
+  # GOHEAD_MEDIA_S3_ACCESS_KEY / GOHEAD_MEDIA_S3_SECRET_KEY in the Secret, or
+  # leave them unset to use the pod's cloud identity (IRSA, instance role).
+  # GOHEAD_MEDIA_DRIVER: s3
+  # GOHEAD_MEDIA_S3_ENDPOINT: https://s3.eu-west-1.amazonaws.com
+  # GOHEAD_MEDIA_S3_REGION: eu-west-1
+  # GOHEAD_MEDIA_S3_BUCKET: my-gohead-media
+  # GOHEAD_MEDIA_PUBLIC_URL: https://media.example.com
+  # GOHEAD_MEDIA_MAX_SIZE_MB: "50"

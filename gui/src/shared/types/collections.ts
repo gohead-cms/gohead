@@ -8,6 +8,8 @@ export interface Attribute {
   target?: string;
   component?: string;
   repeatable?: boolean;
+  multiple?: boolean;
+  allowed_types?: string[];
 }
 
 export interface Schema {

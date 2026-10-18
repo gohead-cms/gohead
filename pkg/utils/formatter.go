@@ -30,6 +30,12 @@ func FormatCollectionSchema(collection *models.Collection) map[string]any {
 			attrDef["component"] = attr.ComponentRef
 			attrDef["repeatable"] = attr.Repeatable
 		}
+		if attr.Type == "media" {
+			attrDef["multiple"] = attr.Multiple
+			if len(attr.AllowedTypes) > 0 {
+				attrDef["allowed_types"] = attr.AllowedTypes
+			}
+		}
 		attrSchema[attr.Name] = attrDef
 	}
 

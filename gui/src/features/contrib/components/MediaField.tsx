@@ -1,0 +1,104 @@
+import React, { useRef, useState } from "react";
+import { Box, Button, HStack, IconButton, Image, Input, Text, VStack, useToast } from "@chakra-ui/react";
+import { FiUpload, FiX, FiFile } from "react-icons/fi";
+import { API_BASE_URL, apiFetchWithAuth } from "../../../services/api";
+
+// A media value as the API returns it (populated), or a bare ID / URL.
+export interface MediaFile {
+  id: number;
+  url: string;
+  name?: string;
+  mime?: string;
+}
+type MediaValue = MediaFile | number | string | null | undefined;
+
+interface MediaFieldProps {
+  id: string;
+  value: MediaValue | MediaValue[];
+  multiple?: boolean;
+  accept?: string[];
+  onChange: (value: MediaValue | MediaValue[]) => void;
+}
+
+// Relative URLs (/uploads/...) point at the API, not at the admin UI.
+const absolute = (url: string) => (url.startsWith("/") ? `${API_BASE_URL}${url}` : url);
+
+function Preview({ value, onRemove }: { value: MediaValue; onRemove: () => void }) {
+  if (value === null || value === undefined) return null;
+  const file = typeof value === "object" ? value : null;
+  const url = file ? file.url : typeof value === "string" ? value : "";
+  const label = file?.name || (typeof value === "number" ? `File #${value}` : url);
+  const isImage = file ? file.mime?.startsWith("image/") : /\.(png|jpe?g|gif|webp|avif)$/i.test(url);
+  return (
+    <HStack borderWidth="1px" borderRadius="md" p={2} spacing={3} w="100%">
+      {isImage && url ? (
+        <Image src={absolute(url)} alt={label} boxSize="48px" objectFit="cover" borderRadius="sm" />
+      ) : (
+        <Box as={FiFile} boxSize="24px" color="gray.500" />
+      )}
+      <Text flex="1" fontSize="sm" noOfLines={1}>{label}</Text>
+      <IconButton aria-label="Remove file" icon={<FiX />} size="xs" variant="ghost" onClick={onRemove} />
+    </HStack>
+  );
+}
+
+// MediaField uploads files to POST /api/media and stores the returned file
+// in the form; EntryFormModal sends its ID when the entry is saved.
+export function MediaField({ id, value, multiple, accept, onChange }: MediaFieldProps) {
+  const input = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const toast = useToast();
+  const values: MediaValue[] = multiple ? (Array.isArray(value) ? value : []) : value ? [value as MediaValue] : [];
+
+  const upload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const body = new FormData();
+    Array.from(files).forEach((f) => body.append("files", f));
+    setUploading(true);
+    try {
+      const res = await apiFetchWithAuth("/api/media", { method: "POST", body });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message || "Upload failed");
+      const uploaded: MediaFile[] = json.data;
+      onChange(multiple ? [...values, ...uploaded] : uploaded[0]);
+    } catch (err) {
+      toast({ title: "Upload failed", description: (err as Error).message, status: "error", duration: 5000, isClosable: true });
+    } finally {
+      setUploading(false);
+      if (input.current) input.current.value = "";
+    }
+  };
+
+  const removeAt = (i: number) => {
+    if (multiple) onChange(values.filter((_, j) => j !== i));
+    else onChange(null);
+  };
+
+  return (
+    <VStack align="stretch" spacing={2}>
+      {values.map((v, i) => (
+        <Preview key={i} value={v} onRemove={() => removeAt(i)} />
+      ))}
+      {(multiple || values.length === 0) && (
+        <Button
+          leftIcon={<FiUpload />}
+          size="sm"
+          variant="outline"
+          isLoading={uploading}
+          onClick={() => input.current?.click()}
+        >
+          {multiple ? "Add files" : "Upload a file"}
+        </Button>
+      )}
+      <Input
+        ref={input}
+        id={id}
+        type="file"
+        display="none"
+        multiple={multiple}
+        accept={accept?.join(",")}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => upload(e.target.files)}
+      />
+    </VStack>
+  );
+}

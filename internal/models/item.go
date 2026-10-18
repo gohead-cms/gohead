@@ -103,13 +103,28 @@ func validateItem(ct Collection, itemData map[string]any, tx *gorm.DB, excludeID
 			continue
 		}
 
-		if attribute.Unique && attribute.Type != "relation" && attribute.Type != "component" {
+		_, isText := value.(string)
+		uniqueApplies := attribute.Type != "relation" && attribute.Type != "component" &&
+			(attribute.Type != "media" || isText) // URL values, as before uploads existed
+		if attribute.Unique && uniqueApplies {
 			if err := validation.CheckFieldUniqueness(tx, ct.ID, attribute.Name, value, excludeID); err != nil {
 				return nil, err
 			}
 		}
 
-		if attribute.Type == "component" {
+		if attribute.Type == "media" {
+			if value == nil {
+				if attribute.Required {
+					return nil, fmt.Errorf("missing required attribute: '%s'", attribute.Name)
+				}
+				continue
+			}
+			processedValue, err := validateMediaValue(attribute, value, tx)
+			if err != nil {
+				return nil, fmt.Errorf("validation failed for attribute '%s': %w", attribute.Name, err)
+			}
+			processedData[attribute.Name] = processedValue
+		} else if attribute.Type == "component" {
 			if value == nil {
 				if attribute.Required {
 					return nil, fmt.Errorf("missing required attribute: '%s'", attribute.Name)

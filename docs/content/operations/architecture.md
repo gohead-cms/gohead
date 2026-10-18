@@ -38,6 +38,7 @@ flowchart TB
 | Scheduler | in-memory schedule | **one replica** |
 | Database | all content, schema, users, agents, agent history | your database's HA |
 | Redis | queues (events, agent jobs), schema-change broadcast, rate-limit counters | Redis HA / managed Redis |
+| Media store | uploaded files (local directory or S3-compatible bucket) | your object store's HA |
 
 ## Request path
 

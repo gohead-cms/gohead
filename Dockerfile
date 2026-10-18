@@ -42,8 +42,10 @@ WORKDIR /app
 COPY --from=builder /out/gohead /usr/local/bin/gohead
 COPY --from=builder --chown=65532:65532 /out/data /data
 
-# Writable location for a SQLite file when no external database is used.
-ENV GOHEAD_DATABASE_URL=sqlite:///data/gohead.db
+# Writable location for a SQLite file when no external database is used,
+# and for uploads with the local media driver.
+ENV GOHEAD_DATABASE_URL=sqlite:///data/gohead.db \
+    GOHEAD_MEDIA_LOCAL_PATH=/data/uploads
 VOLUME ["/data"]
 
 EXPOSE 8080

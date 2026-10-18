@@ -30,6 +30,66 @@ func ResetTypeRegistry() {
 	componentInputs = make(map[string]*graphql.InputObject)
 }
 
+// mediaType is the GraphQL type of uploaded files. URL-only values (from
+// before uploads existed) resolve to an object with just "url".
+var mediaType = graphql.NewObject(graphql.ObjectConfig{
+	Name: "Media",
+	Fields: graphql.Fields{
+		"id":      &graphql.Field{Type: graphql.ID},
+		"url":     &graphql.Field{Type: graphql.String},
+		"name":    &graphql.Field{Type: graphql.String},
+		"mime":    &graphql.Field{Type: graphql.String},
+		"size":    &graphql.Field{Type: graphql.Int},
+		"width":   &graphql.Field{Type: graphql.Int},
+		"height":  &graphql.Field{Type: graphql.Int},
+		"alt":     &graphql.Field{Type: graphql.String},
+		"caption": &graphql.Field{Type: graphql.String},
+	},
+})
+
+// mediaFieldOutput is the output type of a media attribute.
+func mediaFieldOutput(multiple bool) graphql.Output {
+	if multiple {
+		return graphql.NewList(mediaType)
+	}
+	return mediaType
+}
+
+// mediaFieldInput is the input type of a media attribute: file IDs.
+func mediaFieldInput(multiple bool) graphql.Input {
+	if multiple {
+		return graphql.NewList(graphql.ID)
+	}
+	return graphql.ID
+}
+
+// resolveMediaField turns the stored value of attribute name into Media
+// objects.
+func resolveMediaField(name string, multiple bool) graphql.FieldResolveFn {
+	return func(p graphql.ResolveParams) (any, error) {
+		src, ok := p.Source.(map[string]any)
+		if !ok || src[name] == nil {
+			return nil, nil
+		}
+		return toMediaObjects(storage.ResolveMediaValue(p.Context, src[name], multiple)), nil
+	}
+}
+
+// toMediaObjects wraps URL strings as {url} objects.
+func toMediaObjects(v any) any {
+	switch t := v.(type) {
+	case string:
+		return map[string]any{"url": t}
+	case []any:
+		out := make([]any, 0, len(t))
+		for _, el := range t {
+			out = append(out, toMediaObjects(el))
+		}
+		return out
+	}
+	return v
+}
+
 var nonNameChars = regexp.MustCompile(`[^_0-9A-Za-z]`)
 
 // componentTypeName returns a valid GraphQL type name for a component.
@@ -52,6 +112,10 @@ func componentOutputType(name string) (*graphql.Object, error) {
 		Fields: graphql.FieldsThunk(func() graphql.Fields {
 			fields := graphql.Fields{}
 			for _, a := range cmp.Attributes {
+				if a.Type == "media" {
+					fields[a.Name] = &graphql.Field{Type: mediaFieldOutput(a.Multiple), Resolve: resolveMediaField(a.Name, a.Multiple)}
+					continue
+				}
 				t, err := componentFieldOutput(a.BaseAttribute)
 				if err != nil {
 					logger.Log.WithError(err).WithField("attribute", a.Name).Debug("GraphQL: skipping component attribute")
@@ -117,6 +181,9 @@ func componentInputType(name string) (*graphql.InputObject, error) {
 }
 
 func componentFieldInput(a models.BaseAttribute) (graphql.Input, error) {
+	if a.Type == "media" {
+		return mediaFieldInput(a.Multiple), nil
+	}
 	if a.Type == "component" {
 		t, err := componentInputType(a.ComponentRef)
 		if err != nil {
@@ -183,6 +250,9 @@ func ConvertCollectionToGraphQLType(collection models.Collection) (*graphql.Obje
 					resolveFunc = func(p graphql.ResolveParams) (any, error) {
 						return ResolveRelation(p, collection.ID, localAttr)
 					}
+				} else if localAttr.Type == "media" {
+					gqlFieldType = mediaFieldOutput(localAttr.Multiple)
+					resolveFunc = resolveMediaField(localAttr.Name, localAttr.Multiple)
 				} else if localAttr.Type == "component" {
 					gqlFieldType, err = componentFieldOutput(models.BaseAttribute{
 						Type: "component", ComponentRef: localAttr.ComponentRef, Repeatable: localAttr.Repeatable,

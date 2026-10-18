@@ -43,6 +43,38 @@ type RateLimitConfig struct {
 	LoginWindow   time.Duration `mapstructure:"login_window" yaml:"login_window"`
 }
 
+// MediaConfig configures uploads (POST /api/media) and where files are stored.
+type MediaConfig struct {
+	Enabled      bool     `mapstructure:"enabled" yaml:"enabled"`
+	Driver       string   `mapstructure:"driver" yaml:"driver"` // local | s3
+	MaxSizeMB    int      `mapstructure:"max_size_mb" yaml:"max_size_mb"`
+	AllowedTypes []string `mapstructure:"allowed_types" yaml:"allowed_types"` // MIME patterns; empty = built-in list
+	// PublicURL is the base URL files are downloaded from (CDN, public
+	// bucket, or the API's /uploads). Empty: /uploads on the API for local
+	// files, presigned URLs for S3.
+	PublicURL string           `mapstructure:"public_url" yaml:"public_url"`
+	Local     MediaLocalConfig `mapstructure:"local" yaml:"local"`
+	S3        MediaS3Config    `mapstructure:"s3" yaml:"s3"`
+}
+
+// MediaLocalConfig configures the filesystem media driver.
+type MediaLocalConfig struct {
+	Path string `mapstructure:"path" yaml:"path"`
+}
+
+// MediaS3Config configures the S3-compatible media driver.
+type MediaS3Config struct {
+	Endpoint      string        `mapstructure:"endpoint" yaml:"endpoint"`
+	Region        string        `mapstructure:"region" yaml:"region"`
+	Bucket        string        `mapstructure:"bucket" yaml:"bucket"`
+	AccessKey     string        `mapstructure:"access_key" yaml:"access_key"`
+	SecretKey     string        `mapstructure:"secret_key" yaml:"secret_key"`
+	UseSSL        bool          `mapstructure:"use_ssl" yaml:"use_ssl"`
+	PathStyle     bool          `mapstructure:"path_style" yaml:"path_style"`
+	Prefix        string        `mapstructure:"prefix" yaml:"prefix"`
+	PresignExpiry time.Duration `mapstructure:"presign_expiry" yaml:"presign_expiry"`
+}
+
 // RedisConfig holds settings for the Redis connection.
 type RedisConfig struct {
 	Address  string `mapstructure:"address" yaml:"address"`
@@ -75,6 +107,9 @@ type Config struct {
 	// TrustedProxies lists the proxies (IPs or CIDRs) whose X-Forwarded-For
 	// header is trusted to find the client IP. Empty: use the TCP peer.
 	TrustedProxies []string `mapstructure:"trusted_proxies" yaml:"trusted_proxies"`
+
+	// Media uploads and storage
+	Media MediaConfig `mapstructure:"media" yaml:"media"`
 }
 
 // LoadConfig loads the configuration from file and environment variables.
@@ -103,6 +138,24 @@ func LoadConfig(configPath string) (Config, error) {
 	viper.SetDefault("rate_limit.login_failures", 5)
 	viper.SetDefault("rate_limit.login_window", "15m")
 	viper.SetDefault("trusted_proxies", []string{})
+
+	// Media uploads: local directory by default, S3-compatible optional.
+	// Every key has a default so GOHEAD_MEDIA_* variables are picked up.
+	viper.SetDefault("media.enabled", true)
+	viper.SetDefault("media.driver", "local")
+	viper.SetDefault("media.max_size_mb", 50)
+	viper.SetDefault("media.allowed_types", []string{})
+	viper.SetDefault("media.public_url", "")
+	viper.SetDefault("media.local.path", "./uploads")
+	viper.SetDefault("media.s3.endpoint", "")
+	viper.SetDefault("media.s3.region", "")
+	viper.SetDefault("media.s3.bucket", "")
+	viper.SetDefault("media.s3.access_key", "")
+	viper.SetDefault("media.s3.secret_key", "")
+	viper.SetDefault("media.s3.use_ssl", true)
+	viper.SetDefault("media.s3.path_style", false)
+	viper.SetDefault("media.s3.prefix", "")
+	viper.SetDefault("media.s3.presign_expiry", "1h")
 
 	// Redis default values
 	viper.SetDefault("redis.address", "localhost:6379")

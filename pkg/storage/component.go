@@ -13,6 +13,7 @@ import (
 
 // CreateComponent stores a new Component definition in the DB, including its attributes.
 func CreateComponent(cmp *models.Component) error {
+	defer InvalidateComponentCache()
 	// 1) Validate the component schema
 	if err := models.ValidateComponentSchema(*cmp); err != nil {
 		return err
@@ -66,6 +67,7 @@ func GetComponentByName(name string) (*models.Component, error) {
 
 // UpdateComponent updates an existing component definition by name.
 func UpdateComponent(name string, updated *models.Component) error {
+	defer InvalidateComponentCache()
 	// Validate schema of the incoming data
 	if err := models.ValidateComponentSchema(*updated); err != nil {
 		return err
@@ -204,6 +206,7 @@ var ErrComponentInUse = errors.New("component is in use")
 // DeleteComponent removes a component definition by name. It refuses to
 // delete a component that attributes still use.
 func DeleteComponent(name string) error {
+	defer InvalidateComponentCache()
 	var cmp models.Component
 	// Using .Select("ID") is efficient as we only need the ID for the delete operation.
 	err := database.DB.Where("name = ?", name).Select("ID").First(&cmp).Error

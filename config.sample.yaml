@@ -34,6 +34,26 @@ redis:
   password: ""
   db: 0
 
+# Uploads (POST /api/media). Files go to a local directory by default, or to
+# any S3-compatible bucket (AWS S3, MinIO, Cloudflare R2, Garage...).
+media:
+  enabled: true
+  driver: local          # local | s3
+  max_size_mb: 50
+  allowed_types: []      # MIME patterns such as image/*; empty = built-in safe list
+  public_url: ""         # base URL for file links (CDN, public bucket, https://cms.example.com/uploads)
+  local:
+    path: ./uploads
+  s3:
+    endpoint: ""         # e.g. https://s3.eu-west-1.amazonaws.com or http://minio:9000
+    region: ""
+    bucket: ""
+    access_key: ""       # empty: AWS_* variables or the instance/pod role
+    secret_key: ""
+    path_style: false    # true for MinIO and most self-hosted stores
+    prefix: ""
+    presign_expiry: 1h   # lifetime of download URLs when public_url is empty
+
 # Brute-force protection for /auth/login and /auth/register.
 rate_limit:
   enabled: true

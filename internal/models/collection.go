@@ -138,6 +138,21 @@ func mapToAttribute(attrMap map[string]any, attribute *Attribute) error {
 		attribute.Pattern = pattern
 	}
 
+	if attribute.Type == "media" {
+		if multiple, ok := attrMap["multiple"].(bool); ok {
+			attribute.Multiple = multiple
+		}
+		if types, ok := attrMap["allowed_types"].([]any); ok {
+			for _, t := range types {
+				s, ok := t.(string)
+				if !ok || s == "" {
+					return fmt.Errorf("'allowed_types' must be a list of MIME types such as \"image/*\"")
+				}
+				attribute.AllowedTypes = append(attribute.AllowedTypes, s)
+			}
+		}
+	}
+
 	if attribute.Type == "component" {
 		ref, ok := attrMap["component"].(string)
 		if !ok || ref == "" {

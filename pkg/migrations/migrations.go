@@ -16,6 +16,7 @@ func MigrateDatabase(db *gorm.DB) error {
 		&models.Singleton{},
 		&models.SingleItem{},
 		&models.Item{},
+		&models.Media{},
 		&models.User{},
 		&agents.Agent{},
 		&agents.AgentMessage{},

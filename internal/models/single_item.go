@@ -64,7 +64,17 @@ func ValidateSingleItemValues(st Singleton, itemData map[string]any) error {
 		}
 
 		// Validate components, relationships or regular attributes
-		if attribute.Type == "component" {
+		if attribute.Type == "media" {
+			if value == nil {
+				if attribute.Required {
+					return fmt.Errorf("missing required attribute: '%s'", attribute.Name)
+				}
+				continue
+			}
+			if _, err := validateMediaValue(attribute, value, nil); err != nil {
+				return fmt.Errorf("validation failed for attribute '%s': %w", attribute.Name, err)
+			}
+		} else if attribute.Type == "component" {
 			if value == nil {
 				if attribute.Required {
 					return fmt.Errorf("missing required attribute: '%s'", attribute.Name)

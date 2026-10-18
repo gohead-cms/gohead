@@ -101,12 +101,18 @@ func validateComponentObject(cmp Component, obj map[string]any, tx *gorm.DB, dep
 			}
 			continue
 		}
-		attr := ca.toAttribute()
+		attr := ca.ToAttribute()
 		switch ca.Type {
 		case "component":
 			nv, err := validateComponentValue(attr, v, tx, depth+1)
 			if err != nil {
 				return nil, fmt.Errorf("'%s': %w", ca.Name, err)
+			}
+			out[ca.Name] = nv
+		case "media":
+			nv, err := validateMediaValue(attr, v, tx)
+			if err != nil {
+				return nil, fmt.Errorf("'%s' in component '%s': %w", ca.Name, cmp.Name, err)
 			}
 			out[ca.Name] = nv
 		case "relation", "dynamiczone":

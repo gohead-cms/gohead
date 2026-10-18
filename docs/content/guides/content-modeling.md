@@ -52,7 +52,7 @@ relation pointing to it.
 | `datetime` | RFC 3339, e.g. `"2026-10-18T09:00:00Z"` | |
 | `enum` / `enumeration` | one of `options` | `options` (required) |
 | `json` | JSON object | |
-| `media` | string (URL or path) | |
+| `media` | an uploaded file's ID (see [media](media.md)) | `multiple`, `allowed_types`, `min`/`max` (with `multiple`) |
 | `relation` | ID(s) of items in `target` | `relation`, `target` (required) |
 | `component` | an object, or a list with `repeatable` | `component` (required), `repeatable`, `min`/`max` (list length) |
 

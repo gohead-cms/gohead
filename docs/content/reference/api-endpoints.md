@@ -29,6 +29,10 @@ Base URL: your API, e.g. `http://localhost:8080`. **Auth** column: `–` public,
 | `DELETE` | `/api/collections/{collection}/{id}` | token | Delete an item |
 | `POST` | `/api/collections/{collection}/{id}/publish` | token (update) | Publish a draft |
 | `POST` | `/api/collections/{collection}/{id}/unpublish` | token (update) | Unpublish an item |
+| `POST` | `/api/media` | token (create) | Upload files (`multipart/form-data`, field `files`) |
+| `GET` | `/api/media` | token (create) | List the media library (`page`, `pageSize`, `mime`, `search`) |
+| `GET`, `PUT`, `DELETE` | `/api/media/{id}` | token (create / update / delete) | One file; `PUT` changes `name`, `alt`, `caption` |
+| `GET` | `/uploads/{key}` | public | Files of the local media driver |
 | `GET` | `/api/singleton/{name}` | token | Read a singleton's item |
 | `POST`, `PUT` | `/api/singleton/{name}` | token | Write a singleton's item |
 | `POST` | `/api/graphql` | token | [GraphQL](../guides/graphql.md): `query`, `variables`, `operationName` |

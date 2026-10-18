@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -23,6 +24,7 @@ import (
 	"github.com/gohead-cms/gohead/pkg/config"
 	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/media"
 	"github.com/gohead-cms/gohead/pkg/metrics"
 	"github.com/gohead-cms/gohead/pkg/migrations"
 	"github.com/gohead-cms/gohead/pkg/ratelimit"
@@ -126,6 +128,13 @@ func InitializeServer(cfgPath string) (*gin.Engine, *config.Config, func(), erro
 		return nil, nil, func() {}, err
 	}
 	if err := migrations.MigrateDatabase(db); err != nil {
+		cleanup()
+		return nil, nil, func() {}, err
+	}
+
+	// --- Media storage ---
+	localMedia, err := initMediaStore(cfg)
+	if err != nil {
 		cleanup()
 		return nil, nil, func() {}, err
 	}
@@ -234,12 +243,60 @@ func InitializeServer(cfgPath string) (*gin.Engine, *config.Config, func(), erro
 	if cfg.RateLimit.Enabled {
 		authLimit = middleware.RateLimit(authLimiter, "auth", cfg.RateLimit.AuthPerMinute, time.Minute)
 	}
-	setupRoutes(router, authLimit)
+	setupRoutes(router, authLimit, localMedia)
 
 	return router, &cfg, cleanup, nil
 }
 
-func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc) {
+// initMediaStore configures uploads. A misconfigured S3 store stops the
+// server; a local directory that cannot be created (e.g. a read-only
+// filesystem) only disables uploads, with a warning. It returns the local
+// store, whose files the API serves itself, if that driver is used.
+func initMediaStore(cfg config.Config) (*media.Local, error) {
+	if !cfg.Media.Enabled {
+		logger.Log.Info("Media uploads are disabled (media.enabled=false)")
+		return nil, nil
+	}
+	m := cfg.Media
+	store, err := media.New(context.Background(), media.Config{
+		Driver:    m.Driver,
+		PublicURL: m.PublicURL,
+		Local:     media.LocalConfig{Path: m.Local.Path},
+		S3: media.S3Config{
+			Endpoint: m.S3.Endpoint, Region: m.S3.Region, Bucket: m.S3.Bucket,
+			AccessKey: m.S3.AccessKey, SecretKey: m.S3.SecretKey,
+			UseSSL: m.S3.UseSSL, PathStyle: m.S3.PathStyle, Prefix: m.S3.Prefix,
+			PresignExpiry: m.S3.PresignExpiry,
+		},
+	})
+	if err != nil {
+		if strings.EqualFold(m.Driver, "s3") {
+			return nil, fmt.Errorf("media storage: %w", err)
+		}
+		logger.Log.WithError(err).Warn("Media uploads are disabled: the local media directory is not writable. " +
+			"Set media.local.path (GOHEAD_MEDIA_LOCAL_PATH) to a writable volume, or use media.driver=s3.")
+		return nil, nil
+	}
+	storage.InitMediaStore(store)
+	handlers.MediaPolicy = storage.UploadPolicy{
+		MaxSize:      int64(m.MaxSizeMB) << 20,
+		AllowedTypes: m.AllowedTypes,
+	}
+	logger.Log.WithField("driver", store.Driver()).WithField("max_size_mb", m.MaxSizeMB).Info("Media uploads enabled")
+	local, _ := store.(*media.Local)
+	if local != nil {
+		logger.Log.WithField("path", local.Root()).Info("Media files are stored on local disk; use the S3 driver to run several API replicas")
+	}
+	return local, nil
+}
+
+func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *media.Local) {
+	// Files of the local media driver (public, like a bucket's URLs).
+	if localMedia != nil {
+		router.GET(media.LocalPathPrefix+"/*key", handlers.ServeLocalMedia(localMedia))
+		router.HEAD(media.LocalPathPrefix+"/*key", handlers.ServeLocalMedia(localMedia))
+	}
+
 	// Monitoring & Healthcheck
 	router.GET("/_metrics", gin.WrapH(promhttp.Handler()))
 	router.GET("/_health", func(c *gin.Context) {
@@ -310,6 +367,11 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc) {
 		content.Any("/collections/:collection/:id", handlers.DynamicCollectionHandler)
 		content.POST("/collections/:collection/:id/publish", handlers.PublishItem(true))
 		content.POST("/collections/:collection/:id/unpublish", handlers.PublishItem(false))
+		content.POST("/media", handlers.UploadMedia)
+		content.GET("/media", handlers.ListMedia)
+		content.GET("/media/:id", handlers.GetMedia)
+		content.PUT("/media/:id", handlers.UpdateMedia)
+		content.DELETE("/media/:id", handlers.DeleteMedia)
 		content.GET("/singleton/:name", handlers.GetSingleItem)
 		content.POST("/singleton/:name", handlers.CreateOrUpdateSingletonItem)
 		content.PUT("/singleton/:name", handlers.CreateOrUpdateSingletonItem)

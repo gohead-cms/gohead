@@ -8,6 +8,8 @@
 | `Binary was compiled with 'CGO_ENABLED=0', go-sqlite3 requires cgo` | You are using a release binary with SQLite. Use PostgreSQL/MySQL, the container image, or `make build`. |
 | `failed to read config file` | The file exists but is invalid YAML. A missing file is fine. |
 | `jwt_secret is not set …` (warning) | Set `GOHEAD_JWT_SECRET`; otherwise tokens break on restart. |
+| `media storage: cannot reach bucket …` / `bucket … does not exist` | Check `GOHEAD_MEDIA_S3_*`: endpoint, credentials, and that the bucket exists. Use `path_style: true` for MinIO and similar. |
+| `Media uploads are disabled: the local media directory is not writable` (warning) | Point `GOHEAD_MEDIA_LOCAL_PATH` at a writable volume, or use the S3 driver. |
 
 ## Every request returns 401
 
@@ -56,6 +58,17 @@ ingress's IP for every user: set `GOHEAD_TRUSTED_PROXIES`.
 4. The event list must match exactly (`item:created`, not `created`), and the collection name
    too.
 5. Agent writes do not emit events, by design.
+
+## Uploads fail or files do not display
+
+- `415`: the detected type is not allowed. The type comes from the file's content, so a
+  renamed file keeps its real type. Extend `media.allowed_types` if needed.
+- `413`: raise `media.max_size_mb`, and the body size limit of your ingress
+  (`nginx.ingress.kubernetes.io/proxy-body-size`).
+- Images break in the front-end with the local driver: URLs are relative (`/uploads/…`); set
+  `GOHEAD_MEDIA_PUBLIC_URL` to the API's public URL.
+- S3 URLs stop working after an hour: without `media.public_url` they are presigned. Fetch
+  content again, or serve the bucket publicly / through a CDN and set `media.public_url`.
 
 ## Filtering returns 400
 
