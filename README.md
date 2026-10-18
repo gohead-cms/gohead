@@ -154,7 +154,7 @@ The **[GoHead Handbook](https://gohead-cms.github.io/gohead/)** covers everythin
 
 GoHead is **pre-1.0**: the API is usable and tested, and may still change between minor
 versions (see the [changelog](CHANGELOG.md)). Known gaps: media uploads, draft/publish workflow,
-component values in items, and broadcasting GraphQL schema reloads across API replicas.
+and component values in items.
 
 ## Contributing
 

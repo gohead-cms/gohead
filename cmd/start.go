@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"github.com/gohead-cms/gohead/pkg/llm"
 	"log"
 	"net/http"
@@ -18,11 +19,13 @@ import (
 	"github.com/gohead-cms/gohead/internal/api/middleware"
 	"github.com/gohead-cms/gohead/internal/graphql"
 	"github.com/gohead-cms/gohead/pkg/auth"
+	"github.com/gohead-cms/gohead/pkg/cluster"
 	"github.com/gohead-cms/gohead/pkg/config"
 	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/metrics"
 	"github.com/gohead-cms/gohead/pkg/migrations"
+	"github.com/gohead-cms/gohead/pkg/ratelimit"
 	"github.com/gohead-cms/gohead/pkg/seed"
 	"github.com/gohead-cms/gohead/pkg/storage"
 	"github.com/gohead-cms/gohead/pkg/tracing"
@@ -30,6 +33,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/redis/go-redis/v9"
 	"github.com/spf13/cobra"
 	ginlogrus "github.com/toorop/gin-logrus"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
@@ -150,6 +154,34 @@ func InitializeServer(cfgPath string) (*gin.Engine, *config.Config, func(), erro
 		}
 	})
 
+	// --- Shared state across replicas (Redis) ---
+	rdb := connectRedis(cfg)
+	if rdb != nil {
+		closers = append(closers, func() { _ = rdb.Close() })
+	}
+
+	// GraphQL schema: rebuild when another replica changes a collection.
+	schemaSync := cluster.NewSchemaSync(rdb)
+	if rdb != nil {
+		handlers.SchemaNotifier = schemaSync
+		syncCtx, stopSync := context.WithCancel(context.Background())
+		go schemaSync.Run(syncCtx, graphql.InitializeGraphQLSchema)
+		closers = append(closers, stopSync)
+	}
+
+	// Authentication rate limits, shared by all replicas.
+	var authLimiter ratelimit.Counter
+	if cfg.RateLimit.Enabled {
+		authLimiter = ratelimit.New(rdb, "gohead:ratelimit:")
+		if cfg.RateLimit.LoginFailures > 0 {
+			handlers.LoginGuard = &handlers.LoginAttemptGuard{
+				Counter:     authLimiter,
+				MaxFailures: cfg.RateLimit.LoginFailures,
+				Window:      cfg.RateLimit.LoginWindow,
+			}
+		}
+	}
+
 	// --- Telemetry (Optional) ---
 	if cfg.TelemetryEnabled {
 		tracerProvider, err := tracing.InitTracer()
@@ -181,6 +213,16 @@ func InitializeServer(cfgPath string) (*gin.Engine, *config.Config, func(), erro
 	}
 
 	router := gin.New()
+	// Only trust X-Forwarded-For from configured proxies; otherwise clients
+	// could spoof their IP and dodge rate limits.
+	var trusted []string
+	if len(cfg.TrustedProxies) > 0 {
+		trusted = cfg.TrustedProxies
+	}
+	if err := router.SetTrustedProxies(trusted); err != nil {
+		cleanup()
+		return nil, nil, func() {}, fmt.Errorf("invalid trusted_proxies: %w", err)
+	}
 	router.Use(ginlogrus.Logger(logger.Log), gin.Recovery())
 	router.Use(middleware.CORSMiddleware(cfg))
 	router.Use(middleware.MetricsMiddleware())
@@ -188,12 +230,16 @@ func InitializeServer(cfgPath string) (*gin.Engine, *config.Config, func(), erro
 	router.Use(middleware.ResponseWrapper())
 
 	// --- Routes ---
-	setupRoutes(router)
+	authLimit := middleware.RateLimit(authLimiter, "auth", 0, time.Minute)
+	if cfg.RateLimit.Enabled {
+		authLimit = middleware.RateLimit(authLimiter, "auth", cfg.RateLimit.AuthPerMinute, time.Minute)
+	}
+	setupRoutes(router, authLimit)
 
 	return router, &cfg, cleanup, nil
 }
 
-func setupRoutes(router *gin.Engine) {
+func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc) {
 	// Monitoring & Healthcheck
 	router.GET("/_metrics", gin.WrapH(promhttp.Handler()))
 	router.GET("/_health", func(c *gin.Context) {
@@ -201,7 +247,7 @@ func setupRoutes(router *gin.Engine) {
 	})
 
 	// Public routes
-	authRoutes := router.Group("/auth")
+	authRoutes := router.Group("/auth", authLimit)
 	{
 		authRoutes.POST("/register", handlers.Register)
 		authRoutes.POST("/login", handlers.Login)
@@ -290,4 +336,24 @@ func resolveJWTSecret(configured string) string {
 	logger.Log.Warn("jwt_secret is not set (or uses the sample default): using a random secret for this run. " +
 		"Tokens will not survive a restart; set jwt_secret (or GOHEAD_JWT_SECRET) to a long random value.")
 	return hex.EncodeToString(buf)
+}
+
+// connectRedis returns a client for the configured Redis, or nil when it is
+// not reachable at startup. Without Redis, schema changes are not broadcast
+// (single replica only) and rate limits are per process.
+func connectRedis(cfg config.Config) *redis.Client {
+	rdb := redis.NewClient(cfg.RedisOptions())
+	var err error
+	for attempt := 0; attempt < 5; attempt++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		err = rdb.Ping(ctx).Err()
+		cancel()
+		if err == nil {
+			return rdb
+		}
+		time.Sleep(time.Duration(attempt+1) * 300 * time.Millisecond)
+	}
+	logger.Log.WithError(err).Warn("Redis unreachable: schema changes will not be shared between replicas and rate limits are per process. Run a single API replica or fix GOHEAD_REDIS_ADDRESS.")
+	_ = rdb.Close()
+	return nil
 }

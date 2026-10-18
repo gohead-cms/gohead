@@ -24,8 +24,22 @@ afterwards.
 
 ## A new collection is missing from GraphQL
 
-The schema is rebuilt in the API replica that handled the change. With several replicas,
-restart the API deployment. See [scaling](deployment.md#scaling).
+The schema is rebuilt in the API replica that handled the change and broadcast to the others
+through Redis.
+
+- With several replicas, check that they all use the same Redis (`GOHEAD_REDIS_ADDRESS`,
+  `GOHEAD_REDIS_DB`). Logs show `Schema sync started` at startup and
+  `Schema reloaded from another replica's change` when a broadcast arrives.
+- After a Redis outage, replicas catch up within 30 seconds.
+- Without Redis, only the replica that handled the change has the new schema: restart the API
+  deployment, or run a single replica. See [scaling](deployment.md#scaling).
+
+## 429 Too Many Requests on login
+
+`/auth/*` is rate limited per client IP, and repeated failed logins lock that username out from
+that IP for 15 minutes (see [rate limiting](../getting-started/configuration.md#rate-limiting)).
+Wait for the `Retry-After` delay. If everyone is limited at once, the API probably sees the
+ingress's IP for every user: set `GOHEAD_TRUSTED_PROXIES`.
 
 ## The admin UI cannot reach the API
 

@@ -27,11 +27,23 @@ jwt_secret: ""
 # standard OTEL_EXPORTER_OTLP_ENDPOINT variable (default localhost:4317).
 telemetry_enabled: false
 
-# Redis backs the job queues used by the worker, dispatcher and scheduler.
+# Redis backs the job queues used by the worker, dispatcher and scheduler, and
+# lets API replicas share GraphQL schema changes and rate-limit counters.
 redis:
   address: localhost:6379
   password: ""
   db: 0
+
+# Brute-force protection for /auth/login and /auth/register.
+rate_limit:
+  enabled: true
+  auth_per_minute: 20  # requests per client IP
+  login_failures: 5    # failed logins per username and IP before lockout (0 = off)
+  login_window: 15m
+
+# IPs/CIDRs of the load balancer or ingress allowed to set X-Forwarded-For.
+# Empty: the header is ignored and the connection's address is the client IP.
+trusted_proxies: []
 
 cors:
   allowed_origins: ["*"]

@@ -32,12 +32,12 @@ flowchart TB
 
 | Component | State | Scaling |
 |-----------|-------|---------|
-| API | stateless (tokens are JWTs) | see [GraphQL reloads](deployment.md#scaling) |
+| API | stateless (tokens are JWTs) | horizontal, with Redis ([details](deployment.md#scaling)) |
 | Dispatcher | stateless | horizontal |
 | Worker | stateless, 10 concurrent jobs per process | horizontal |
 | Scheduler | in-memory schedule | **one replica** |
 | Database | all content, schema, users, agents, agent history | your database's HA |
-| Redis | queues (events, agent jobs) | Redis HA / managed Redis |
+| Redis | queues (events, agent jobs), schema-change broadcast, rate-limit counters | Redis HA / managed Redis |
 
 ## Request path
 
