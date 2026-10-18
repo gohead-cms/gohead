@@ -66,10 +66,12 @@ func TestComponentHandlers(t *testing.T) {
 
 		assert.Equal(t, http.StatusCreated, rr.Code)
 
-		var response map[string]any
-		json.Unmarshal(rr.Body.Bytes(), &response)
-		assert.Contains(t, response["message"], "component created successfully")
-		assert.Equal(t, componentName, response["component"])
+		var envelope struct {
+			Data map[string]any `json:"data"`
+		}
+		assert.NoError(t, json.Unmarshal(rr.Body.Bytes(), &envelope))
+		assert.Contains(t, envelope.Data["message"], "component created successfully")
+		assert.Equal(t, componentName, envelope.Data["component"])
 
 		// Verify in DB
 		_, err := storage.GetComponentByName(componentName)
@@ -84,10 +86,12 @@ func TestComponentHandlers(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 
-		var response models.Component
-		json.Unmarshal(rr.Body.Bytes(), &response)
-		assert.Equal(t, componentName, response.Name)
-		assert.Len(t, response.Attributes, 2, "Expected component to have 2 attributes")
+		var envelope struct {
+			Data models.Component `json:"data"`
+		}
+		assert.NoError(t, json.Unmarshal(rr.Body.Bytes(), &envelope))
+		assert.Equal(t, componentName, envelope.Data.Name)
+		assert.Len(t, envelope.Data.Attributes, 2, "Expected component to have 2 attributes")
 	})
 
 	// --- Sub-test for Get Not Found ---

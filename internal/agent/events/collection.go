@@ -34,7 +34,13 @@ type CollectionEventPayload struct {
 }
 
 // EnqueueCollectionEvent creates and enqueues a new generic collection event.
+// When no queue client is configured (e.g. in tests or a deployment without
+// Redis), the event is dropped with a debug log instead of panicking.
 func EnqueueCollectionEvent(ctx context.Context, client *asynq.Client, payload CollectionEventPayload) error {
+	if client == nil {
+		logger.Log.WithField("event_type", payload.EventType).Debug("No queue client configured; skipping collection event")
+		return nil
+	}
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		logger.Log.WithError(err).Error("Failed to marshal collection event payload")

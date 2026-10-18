@@ -32,6 +32,13 @@ func InitDatabase(databaseURL string, logLevel gormlogger.LogLevel) (*gorm.DB, e
 			Logger:         gormLogger,
 			TranslateError: true,
 		})
+		// Every new connection to ":memory:" opens a separate, empty
+		// database, so an in-memory DB must be pinned to one connection.
+		if err == nil && strings.Contains(dbPath, ":memory:") {
+			if sqlDB, dbErr := db.DB(); dbErr == nil {
+				sqlDB.SetMaxOpenConns(1)
+			}
+		}
 
 	case strings.HasPrefix(databaseURL, "mysql://"):
 		// MySQL configuration

@@ -30,7 +30,7 @@ func TestFormatCollectionSchema(t *testing.T) {
 	result := FormatCollectionSchema(collection)
 
 	// Check top-level keys
-	if result["id"] != 1 {
+	if result["id"] != uint(1) {
 		t.Errorf("expected id to be 1, got %v", result["id"])
 	}
 
@@ -127,7 +127,7 @@ func TestFormatCollectionItem(t *testing.T) {
 		t.Fatal("expected non-nil result")
 	}
 
-	if result["id"] != 101 {
+	if result["id"] != uint(101) {
 		t.Errorf("expected id to be 101, got %v", result["id"])
 	}
 
@@ -204,7 +204,7 @@ func TestFormatCollectionItems(t *testing.T) {
 	}
 
 	// Check first item
-	if result[0]["id"] != 1 {
+	if result[0]["id"] != uint(1) {
 		t.Errorf("expected first item ID to be 1, got %v", result[0]["id"])
 	}
 	attrs1, ok := result[0]["attributes"].(map[string]interface{})
@@ -217,7 +217,7 @@ func TestFormatCollectionItems(t *testing.T) {
 	}
 
 	// Check second item
-	if result[1]["id"] != 2 {
+	if result[1]["id"] != uint(2) {
 		t.Errorf("expected second item ID to be 2, got %v", result[1]["id"])
 	}
 	attrs2, ok := result[1]["attributes"].(map[string]interface{})

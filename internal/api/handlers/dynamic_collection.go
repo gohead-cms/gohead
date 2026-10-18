@@ -3,11 +3,11 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/gohead-cms/gohead/internal/models"
-	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
 	"github.com/gohead-cms/gohead/pkg/utils"
@@ -95,95 +95,78 @@ func handleCreate(c *gin.Context, userRole string, ct *models.Collection) {
 		return
 	}
 
-	// Trim whitespace and check the first character
 	body := bytes.TrimSpace(raw)
+	isBatch := len(body) > 0 && body[0] == '['
 
-	// ---------------------------------
-	//  CASE 1: Bulk Creation (Array)
-	// ---------------------------------
-	tx := database.DB.Begin()
-	if len(body) > 0 && body[0] == '[' {
+	var batch []models.JSONMap
+	if isBatch {
 		var inputs []struct {
 			Data map[string]any `json:"data"`
 		}
-		if err := json.Unmarshal(body, &inputs); err != nil {
-			c.Set("response", "Invalid JSON array format. Expecting an array of objects with a 'data' key.")
+		if err := json.Unmarshal(body, &inputs); err != nil || len(inputs) == 0 {
+			c.Set("response", "Invalid JSON array format. Expecting a non-empty array of objects with a 'data' key.")
 			c.Set("status", http.StatusBadRequest)
 			return
 		}
-
-		var createdItems []map[string]any
-		// IMPORTANT: For bulk operations, you should use a database transaction.
-
-		for i, input := range inputs {
-			if _, err := models.ValidateItemValues(*ct, input.Data, tx); err != nil {
-				// tx.Rollback() // Rollback on the first validation error
-				c.Set("response", gin.H{
-					"error":      "Validation failed for an item in the batch",
-					"details":    err.Error(),
-					"item_index": i,
-				})
-				c.Set("status", http.StatusBadRequest)
-				return
-			}
-
-			item := models.Item{
-				CollectionID: ct.ID,
-				Data:         input.Data,
-			}
-
-			if err := storage.SaveItemWithTransaction(tx, &item); err != nil { // Should be storage.SaveItemInTransaction(&item, tx)
-				tx.Rollback()
-				c.Set("response", "Failed to save an item during bulk operation")
-				c.Set("status", http.StatusInternalServerError)
-				return
-			}
-			createdItems = append(createdItems, utils.FormatCollectionItem(&item, ct))
+		for _, in := range inputs {
+			batch = append(batch, in.Data)
 		}
-
-		tx.Commit()
-		c.Set("response", createdItems)
-		c.Set("meta", gin.H{"created_count": len(createdItems)})
-		c.Set("status", http.StatusCreated)
-
-		// ---------------------------------
-		//  CASE 2: Single Item Creation (Object)
-		// ---------------------------------
 	} else if len(body) > 0 && body[0] == '{' {
 		var input struct {
 			Data map[string]any `json:"data"`
 		}
-		if err := json.Unmarshal(body, &input); err != nil {
+		if err := json.Unmarshal(body, &input); err != nil || input.Data == nil {
 			c.Set("response", "Invalid JSON object format. Expecting an object with a 'data' key.")
 			c.Set("status", http.StatusBadRequest)
 			return
 		}
-
-		// This logic is directly from your original CreateItem function
-		if _, err := models.ValidateItemValues(*ct, input.Data, tx); err != nil {
-			c.Set("response", err.Error())
-			c.Set("status", http.StatusBadRequest)
-			return
-		}
-
-		newItem, err := storage.SaveItem(*ct, input.Data)
-		if err != nil {
-			c.Set("response", "Failed to save item: "+err.Error())
-			c.Set("status", http.StatusInternalServerError)
-			return
-		}
-
-		c.Set("response", utils.FormatCollectionItem(newItem, ct))
-		c.Set("meta", gin.H{})
-		c.Set("status", http.StatusCreated)
-
+		batch = []models.JSONMap{input.Data}
 	} else {
 		c.Set("response", "Invalid or empty JSON body")
 		c.Set("status", http.StatusBadRequest)
+		return
 	}
+
+	// All items are validated and stored in a single transaction.
+	created, err := storage.SaveItems(*ct, batch)
+	if err != nil {
+		var verr *storage.ItemValidationError
+		if errors.As(err, &verr) {
+			if isBatch {
+				c.Set("response", "Validation failed for an item in the batch")
+				c.Set("details", gin.H{"item_index": verr.Index, "error": verr.Error()})
+			} else {
+				c.Set("response", verr.Error())
+			}
+			c.Set("status", http.StatusBadRequest)
+			return
+		}
+		logger.Log.WithError(err).WithField("collection", ct.Name).Error("Failed to save items")
+		c.Set("response", "Failed to save item")
+		c.Set("status", http.StatusInternalServerError)
+		return
+	}
+
+	if !isBatch {
+		c.Set("response", utils.FormatCollectionItem(created[0], ct))
+		c.Set("meta", gin.H{})
+		c.Set("status", http.StatusCreated)
+		return
+	}
+	out := make([]map[string]any, 0, len(created))
+	for _, item := range created {
+		out = append(out, utils.FormatCollectionItem(item, ct))
+	}
+	c.Set("response", out)
+	c.Set("meta", gin.H{"created_count": len(out)})
+	c.Set("status", http.StatusCreated)
 }
 
 // handleRead handles fetching items or a single item by ID
+// maxRelationLevel caps how deep relations are populated, to bound the work
+// (and queries) a single request can trigger.
+const maxRelationLevel = 5
+
 func handleRead(c *gin.Context, userRole string, ct *models.Collection, id string) {
 	if !hasPermission(userRole, "read") {
 		logger.Log.WithFields(logrus.Fields{
@@ -199,7 +182,7 @@ func handleRead(c *gin.Context, userRole string, ct *models.Collection, id strin
 	level := 1
 	if levelParam != "" {
 		parsedLevel, err := strconv.Atoi(levelParam)
-		if err != nil || parsedLevel < 1 {
+		if err != nil || parsedLevel < 1 || parsedLevel > maxRelationLevel {
 			logger.Log.WithField("level_param", levelParam).Warn("Invalid level parameter")
 			c.Set("response", "Invalid level parameter")
 			c.Set("status", http.StatusBadRequest)

@@ -167,7 +167,7 @@ func TestRetrieveContentItem(t *testing.T) {
 		Data:         models.JSONMap{"title": "Existing Article", "content": "This is an existing article."},
 	}
 
-	_, err := storage.SaveItem(*&collection, contentItem.Data)
+	saved, err := storage.SaveItem(collection, contentItem.Data)
 	assert.NoError(t, err)
 	// Apply AuthMiddleware to protected routes
 	protected := router.Group("/")
@@ -180,7 +180,7 @@ func TestRetrieveContentItem(t *testing.T) {
 	token, err := auth.GenerateJWT("test_viewer", "viewer")
 	assert.NoError(t, err)
 
-	req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("/articles/%d", contentItem.ID), nil)
+	req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("/articles/%d", saved.ID), nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	rr := httptest.NewRecorder()
@@ -198,5 +198,6 @@ func TestRetrieveContentItem(t *testing.T) {
 	data, ok := response["data"].(map[string]any)
 	assert.True(t, ok, "Response should have a 'data' key")
 
-	assert.Equal(t, "Existing Article", data["title"])
+	attrs, _ := data["attributes"].(map[string]any)
+	assert.Equal(t, "Existing Article", attrs["title"])
 }

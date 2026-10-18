@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"gorm.io/gorm"
 )
@@ -71,6 +72,9 @@ func ValidateComponentSchema(cmp Component) error {
 
 	seen := make(map[string]bool)
 	for _, attr := range cmp.Attributes {
+		if strings.TrimSpace(attr.Name) == "" {
+			return fmt.Errorf("component '%s' has an attribute without a name", cmp.Name)
+		}
 		// Check duplicate attribute names
 		if seen[attr.Name] {
 			return fmt.Errorf("duplicate attribute name: '%s' in component '%s'", attr.Name, cmp.Name)

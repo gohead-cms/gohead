@@ -71,9 +71,10 @@ func TestRoleCRUD(t *testing.T) {
 
 	assert.NoError(t, db.AutoMigrate(&models.UserRole{}), "Failed to apply migrations")
 	// Test CreateRole
+	// testutils seeds admin/editor/viewer; use a name that is not seeded.
 	role := &models.UserRole{
-		Name:        "admin",
-		Description: "Administrator role",
+		Name:        "auditor",
+		Description: "Auditor role",
 		Permissions: models.JSONMap{"manage_users": true, "manage_content": true},
 	}
 	err := storage.SaveRole(role)
@@ -86,25 +87,25 @@ func TestRoleCRUD(t *testing.T) {
 	assert.Equal(t, role.Name, fetchedRole.Name, "Fetched role name should match created role")
 
 	// Test GetRoleByName
-	fetchedRoleByName, err := storage.GetRoleByName("admin")
+	fetchedRoleByName, err := storage.GetRoleByName("auditor")
 	assert.NoError(t, err, "GetRoleByName should not return an error")
 	assert.Equal(t, role.ID, fetchedRoleByName.ID, "Fetched role by name should match created role ID")
 
 	// Test GetAllRoles
 	roles, err := storage.GetAllRoles()
 	assert.NoError(t, err, "GetAllRoles should not return an error")
-	assert.Len(t, roles, 1, "There should be one role in the database")
+	assert.Len(t, roles, 4, "Expected the 3 seeded roles plus the new one")
 
 	// Test UpdateRole
 	updates := map[string]interface{}{
-		"description": "Updated Administrator role",
+		"description": "Updated auditor role",
 	}
 	err = storage.UpdateRole(role.ID, updates)
 	assert.NoError(t, err, "UpdateRole should not return an error")
 
 	updatedRole, err := storage.GetRoleByID(role.ID)
 	assert.NoError(t, err, "GetRoleByID should not return an error")
-	assert.Equal(t, "Updated Administrator role", updatedRole.Description, "Role description should be updated")
+	assert.Equal(t, "Updated auditor role", updatedRole.Description, "Role description should be updated")
 
 	// Test DeleteRole
 	err = storage.DeleteRole(role.ID)

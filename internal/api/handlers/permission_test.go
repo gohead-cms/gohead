@@ -34,7 +34,7 @@ func TestProtectedHandlerWithPermissions(t *testing.T) {
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
-	assert.NoError(t, db.AutoMigrate(&models.User{}, &models.UserRole{}, &models.Collection{}, &models.Attribute{}))
+	assert.NoError(t, db.AutoMigrate(&models.User{}, &models.UserRole{}, &models.Collection{}, &models.Attribute{}, &models.Item{}))
 
 	// Seed roles with the required permissions for the test cases.
 	adminRole := models.UserRole{Name: "admin", Permissions: models.JSONMap{"create": true}}
@@ -145,8 +145,10 @@ func TestProtectedHandlerWithPermissions(t *testing.T) {
 				// Assert successful data response
 				data, ok := response["data"].(map[string]any)
 				assert.True(t, ok, "Response should have a 'data' key")
-				assert.Equal(t, tc.expectedData.(map[string]any)["title"], data["title"])
-				assert.Equal(t, tc.expectedData.(map[string]any)["content"], data["content"])
+				attrs, _ := data["attributes"].(map[string]any)
+				assert.NotNil(t, data["id"])
+				assert.Equal(t, tc.expectedData.(map[string]any)["title"], attrs["title"])
+				assert.Equal(t, tc.expectedData.(map[string]any)["content"], attrs["content"])
 			}
 		})
 	}

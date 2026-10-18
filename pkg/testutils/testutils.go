@@ -1,6 +1,12 @@
 package testutils
 
 import (
+	"database/sql/driver"
+	"encoding/json"
+	"fmt"
+	"os"
+	"strings"
+
 	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
 
@@ -10,8 +16,36 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 )
 
-// JSONMap is a custom type that implements driver.Valuer and sql.Scanner
+// JSONMap is a custom type that implements driver.Valuer and sql.Scanner.
+// testutils cannot import internal/models (models tests import testutils),
+// so it carries its own minimal copy.
 type JSONMap map[string]interface{}
+
+// Value serializes the map to JSON for storage.
+func (m JSONMap) Value() (driver.Value, error) {
+	if m == nil {
+		return "{}", nil
+	}
+	b, err := json.Marshal(m)
+	return string(b), err
+}
+
+// Scan deserializes JSON from the database.
+func (m *JSONMap) Scan(value interface{}) error {
+	var b []byte
+	switch v := value.(type) {
+	case []byte:
+		b = v
+	case string:
+		b = []byte(v)
+	case nil:
+		*m = JSONMap{}
+		return nil
+	default:
+		return fmt.Errorf("unsupported type for JSONMap: %T", value)
+	}
+	return json.Unmarshal(b, m)
+}
 
 type UserRole struct {
 	ID          uint    `json:"id"`
@@ -24,10 +58,21 @@ type UserRole struct {
 func SetupTestServer() (*gin.Engine, *gorm.DB) {
 	// Initialize the logger
 	logger.InitLogger("debug")
-	// Initialize in-memory test database
-	db, err := database.InitDatabase("sqlite://:memory:", gormlogger.Info)
+	// Tests use an in-memory SQLite database by default. Set
+	// GOHEAD_TEST_DATABASE_URL to a postgres:// URL to run the same tests
+	// against PostgreSQL; its public schema is wiped before each setup.
+	dbURL := os.Getenv("GOHEAD_TEST_DATABASE_URL")
+	if dbURL == "" {
+		dbURL = "sqlite://:memory:"
+	}
+	db, err := database.InitDatabase(dbURL, gormlogger.Info)
 	if err != nil {
-		panic("Failed to initialize in-memory database: " + err.Error())
+		panic("Failed to initialize test database: " + err.Error())
+	}
+	if strings.HasPrefix(dbURL, "postgres://") {
+		if err := db.Exec("DROP SCHEMA public CASCADE; CREATE SCHEMA public").Error; err != nil {
+			panic("Failed to reset test schema: " + err.Error())
+		}
 	}
 	database.DB = db
 
@@ -45,7 +90,7 @@ func SetupTestServer() (*gin.Engine, *gorm.DB) {
 	}
 
 	for _, role := range roles {
-		if err := database.DB.FirstOrCreate(&UserRole{}, role).Error; err != nil {
+		if err := database.DB.Where(UserRole{Name: role.Name}).Attrs(role).FirstOrCreate(&UserRole{}).Error; err != nil {
 			logger.Log.WithFields(logrus.Fields{
 				"role": role.Name,
 			}).Warn("Failed to seed role : ", err)

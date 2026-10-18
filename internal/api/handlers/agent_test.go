@@ -111,6 +111,7 @@ func TestGetAgentsHandler(t *testing.T) {
 
 func TestGetAgentHandler(t *testing.T) {
 	router, db := testutils.SetupTestServer()
+	router.Use(middleware.ResponseWrapper())
 	defer testutils.CleanupTestDB()
 	assert.NoError(t, db.AutoMigrate(&agents.Agent{}))
 
@@ -161,6 +162,7 @@ func TestGetAgentHandler(t *testing.T) {
 
 func TestCreateAgentHandler(t *testing.T) {
 	router, db := testutils.SetupTestServer()
+	router.Use(middleware.ResponseWrapper())
 	defer testutils.CleanupTestDB()
 	assert.NoError(t, db.AutoMigrate(&agents.Agent{}))
 
@@ -250,6 +252,7 @@ func TestCreateAgentHandler(t *testing.T) {
 
 func TestUpdateAgentHandler(t *testing.T) {
 	router, db := testutils.SetupTestServer()
+	router.Use(middleware.ResponseWrapper())
 	defer testutils.CleanupTestDB()
 	assert.NoError(t, db.AutoMigrate(&agents.Agent{}))
 
@@ -302,7 +305,7 @@ func TestUpdateAgentHandler(t *testing.T) {
 		},
 		{
 			name:      "Validation Fails",
-			agentName: "to_be_updated",
+			agentName: "updated_agent", // renamed by the "Success" case above
 			inputData: map[string]any{
 				"name":          "invalid_update",
 				"system_prompt": "", // Invalid field
@@ -331,6 +334,7 @@ func TestUpdateAgentHandler(t *testing.T) {
 
 func TestDeleteAgentHandler(t *testing.T) {
 	router, db := testutils.SetupTestServer()
+	router.Use(middleware.ResponseWrapper())
 	defer testutils.CleanupTestDB()
 	assert.NoError(t, db.AutoMigrate(&agents.Agent{}))
 

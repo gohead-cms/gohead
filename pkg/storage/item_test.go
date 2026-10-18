@@ -8,6 +8,7 @@ import (
 	"github.com/gohead-cms/gohead/pkg/validation"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSaveItem(t *testing.T) {
@@ -16,10 +17,13 @@ func TestSaveItem(t *testing.T) {
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
-	assert.NoError(t, db.AutoMigrate(&models.Item{}, &models.Collection{}))
+	assert.NoError(t, db.AutoMigrate(&models.Item{}, &models.Collection{}, &models.Attribute{}))
 
 	// Create a sample collection
-	collection := &models.Collection{Name: "articles"}
+	collection := &models.Collection{Name: "articles", Attributes: []models.Attribute{
+		{Name: "title", Type: "string"},
+		{Name: "content", Type: "text"},
+	}}
 	assert.NoError(t, db.Create(collection).Error)
 
 	// Create a sample content item
@@ -30,8 +34,13 @@ func TestSaveItem(t *testing.T) {
 
 	// Save the content item
 	final, err := SaveItem(*collection, itemData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotZero(t, final.ID)
+
+	// Unknown attributes are rejected as validation errors.
+	_, err = SaveItem(*collection, models.JSONMap{"nope": 1})
+	var verr *ItemValidationError
+	assert.ErrorAs(t, err, &verr)
 	// Verify the content item exists in the database
 	var result models.Item
 	err = db.First(&result, final.ID).Error
@@ -43,6 +52,7 @@ func TestGetItemByID(t *testing.T) {
 	// Setup a test database
 	_, db := testutils.SetupTestServer()
 	defer testutils.CleanupTestDB()
+	require.NoError(t, db.AutoMigrate(&models.Item{}))
 
 	// Create a mock item
 	mockItem := models.Item{
@@ -82,7 +92,7 @@ func TestGetItems(t *testing.T) {
 	// Fetch all content items
 	results, total, err := GetItems(collection.ID, 1, 15)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, total)
+	assert.Equal(t, 2, total)
 	assert.Len(t, results, 2)
 	assert.Equal(t, "Article 1", results[0].Data["title"])
 	assert.Equal(t, "Article 2", results[1].Data["title"])
@@ -108,10 +118,11 @@ func TestUpdateItem(t *testing.T) {
 	assert.NoError(t, db.Create(item).Error)
 
 	// Update the content item
+	// UpdateItem stores already-validated data; validation and nested
+	// relation creation happen in the handler layer.
 	updatedData := models.JSONMap{
-		"title":             "New Title",
-		"content":           "New Content",
-		"related_attribute": map[string]interface{}{"title": "Nested Title"},
+		"title":   "New Title",
+		"content": "New Content",
 	}
 	err := UpdateItem(item.ID, updatedData)
 	assert.NoError(t, err)
@@ -122,10 +133,8 @@ func TestUpdateItem(t *testing.T) {
 	assert.Equal(t, "New Title", updatedItem.Data["title"])
 	assert.Equal(t, "New Content", updatedItem.Data["content"])
 
-	// Verify nested item creation
-	var nestedItem models.Item
-	assert.NoError(t, db.Where("data->>'title' = ?", "Nested Title").First(&nestedItem).Error)
-	assert.NotZero(t, nestedItem.ID)
+	// Updating a missing item fails.
+	assert.Error(t, UpdateItem(9999, updatedData))
 }
 
 func TestDeleteItem(t *testing.T) {
