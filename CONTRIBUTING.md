@@ -1,107 +1,36 @@
-# Contributing to Gohead
+# Contributing to GoHead
 
-Thank you for considering contributing to **Gohead**! Your contributions are highly valued and help improve the project for everyone. This document outlines the process to get started.
+Thank you for helping! Bug reports, docs, tests and features are all welcome.
 
+The full guide (setup, tests, PostgreSQL tests, admin UI, docs, conventions) is in the
+handbook: **[Contributing](https://gohead-cms.github.io/gohead/development/contributing/)**.
 
-## How Can You Contribute?
+## In short
 
-- Reporting bugs
-- Suggesting new features
-- Improving documentation
-- Submitting code (fixes, features, or improvements)
-- Writing tests
+```bash
+git clone https://github.com/<you>/gohead.git && cd gohead
+git remote add upstream https://github.com/gohead-cms/gohead.git
+git checkout -b feat/short-description
 
-## Getting Started
+make lint test-race     # gofmt, go vet, tests with the race detector
+make up                 # full stack (API, workers, admin UI, Postgres, Redis)
+make docs               # handbook on http://localhost:8000
+```
 
-1. **Fork the Repository**:
-   - Click the "Fork" button on the repository page: [Gohead GitLab Repository](https://gitlab.com/sudo.bngz/gohead).
+- Branch from `master` and open pull requests against `master`; CI must be green.
+- Add a test for every bug fix, and update the docs and `CHANGELOG.md` (*Unreleased*) for
+  user-visible changes.
+- Use [conventional commits](https://www.conventionalcommits.org/): `feat:`, `fix:`,
+  `fix(security):`, `docs:`, `test:`, `refactor:`, `ci:`, `chore:`. Release notes are
+  generated from them.
 
-2. **Clone Your Fork**:
-   ```bash
-   git clone https://gitlab.com/your-username/gohead.git
-   cd gohead
-   ```
+## Reporting issues
 
-3. **Set Upstream**:
-   ```bash
-   git remote add upstream https://gitlab.com/sudo.bngz/gohead.git
-   ```
+Search the [issues](https://github.com/gohead-cms/gohead/issues) first, then include your
+GoHead version (`gohead version`), database, steps to reproduce and logs.
 
-4. **Create a New Branch**:
-   Always create a new branch for your contributions:
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
+Security vulnerabilities: please report them privately through
+[GitHub security advisories](https://github.com/gohead-cms/gohead/security/advisories/new),
+not in a public issue.
 
----
-
-## Code Style
-
-- Follow the **Golang standard style guidelines**.
-- Use `gofmt` or `gocritic` to format your code before submitting.
-- Maintain consistency with the existing codebase.
-
-## Commit Messages
-
-Use this format for commit messages:  
-`<type>(<scope>): <description>`
-
-### Examples:
-- `feat(api): add endpoint for user authentication`
-- `fix(ui): resolve alignment issue in header`
-- `docs(readme): update contributing section`
-
-### Allowed Types:
-- `feat`: A new feature
-- `fix`: A bug fix
-- `docs`: Documentation only changes
-- `style`: Changes that do not affect the meaning of the code (white-space, formatting, etc.)
-- `refactor`: A code change that neither fixes a bug nor adds a feature
-- `test`: Adding or fixing tests
-- `chore`: Changes to the build process or auxiliary tools
-
-## Merge Request Guidelines
-
-1. Ensure your code is **up to date** with the main branch:
-   ```bash
-   git pull upstream main
-   ```
-
-2. **Run Tests**:
-   Make sure your code passes all tests before submitting:
-   ```bash
-   go test ./...
-   ```
-
-3. **Submit a Merge Request**:
-   - Push your branch to your fork:
-     ```bash
-     git push origin feature/your-feature-name
-     ```
-   - Open a merge request (MR) on the original repository: [Gohead GitLab Repository](https://gitlab.com/sudo.bngz/gohead).
-
-4. **Describe Your Changes**:
-   In the merge request description, explain:
-   - What problem your changes solve
-   - How they solve it
-   - Any additional context or considerations
-
----
-
-## Reporting Issues
-
-- Before reporting a bug, check if it has already been reported in the [Issues](https://gitlab.com/sudo.bngz/gohead/-/issues).
-- Include detailed steps to reproduce the issue.
-- Provide information about your environment:
-  - Go version
-  - Operating system
-
----
-
-## Need Help?
-
-Feel free to reach out by:
-- Opening an issue in the [Issues section](https://gitlab.com/sudo.bngz/gohead/-/issues).
-- Contacting maintainers via GitLab.
-
-Thank you for contributing to Gohead! 🚀
+By contributing you agree that your contributions are licensed under the [MIT License](LICENSE.md).

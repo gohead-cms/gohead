@@ -64,7 +64,7 @@ jobs:
             type=raw,value=master-${{ steps.vars.outputs.sha }}-${{ steps.vars.outputs.ts }},enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
+            type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }}
             type=ref,event=pr
           flavor: |
             latest=auto

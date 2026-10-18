@@ -1,0 +1,4 @@
+.md-typeset .hero { text-align: center; margin: 1.5rem 0 2rem; }
+.md-typeset .hero img { width: 140px; }
+.md-typeset .hero p { font-size: 1.15rem; opacity: .85; }
+.md-typeset .grid.cards > ul > li { border-radius: .5rem; }
