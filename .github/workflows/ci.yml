@@ -236,9 +236,13 @@ jobs:
           fi
           echo "$out" | tee -a helm.log | grep -q "set database.url"
 
-      # Install on a real cluster with the released images of the chart's
-      # appVersion, then run `helm test`.
+      # Install the branch's images on a real cluster, then run `helm test`.
       - uses: helm/kind-action@v1.15.1
+      - name: Build and load the images
+        run: |
+          docker build -t gohead:ci .
+          docker build -t gohead-admin:ci gui
+          kind load docker-image gohead:ci gohead-admin:ci --name chart-testing
       - name: Install on kind
         shell: bash
         run: |
@@ -247,7 +251,10 @@ jobs:
           kubectl set env deployment/postgres POSTGRES_USER=gohead POSTGRES_PASSWORD=gohead POSTGRES_DB=gohead
           kubectl expose deployment postgres --port=5432
           kubectl rollout status deployment/postgres --timeout=180s
-          helm install gohead charts/gohead -f charts/gohead/ci/default-values.yaml --wait --timeout 6m 2>&1 | tee -a helm.log
+          helm install gohead charts/gohead -f charts/gohead/ci/default-values.yaml \
+            --set image.repository=gohead,image.tag=ci,image.pullPolicy=Never \
+            --set admin.image.repository=gohead-admin,admin.image.tag=ci,admin.image.pullPolicy=Never \
+            --wait --timeout 6m 2>&1 | tee -a helm.log
           helm test gohead --logs 2>&1 | tee -a helm.log
       - name: Diagnostics
         if: failure()
