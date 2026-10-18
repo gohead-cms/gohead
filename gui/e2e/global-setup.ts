@@ -7,7 +7,7 @@ export default async function globalSetup() {
   const api = await request.newContext({ baseURL: apiURL });
 
   for (let i = 0; ; i++) {
-    const res = await api.get("/health").catch(() => null);
+    const res = await api.get("/_health").catch(() => null);
     if (res?.ok()) break;
     if (i > 60) throw new Error(`API not reachable at ${apiURL}`);
     await new Promise((r) => setTimeout(r, 1000));

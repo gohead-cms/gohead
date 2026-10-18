@@ -1,0 +1,208 @@
+# Default values for GoHead.
+#
+# GoHead needs a PostgreSQL or MySQL database (set `database.url` or
+# `existingSecret`) and Redis (bundled by default, see `redis`). Uploads go to
+# S3-compatible storage when the API runs more than one replica.
+
+image:
+  repository: ghcr.io/gohead-cms/gohead
+  # Defaults to the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# --- Secrets -----------------------------------------------------------------
+# Either name an existing Secret holding the variables below (GOHEAD_DATABASE_URL,
+# GOHEAD_JWT_SECRET and optionally GOHEAD_REDIS_PASSWORD,
+# GOHEAD_MEDIA_S3_ACCESS_KEY, GOHEAD_MEDIA_S3_SECRET_KEY, OPENAI_API_KEY,
+# ANTHROPIC_API_KEY…), or let the chart create one from `database`, `jwtSecret`
+# and `extraSecretEnv`.
+existingSecret: ""
+
+database:
+  # postgres://user:pass@host:5432/gohead?sslmode=require
+  # mysql://user:pass@tcp(host:3306)/gohead?charset=utf8mb4&parseTime=True&loc=UTC
+  url: ""
+
+# Signs login tokens. Leave empty to generate a random one at install time
+# (kept across upgrades).
+jwtSecret: ""
+
+# More secret environment variables, e.g. { OPENAI_API_KEY: sk-... }.
+extraSecretEnv: {}
+
+# --- Configuration -------------------------------------------------------------
+# Non-secret settings, as GOHEAD_* environment variables. See
+# https://gohead-cms.github.io/gohead/getting-started/configuration/
+config:
+  GOHEAD_LOG_LEVEL: info
+  GOHEAD_MODE: production
+  GOHEAD_TELEMETRY_ENABLED: "false"
+  # Pod CIDR of your ingress controller, so per-IP rate limits see clients.
+  # GOHEAD_TRUSTED_PROXIES: 10.0.0.0/8
+  # Uploads on S3-compatible storage (required with several API replicas):
+  # GOHEAD_MEDIA_DRIVER: s3
+  # GOHEAD_MEDIA_S3_ENDPOINT: https://s3.eu-west-1.amazonaws.com
+  # GOHEAD_MEDIA_S3_REGION: eu-west-1
+  # GOHEAD_MEDIA_S3_BUCKET: my-gohead-media
+  # GOHEAD_MEDIA_PUBLIC_URL: https://media.example.com
+
+# Extra environment for every GoHead container (list of EnvVar).
+extraEnv: []
+
+# --- API -------------------------------------------------------------------------
+api:
+  replicas: 2
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { memory: 512Mi }
+  service:
+    type: ClusterIP
+    port: 80
+    annotations: {}
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    hosts:
+      - host: api.example.com
+        paths: [/]
+    tls: []
+    #  - secretName: gohead-api-tls
+    #    hosts: [api.example.com]
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 75
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+  # Local uploads (GOHEAD_MEDIA_DRIVER=local) are written to /data/uploads.
+  # Without persistence they are lost when the pod restarts; a ReadWriteOnce
+  # volume only works with a single API replica. Prefer S3 in production.
+  uploads:
+    persistence:
+      enabled: false
+      size: 10Gi
+      storageClass: ""
+      accessModes: [ReadWriteOnce]
+      existingClaim: ""
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  topologySpreadConstraints: []
+
+# --- Background processes ------------------------------------------------------
+# They run agents and outbound webhooks and need Redis.
+worker:
+  enabled: true
+  replicas: 1
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { memory: 512Mi }
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+dispatcher:
+  enabled: true
+  replicas: 1
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { memory: 256Mi }
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Enqueues cron-triggered agent runs. Always exactly one replica.
+scheduler:
+  enabled: true
+  resources:
+    requests: { cpu: 25m, memory: 64Mi }
+    limits: { memory: 256Mi }
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# --- Admin UI --------------------------------------------------------------------
+admin:
+  enabled: true
+  image:
+    repository: ghcr.io/gohead-cms/gohead-admin
+    tag: ""
+    pullPolicy: IfNotPresent
+  replicas: 1
+  # Public URL of the API, as the browser reaches it. Defaults to the first
+  # API ingress host.
+  apiUrl: ""
+  resources:
+    requests: { cpu: 10m, memory: 32Mi }
+    limits: { memory: 128Mi }
+  service:
+    type: ClusterIP
+    port: 80
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    hosts:
+      - host: admin.example.com
+        paths: [/]
+    tls: []
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# --- Redis -----------------------------------------------------------------------
+redis:
+  # Deploys a single Redis pod. Fine to start with; queued jobs survive
+  # restarts only with persistence. Set enabled: false and `address` to use a
+  # managed Redis (ElastiCache, Memorystore, Azure Cache…); put its password
+  # in the Secret as GOHEAD_REDIS_PASSWORD.
+  enabled: true
+  address: ""
+  image:
+    repository: docker.io/library/redis
+    tag: "7.4-alpine"
+    pullPolicy: IfNotPresent
+  persistence:
+    enabled: false
+    size: 1Gi
+    storageClass: ""
+  resources:
+    requests: { cpu: 25m, memory: 32Mi }
+    limits: { memory: 256Mi }
+
+# --- Pods ------------------------------------------------------------------------
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {} # e.g. eks.amazonaws.com/role-arn for S3 access through IRSA
+  automount: false
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile: { type: RuntimeDefault }
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: { drop: [ALL] }
+
+# Prometheus Operator ServiceMonitor for the API's /_metrics endpoint.
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  labels: {}

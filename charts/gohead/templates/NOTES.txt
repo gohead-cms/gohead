@@ -1,0 +1,40 @@
+GoHead {{ .Chart.AppVersion }} is installed as "{{ .Release.Name }}".
+
+{{- if .Values.api.ingress.enabled }}
+
+API:      {{ include "gohead.apiUrl" . }}
+{{- else }}
+
+Reach the API locally:
+
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "gohead.fullname" . }}-api 8080:{{ .Values.api.service.port }}
+  curl http://localhost:8080/_health
+{{- end }}
+{{- if .Values.admin.enabled }}
+{{- if .Values.admin.ingress.enabled }}
+Admin UI: http{{ if .Values.admin.ingress.tls }}s{{ end }}://{{ (first .Values.admin.ingress.hosts).host }}
+{{- else }}
+
+Admin UI (it calls the API at {{ include "gohead.apiUrl" . }}):
+
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "gohead.fullname" . }}-admin 3000:{{ .Values.admin.service.port }}
+  open http://localhost:3000
+{{- end }}
+{{- end }}
+
+Create the first account (it becomes the admin):
+
+  curl -X POST <api-url>/auth/register -H 'Content-Type: application/json' \
+    -d '{"username":"admin","email":"admin@example.com","password":"change-me-please"}'
+
+Register it right away: until then anyone who can reach the API can claim it.
+{{- if and .Values.redis.enabled (not .Values.redis.address) (not .Values.redis.persistence.enabled) }}
+
+Note: the bundled Redis keeps no data on disk; queued agent and webhook jobs
+are lost if its pod restarts. Use redis.persistence.enabled or a managed Redis.
+{{- end }}
+{{- if and (gt (int .Values.api.replicas) 1) (not (hasKey .Values.config "GOHEAD_MEDIA_DRIVER")) }}
+
+Note: uploads are stored in each API pod. With several replicas, use
+S3-compatible storage (config.GOHEAD_MEDIA_DRIVER: s3).
+{{- end }}

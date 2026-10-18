@@ -1,0 +1,72 @@
+{{- /* Background processes: same image and configuration as the API. */}}
+{{- $processes := list
+  (dict "name" "worker" "values" .Values.worker "replicas" .Values.worker.replicas)
+  (dict "name" "dispatcher" "values" .Values.dispatcher "replicas" .Values.dispatcher.replicas)
+  (dict "name" "scheduler" "values" .Values.scheduler "replicas" 1) }}
+{{- range $p := $processes }}
+{{- if $p.values.enabled }}
+{{- $component := dict "ctx" $ "component" $p.name }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "gohead.fullname" $ }}-{{ $p.name }}
+  labels:
+    {{- include "gohead.componentLabels" $component | nindent 4 }}
+spec:
+  replicas: {{ $p.replicas }}
+  {{- if eq $p.name "scheduler" }}
+  # Exactly one scheduler, also during rollouts, or cron runs fire twice.
+  strategy:
+    type: Recreate
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "gohead.selectorLabels" $component | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "gohead.componentLabels" $component | nindent 8 }}
+      annotations:
+        {{- include "gohead.configChecksums" $ | nindent 8 }}
+        {{- with $p.values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "gohead.serviceAccountName" $ }}
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml $.Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ $p.name }}
+          image: {{ include "gohead.image" $ }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          args: [{{ $p.name | quote }}]
+          {{- include "gohead.env" $ | nindent 10 }}
+          resources:
+            {{- toYaml $p.values.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml $.Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- with $p.values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $p.values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $p.values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
+{{- end }}

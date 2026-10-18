@@ -1,0 +1,41 @@
+# Every optional feature on, to check that all templates render.
+database:
+  url: mysql://gohead:secret@tcp(mysql:3306)/gohead?charset=utf8mb4&parseTime=True&loc=UTC
+jwtSecret: a-fixed-secret-for-rendering-only
+extraSecretEnv:
+  OPENAI_API_KEY: sk-test
+config:
+  GOHEAD_MEDIA_DRIVER: s3
+  GOHEAD_MEDIA_S3_BUCKET: media
+extraEnv:
+  - name: TZ
+    value: UTC
+api:
+  ingress:
+    enabled: true
+    className: nginx
+    hosts:
+      - host: api.example.com
+        paths: [/]
+    tls:
+      - secretName: api-tls
+        hosts: [api.example.com]
+  autoscaling:
+    enabled: true
+  uploads:
+    persistence:
+      enabled: true
+admin:
+  ingress:
+    enabled: true
+    hosts:
+      - host: admin.example.com
+        paths: [/]
+redis:
+  persistence:
+    enabled: true
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/gohead
+serviceMonitor:
+  enabled: true

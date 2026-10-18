@@ -163,7 +163,7 @@ jobs:
         run: |
           go build -o gohead ./main
           ./gohead start > api.log 2>&1 &
-          for i in $(seq 1 60); do curl -fs http://localhost:8080/health && exit 0; sleep 1; done
+          for i in $(seq 1 60); do curl -fs http://localhost:8080/_health && exit 0; sleep 1; done
           cat api.log; exit 1
         env:
           GOHEAD_DATABASE_URL: sqlite://e2e.db
@@ -179,7 +179,18 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Smoke test
         working-directory: gui
-        run: npx playwright test
+        run: npx playwright test 2>&1 | tee ../e2e.log; exit "${PIPESTATUS[0]}"
+        shell: bash
+
+      # Job logs are not always at hand: surface the essentials on the PR.
+      - name: Report failure details
+        if: failure()
+        run: |
+          annotate() { [ -s "$2" ] && echo "::error title=$1::$(sed -e 's/%/%25/g' "$2" | awk 'BEGIN{ORS="%0A"} {print}')"; true; }
+          grep -vE '^\s*$' e2e.log 2>/dev/null | grep -E -A25 'Error|✘|failed|Timeout' | head -120 > e2e.fail || true
+          annotate "Playwright" e2e.fail
+          grep -E '"level":"(error|fatal|warning)"' api.log 2>/dev/null | tail -40 > api.fail || true
+          annotate "API log" api.fail
 
       - name: Keep the report and API log
         if: failure()
@@ -191,6 +202,55 @@ jobs:
             gui/test-results
             api.log
           retention-days: 7
+
+  helm:
+    name: Helm chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v5
+        with:
+          version: v4.3.0
+      - name: Install kubeconform
+        run: |
+          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz \
+            | tar xz -C /usr/local/bin kubeconform
+
+      - name: Lint and validate every values set
+        run: |
+          for values in charts/gohead/ci/*-values.yaml; do
+            echo "::group::$values"
+            helm lint --strict charts/gohead -f "$values"
+            # ServiceMonitor is a CRD: no schema in the default catalog.
+            helm template ci charts/gohead -f "$values" \
+              | kubeconform -strict -summary -ignore-missing-schemas -kubernetes-version 1.31.0
+            echo "::endgroup::"
+          done
+
+      - name: Missing database fails with a clear message
+        run: |
+          if out=$(helm template ci charts/gohead 2>&1); then
+            echo "::error::rendering without a database should fail"; exit 1
+          fi
+          echo "$out" | grep -q "set database.url"
+
+      # Install on a real cluster with the released images of the chart's
+      # appVersion, then run `helm test`.
+      - uses: helm/kind-action@v1.15.1
+      - name: Install on kind
+        run: |
+          kubectl create deployment postgres --image=postgres:17-alpine --port=5432
+          kubectl set env deployment/postgres POSTGRES_USER=gohead POSTGRES_PASSWORD=gohead POSTGRES_DB=gohead
+          kubectl expose deployment postgres --port=5432
+          kubectl rollout status deployment/postgres --timeout=180s
+          helm install gohead charts/gohead -f charts/gohead/ci/default-values.yaml --wait --timeout 6m
+          helm test gohead --logs
+      - name: Diagnostics
+        if: failure()
+        run: |
+          kubectl get pods -o wide
+          kubectl describe pods | tail -120
+          for d in $(kubectl get deploy -o name); do echo "== $d"; kubectl logs "$d" --tail=60 --all-containers || true; done
 
   docs:
     name: Docs build
