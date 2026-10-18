@@ -1,7 +1,10 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"github.com/hibiken/asynq"
+	"io/fs"
 	"os"
 	"strings"
 
@@ -36,7 +39,7 @@ type RedisConfig struct {
 // Config holds all application settings.
 type Config struct {
 	LogLevel          string `mapstructure:"log_level"`
-	Mode              string `yaml:"gin_log_level"` // For Gin framework logging
+	Mode              string `mapstructure:"mode" yaml:"mode"` // Gin mode: development | production | test
 	TelemetryEnabled  bool   `mapstructure:"telemetry_enabled"`
 	JWTSecret         string `mapstructure:"jwt_secret"`
 	DatabaseURL       string `mapstructure:"database_url"`
@@ -59,16 +62,17 @@ func LoadConfig(configPath string) (Config, error) {
 
 	// Set default values
 	viper.SetDefault("log_level", "info")
-	viper.SetDefault("telemetry_enabled", true)
+	viper.SetDefault("telemetry_enabled", false)
 	viper.SetDefault("jwt_secret", "your-secret-key")
 	viper.SetDefault("database_url", "sqlite://gohead-cms.db")
 	viper.SetDefault("server_port", "8080")
+	viper.SetDefault("mode", "production") // gin mode: development | production | test
 	viper.SetDefault("min_password_length", 6)
 
 	// CORS default values
 	viper.SetDefault("cors.allowed_origins", []string{"*"})
 	viper.SetDefault("cors.allowed_methods", []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"})
-	viper.SetDefault("cors.allowed_headers", []string{"Access-Control-Allow-Headers", "Access-Control-Allow-Headers, Origin,Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers"})
+	viper.SetDefault("cors.allowed_headers", []string{"Origin", "Accept", "Content-Type", "Authorization", "X-Requested-With", "Webhook-Token"})
 	viper.SetDefault("cors.allow_credentials", true)
 	viper.SetDefault("cors.max_age", 86400)
 
@@ -81,13 +85,17 @@ func LoadConfig(configPath string) (Config, error) {
 	viper.SetDefault("llm.provider", "openai")
 	viper.SetDefault("llm.model", "gpt-4o")
 	viper.SetDefault("llm.api_key", os.Getenv("OPENAI_API_KEY"))
+	viper.SetDefault("llm.base_url", "")
 
 	// Set the config file path
 	viper.SetConfigFile(configPath)
 
 	// Read the config file
+	// A missing file is fine: configuration can come entirely from
+	// GOHEAD_* environment variables (containers, Kubernetes).
 	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+		var notFound viper.ConfigFileNotFoundError
+		if !errors.As(err, &notFound) && !errors.Is(err, fs.ErrNotExist) {
 			return cfg, fmt.Errorf("failed to read config file: %w", err)
 		}
 	}
@@ -127,4 +135,14 @@ func SaveConfig(cfg *Config, filePath string) error {
 	}
 
 	return nil
+}
+
+// RedisClientOpt returns the asynq connection options for the configured
+// Redis, including password and database index.
+func (c Config) RedisClientOpt() asynq.RedisClientOpt {
+	return asynq.RedisClientOpt{
+		Addr:     c.Redis.Address,
+		Password: c.Redis.Password,
+		DB:       c.Redis.DB,
+	}
 }

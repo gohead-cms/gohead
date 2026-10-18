@@ -41,3 +41,6 @@ config.yml
 
 # Ignore documentation build directories
 /docs/venv/
+gui/node_modules
+docs/site
+site

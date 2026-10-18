@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 
 	"github.com/tmc/langchaingo/llms"
 
@@ -211,8 +212,53 @@ func convertRole(role Role) llms.ChatMessageType {
 	}
 }
 
+var (
+	defaultsMu sync.RWMutex
+	defaults   Config
+)
+
+// SetDefaultConfig sets the instance-wide LLM settings (the `llm` block of
+// the configuration). Fields an agent leaves empty fall back to them.
+func SetDefaultConfig(cfg Config) {
+	defaultsMu.Lock()
+	defer defaultsMu.Unlock()
+	defaults = cfg
+}
+
+func withDefaults(cfg Config) Config {
+	defaultsMu.RLock()
+	d := defaults
+	defaultsMu.RUnlock()
+	if cfg.Provider == "" {
+		cfg.Provider = d.Provider
+		// Model, key and endpoint only make sense for the same provider.
+		if cfg.Model == "" {
+			cfg.Model = d.Model
+		}
+		if cfg.APIKey == "" {
+			cfg.APIKey = d.APIKey
+		}
+		if cfg.BaseURL == "" {
+			cfg.BaseURL = d.BaseURL
+		}
+	} else if cfg.Provider == d.Provider {
+		if cfg.Model == "" {
+			cfg.Model = d.Model
+		}
+		if cfg.APIKey == "" {
+			cfg.APIKey = d.APIKey
+		}
+		if cfg.BaseURL == "" {
+			cfg.BaseURL = d.BaseURL
+		}
+	}
+	return cfg
+}
+
 // NewAdapter creates a new `Client` by wrapping the specified LLM provider.
+// Empty fields are filled from SetDefaultConfig.
 func NewAdapter(cfg Config) (Client, error) {
+	cfg = withDefaults(cfg)
 	var client llms.Model
 	var err error
 	switch cfg.Provider {

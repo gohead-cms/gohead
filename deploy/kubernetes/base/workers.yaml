@@ -1,0 +1,88 @@
+# Background processes. They share the API image and configuration.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gohead-worker
+  labels: { app.kubernetes.io/name: gohead-worker }
+spec:
+  replicas: 1 # scale freely
+  selector:
+    matchLabels: { app.kubernetes.io/name: gohead-worker }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: gohead-worker }
+    spec:
+      securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: worker
+          image: ghcr.io/gohead-cms/gohead:latest
+          args: ["worker"]
+          envFrom:
+            - configMapRef: { name: gohead-config }
+            - secretRef: { name: gohead-secrets }
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gohead-dispatcher
+  labels: { app.kubernetes.io/name: gohead-dispatcher }
+spec:
+  replicas: 1 # scale freely
+  selector:
+    matchLabels: { app.kubernetes.io/name: gohead-dispatcher }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: gohead-dispatcher }
+    spec:
+      securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: dispatcher
+          image: ghcr.io/gohead-cms/gohead:latest
+          args: ["dispatcher"]
+          envFrom:
+            - configMapRef: { name: gohead-config }
+            - secretRef: { name: gohead-secrets }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gohead-scheduler
+  labels: { app.kubernetes.io/name: gohead-scheduler }
+spec:
+  replicas: 1 # must stay at 1, or cron jobs run twice
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app.kubernetes.io/name: gohead-scheduler }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: gohead-scheduler }
+    spec:
+      securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: scheduler
+          image: ghcr.io/gohead-cms/gohead:latest
+          args: ["scheduler"]
+          envFrom:
+            - configMapRef: { name: gohead-config }
+            - secretRef: { name: gohead-secrets }
+          resources:
+            requests: { cpu: 25m, memory: 64Mi }
+            limits: { memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }

@@ -168,3 +168,32 @@ func TestValidateItemData(t *testing.T) {
 		assert.Equal(t, "validation failed for attribute 'rating': attribute 'rating' must be at most 20", err.Error())
 	})
 }
+
+// Every scalar type exposed in the type registry must accept a valid value.
+func TestValidateAttributeValue_AllScalarTypes(t *testing.T) {
+	cases := []struct {
+		attr  Attribute
+		value any
+	}{
+		{Attribute{Name: "a", Type: "string"}, "x"},
+		{Attribute{Name: "a", Type: "password"}, "s3cret"},
+		{Attribute{Name: "a", Type: "int"}, float64(3)},
+		{Attribute{Name: "a", Type: "integer"}, float64(3)},
+		{Attribute{Name: "a", Type: "float"}, 2.5},
+		{Attribute{Name: "a", Type: "decimal"}, float64(10)},
+		{Attribute{Name: "a", Type: "bool"}, true},
+		{Attribute{Name: "a", Type: "boolean"}, false},
+		{Attribute{Name: "a", Type: "date"}, "2026-10-18"},
+		{Attribute{Name: "a", Type: "datetime"}, "2026-10-18T09:00:00Z"},
+		{Attribute{Name: "a", Type: "enum", Options: []string{"x", "y"}}, "y"},
+		{Attribute{Name: "a", Type: "enumeration", Options: []string{"x"}}, "x"},
+		{Attribute{Name: "a", Type: "uid"}, "my-slug"},
+		{Attribute{Name: "a", Type: "media"}, "https://cdn.example.com/a.png"},
+	}
+	for _, c := range cases {
+		assert.NoError(t, validateAttributeValue(c.attr, c.value), c.attr.Type)
+	}
+
+	assert.Error(t, validateAttributeValue(Attribute{Name: "a", Type: "float"}, "abc"))
+	assert.Error(t, validateAttributeValue(Attribute{Name: "a", Type: "enumeration", Options: []string{"x"}}, "z"))
+}

@@ -1,0 +1,70 @@
+# API endpoints
+
+Base URL: your API, e.g. `http://localhost:8080`. **Auth** column: `–` public,
+`token` any authenticated user (content permissions per [role](../guides/users-and-roles.md)),
+`admin` admin role, `webhook` agent token in `Webhook-Token`.
+
+## System
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/_health` | – | Liveness: `{"status":"ok"}` |
+| `GET` | `/_metrics` | – | Prometheus metrics (keep internal) |
+
+## Authentication
+
+| Method | Path | Auth | Body |
+|--------|------|------|------|
+| `POST` | `/auth/register` | – | `username`, `email`, `password` |
+| `POST` | `/auth/login` | – | `username`, `password` → `{"data":{"token":…}}` |
+
+## Content
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/collections/{collection}` | token | List items. [Filters, sort, pagination](../guides/rest-api.md#filtering-and-sorting) |
+| `POST` | `/api/collections/{collection}` | token | Create one item (`{"data":…}`) or a batch (array) |
+| `GET` | `/api/collections/{collection}/{id}` | token | Get an item; `?level=1..5` |
+| `PUT` | `/api/collections/{collection}/{id}` | token | Replace an item's data |
+| `DELETE` | `/api/collections/{collection}/{id}` | token | Delete an item |
+| `GET` | `/api/singleton/{name}` | token | Read a singleton's item |
+| `POST`, `PUT` | `/api/singleton/{name}` | token | Write a singleton's item |
+| `POST` | `/api/graphql` | token | [GraphQL](../guides/graphql.md): `query`, `variables`, `operationName` |
+
+## Schema
+
+| Method | Path | Auth |
+|--------|------|------|
+| `GET`, `POST` | `/admin/collections` | admin |
+| `GET`, `PUT`, `DELETE` | `/admin/collections/{name}` | admin |
+| `GET` | `/admin/singletons` | admin |
+| `POST` | `/admin/singleton` | admin |
+| `GET`, `PUT`, `DELETE` | `/admin/singleton/{name}` | admin |
+| `GET`, `POST` | `/admin/components` | admin |
+| `GET`, `PUT`, `DELETE` | `/admin/components/{name}` | admin |
+
+`GET /admin/collections` also accepts `filter` (JSON object of column → value), `sort`
+(`["name","DESC"]`) and `range` (`[0,9]`), react-admin style, and returns a `Content-Range`
+header.
+
+## Users
+
+| Method | Path | Auth | Body |
+|--------|------|------|------|
+| `GET`, `POST` | `/admin/users` | admin | `username`, `email`, `password`, `role_name` |
+| `GET`, `PUT`, `DELETE` | `/admin/users/{id}` | admin | `username`, `email`, `password`, `role_name` |
+
+## Agents
+
+| Method | Path | Auth |
+|--------|------|------|
+| `GET`, `POST` | `/admin/agents` | admin |
+| `GET`, `PUT`, `DELETE` | `/admin/agents/{name}` | admin |
+| `POST` | `/agents/webhook/{id}` | webhook |
+
+## Response envelope
+
+```json
+{ "data": … , "meta": { … } }
+{ "error": { "status": 400, "name": "ValidationError", "message": "…", "details": … } }
+```

@@ -588,3 +588,21 @@ func TestChatOllama(t *testing.T) {
 		})
 	}
 }
+
+func TestWithDefaults(t *testing.T) {
+	SetDefaultConfig(config.LLMConfig{Provider: "openai", Model: "gpt-4o", APIKey: "global-key", BaseURL: "https://proxy.example"})
+	t.Cleanup(func() { SetDefaultConfig(config.LLMConfig{}) })
+
+	// Empty agent config takes everything from the instance defaults.
+	got := withDefaults(config.LLMConfig{})
+	assert.Equal(t, config.LLMConfig{Provider: "openai", Model: "gpt-4o", APIKey: "global-key", BaseURL: "https://proxy.example"}, got)
+
+	// Same provider: only missing fields are filled.
+	got = withDefaults(config.LLMConfig{Provider: "openai", Model: "gpt-4.1"})
+	assert.Equal(t, "gpt-4.1", got.Model)
+	assert.Equal(t, "global-key", got.APIKey)
+
+	// Different provider: the global key/model must not leak across providers.
+	got = withDefaults(config.LLMConfig{Provider: "anthropic"})
+	assert.Equal(t, config.LLMConfig{Provider: "anthropic"}, got)
+}

@@ -1,0 +1,14 @@
+# Non-secret settings. Secrets (GOHEAD_DATABASE_URL, GOHEAD_JWT_SECRET,
+# GOHEAD_REDIS_PASSWORD, provider API keys) come from the `gohead-secrets`
+# Secret; see ../external-secret.example.yaml.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gohead-config
+data:
+  GOHEAD_LOG_LEVEL: info
+  GOHEAD_MODE: production
+  GOHEAD_SERVER_PORT: "8080"
+  GOHEAD_REDIS_ADDRESS: redis:6379
+  GOHEAD_TELEMETRY_ENABLED: "false"
+  # OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector.observability:4317

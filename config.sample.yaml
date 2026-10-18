@@ -1,6 +1,49 @@
-# config.yaml
-log_level: "info"
-telemetry_enabled: true
-jwt_secret: "your-secret-key"
-database_url: "sqlite://cms.db"
+# GoHead configuration.
+#
+# Every key can be overridden with an environment variable: prefix GOHEAD_,
+# upper case, dots become underscores (redis.address -> GOHEAD_REDIS_ADDRESS).
+# The file is optional; containers usually rely on environment variables only.
+
+# debug | info | warn | error
+log_level: info
+
+# Gin mode: development | production | test
+mode: production
+
+# Port the API listens on.
 server_port: "8080"
+
+# sqlite://path/to/file.db
+# postgres://user:pass@host:5432/db?sslmode=disable
+# mysql://user:pass@tcp(host:3306)/db?charset=utf8mb4&parseTime=True&loc=Local
+database_url: sqlite://gohead.db
+
+# Signs login tokens. Use a long random value (openssl rand -hex 32).
+# If empty or left at the sample value, a random secret is generated at
+# startup and tokens stop working after a restart.
+jwt_secret: ""
+
+# Export OpenTelemetry traces over OTLP/gRPC. The endpoint is read from the
+# standard OTEL_EXPORTER_OTLP_ENDPOINT variable (default localhost:4317).
+telemetry_enabled: false
+
+# Redis backs the job queues used by the worker, dispatcher and scheduler.
+redis:
+  address: localhost:6379
+  password: ""
+  db: 0
+
+cors:
+  allowed_origins: ["*"]
+  allowed_methods: [GET, POST, PUT, DELETE, OPTIONS]
+  allowed_headers: [Origin, Accept, Content-Type, Authorization, X-Requested-With]
+  allow_credentials: true
+  max_age: 86400
+
+# Default LLM settings. Each agent can override provider, model, api_key and
+# base_url in its own llm_config.
+llm:
+  provider: openai        # openai | anthropic | ollama
+  model: gpt-4o
+  api_key: ""             # falls back to OPENAI_API_KEY / ANTHROPIC_API_KEY
+  base_url: ""            # optional: Azure/OpenAI-compatible endpoint, Ollama URL

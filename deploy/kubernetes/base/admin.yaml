@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gohead-admin
+  labels: { app.kubernetes.io/name: gohead-admin }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: gohead-admin }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: gohead-admin }
+    spec:
+      securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: admin
+          image: ghcr.io/gohead-cms/gohead-admin:latest
+          env:
+            - name: GOHEAD_API_URL
+              value: https://api.example.com # public URL of the API, set per overlay
+          ports:
+            - { name: http, containerPort: 8080 }
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { memory: 128Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gohead-admin
+spec:
+  selector: { app.kubernetes.io/name: gohead-admin }
+  ports:
+    - { name: http, port: 80, targetPort: http }

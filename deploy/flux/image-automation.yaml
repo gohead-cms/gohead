@@ -1,0 +1,96 @@
+# Flux image automation for GoHead.
+#
+#   staging    follows master builds  (tags master-<sha>-<unix-ts>)
+#   production follows releases       (semver tags)
+#
+# Requires the image-reflector and image-automation controllers:
+#   flux bootstrap ... --components-extra=image-reflector-controller,image-automation-controller
+# Put this file in your fleet repository next to a Kustomization that points
+# at deploy/kubernetes/overlays/<env> (copied or referenced from this repo).
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: gohead
+  namespace: flux-system
+spec:
+  image: ghcr.io/gohead-cms/gohead
+  interval: 5m
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: gohead-admin
+  namespace: flux-system
+spec:
+  image: ghcr.io/gohead-cms/gohead-admin
+  interval: 5m
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: gohead-staging
+  namespace: flux-system
+spec:
+  imageRepositoryRef: { name: gohead }
+  filterTags:
+    pattern: '^master-[a-f0-9]+-(?P<ts>[0-9]+)$'
+    extract: '$ts'
+  policy:
+    numerical: { order: asc }
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: gohead-staging-admin
+  namespace: flux-system
+spec:
+  imageRepositoryRef: { name: gohead-admin }
+  filterTags:
+    pattern: '^master-[a-f0-9]+-(?P<ts>[0-9]+)$'
+    extract: '$ts'
+  policy:
+    numerical: { order: asc }
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: gohead-production
+  namespace: flux-system
+spec:
+  imageRepositoryRef: { name: gohead }
+  policy:
+    semver: { range: ">=0.2.0" }
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: gohead-production-admin
+  namespace: flux-system
+spec:
+  imageRepositoryRef: { name: gohead-admin }
+  policy:
+    semver: { range: ">=0.2.0" }
+---
+# Commits the new tags back to the fleet repository.
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageUpdateAutomation
+metadata:
+  name: gohead
+  namespace: flux-system
+spec:
+  interval: 10m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  git:
+    checkout:
+      ref: { branch: main }
+    commit:
+      author: { name: fluxcdbot, email: fluxcdbot@users.noreply.github.com }
+      messageTemplate: "chore(gohead): update images {{range .Changed.Changes}}{{print .OldValue}} -> {{println .NewValue}}{{end}}"
+    push:
+      branch: main
+  update:
+    path: ./clusters
+    strategy: Setters

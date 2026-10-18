@@ -1,0 +1,90 @@
+# GoHead full stack: API, background workers, admin UI, PostgreSQL and Redis.
+#
+#   docker compose up -d            # pull published images
+#   docker compose up -d --build    # build from this checkout
+#
+# API: http://localhost:8080   Admin UI: http://localhost:3000
+# Set GOHEAD_JWT_SECRET (e.g. in a .env file) before exposing it anywhere.
+
+x-gohead-env: &gohead-env
+  GOHEAD_DATABASE_URL: postgres://gohead:gohead@postgres:5432/gohead?sslmode=disable
+  GOHEAD_REDIS_ADDRESS: redis:6379
+  GOHEAD_JWT_SECRET: ${GOHEAD_JWT_SECRET:-change-me-to-a-long-random-string-0123456789}
+  GOHEAD_LOG_LEVEL: ${GOHEAD_LOG_LEVEL:-info}
+  # Needed by agents that use OpenAI (or set api_key per agent).
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+
+x-gohead: &gohead
+  image: ghcr.io/gohead-cms/gohead:${GOHEAD_VERSION:-latest}
+  build:
+    context: .
+  environment: *gohead-env
+  restart: unless-stopped
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  api:
+    <<: *gohead
+    command: ["start", "--config", "/app/config.yaml"]
+    ports:
+      - "8080:8080"
+
+  worker:
+    <<: *gohead
+    command: ["worker", "--config", "/app/config.yaml"]
+
+  dispatcher:
+    <<: *gohead
+    command: ["dispatcher", "--config", "/app/config.yaml"]
+
+  # Run exactly one scheduler.
+  scheduler:
+    <<: *gohead
+    command: ["scheduler", "--config", "/app/config.yaml"]
+
+  admin:
+    image: ghcr.io/gohead-cms/gohead-admin:${GOHEAD_VERSION:-latest}
+    build:
+      context: ./gui
+    environment:
+      GOHEAD_API_URL: ${GOHEAD_PUBLIC_API_URL:-http://localhost:8080}
+    ports:
+      - "3000:8080"
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: gohead
+      POSTGRES_PASSWORD: gohead
+      POSTGRES_DB: gohead
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gohead -d gohead"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:

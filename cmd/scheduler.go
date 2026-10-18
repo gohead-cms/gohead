@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/gohead-cms/gohead/internal/agent/triggers"
 	"github.com/gohead-cms/gohead/pkg/config"
@@ -16,6 +17,9 @@ import (
 )
 
 // schedulerCmd represents the scheduler command
+// reloadInterval is how often the scheduler re-reads cron agents.
+const reloadInterval = time.Minute
+
 var schedulerCmd = &cobra.Command{
 	Use:   "scheduler",
 	Short: "Starts the background scheduler for cron-based agent jobs.",
@@ -59,7 +63,7 @@ func runScheduler(cfgPath string) {
 	}
 
 	// The scheduler needs an Asynq client to enqueue jobs.
-	asynqClient := asynq.NewClient(asynq.RedisClientOpt{Addr: cfg.Redis.Address})
+	asynqClient := asynq.NewClient(cfg.RedisClientOpt())
 	triggers.InitAsynqClient(asynqClient)
 
 	// Start the actual cron scheduler.
@@ -67,10 +71,24 @@ func runScheduler(cfgPath string) {
 
 	logger.Log.Info("Scheduler started successfully. Waiting for jobs...")
 
-	// Wait indefinitely until a termination signal is received.
+	// Re-read cron agents periodically to pick up agents created, changed or
+	// deleted since startup; stop on SIGINT/SIGTERM.
+	reload := time.NewTicker(reloadInterval)
+	defer reload.Stop()
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	for running := true; running; {
+		select {
+		case <-reload.C:
+			triggers.StartScheduler()
+		case <-quit:
+			running = false
+		}
+	}
+	if triggers.Scheduler != nil {
+		triggers.Scheduler.Stop()
+	}
 
 	logger.Log.Info("Shutting down scheduler...")
 }
