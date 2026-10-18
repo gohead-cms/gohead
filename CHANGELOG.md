@@ -21,7 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Playwright smoke test of the admin UI (login, schema designer, content creation, agents) against the real API in CI.
 
 ### Changed
-- MySQL: JSON columns are created as `JSON` (they used PostgreSQL's `JSONB`, which MySQL rejects), and unique text columns (collection, component, singleton, agent and user slug names, token hashes, media keys) have a length. On PostgreSQL these columns become `varchar(191)` (`varchar(64)` and `varchar(255)` for token hashes and media keys) instead of `text`, applied by the automatic migration.
+- MySQL: JSON columns are created as `JSON` (they used PostgreSQL's `JSONB`, which MySQL rejects), and unique text columns (collection, component, singleton, agent and user slug names, token hashes, media keys) have a length. On PostgreSQL these columns become `varchar(191)` (`varchar(64)` and `varchar(255)` for token hashes and media keys) instead of `text`, changed by the automatic migration at startup: it fails if an existing value is longer, so check first, e.g. `SELECT max(length(name)) FROM collections` (and `components`, `singletons`, `agents`, `users.slug`).
 - Use `loc=UTC` in MySQL URLs (the examples did not), so times are stored in UTC like on the other databases.
 - The admin UI lint (ESLint, React hooks rules) is clean and blocks CI.
 - `/admin/users` requires a user session (not an API token).
@@ -30,7 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 - MySQL: updating a collection, component or singleton failed (`Incorrect datetime value`), looking up related items by unique fields used PostgreSQL-only SQL, and finding the agents of a collection event failed (`trigger` is a reserved word).
-- Admin UI: the workspace's Edit action on a node opened nothing; the relation dialog sent `oneToMny` and labelled many-to-many as many-to-one; hooks were called conditionally in the sidebar and the collection list.
+- Admin UI: the workspace's Edit action on a collection node opened nothing; the relation dialog sent `oneToMny` and labelled many-to-many as many-to-one; hooks were called conditionally in the sidebar and the collection list.
 - Re-creating an agent with the name of a deleted one restored the old configuration instead of the new one.
 - The admin UI's **Agents** link led to an empty page.
 

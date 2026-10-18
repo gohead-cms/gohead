@@ -31,31 +31,34 @@ test.describe("signed in", () => {
 
   test("content editor lists and creates entries", async ({ page }) => {
     const errors = trackErrors(page);
+    // Unique per attempt: a retry must not find the first attempt's entry.
+    const title = `Written by Playwright #${test.info().retry}`;
     await page.goto("/contrib");
     await expect(page.getByRole("heading", { name: /articles/i })).toBeVisible();
     await expect(page.getByRole("cell", { name: "Seeded article" })).toBeVisible();
 
     await page.getByRole("button", { name: "Quick Add" }).click();
     const drawer = page.getByRole("dialog");
-    await drawer.getByLabel("title").fill("Written by Playwright");
+    await drawer.getByLabel("title").fill(title);
     await drawer.getByLabel("body").fill("Smoke test entry");
     await drawer.getByRole("button", { name: "Save Changes" }).click();
 
-    await expect(page.getByRole("cell", { name: "Written by Playwright" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: title })).toBeVisible();
     expect(errors).toEqual([]);
   });
 
   test("full-page editor creates an entry", async ({ page }) => {
     const errors = trackErrors(page);
+    const title = `From the full editor #${test.info().retry}`;
     await page.goto("/contrib");
     await page.getByRole("button", { name: "Contrib" }).click();
     await expect(page).toHaveURL(/\/contrib\/edit\/articles$/);
-    await page.getByPlaceholder("Your post title...").fill("From the full editor");
+    await page.getByPlaceholder("Your post title...").fill(title);
     await page.getByPlaceholder("Begin writing your content...").fill("Long form");
     await page.getByRole("button", { name: "Save Entry" }).click();
 
     await expect(page).toHaveURL(/\/contrib$/);
-    await expect(page.getByRole("cell", { name: "From the full editor" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: title })).toBeVisible();
     expect(errors).toEqual([]);
   });
 

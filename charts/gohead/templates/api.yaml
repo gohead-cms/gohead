@@ -1,4 +1,7 @@
 {{- $component := dict "ctx" . "component" "api" }}
+{{- if and .Values.api.autoscaling.enabled .Values.api.uploads.persistence.enabled (has "ReadWriteOnce" .Values.api.uploads.persistence.accessModes) }}
+{{- fail "api: autoscaling needs uploads on S3 or a ReadWriteMany volume (a ReadWriteOnce volume attaches to one pod)" }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -187,7 +190,8 @@ spec:
           type: Utilization
           averageUtilization: {{ .Values.api.autoscaling.targetCPUUtilizationPercentage }}
 {{- end }}
-{{- if .Values.api.podDisruptionBudget.enabled }}
+{{- /* With a single replica, minAvailable: 1 would block node drains. */}}
+{{- if and .Values.api.podDisruptionBudget.enabled (or .Values.api.autoscaling.enabled (gt (int .Values.api.replicas) 1)) }}
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget

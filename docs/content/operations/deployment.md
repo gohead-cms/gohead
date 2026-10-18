@@ -98,21 +98,23 @@ serviceAccount:
 | Value | Default | |
 |-------|---------|-|
 | `database.url` / `existingSecret` | – | **Required.** PostgreSQL or MySQL; SQLite cannot be shared by the API and the workers |
-| `jwtSecret` | generated | Generated once and kept across upgrades when empty |
+| `jwtSecret` | generated | When empty, generated at install and kept by `helm upgrade`. With Argo CD, Flux or `helm template`, set it or use `existingSecret`: they render without the cluster and would generate a new one each time |
 | `extraSecretEnv` | `{}` | More secret variables (provider API keys, S3 keys) when the chart creates the Secret |
 | `config` | log level, mode | Any `GOHEAD_*` setting from the [configuration reference](../getting-started/configuration.md) |
 | `image.tag`, `admin.image.tag` | chart `appVersion` | Pin or override the GoHead version |
 | `api.replicas`, `api.autoscaling.*` | 2, off | HPA on CPU when enabled |
 | `api.ingress.*`, `admin.ingress.*` | off | Standard `networking.k8s.io/v1` ingresses |
 | `api.uploads.persistence.*` | off | Volume for local uploads (one API replica with `ReadWriteOnce`) |
-| `api.podDisruptionBudget.*` | on, `minAvailable: 1` | |
+| `api.podDisruptionBudget.*` | on, `minAvailable: 1` | Only created with 2+ replicas or autoscaling |
 | `worker.*`, `dispatcher.*` | 1 replica each | Disable both if you don't use agents or webhooks |
 | `scheduler.enabled` | on | Always a single replica, recreated on upgrade |
 | `redis.enabled` / `redis.address` | bundled, no persistence | Use a managed Redis in production |
 | `serviceMonitor.enabled` | off | Prometheus Operator scrape of `/_metrics` |
 
-Pods run as non-root with a read-only root filesystem and no capabilities, and roll
-automatically when the configuration or the Secret the chart manages changes. `helm test`
+Pods run as non-root without capabilities (GoHead and Redis also with a read-only root
+filesystem; the admin UI's nginx writes its configuration at startup), and roll
+automatically when the configuration or the Secret the chart manages changes. The API's
+`/_metrics` endpoint is not authenticated: block it at your ingress if the API is public. `helm test`
 checks that the API answers. See
 [`charts/gohead/values.yaml`](https://github.com/gohead-cms/gohead/blob/master/charts/gohead/values.yaml)
 for every option.

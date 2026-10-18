@@ -27,8 +27,10 @@ database:
   # mysql://user:pass@tcp(host:3306)/gohead?charset=utf8mb4&parseTime=True&loc=UTC
   url: ""
 
-# Signs login tokens. Leave empty to generate a random one at install time
-# (kept across upgrades).
+# Signs login tokens. Leave empty to generate a random one at install time,
+# kept across `helm upgrade`. Tools that render without cluster access
+# (helm template, Argo CD, Flux post-renderers) would generate a new one on
+# every render and log everyone out: set it, or use existingSecret.
 jwtSecret: ""
 
 # More secret environment variables, e.g. { OPENAI_API_KEY: sk-... }.
@@ -202,6 +204,8 @@ securityContext:
   capabilities: { drop: [ALL] }
 
 # Prometheus Operator ServiceMonitor for the API's /_metrics endpoint.
+# /_metrics is not authenticated: with an API ingress, block it there (for
+# example with an annotation of your ingress controller).
 serviceMonitor:
   enabled: false
   interval: 30s

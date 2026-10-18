@@ -25,6 +25,7 @@ api:
   uploads:
     persistence:
       enabled: true
+      accessModes: [ReadWriteMany]
 admin:
   ingress:
     enabled: true
