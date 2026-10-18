@@ -285,13 +285,18 @@ func DeleteMedia(c *gin.Context) {
 func ServeLocalMedia(store *media.Local) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		key := strings.TrimPrefix(c.Param("key"), "/")
-		path, err := store.Path(key)
-		if err != nil {
+		if _, err := store.Path(key); err != nil { // reject traversal before any lookup
 			c.Status(http.StatusNotFound)
 			return
 		}
 		var m models.Media
 		if err := database.DB.Where(&models.Media{Key: key}).First(&m).Error; err != nil {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		// Build the path from the stored key, and check it stays under the root.
+		path, err := store.Path(m.Key)
+		if err != nil || !media.Within(store.Root(), path) {
 			c.Status(http.StatusNotFound)
 			return
 		}

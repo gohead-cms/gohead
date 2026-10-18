@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // LocalPathPrefix is where the API serves local files.
@@ -48,6 +49,15 @@ func (l *Local) Path(key string) (string, error) {
 		return "", err
 	}
 	return filepath.Join(l.root, filepath.FromSlash(key)), nil
+}
+
+// Within reports whether path is inside root once both are cleaned.
+func Within(root, path string) bool {
+	rel, err := filepath.Rel(filepath.Clean(root), filepath.Clean(path))
+	if err != nil {
+		return false
+	}
+	return rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)
 }
 
 func (l *Local) Put(_ context.Context, key string, r io.Reader, _ int64, _ ObjectMeta) error {

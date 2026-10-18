@@ -8,7 +8,6 @@ import (
 	"image/png"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -16,8 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/johannesboyne/gofakes3"
-	"github.com/johannesboyne/gofakes3/backend/s3mem"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -77,6 +74,14 @@ func TestImageSize(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func TestWithin(t *testing.T) {
+	assert.True(t, Within("/data/uploads", "/data/uploads/2026/x.png"))
+	assert.False(t, Within("/data/uploads", "/data/uploads"))
+	assert.False(t, Within("/data/uploads", "/data/uploads/../secret"))
+	assert.False(t, Within("/data/uploads", "/data/uploads-other/x"))
+	assert.False(t, Within("/data/uploads", "/etc/passwd"))
+}
+
 func TestCheckKey(t *testing.T) {
 	for _, bad := range []string{"", "/etc/passwd", "../x", "a/../../x", "a//b", "a/./b", `a\b`} {
 		assert.ErrorIs(t, checkKey(bad), ErrInvalidKey, bad)
@@ -110,17 +115,6 @@ func TestLocalStore(t *testing.T) {
 
 	require.NoError(t, s.Delete(ctx, "2026/10/a-x.txt"))
 	require.NoError(t, s.Delete(ctx, "2026/10/a-x.txt"), "deleting twice is fine")
-}
-
-// fakeS3 starts an in-process S3 server with one bucket.
-func fakeS3(t *testing.T, bucket string) (endpoint string) {
-	t.Helper()
-	backend := s3mem.New()
-	faker := gofakes3.New(backend)
-	srv := httptest.NewServer(faker.Server())
-	t.Cleanup(srv.Close)
-	require.NoError(t, backend.CreateBucket(bucket))
-	return srv.URL
 }
 
 func TestS3Store(t *testing.T) {
