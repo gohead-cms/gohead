@@ -5,7 +5,7 @@
 #
 # CGO is enabled because the SQLite driver (mattn/go-sqlite3) needs it.
 
-ARG GO_VERSION=1.25
+ARG GO_VERSION=1.27
 
 FROM golang:${GO_VERSION}-bookworm AS builder
 WORKDIR /src

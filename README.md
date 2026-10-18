@@ -137,7 +137,7 @@ flowchart LR
 | **Container** | `docker run -p 8080:8080 -e GOHEAD_JWT_SECRET=… ghcr.io/gohead-cms/gohead` |
 | **Kubernetes** | `kubectl apply -k deploy/kubernetes/overlays/production` (or let Flux do it) |
 | **Binary** | [Releases](https://github.com/gohead-cms/gohead/releases) for Linux, macOS, Windows (PostgreSQL/MySQL) |
-| **Source** | `make build` (Go 1.25+, cgo for SQLite) |
+| **Source** | `make build` (Go 1.26+, cgo for SQLite) |
 
 Configuration is a YAML file or `GOHEAD_*` environment variables, see
 [configuration](https://gohead-cms.github.io/gohead/getting-started/configuration/).

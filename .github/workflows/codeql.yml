@@ -25,9 +25,10 @@ jobs:
       - if: matrix.language == 'go'
         uses: actions/setup-go@v7
         with:
-          # Latest 1.25 patch: go.mod says 1.25.0, which would pin a toolchain
-          # with known (since fixed) standard-library vulnerabilities.
-          go-version: "1.25.x"
+          # Latest patch of the current Go release. go.mod only sets the
+          # minimum (1.26.0); building with an old patch would ship known,
+          # since-fixed standard-library vulnerabilities.
+          go-version: "1.27.x"
           check-latest: true
       - uses: github/codeql-action/init@v4
         with:

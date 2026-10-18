@@ -73,7 +73,7 @@ GOHEAD_JWT_SECRET="$(openssl rand -hex 32)" ./gohead start
 
 ## From source
 
-Requirements: Go 1.25+, a C compiler (for SQLite), Node 22 for the admin UI.
+Requirements: Go 1.26+, a C compiler (for SQLite), Node 22 for the admin UI.
 
 ```bash
 git clone https://github.com/gohead-cms/gohead.git && cd gohead

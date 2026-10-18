@@ -4,7 +4,7 @@ Thanks for helping! Bugs, docs, tests and features are all welcome.
 
 ## Setup
 
-Requirements: Go 1.25+, a C compiler (SQLite), Node 22 (admin UI), Docker (optional),
+Requirements: Go 1.26+, a C compiler (SQLite), Node 22 (admin UI), Docker (optional),
 Python 3.12 (docs, optional).
 
 ```bash
