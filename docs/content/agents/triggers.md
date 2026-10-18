@@ -27,6 +27,9 @@ collection, the item ID and the item data.
 
 ## Webhook
 
+This section is about webhooks that *start an agent*. To send content events to another
+service without an agent, use [outbound webhooks](../guides/integrations.md#outbound-webhooks).
+
 ```json
 "trigger": { "type": "webhook", "webhook_token": "a-long-random-string" }
 ```

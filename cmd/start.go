@@ -19,6 +19,7 @@ import (
 	"github.com/gohead-cms/gohead/internal/api/handlers"
 	"github.com/gohead-cms/gohead/internal/api/middleware"
 	"github.com/gohead-cms/gohead/internal/graphql"
+	"github.com/gohead-cms/gohead/internal/webhooks"
 	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/cluster"
 	"github.com/gohead-cms/gohead/pkg/config"
@@ -109,6 +110,11 @@ func InitializeServer(cfgPath string) (*gin.Engine, *config.Config, func(), erro
 	}
 	logger.InitLogger(cfg.LogLevel)
 	llm.SetDefaultConfig(cfg.LLM)
+	webhooks.Configure(webhooks.Config{
+		AllowPrivateNetworks: cfg.Webhooks.AllowPrivateNetworks,
+		Timeout:              cfg.Webhooks.Timeout,
+		MaxRetries:           cfg.Webhooks.MaxRetries,
+	})
 
 	var gormLogLevel gormlogger.LogLevel
 	switch cfg.LogLevel {
@@ -243,7 +249,8 @@ func InitializeServer(cfgPath string) (*gin.Engine, *config.Config, func(), erro
 	if cfg.RateLimit.Enabled {
 		authLimit = middleware.RateLimit(authLimiter, "auth", cfg.RateLimit.AuthPerMinute, time.Minute)
 	}
-	setupRoutes(router, authLimit, localMedia)
+	handlers.APIVersion = version
+	setupRoutes(router, authLimit, localMedia, cfg.OpenAPI)
 
 	return router, &cfg, cleanup, nil
 }
@@ -290,7 +297,15 @@ func initMediaStore(cfg config.Config) (*media.Local, error) {
 	return local, nil
 }
 
-func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *media.Local) {
+func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *media.Local, openAPI config.OpenAPIConfig) {
+	// API description: the spec (public or behind a token) and Swagger UI.
+	if openAPI.Enabled {
+		if openAPI.Public {
+			router.GET("/api/openapi.json", handlers.OpenAPISpec)
+		}
+		router.GET("/api/docs", handlers.APIDocs(openAPI.Public))
+	}
+
 	// Files of the local media driver (public, like a bucket's URLs).
 	if localMedia != nil {
 		router.GET(media.LocalPathPrefix+"/*key", handlers.ServeLocalMedia(localMedia))
@@ -339,11 +354,27 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *medi
 		admin.DELETE("/components/:name", handlers.DeleteComponent)
 
 		// Users
-		admin.POST("/users", handlers.CreateUser)
-		admin.GET("/users", handlers.GetAllUsers)
-		admin.GET("/users/:id", handlers.GetUser)
-		admin.PUT("/users/:id", handlers.UpdateUser)
-		admin.DELETE("/users/:id", handlers.DeleteUser)
+		// Credentials (users, API tokens) can only be managed from a user
+		// session, so a leaked token cannot mint new credentials.
+		creds := admin.Group("", middleware.UserSessionOnly())
+		creds.POST("/users", handlers.CreateUser)
+		creds.GET("/users", handlers.GetAllUsers)
+		creds.GET("/users/:id", handlers.GetUser)
+		creds.PUT("/users/:id", handlers.UpdateUser)
+		creds.DELETE("/users/:id", handlers.DeleteUser)
+		creds.POST("/tokens", handlers.CreateAPIToken)
+		creds.GET("/tokens", handlers.ListAPITokens)
+		creds.GET("/tokens/:id", handlers.GetAPIToken)
+		creds.DELETE("/tokens/:id", handlers.RevokeAPIToken)
+
+		// Outbound webhooks
+		admin.POST("/webhooks", handlers.CreateWebhook)
+		admin.GET("/webhooks", handlers.ListWebhooks)
+		admin.GET("/webhooks/:id", handlers.GetWebhook)
+		admin.PUT("/webhooks/:id", handlers.UpdateWebhook)
+		admin.DELETE("/webhooks/:id", handlers.DeleteWebhook)
+		admin.GET("/webhooks/:id/deliveries", handlers.ListWebhookDeliveries)
+		admin.POST("/webhooks/:id/test", handlers.TestWebhook)
 
 		// Agents
 		agents := admin.Group("/agents")
@@ -361,6 +392,9 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *medi
 	content.Use(middleware.AuthMiddleware())
 	{
 		content.POST("/graphql", handlers.GraphQLHandler)
+		if openAPI.Enabled && !openAPI.Public {
+			content.GET("/openapi.json", handlers.OpenAPISpec)
+		}
 
 		// Dynamic Handlers
 		content.Any("/collections/:collection", handlers.DynamicCollectionHandler)

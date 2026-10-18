@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/gohead-cms/gohead/internal/webhooks"
 	"github.com/gohead-cms/gohead/pkg/llm"
 	"log"
 
@@ -41,6 +42,11 @@ func runWorker(cfgPath string) {
 
 	// 2. Initialize logger and database just like in start.go
 	logger.InitLogger(cfg.LogLevel)
+	webhooks.Configure(webhooks.Config{
+		AllowPrivateNetworks: cfg.Webhooks.AllowPrivateNetworks,
+		Timeout:              cfg.Webhooks.Timeout,
+		MaxRetries:           cfg.Webhooks.MaxRetries,
+	})
 	llm.SetDefaultConfig(cfg.LLM)
 
 	var gormLogLevel gormlogger.LogLevel
@@ -67,7 +73,7 @@ func runWorker(cfgPath string) {
 		asynq.Config{
 			Concurrency: 10,
 			Logger:      &logger.AsynqLoggerAdapter{},
-			Queues:      map[string]int{"agents": 10},
+			Queues:      map[string]int{"agents": 10, webhooks.Queue: 5},
 		},
 	)
 
@@ -77,6 +83,7 @@ func runWorker(cfgPath string) {
 	// 5. Create a new ServeMux to map task types to handlers
 	mux := asynq.NewServeMux()
 	mux.HandleFunc("agent:run", agentRunner.HandleAgentJob)
+	mux.HandleFunc(webhooks.TaskTypeDeliver, webhooks.HandleDelivery)
 
 	// 6. Start the server
 	logger.Log.Info("Worker is ready and listening for jobs...")

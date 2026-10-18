@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/gohead-cms/gohead/internal/webhooks"
 	"log"
 
 	"github.com/hibiken/asynq"
@@ -40,6 +41,11 @@ func initializeDispatcher(cfgPath string) (*asynq.Server, *asynq.ServeMux, error
 	}
 
 	logger.InitLogger(cfg.LogLevel)
+	webhooks.Configure(webhooks.Config{
+		AllowPrivateNetworks: cfg.Webhooks.AllowPrivateNetworks,
+		Timeout:              cfg.Webhooks.Timeout,
+		MaxRetries:           cfg.Webhooks.MaxRetries,
+	})
 
 	var gormLogLevel gormlogger.LogLevel
 	switch cfg.LogLevel {

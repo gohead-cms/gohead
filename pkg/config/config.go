@@ -75,6 +75,23 @@ type MediaS3Config struct {
 	PresignExpiry time.Duration `mapstructure:"presign_expiry" yaml:"presign_expiry"`
 }
 
+// WebhooksConfig controls outbound webhook deliveries.
+type WebhooksConfig struct {
+	// AllowPrivateNetworks lets webhooks reach private and loopback
+	// addresses. Link-local (cloud metadata) addresses are always refused.
+	AllowPrivateNetworks bool          `mapstructure:"allow_private_networks" yaml:"allow_private_networks"`
+	Timeout              time.Duration `mapstructure:"timeout" yaml:"timeout"`
+	MaxRetries           int           `mapstructure:"max_retries" yaml:"max_retries"`
+}
+
+// OpenAPIConfig controls the generated API description.
+type OpenAPIConfig struct {
+	Enabled bool `mapstructure:"enabled" yaml:"enabled"`
+	// Public serves /api/openapi.json without a token. Off by default: the
+	// spec describes your content model.
+	Public bool `mapstructure:"public" yaml:"public"`
+}
+
 // RedisConfig holds settings for the Redis connection.
 type RedisConfig struct {
 	Address  string `mapstructure:"address" yaml:"address"`
@@ -110,6 +127,12 @@ type Config struct {
 
 	// Media uploads and storage
 	Media MediaConfig `mapstructure:"media" yaml:"media"`
+
+	// Outbound webhooks
+	Webhooks WebhooksConfig `mapstructure:"webhooks" yaml:"webhooks"`
+
+	// OpenAPI description and Swagger UI
+	OpenAPI OpenAPIConfig `mapstructure:"openapi" yaml:"openapi"`
 }
 
 // LoadConfig loads the configuration from file and environment variables.
@@ -156,6 +179,13 @@ func LoadConfig(configPath string) (Config, error) {
 	viper.SetDefault("media.s3.path_style", false)
 	viper.SetDefault("media.s3.prefix", "")
 	viper.SetDefault("media.s3.presign_expiry", "1h")
+
+	// Outbound webhooks and OpenAPI
+	viper.SetDefault("webhooks.allow_private_networks", false)
+	viper.SetDefault("webhooks.timeout", "10s")
+	viper.SetDefault("webhooks.max_retries", 8)
+	viper.SetDefault("openapi.enabled", true)
+	viper.SetDefault("openapi.public", false)
 
 	// Redis default values
 	viper.SetDefault("redis.address", "localhost:6379")

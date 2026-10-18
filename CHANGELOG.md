@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+- **API tokens**: long-lived, role-scoped (`viewer`, `editor`, `admin`), optionally expiring and revocable keys (`ght_…`) for front-ends, CI and integrations, managed under `/admin/tokens`. Only a SHA-256 hash is stored; last use is recorded. Tokens cannot manage tokens or users.
+- **OpenAPI 3.1** description generated from the content model (collections, components, singletons, media, auth, GraphQL) at `/api/openapi.json`, with Swagger UI at `/api/docs`. Behind a token unless `openapi.public` is on.
+- **Outbound webhooks** on content events (`item:created|updated|deleted|published|unpublished`), filtered by event and collection, in JSON or Slack format, with custom headers, HMAC-SHA256 signatures, retries with backoff, a delivery log and a test endpoint (`/admin/webhooks`). Private and link-local addresses are refused by default.
+
+### Changed
+- `/admin/users` requires a user session (not an API token).
+
+## [0.4.0] - 2026-10-18
+
 ### Breaking changes
 - GraphQL: `media` attributes are now `Media` objects instead of strings. Query `cover { url }` instead of `cover`. REST still returns URL values as they were stored.
 
