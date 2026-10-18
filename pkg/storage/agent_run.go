@@ -19,9 +19,10 @@ func CreateAgentRun(r *agents.AgentRun) error {
 	return database.DB.Create(r).Error
 }
 
-// SaveAgentRun stores the run's current state (usage, status, output).
+// SaveAgentRun stores the run's current state (usage, status, output). It
+// only updates: a run deleted meanwhile (agent deleted) is not re-created.
 func SaveAgentRun(r *agents.AgentRun) error {
-	return database.DB.Omit("Steps").Save(r).Error
+	return database.DB.Model(&agents.AgentRun{ID: r.ID}).Select("*").Omit("ID", "Steps").Updates(r).Error
 }
 
 // AddAgentRunStep records one step of a run.
@@ -49,11 +50,22 @@ func (u AgentUsage) Tokens() int { return u.InputTokens + u.OutputTokens }
 // by a limit do not count as runs, but tokens and cost spent by runs that
 // a limit stopped midway do. excludeRun (or 0) is left out.
 func AgentUsageSince(agentID uint, since time.Time, excludeRun uint) (AgentUsage, error) {
-	var u AgentUsage
 	q := database.DB.Model(&agents.AgentRun{}).Where("agent_id = ? AND started_at >= ?", agentID, since.UTC())
 	if excludeRun != 0 {
 		q = q.Where("id <> ?", excludeRun)
 	}
+	return sumUsage(q)
+}
+
+// AgentUsageBefore is AgentUsageSince over the runs created before run
+// beforeRun, which orders runs starting at the same time.
+func AgentUsageBefore(agentID uint, since time.Time, beforeRun uint) (AgentUsage, error) {
+	return sumUsage(database.DB.Model(&agents.AgentRun{}).
+		Where("agent_id = ? AND started_at >= ? AND id < ?", agentID, since.UTC(), beforeRun))
+}
+
+func sumUsage(q *gorm.DB) (AgentUsage, error) {
+	var u AgentUsage
 	var row struct {
 		Runs         int64
 		InputTokens  int64
@@ -109,6 +121,7 @@ func GetAgentRun(agentID, runID uint) (*agents.AgentRun, error) {
 }
 
 // PruneAgentRuns keeps the newest keep runs of an agent (and their steps).
+// Runs still in progress are never pruned.
 func PruneAgentRuns(agentID uint, keep int) {
 	if keep <= 0 {
 		return
@@ -120,11 +133,12 @@ func PruneAgentRuns(agentID uint, keep int) {
 	}
 	last := cutoff[0].ID
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
-		sub := tx.Model(&agents.AgentRun{}).Select("id").Where("agent_id = ? AND id <= ?", agentID, last)
+		old := "agent_id = ? AND id <= ? AND status <> ?"
+		sub := tx.Model(&agents.AgentRun{}).Select("id").Where(old, agentID, last, agents.RunRunning)
 		if err := tx.Where("run_id IN (?)", sub).Delete(&agents.AgentRunStep{}).Error; err != nil {
 			return err
 		}
-		return tx.Where("agent_id = ? AND id <= ?", agentID, last).Delete(&agents.AgentRun{}).Error
+		return tx.Where(old, agentID, last, agents.RunRunning).Delete(&agents.AgentRun{}).Error
 	})
 	if err != nil {
 		logger.Log.WithError(err).Warn("Failed to prune agent runs")

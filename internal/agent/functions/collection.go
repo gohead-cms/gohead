@@ -97,6 +97,15 @@ func upsertCollectionItem(ctx context.Context, args any) (string, error) {
 		return fmt.Sprintf(`{"status": "error", "message": "%s"}`, err.Error()), nil
 	}
 
+	// Nested relation objects can look up or create items in other
+	// collections: those must be in scope too.
+	if name, err := nestedScopeViolation(ctx, collection, data, 0); err != nil {
+		msg, _ := json.Marshal(err.Error())
+		return fmt.Sprintf(`{"status": "error", "message": %s}`, msg), nil
+	} else if name != "" {
+		return scopeError(name), nil
+	}
+
 	itemID, _ := strconv.ParseUint(itemIDStr, 10, 32)
 
 	// 2. Decide whether to UPDATE or CREATE

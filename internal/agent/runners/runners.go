@@ -75,27 +75,28 @@ func (r *AgentRunner) Run(ctx context.Context, payload jobs.AgentJobPayload, att
 	run.TriggerType, run.Trigger = describeTrigger(payload)
 	run.Input = truncate(r.createContextualInput(payload), maxStoredText)
 
-	// Limits that apply before anything is spent.
-	day, err := storage.AgentUsageSince(agent.ID, r.now().UTC().Add(-24*time.Hour), 0)
+	// Record the run first, then check the limits against the runs created
+	// before it: runs of the same agent starting together on several
+	// workers are ordered by ID and cannot all pass the same check.
+	if err := storage.CreateAgentRun(run); err != nil {
+		return fmt.Errorf("could not record run: %w", err)
+	}
+	reason, err := preRunLimit(agent, run.ID, r.now)
 	if err != nil {
+		r.finish(run, agentModels.RunFailed, "could not check limits: "+err.Error(), nil)
+		r.save(run)
 		return fmt.Errorf("could not check agent usage: %w", err)
 	}
-	if reason := preRunLimit(agent, day, r.now); reason != "" {
+	if reason != "" {
 		r.finish(run, agentModels.RunLimited, reason, nil)
-		if err := storage.CreateAgentRun(run); err != nil {
-			logger.Log.WithError(err).Warn("Failed to record limited run")
-		}
+		r.save(run)
 		logger.Log.WithField("agent", agent.Name).WithField("reason", reason).Warn("Agent run skipped: limit reached")
 		storage.PruneAgentRuns(agent.ID, RunsKept)
 		return nil
 	}
 
-	if err := storage.CreateAgentRun(run); err != nil {
-		return fmt.Errorf("could not record run: %w", err)
-	}
-
 	rec := &llm.UsageRecorder{}
-	runErr := r.runConversation(llm.WithUsageRecorder(ctx, rec), agent, payload, run, rec, day)
+	runErr := r.runConversation(llm.WithUsageRecorder(ctx, rec), agent, payload, run, rec)
 
 	var limited *errLimited
 	switch {
@@ -107,9 +108,7 @@ func (r *AgentRunner) Run(ctx context.Context, payload jobs.AgentJobPayload, att
 	default:
 		r.finish(run, agentModels.RunSucceeded, run.Error, rec)
 	}
-	if err := storage.SaveAgentRun(run); err != nil {
-		logger.Log.WithError(err).Warn("Failed to save agent run")
-	}
+	r.save(run)
 	storage.PruneAgentRuns(agent.ID, RunsKept)
 
 	if runErr != nil {
@@ -118,6 +117,12 @@ func (r *AgentRunner) Run(ctx context.Context, payload jobs.AgentJobPayload, att
 	}
 	logger.Log.WithField("agent_id", payload.AgentID).WithField("run_id", run.ID).WithField("status", run.Status).Info("Agent job completed")
 	return nil
+}
+
+func (r *AgentRunner) save(run *agentModels.AgentRun) {
+	if err := storage.SaveAgentRun(run); err != nil {
+		logger.Log.WithError(err).Warn("Failed to save agent run")
+	}
 }
 
 func (r *AgentRunner) finish(run *agentModels.AgentRun, status, errText string, rec *llm.UsageRecorder) {
@@ -132,39 +137,59 @@ func (r *AgentRunner) finish(run *agentModels.AgentRun, status, errText string, 
 	}
 }
 
-// preRunLimit returns why the agent may not start a run now ("" if it may).
-func preRunLimit(agent *agentModels.Agent, day storage.AgentUsage, now func() time.Time) string {
+// preRunLimit returns why run runID of the agent may not start ("" if it
+// may), counting only the runs created before it. A database error fails
+// closed.
+func preRunLimit(agent *agentModels.Agent, runID uint, now func() time.Time) (string, error) {
 	l := agent.Limits
+	if !l.Any() {
+		return "", nil
+	}
+	day, err := storage.AgentUsageBefore(agent.ID, now().UTC().Add(-24*time.Hour), runID)
+	if err != nil {
+		return "", err
+	}
 	if l.MaxRunsPerDay > 0 && day.Runs >= l.MaxRunsPerDay {
-		return fmt.Sprintf("max_runs_per_day reached (%d runs in the last 24 hours)", day.Runs)
+		return fmt.Sprintf("max_runs_per_day reached (%d runs in the last 24 hours)", day.Runs), nil
 	}
 	if l.MaxRunsPerHour > 0 {
-		hour, err := storage.AgentUsageSince(agent.ID, now().UTC().Add(-time.Hour), 0)
-		if err == nil && hour.Runs >= l.MaxRunsPerHour {
-			return fmt.Sprintf("max_runs_per_hour reached (%d runs in the last hour)", hour.Runs)
+		hour, err := storage.AgentUsageBefore(agent.ID, now().UTC().Add(-time.Hour), runID)
+		if err != nil {
+			return "", err
+		}
+		if hour.Runs >= l.MaxRunsPerHour {
+			return fmt.Sprintf("max_runs_per_hour reached (%d runs in the last hour)", hour.Runs), nil
 		}
 	}
 	if l.MaxTokensPerDay > 0 && day.Tokens() >= l.MaxTokensPerDay {
-		return fmt.Sprintf("max_tokens_per_day reached (%d tokens in the last 24 hours)", day.Tokens())
+		return fmt.Sprintf("max_tokens_per_day reached (%d tokens in the last 24 hours)", day.Tokens()), nil
 	}
 	if l.MaxCostPerDay > 0 && day.CostUSD >= l.MaxCostPerDay {
-		return fmt.Sprintf("max_cost_per_day reached ($%.4f in the last 24 hours)", day.CostUSD)
+		return fmt.Sprintf("max_cost_per_day reached ($%.4f in the last 24 hours)", day.CostUSD), nil
 	}
-	return ""
+	return "", nil
 }
 
-// inRunLimit returns why a running run must stop ("" to continue). day is
-// the usage of the agent's other runs in the last 24 hours.
-func inRunLimit(agent *agentModels.Agent, run llm.Usage, day storage.AgentUsage) string {
+// inRunLimit returns why a running run must stop ("" to continue). Daily
+// limits are checked against the live usage of all the agent's other runs,
+// including runs in progress on other workers.
+func (r *AgentRunner) inRunLimit(agent *agentModels.Agent, run *agentModels.AgentRun, used llm.Usage) string {
 	l := agent.Limits
-	if l.MaxTokensPerRun > 0 && run.Total() > l.MaxTokensPerRun {
-		return fmt.Sprintf("max_tokens_per_run reached (%d tokens)", run.Total())
+	if l.MaxTokensPerRun > 0 && used.Total() > l.MaxTokensPerRun {
+		return fmt.Sprintf("max_tokens_per_run reached (%d tokens)", used.Total())
 	}
-	if l.MaxTokensPerDay > 0 && day.Tokens()+run.Total() > l.MaxTokensPerDay {
-		return fmt.Sprintf("max_tokens_per_day reached (%d tokens in the last 24 hours)", day.Tokens()+run.Total())
+	if l.MaxTokensPerDay == 0 && l.MaxCostPerDay == 0 {
+		return ""
 	}
-	if l.MaxCostPerDay > 0 && day.CostUSD+run.CostUSD > l.MaxCostPerDay {
-		return fmt.Sprintf("max_cost_per_day reached ($%.4f in the last 24 hours)", day.CostUSD+run.CostUSD)
+	day, err := storage.AgentUsageSince(agent.ID, r.now().UTC().Add(-24*time.Hour), run.ID)
+	if err != nil {
+		return "could not check daily limits: " + err.Error()
+	}
+	if l.MaxTokensPerDay > 0 && day.Tokens()+used.Total() > l.MaxTokensPerDay {
+		return fmt.Sprintf("max_tokens_per_day reached (%d tokens in the last 24 hours)", day.Tokens()+used.Total())
+	}
+	if l.MaxCostPerDay > 0 && day.CostUSD+used.CostUSD > l.MaxCostPerDay {
+		return fmt.Sprintf("max_cost_per_day reached ($%.4f in the last 24 hours)", day.CostUSD+used.CostUSD)
 	}
 	return ""
 }
@@ -172,7 +197,7 @@ func inRunLimit(agent *agentModels.Agent, run llm.Usage, day storage.AgentUsage)
 // runConversation contains the main agent loop: LLM calls, function
 // execution, history management, step recording and in-run limits.
 func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Agent, payload jobs.AgentJobPayload,
-	run *agentModels.AgentRun, rec *llm.UsageRecorder, day storage.AgentUsage) error {
+	run *agentModels.AgentRun, rec *llm.UsageRecorder) (runErr error) {
 	llmClient, err := r.newClient(llm.Config{
 		Provider:             agent.LLMConfig.Provider,
 		Model:                agent.LLMConfig.Model,
@@ -214,7 +239,13 @@ func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Ag
 		}
 	}
 	defer func() {
-		// Keep the conversation even when the run stops early.
+		// Keep the conversation when the run ends or a limit stops it, but
+		// not when it fails: the job is retried, and the retry starts again
+		// from the same history and input.
+		var limited *errLimited
+		if runErr != nil && !errors.As(runErr, &limited) {
+			return
+		}
 		if err := storage.SaveConversationHistory(agent.ID, messages[1:]); err != nil {
 			logger.Log.WithError(err).Warn("Could not save conversation history")
 		}
@@ -239,15 +270,17 @@ func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Ag
 		}
 		step(llmStep)
 		saveProgress()
-		if reason := inRunLimit(agent, rec.Total(), day); reason != "" {
-			return &errLimited{reason: reason}
-		}
 
+		// A final answer completes the run, even if it went over a limit:
+		// the work is done and the next run will be refused.
 		if response.Type != llm.ResponseTypeToolCall {
 			messages = append(messages, llm.Message{Role: llm.RoleAssistant, Content: response.Content})
 			run.Output = truncate(response.Content, maxStoredText)
 			finished = true
 			break
+		}
+		if reason := r.inRunLimit(agent, run, rec.Total()); reason != "" {
+			return &errLimited{reason: reason}
 		}
 
 		toolCall := response.ToolCall
@@ -261,7 +294,7 @@ func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Ag
 		messages = append(messages, llm.Message{Role: llm.RoleTool, ToolCallID: toolCall.ID, Content: result})
 		step(toolStep)
 		saveProgress()
-		if reason := inRunLimit(agent, rec.Total(), day); reason != "" {
+		if reason := r.inRunLimit(agent, run, rec.Total()); reason != "" {
 			return &errLimited{reason: reason}
 		}
 	}

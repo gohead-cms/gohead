@@ -196,9 +196,12 @@ func DeleteAgent(agentID uint) error {
 		return fmt.Errorf("failed to delete agent with ID '%d': %w", agentID, err)
 	}
 	// A re-created agent with the same name reuses this row, so its old
-	// runs go now.
+	// runs and conversation go now.
 	if err := DeleteAgentRuns(agentID); err != nil {
 		logger.Log.WithError(err).WithField("agent_id", agentID).Warn("Failed to delete agent runs")
+	}
+	if err := database.DB.Where("agent_id = ?", agentID).Delete(&models.AgentMessage{}).Error; err != nil {
+		logger.Log.WithError(err).WithField("agent_id", agentID).Warn("Failed to delete agent conversation")
 	}
 
 	logger.Log.WithField("agent_id", agentID).Info("Agent deleted successfully")

@@ -239,18 +239,50 @@ func TestRunLimits(t *testing.T) {
 
 	t.Run("daily cost spans runs", func(t *testing.T) {
 		f := setup(t)
-		a := f.agent(agents.Limits{MaxCostPerDay: 0.01})
+		a := f.agent(agents.Limits{MaxCostPerDay: 0.01}, upsert)
 		f.llm.responses = []llm.Response{text("first", 1000, 100, 0.008)}
 		run, _ := f.run(a)
 		assert.Equal(t, agents.RunSucceeded, run.Status)
-		f.llm.responses = []llm.Response{text("second", 1000, 100, 0.008)}
+
+		// The second run goes over the limit with a function call: it stops
+		// before running the function.
+		f.llm.responses = []llm.Response{
+			toolCall("c1", "save", `{"collection_name":"articles","data":{"title":"x"}}`, 1000, 100, 0.008),
+		}
 		run, _ = f.run(a)
 		assert.Equal(t, agents.RunLimited, run.Status, "stopped once the day's cost exceeds the limit")
 		assert.Contains(t, run.Error, "max_cost_per_day")
+		_, total, _ := storage.GetItems(f.articles.ID, 1, 10)
+		assert.Zero(t, total, "the function was not called")
+
 		run, _ = f.run(a)
 		assert.Equal(t, agents.RunLimited, run.Status)
 		assert.Empty(t, run.Steps, "later runs do not start")
 		assert.Equal(t, 2, f.llm.calls)
+	})
+
+	t.Run("a final answer over the limit still completes the run", func(t *testing.T) {
+		f := setup(t)
+		a := f.agent(agents.Limits{MaxTokensPerRun: 50})
+		f.llm.responses = []llm.Response{text("done", 100, 10, 0)}
+		run, err := f.run(a)
+		require.NoError(t, err)
+		assert.Equal(t, agents.RunSucceeded, run.Status)
+		assert.Equal(t, "done", run.Output)
+		history, _ := storage.GetConversationHistory(a.ID)
+		assert.Len(t, history, 2, "input and answer are kept")
+	})
+
+	t.Run("runs are counted in creation order", func(t *testing.T) {
+		f := setup(t)
+		a := f.agent(agents.Limits{MaxRunsPerHour: 1})
+		// Two runs that started together: the earlier one is still running.
+		first := &agents.AgentRun{AgentID: a.ID, Status: agents.RunRunning, StartedAt: time.Now().UTC()}
+		require.NoError(t, storage.CreateAgentRun(first))
+		run, err := f.run(a)
+		require.NoError(t, err)
+		assert.Equal(t, agents.RunLimited, run.Status, "a run in progress counts")
+		assert.Zero(t, f.llm.calls)
 	})
 }
 
@@ -264,6 +296,45 @@ func TestFailedRun(t *testing.T) {
 	assert.Contains(t, run.Error, "provider unavailable")
 	require.Len(t, run.Steps, 1)
 	assert.Contains(t, run.Steps[0].Error, "provider unavailable")
+
+	history, err := storage.GetConversationHistory(a.ID)
+	require.NoError(t, err)
+	assert.Empty(t, history, "a failed run leaves the history to its retry")
+}
+
+func TestNestedRelationsRespectScopes(t *testing.T) {
+	f := setup(t)
+	posts := models.Collection{Name: "posts", Kind: "collection", Attributes: []models.Attribute{
+		{Name: "title", Type: "string"},
+		{Name: "draft", Type: "relation", Target: "drafts", Relation: "oneToOne"},
+	}}
+	require.NoError(t, storage.SaveCollection(&posts))
+	draft, err := storage.SaveItem(f.drafts, models.JSONMap{"title": "Existing"})
+	require.NoError(t, err)
+
+	savePost := agents.FunctionSpec{Name: "save_post", ImplKey: "collections.upsert_item", Parameters: models.JSONMap{"type": "object"}, Collections: []string{"posts"}}
+	a := f.agent(agents.Limits{}, savePost)
+	f.llm.responses = []llm.Response{
+		toolCall("c1", "save_post", `{"collection_name":"posts","data":{"title":"a","draft":{"title":"created in drafts"}}}`, 10, 5, 0),
+		toolCall("c2", "save_post", `{"collection_name":"posts","data":{"title":"b","draft":{"id":`+itoa(draft.ID)+`}}}`, 10, 5, 0),
+		text("ok", 10, 5, 0),
+	}
+	run, err := f.run(a)
+	require.NoError(t, err)
+	var tools []agents.AgentRunStep
+	for _, s := range run.Steps {
+		if s.Type == agents.StepTool {
+			tools = append(tools, s)
+		}
+	}
+	require.Len(t, tools, 2)
+	assert.Contains(t, tools[0].Result, "not allowed to access collection 'drafts'", "nested creates need the target in scope")
+	assert.Contains(t, tools[1].Result, `"created"`, "connecting an existing item by ID is allowed")
+
+	_, total, _ := storage.GetItems(f.drafts.ID, 1, 10)
+	assert.Equal(t, 1, total, "nothing was created in drafts")
+	_, total, _ = storage.GetItems(posts.ID, 1, 10)
+	assert.Equal(t, 1, total)
 }
 
 func TestPruning(t *testing.T) {

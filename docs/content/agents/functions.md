@@ -70,6 +70,9 @@ Without a scope, a `collections.*` function works on every collection: an agent 
   item ID from another collection is refused. If the model also passes `collection_name`, it
   must match.
 - `collections.list` only returns the collections in scope.
+- Writes follow relations: a relation value given as an object without an `id` is looked up
+  in, or created in, the target collection, so that collection must be in scope too.
+  Connecting an existing item by ID (`5` or `{"id": 5}`) only needs the written collection.
 - `collections` is only accepted on `collections.*` functions. Scope each function on its
   own: two functions can share an `impl_key` with different scopes.
 

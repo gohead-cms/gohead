@@ -36,7 +36,8 @@ A run whose worker was killed stays `running`; the queue retries the job as a ne
 
 Texts longer than 16 KB (payloads, arguments, results) are truncated. The newest 200 runs of
 each agent are kept; change it with [`agents.runs_kept`](../getting-started/configuration.md#llm-defaults).
-Deleting an agent deletes its runs.
+Runs in progress are never pruned. Deleting an agent deletes its runs and its conversation
+history.
 
 ### API
 
@@ -88,11 +89,16 @@ Add `limits` to an agent. Every limit is optional; `0` or absent means no limit.
 - A skipped or stopped run is recorded with status `limited` and the reason in `error`, and
   is **not retried**. Skipped runs don't count toward the run limits; tokens and cost spent
   before a run was stopped do count.
-- A limit stops a run between steps, so a run can go over by the size of one call. Keep
-  `max_turns` small to bound that.
+- A limit stops a run between steps, before the next function call, so a run can go over by
+  the size of one call. A run whose model has given its final answer completes normally
+  even if that answer crossed a limit; the next run is refused. Keep `max_turns` small to
+  bound the overshoot.
 - Limits are per agent and counted from the run history in the database, so they hold
-  across any number of workers. Two runs starting at the same instant can both pass a
-  check that only one should have.
+  across any number of workers. Runs starting at the same time are counted in the order
+  they were created, and runs still in progress count, so a burst of events cannot slip
+  past `max_runs_per_hour`. Daily token and cost limits include what runs in progress on
+  other workers have spent so far.
+- If usage cannot be read from the database, the run does not start (and is retried).
 
 ### Costs
 

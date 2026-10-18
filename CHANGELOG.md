@@ -19,7 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ### Changed
 - `/admin/users` requires a user session (not an API token).
 - Usernames cannot contain `:` (reserved for `token:<name>` attribution).
-- Deleting an agent deletes its run history.
+- Deleting an agent deletes its run history and conversation.
 
 ### Fixed
 - Re-creating an agent with the name of a deleted one restored the old configuration instead of the new one.
