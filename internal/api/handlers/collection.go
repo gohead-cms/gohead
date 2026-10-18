@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	gqlschema "github.com/gohead-cms/gohead/internal/graphql"
 	"net/http"
 	"strconv"
 
@@ -154,6 +155,7 @@ func CreateCollection(c *gin.Context) {
 	logger.Log.WithField("collection", collection.Name).Info("Collection created successfully")
 	c.Set("response", utils.FormatCollectionSchema(&collection))
 	c.Set("meta", gin.H{"message": "Collection created successfully"})
+	reloadGraphQLSchema()
 	c.Set("status", http.StatusCreated)
 }
 
@@ -211,6 +213,7 @@ func UpdateCollection(c *gin.Context) {
 	c.Set("response",
 		utils.FormatCollectionSchema(updated),
 	)
+	reloadGraphQLSchema()
 	c.Set("status", http.StatusOK)
 }
 
@@ -242,6 +245,7 @@ func DeleteCollection(c *gin.Context) {
 	c.Set("meta", gin.H{
 		"message": "Collection deleted successfully",
 	})
+	reloadGraphQLSchema()
 	c.Set("status", http.StatusOK)
 }
 
@@ -251,4 +255,13 @@ func formatContentRange(count, total int) string {
 		return "items */0"
 	}
 	return "items 0-" + strconv.Itoa(count-1) + "/" + strconv.Itoa(total)
+}
+
+// reloadGraphQLSchema rebuilds the GraphQL schema after a collection changes so
+// new or modified collections are queryable without a restart. A failure is
+// logged but does not fail the REST request that already succeeded.
+func reloadGraphQLSchema() {
+	if err := gqlschema.InitializeGraphQLSchema(); err != nil {
+		logger.Log.WithError(err).Error("Failed to reload GraphQL schema")
+	}
 }

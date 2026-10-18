@@ -1,8 +1,14 @@
 package handlers
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
+	"net/url"
+	"regexp"
+	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/database"
@@ -49,52 +55,124 @@ func CreateItem(collection models.Collection) gin.HandlerFunc {
 	}
 }
 
-// GetItems handles pagination and relation hydrating.
+// GetItems lists a collection's items with pagination, filtering and sorting.
+//
+// Query parameters:
+//
+//	page, pageSize                 pagination (pageSize max 100)
+//	filters[<field>][<op>]=<value> op: $eq $ne $lt $lte $gt $gte $contains
+//	filters[<field>]=<value>       shorthand for $eq
+//	sort=<field>[:asc|:desc],...   multiple keys allowed
+//
+// <field> is a collection attribute or one of id, created_at, updated_at.
 func GetItems(collection models.Collection, level uint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Handle pagination from query params
-		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-		pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
-		if page < 1 {
-			page = 1
-		}
-		if pageSize < 1 || pageSize > 100 {
-			pageSize = 10
+		q, err := parseItemQuery(c.Request.URL.Query())
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"status": http.StatusBadRequest, "name": "ValidationError", "message": err.Error(), "details": nil}})
+			return
 		}
 
-		items, total, err := storage.GetItems(collection.ID, page, pageSize)
+		items, total, err := storage.QueryItems(collection, q)
 		if err != nil {
+			var qe *storage.QueryFieldError
+			if errors.As(err, &qe) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"status": http.StatusBadRequest, "name": "ValidationError", "message": qe.Error(), "details": nil}})
+				return
+			}
+			logger.Log.WithError(err).Error("Failed to fetch items")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch items"})
 			return
 		}
 
-		var results []models.JSONMap
+		results := make([]models.JSONMap, 0, len(items))
 		for _, item := range items {
-			logger.Log.WithField("item_id", item).Debug("Fetch relation")
 			item.Data["id"] = item.ID
-			// Use the storage layer to fetch relations
 			hydratedData, err := storage.FetchNestedRelations(collection, item.Data, level)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to populate relations"})
 				return
 			}
-			logger.Log.WithField("hydratedData", hydratedData).Debug("Hydrated")
 			results = append(results, hydratedData)
 		}
 
-		// Construct response with pagination metadata
 		c.JSON(http.StatusOK, gin.H{
 			"data": results,
 			"meta": gin.H{
 				"pagination": gin.H{
-					"page":      page,
-					"pageSize":  pageSize,
+					"page":      q.Page,
+					"pageSize":  q.PageSize,
 					"total":     total,
-					"pageCount": (int(total) + pageSize - 1) / pageSize, // Ceiling division
+					"pageCount": (total + q.PageSize - 1) / q.PageSize, // Ceiling division
 				},
 			},
 		})
 	}
+}
+
+var filterParamRe = regexp.MustCompile(`^filters\[([^\[\]]+)\](?:\[(\$[a-z]+)\])?$`)
+
+// maxFilters bounds the number of conditions a single request can add.
+const maxFilters = 20
+
+func parseItemQuery(values url.Values) (storage.ItemQuery, error) {
+	q := storage.ItemQuery{Page: 1, PageSize: 10}
+	if v := values.Get("page"); v != "" {
+		p, err := strconv.Atoi(v)
+		if err != nil || p < 1 {
+			return q, fmt.Errorf("invalid page '%s'", v)
+		}
+		q.Page = p
+	}
+	if v := values.Get("pageSize"); v != "" {
+		ps, err := strconv.Atoi(v)
+		if err != nil || ps < 1 || ps > 100 {
+			return q, fmt.Errorf("pageSize must be between 1 and 100")
+		}
+		q.PageSize = ps
+	}
+
+	for key, vals := range values {
+		m := filterParamRe.FindStringSubmatch(key)
+		if m == nil {
+			continue
+		}
+		op := m[2]
+		if op == "" {
+			op = storage.OpEq
+		}
+		for _, v := range vals {
+			q.Filters = append(q.Filters, storage.ItemFilter{Field: m[1], Op: op, Value: v})
+		}
+	}
+	if len(q.Filters) > maxFilters {
+		return q, fmt.Errorf("too many filters (max %d)", maxFilters)
+	}
+	// Map iteration order is random; keep the generated SQL stable.
+	sort.Slice(q.Filters, func(i, j int) bool {
+		if q.Filters[i].Field != q.Filters[j].Field {
+			return q.Filters[i].Field < q.Filters[j].Field
+		}
+		return q.Filters[i].Op < q.Filters[j].Op
+	})
+
+	if v := values.Get("sort"); v != "" {
+		for _, part := range strings.Split(v, ",") {
+			field, dir, _ := strings.Cut(strings.TrimSpace(part), ":")
+			if field == "" {
+				return q, fmt.Errorf("invalid sort '%s'", v)
+			}
+			switch strings.ToLower(dir) {
+			case "", "asc":
+				q.Sort = append(q.Sort, storage.ItemSort{Field: field})
+			case "desc":
+				q.Sort = append(q.Sort, storage.ItemSort{Field: field, Desc: true})
+			default:
+				return q, fmt.Errorf("invalid sort direction '%s'", dir)
+			}
+		}
+	}
+	return q, nil
 }
 
 // GetItemByID retrieves a single item by ID.

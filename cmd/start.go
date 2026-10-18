@@ -2,8 +2,15 @@ package cmd
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/gohead-cms/gohead/internal/agent/triggers"
 	"github.com/gohead-cms/gohead/internal/api/handlers"
@@ -38,21 +45,37 @@ var startCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		configPath, _ := cmd.Flags().GetString("config")
 
-		// Initialize and start the server
-		router, err := InitializeServer(configPath)
+		router, cfg, cleanup, err := InitializeServer(configPath)
 		if err != nil {
-			// Use the initialized logger if available, otherwise fallback to standard log
 			if logger.Log != nil {
 				logger.Log.Fatalf("Cannot initialize server: %v", err)
 			}
 			log.Fatalf("Cannot initialize server: %v", err)
 		}
+		defer cleanup()
 
-		// Load config just to get the port, as logger is now initialized inside InitializeServer
-		cfg, _ := config.LoadConfig(configPath)
-		logger.Log.Infof("Starting server on port %s", cfg.ServerPort)
-		if err := router.Run(":" + cfg.ServerPort); err != nil {
-			logger.Log.Fatalf("Cannot start server: %v", err)
+		srv := &http.Server{
+			Addr:              ":" + cfg.ServerPort,
+			Handler:           router,
+			ReadHeaderTimeout: 10 * time.Second,
+		}
+
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+
+		go func() {
+			logger.Log.Infof("Starting server on port %s", cfg.ServerPort)
+			if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				logger.Log.Fatalf("Cannot start server: %v", err)
+			}
+		}()
+
+		<-ctx.Done()
+		logger.Log.Info("Shutting down server...")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			logger.Log.WithError(err).Error("Server forced to shut down")
 		}
 	},
 }
@@ -61,11 +84,21 @@ func init() {
 	startCmd.Flags().StringP("config", "c", "config.yaml", "Path to the configuration file")
 }
 
-func InitializeServer(cfgPath string) (*gin.Engine, error) {
+// InitializeServer builds the router and its dependencies. The returned
+// cleanup function releases long-lived resources (queue client, tracer) and
+// must be called when the server stops.
+func InitializeServer(cfgPath string) (*gin.Engine, *config.Config, func(), error) {
+	var closers []func()
+	cleanup := func() {
+		for i := len(closers) - 1; i >= 0; i-- {
+			closers[i]()
+		}
+	}
 	// --- Core Dependencies ---
 	cfg, err := config.LoadConfig(cfgPath)
 	if err != nil {
-		return nil, err
+		cleanup()
+		return nil, nil, func() {}, err
 	}
 	logger.InitLogger(cfg.LogLevel)
 
@@ -83,21 +116,24 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 
 	db, err := database.InitDatabase(cfg.DatabaseURL, gormLogLevel)
 	if err != nil {
-		return nil, err
+		cleanup()
+		return nil, nil, func() {}, err
 	}
 	if err := migrations.MigrateDatabase(db); err != nil {
-		return nil, err
+		cleanup()
+		return nil, nil, func() {}, err
 	}
 
 	// Initialize the GraphQL Schema
 	if err := graphql.InitializeGraphQLSchema(); err != nil {
 		logger.Log.WithError(err).Error("Failed to initialize GraphQL schema")
-		return nil, err
+		cleanup()
+		return nil, nil, func() {}, err
 	}
 
 	// --- Application Services ---
 	seed.SeedRoles()
-	auth.InitializeJWT(cfg.JWTSecret)
+	auth.InitializeJWT(resolveJWTSecret(cfg.JWTSecret))
 	metrics.InitMetrics()
 
 	// --- Asynq Client Initialization for Producers ---
@@ -105,18 +141,29 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	asynqClient := asynq.NewClient(asynq.RedisClientOpt{Addr: cfg.Redis.Address})
 	storage.InitAsynqClient(asynqClient)
 	triggers.InitAsynqClient(asynqClient)
+	handlers.InitAsynqClient(asynqClient) // used by the agent webhook endpoint
+	closers = append(closers, func() {
+		if err := asynqClient.Close(); err != nil {
+			logger.Log.WithError(err).Warn("Error closing queue client")
+		}
+	})
 
 	// --- Telemetry (Optional) ---
 	if cfg.TelemetryEnabled {
 		tracerProvider, err := tracing.InitTracer()
 		if err != nil {
-			return nil, err
+			cleanup()
+			return nil, nil, func() {}, err
 		}
-		defer func() {
-			if err := tracerProvider.Shutdown(context.Background()); err != nil {
-				logger.Log.Error("Error shutting down tracer provider:", err)
+		// Shut down (and flush spans) when the server stops, not when this
+		// function returns.
+		closers = append(closers, func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := tracerProvider.Shutdown(ctx); err != nil {
+				logger.Log.WithError(err).Error("Error shutting down tracer provider")
 			}
-		}()
+		})
 	}
 
 	// --- Gin Router Setup ---
@@ -141,7 +188,7 @@ func InitializeServer(cfgPath string) (*gin.Engine, error) {
 	// --- Routes ---
 	setupRoutes(router)
 
-	return router, nil
+	return router, &cfg, cleanup, nil
 }
 
 func setupRoutes(router *gin.Engine) {
@@ -173,6 +220,7 @@ func setupRoutes(router *gin.Engine) {
 		admin.DELETE("/collections/:name", handlers.DeleteCollection)
 
 		// Singletons
+		admin.GET("/singletons", handlers.GetSingletons)
 		admin.POST("/singleton", handlers.CreateOrUpdateSingleton)
 		admin.GET("/singleton/:name", handlers.GetSingleton)
 		admin.PUT("/singleton/:name", handlers.CreateOrUpdateSingleton)
@@ -180,14 +228,22 @@ func setupRoutes(router *gin.Engine) {
 
 		// Components
 		admin.POST("/components", handlers.CreateComponent)
+		admin.GET("/components", handlers.GetComponents)
 		admin.GET("/components/:name", handlers.GetComponent)
 		admin.PUT("/components/:name", handlers.UpdateComponent)
 		admin.DELETE("/components/:name", handlers.DeleteComponent)
 
+		// Users
+		admin.POST("/users", handlers.CreateUser)
+		admin.GET("/users", handlers.GetAllUsers)
+		admin.GET("/users/:id", handlers.GetUser)
+		admin.PUT("/users/:id", handlers.UpdateUser)
+		admin.DELETE("/users/:id", handlers.DeleteUser)
+
 		// Agents
 		agents := admin.Group("/agents")
 		{
-			agents.POST("/", handlers.CreateAgent)
+			agents.POST("", handlers.CreateAgent)
 			agents.GET("", handlers.GetAgents)
 			agents.GET("/:name", handlers.GetAgent)
 			agents.PUT("/:name", handlers.UpdateAgent)
@@ -208,4 +264,28 @@ func setupRoutes(router *gin.Engine) {
 		content.POST("/singleton/:name", handlers.CreateOrUpdateSingletonItem)
 		content.PUT("/singleton/:name", handlers.CreateOrUpdateSingletonItem)
 	}
+}
+
+// insecureJWTSecrets are well-known values (shipped in samples/defaults) that
+// would let anyone forge admin tokens.
+var insecureJWTSecrets = map[string]bool{"": true, "your-secret-key": true}
+
+// resolveJWTSecret returns the configured secret, or a random one when the
+// configured value is missing or a published default. A random secret keeps
+// quick-start setups working without being forgeable, at the cost of
+// invalidating tokens on restart.
+func resolveJWTSecret(configured string) string {
+	if !insecureJWTSecrets[configured] {
+		if len(configured) < 32 {
+			logger.Log.Warn("jwt_secret is shorter than 32 characters; use a long random value")
+		}
+		return configured
+	}
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		logger.Log.Fatalf("Cannot generate a JWT secret: %v", err)
+	}
+	logger.Log.Warn("jwt_secret is not set (or uses the sample default): using a random secret for this run. " +
+		"Tokens will not survive a restart; set jwt_secret (or GOHEAD_JWT_SECRET) to a long random value.")
+	return hex.EncodeToString(buf)
 }

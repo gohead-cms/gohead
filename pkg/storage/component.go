@@ -166,11 +166,26 @@ func DeleteComponent(name string) error {
 		return fmt.Errorf("failed to find component '%s': %w", name, err)
 	}
 
-	// GORM will automatically delete associated ComponentAttributes due to the
-	// `constraint:OnDelete:CASCADE` tag in the Component model.
-	if err := database.DB.Delete(&cmp).Error; err != nil {
-		return fmt.Errorf("failed to delete component '%s': %w", name, err)
-	}
+	// The ON DELETE CASCADE constraint only fires on hard deletes (and only
+	// when the database enforces foreign keys), so remove the attributes
+	// explicitly. Definitions are hard-deleted so the name can be reused.
+	return database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Unscoped().Where("component_id = ?", cmp.ID).Delete(&models.ComponentAttribute{}).Error; err != nil {
+			return fmt.Errorf("failed to delete attributes of component '%s': %w", name, err)
+		}
+		if err := tx.Unscoped().Delete(&cmp).Error; err != nil {
+			return fmt.Errorf("failed to delete component '%s': %w", name, err)
+		}
+		return nil
+	})
+}
 
-	return nil
+// GetAllComponents returns every component definition with its attributes,
+// ordered by name.
+func GetAllComponents() ([]models.Component, error) {
+	var cmps []models.Component
+	if err := database.DB.Preload("Attributes").Order("name ASC").Find(&cmps).Error; err != nil {
+		return nil, fmt.Errorf("failed to list components: %w", err)
+	}
+	return cmps, nil
 }

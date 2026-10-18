@@ -24,7 +24,7 @@ func InitTracer() (*sdktrace.TracerProvider, error) {
 	// Create the resource describing this application
 	res, err := resource.New(ctx,
 		resource.WithAttributes(
-			semconv.ServiceNameKey.String("your-cms"),
+			semconv.ServiceNameKey.String("gohead"),
 		),
 	)
 	if err != nil {
