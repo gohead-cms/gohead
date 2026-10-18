@@ -26,7 +26,12 @@ curl -X POST $GOHEAD/admin/collections -H "$JSON" -H "$AUTH" -d '{
 | `name` | yes | Used in URLs (`/api/collections/products`) and as the GraphQL field name. |
 | `kind` | yes | `collection`. |
 | `description` | no | Free text. |
+| `draft_and_publish` | no | `true` enables the [draft/publish workflow](#draft-and-publish). Default `false`. |
 | `attributes` | yes | Map of attribute name → definition. |
+
+Attribute names `id`, `createdAt`, `updatedAt` and `publishedAt` are reserved (they are
+system fields in every [response](rest-api.md#responses)), and so is `status` in
+draft-and-publish collections.
 
 Manage collections with `GET /admin/collections`, `GET|PUT|DELETE /admin/collections/{name}`.
 Updating a collection replaces its attribute list: attributes you omit are removed.
@@ -49,7 +54,7 @@ relation pointing to it.
 | `json` | JSON object | |
 | `media` | string (URL or path) | |
 | `relation` | ID(s) of items in `target` | `relation`, `target` (required) |
-| `component` | *see below* | `component` (component name) |
+| `component` | an object, or a list with `repeatable` | `component` (required), `repeatable`, `min`/`max` (list length) |
 
 Every attribute also accepts `required` (default `false`) and `unique`.
 
@@ -94,10 +99,12 @@ curl $GOHEAD/api/singleton/homepage -H "$AUTH"
 ```
 
 ```json
-{ "data": { "id": 1, "attributes": { "headline": "Welcome", "tagline": "Built with GoHead" } } }
+{ "data": { "id": 1, "headline": "Welcome", "tagline": "Built with GoHead",
+            "createdAt": "2026-10-18T09:00:00Z", "updatedAt": "2026-10-18T09:00:00Z" } }
 ```
 
-`POST /admin/singleton` creates or updates (upsert by name). List them with
+Writing needs the `update` permission; reading needs `read`. `level` populates relations
+as for items. `POST /admin/singleton` creates or updates (upsert by name). List them with
 `GET /admin/singletons`; delete with `DELETE /admin/singleton/{name}`.
 
 ## Components
@@ -114,13 +121,69 @@ curl -X POST $GOHEAD/admin/components -H "$JSON" -H "$AUTH" -d '{
 }'
 ```
 
-Manage with `GET /admin/components`, `GET|PUT|DELETE /admin/components/{name}`.
+Use it from a collection (or a singleton) with `"type": "component"`. Add
+`"repeatable": true` for a list of them; `min` and `max` then bound the list length:
 
-!!! warning "Current limitation"
-    Components can be defined and referenced from a collection (`"type": "component",
-    "component": "seo"`), but item values for component attributes are not validated or
-    stored yet, and component fields are not exposed in GraphQL. Until then, model reusable
-    groups as a `json` attribute or as a related collection.
+```bash
+curl -X POST $GOHEAD/admin/collections -H "$JSON" -H "$AUTH" -d '{
+  "name": "pages",
+  "kind": "collection",
+  "attributes": {
+    "title": { "type": "string", "required": true },
+    "seo":   { "type": "component", "component": "seo", "required": true },
+    "faq":   { "type": "component", "component": "question", "repeatable": true, "max": 20 }
+  }
+}'
+```
+
+Item values are plain objects, validated field by field with the component's rules
+(types, `required`, `pattern`, `min`/`max`, `options`); unknown fields are rejected:
+
+```json
+{ "data": {
+    "title": "Pricing",
+    "seo": { "meta_title": "Pricing - Acme" },
+    "faq": [ { "question": "Is there a free plan?", "answer": "Yes." } ]
+} }
+```
+
+They come back exactly like that in REST responses, and as typed objects in
+[GraphQL](graphql.md#components). Components can contain other components (up to five levels
+deep), but not relations: put relations on the collection.
+
+Manage components with `GET /admin/components` and `GET|PUT|DELETE /admin/components/{name}`.
+A component that is still used by a collection, singleton or other component cannot be
+deleted or renamed (`409`, with the list of attributes using it).
+
+## Draft and publish
+
+With `"draft_and_publish": true`, a collection's items have a status:
+
+- **New items are drafts** unless created with `"status": "published"`.
+- **Readers only see published items.** Viewers never see drafts, in lists, by ID, or inside
+  populated relations. Lists return published items by default for every role; editors and
+  admins add `status=draft` or `status=all`, and get drafts when fetching an item by ID.
+- Items gain two response fields: `status` (`draft` or `published`) and `publishedAt`.
+
+```bash
+# create a draft, then publish it
+curl -X POST $GOHEAD/api/collections/articles -H "$JSON" -H "$AUTH" -d '{"data":{"title":"Soon"}}'
+curl -X POST $GOHEAD/api/collections/articles/7/publish -H "$AUTH"
+curl -X POST $GOHEAD/api/collections/articles/7/unpublish -H "$AUTH"
+
+# or set the status while writing
+curl -X PUT $GOHEAD/api/collections/articles/7 -H "$JSON" -H "$AUTH" \
+  -d '{"data":{"title":"Now"},"status":"published"}'
+```
+
+Publishing needs the `update` permission. Publishing and unpublishing emit `item:published`
+and `item:unpublished` [events](../agents/triggers.md), for example to rebuild a static site.
+
+An item has a single version: editing a published item changes what readers see right
+away. To prepare changes privately, unpublish first, or keep drafts in a separate item.
+
+Turning the option on for an existing collection publishes its existing items, so nothing
+disappears. Turning it off makes every item visible again.
 
 ## Naming tips
 

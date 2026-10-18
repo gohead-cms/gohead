@@ -45,14 +45,40 @@ type ItemQuery struct {
 	PageSize int
 	Filters  []ItemFilter
 	Sort     []ItemSort
+	// Status filters draft-and-publish collections: "" (all items),
+	// models.StatusPublished or models.StatusDraft. Ignored otherwise.
+	Status string
+}
+
+// withStatus restricts q to published or draft items of a draft-and-publish
+// collection.
+func withStatus(q *gorm.DB, ct models.Collection, status string) *gorm.DB {
+	if !ct.DraftAndPublish {
+		return q
+	}
+	switch status {
+	case models.StatusPublished:
+		return q.Where("published_at IS NOT NULL")
+	case models.StatusDraft:
+		return q.Where("published_at IS NULL")
+	}
+	return q
 }
 
 // builtinColumns are real columns on the items table that can be filtered
 // and sorted on, mapped to their kind.
 var builtinColumns = map[string]string{
-	"id":         "int",
-	"created_at": "datetime",
-	"updated_at": "datetime",
+	"id":           "int",
+	"created_at":   "datetime",
+	"updated_at":   "datetime",
+	"published_at": "datetime",
+}
+
+// builtinAliases maps the field names used in responses to their columns.
+var builtinAliases = map[string]string{
+	"createdAt":   "created_at",
+	"updatedAt":   "updated_at",
+	"publishedAt": "published_at",
 }
 
 // filterableTypes lists attribute types whose stored JSON value is a scalar
@@ -79,6 +105,9 @@ type resolvedField struct {
 }
 
 func resolveField(ct models.Collection, name string) (resolvedField, error) {
+	if col, ok := builtinAliases[name]; ok {
+		name = col
+	}
 	if kind, ok := builtinColumns[name]; ok {
 		return resolvedField{column: name, kind: kind}, nil
 	}
@@ -251,7 +280,7 @@ func QueryItems(ct models.Collection, q ItemQuery) ([]models.Item, int, error) {
 	}
 	dialect := database.DB.Dialector.Name()
 
-	base := database.DB.Model(&models.Item{}).Where("collection_id = ?", ct.ID)
+	base := withStatus(database.DB.Model(&models.Item{}).Where("collection_id = ?", ct.ID), ct, q.Status)
 	var err error
 	for _, flt := range q.Filters {
 		if base, err = applyFilter(base, dialect, ct, flt); err != nil {

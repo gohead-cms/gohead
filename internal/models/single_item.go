@@ -18,6 +18,23 @@ type SingleItem struct {
 	Data         JSONMap   `json:"data" gorm:"type:json"`
 }
 
+// SingleItemResponse is the JSON shape of a singleton's content: its
+// attributes at the top level plus id, createdAt and updatedAt. data is the
+// (possibly relation-populated) data; nil means item.Data.
+func SingleItemResponse(item SingleItem, data JSONMap) map[string]any {
+	if data == nil {
+		data = item.Data
+	}
+	out := make(map[string]any, len(data)+3)
+	for k, v := range data {
+		out[k] = v
+	}
+	out["id"] = item.ID
+	out["createdAt"] = APITime(item.CreatedAt)
+	out["updatedAt"] = APITime(item.UpdatedAt)
+	return out
+}
+
 // ValidateSingleItemValues validates a single item's data against the SingleType's schema (attributes).
 func ValidateSingleItemValues(st Singleton, itemData map[string]any) error {
 	// 1. Build a set of valid attribute names
@@ -46,8 +63,18 @@ func ValidateSingleItemValues(st Singleton, itemData map[string]any) error {
 			continue // if not required and missing, skip
 		}
 
-		// Validate regular attributes or relationships
-		if attribute.Type == "relation" {
+		// Validate components, relationships or regular attributes
+		if attribute.Type == "component" {
+			if value == nil {
+				if attribute.Required {
+					return fmt.Errorf("missing required attribute: '%s'", attribute.Name)
+				}
+				continue
+			}
+			if _, err := validateComponentValue(attribute, value, nil, 1); err != nil {
+				return fmt.Errorf("validation failed for component '%s': %w", attribute.Name, err)
+			}
+		} else if attribute.Type == "relation" {
 			if err := validateSingleItemRelationship(attribute, value); err != nil {
 				logger.Log.WithField("attribute", attribute.Name).
 					Warn("Validation failed for relationship")

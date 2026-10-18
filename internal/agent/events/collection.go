@@ -22,6 +22,10 @@ const (
 	EventTypeItemCreated       EventType = "item:created"
 	EventTypeItemUpdated       EventType = "item:updated"
 	EventTypeItemDeleted       EventType = "item:deleted"
+	// Draft-and-publish collections only: an item became visible to readers,
+	// or was withdrawn.
+	EventTypeItemPublished   EventType = "item:published"
+	EventTypeItemUnpublished EventType = "item:unpublished"
 )
 
 // CollectionEventPayload is the generic data structure for a collection event.

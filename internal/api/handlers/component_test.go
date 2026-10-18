@@ -32,7 +32,7 @@ func TestComponentHandlers(t *testing.T) {
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations
-	assert.NoError(t, db.AutoMigrate(&models.Component{}, &models.ComponentAttribute{}))
+	assert.NoError(t, db.AutoMigrate(&models.Component{}, &models.ComponentAttribute{}, &models.Collection{}, &models.Singleton{}, &models.Attribute{}))
 
 	// Register component routes
 	router.POST("/components", CreateComponent)

@@ -2,6 +2,7 @@ package graphql
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/internal/types"
@@ -16,9 +17,125 @@ import (
 // by buildMu in InitializeGraphQLSchema.
 var typeRegistry = make(map[string]*graphql.Object)
 
-// ResetTypeRegistry drops all cached collection types.
+// componentTypes and componentInputs cache the types built for components.
+var (
+	componentTypes  = make(map[string]*graphql.Object)
+	componentInputs = make(map[string]*graphql.InputObject)
+)
+
+// ResetTypeRegistry drops all cached collection and component types.
 func ResetTypeRegistry() {
 	typeRegistry = make(map[string]*graphql.Object)
+	componentTypes = make(map[string]*graphql.Object)
+	componentInputs = make(map[string]*graphql.InputObject)
+}
+
+var nonNameChars = regexp.MustCompile(`[^_0-9A-Za-z]`)
+
+// componentTypeName returns a valid GraphQL type name for a component.
+func componentTypeName(name string) string {
+	return "Component_" + nonNameChars.ReplaceAllString(name, "_")
+}
+
+// componentOutputType returns the GraphQL object for a component. Values
+// are stored as plain objects, so the default resolver reads the fields.
+func componentOutputType(name string) (*graphql.Object, error) {
+	if t, ok := componentTypes[name]; ok {
+		return t, nil
+	}
+	cmp, err := storage.GetComponentByName(name)
+	if err != nil {
+		return nil, err
+	}
+	obj := graphql.NewObject(graphql.ObjectConfig{
+		Name: componentTypeName(cmp.Name),
+		Fields: graphql.FieldsThunk(func() graphql.Fields {
+			fields := graphql.Fields{}
+			for _, a := range cmp.Attributes {
+				t, err := componentFieldOutput(a.BaseAttribute)
+				if err != nil {
+					logger.Log.WithError(err).WithField("attribute", a.Name).Debug("GraphQL: skipping component attribute")
+					continue
+				}
+				fields[a.Name] = &graphql.Field{Type: t}
+			}
+			if len(fields) == 0 {
+				fields["_empty"] = &graphql.Field{Type: graphql.String}
+			}
+			return fields
+		}),
+	})
+	componentTypes[name] = obj
+	return obj, nil
+}
+
+func componentFieldOutput(a models.BaseAttribute) (graphql.Output, error) {
+	if a.Type != "component" {
+		return types.GetGraphQLType(a.Type)
+	}
+	t, err := componentOutputType(a.ComponentRef)
+	if err != nil {
+		return nil, err
+	}
+	if a.Repeatable {
+		return graphql.NewList(t), nil
+	}
+	return t, nil
+}
+
+// componentInputType returns the GraphQL input object for a component.
+func componentInputType(name string) (*graphql.InputObject, error) {
+	if t, ok := componentInputs[name]; ok {
+		return t, nil
+	}
+	cmp, err := storage.GetComponentByName(name)
+	if err != nil {
+		return nil, err
+	}
+	in := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name: componentTypeName(cmp.Name) + "Input",
+		Fields: graphql.InputObjectConfigFieldMapThunk(func() graphql.InputObjectConfigFieldMap {
+			fields := graphql.InputObjectConfigFieldMap{}
+			for _, a := range cmp.Attributes {
+				t, err := componentFieldInput(a.BaseAttribute)
+				if err != nil {
+					continue
+				}
+				if a.Required {
+					t = graphql.NewNonNull(t)
+				}
+				fields[a.Name] = &graphql.InputObjectFieldConfig{Type: t}
+			}
+			if len(fields) == 0 {
+				fields["_empty"] = &graphql.InputObjectFieldConfig{Type: graphql.String}
+			}
+			return fields
+		}),
+	})
+	componentInputs[name] = in
+	return in, nil
+}
+
+func componentFieldInput(a models.BaseAttribute) (graphql.Input, error) {
+	if a.Type == "component" {
+		t, err := componentInputType(a.ComponentRef)
+		if err != nil {
+			return nil, err
+		}
+		if a.Repeatable {
+			return graphql.NewList(graphql.NewNonNull(t)), nil
+		}
+		return t, nil
+	}
+	out, err := types.GetGraphQLType(a.Type)
+	if err != nil {
+		return nil, err
+	}
+	in, ok := out.(graphql.Input)
+	if !ok {
+		return nil, fmt.Errorf("type '%s' cannot be used as input", a.Type)
+	}
+	return in, nil
 }
 
 func ConvertCollectionToGraphQLType(collection models.Collection) (*graphql.Object, error) {
@@ -33,7 +150,13 @@ func ConvertCollectionToGraphQLType(collection models.Collection) (*graphql.Obje
 		Fields: graphql.FieldsThunk(func() graphql.Fields {
 			// 1. Create the map of fields inside the thunk.
 			fields := graphql.Fields{
-				"id": &graphql.Field{Type: graphql.ID},
+				"id":        &graphql.Field{Type: graphql.ID},
+				"createdAt": &graphql.Field{Type: graphql.String},
+				"updatedAt": &graphql.Field{Type: graphql.String},
+			}
+			if collection.DraftAndPublish {
+				fields["publishedAt"] = &graphql.Field{Type: graphql.String}
+				fields["status"] = &graphql.Field{Type: graphql.String}
 			}
 
 			// 2. Loop through attributes and build all fields.
@@ -60,11 +183,26 @@ func ConvertCollectionToGraphQLType(collection models.Collection) (*graphql.Obje
 					resolveFunc = func(p graphql.ResolveParams) (any, error) {
 						return ResolveRelation(p, collection.ID, localAttr)
 					}
+				} else if localAttr.Type == "component" {
+					gqlFieldType, err = componentFieldOutput(models.BaseAttribute{
+						Type: "component", ComponentRef: localAttr.ComponentRef, Repeatable: localAttr.Repeatable,
+					})
+					if err != nil {
+						logger.Log.WithError(err).WithField("attribute", localAttr.Name).
+							Warn("GraphQL: skipping component attribute with unknown component")
+						continue
+					}
+					resolveFunc = func(p graphql.ResolveParams) (any, error) {
+						if sourceMap, ok := p.Source.(map[string]any); ok {
+							return sourceMap[localAttr.Name], nil
+						}
+						return nil, nil
+					}
 				} else {
 					gqlFieldType, err = types.GetGraphQLType(localAttr.Type)
 					if err != nil {
-						// e.g. component / dynamiczone attributes are not exposed
-						// yet; skip them instead of crashing schema generation.
+						// e.g. dynamiczone attributes are not exposed yet; skip
+						// them instead of crashing schema generation.
 						logger.Log.WithError(err).WithField("attribute", localAttr.Name).
 							Debug("GraphQL: skipping attribute with unsupported type")
 						continue

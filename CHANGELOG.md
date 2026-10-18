@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Breaking changes
+- **One response shape for items.** Every item response (lists, single items, create, update, populated relations, singletons) is a flat object: the attributes at the top level next to `id`, `createdAt` and `updatedAt`. Single items, create/update responses and singletons used `{id, attributes}`, and create responses nested relations as `{data: {id}}`. Clients that read `data.attributes.x` must read `data.x`.
+- Attribute names `id`, `createdAt`, `updatedAt` and `publishedAt` are reserved for new and updated collections.
+- `level=0` is now accepted (no relation population); create and update responses populate relations one level deep, like reads.
+
+### Added
+- **Component values in items**: collections and singletons can use components (`"type": "component", "component": "seo"`), single or `repeatable` (with `min`/`max` list length). Values are validated field by field, can nest components, and are exposed in GraphQL as typed objects and input objects. Components that are in use cannot be deleted or renamed (`409`).
+- **Draft and publish**, opt-in per collection (`"draft_and_publish": true`): items start as drafts, `status`/`publishedAt` appear in responses, `POST /api/collections/{c}/{id}/publish|unpublish` and a `"status"` field on writes change state, lists return published items unless an editor asks for `status=draft|all`, and viewers never see drafts (also in relations and GraphQL). New `item:published` / `item:unpublished` events. Enabling it on an existing collection publishes the existing items.
+- GraphQL: `createdAt`/`updatedAt` on every type, `status` argument on queries, `publish<Name>`/`unpublish<Name>` mutations, list inputs for many-to-many relations.
+- Sorting and filtering on `createdAt`, `updatedAt` and `publishedAt`.
+- Admin UI: edits update the entry instead of creating a new one, drafts are listed with a status badge and a publish toggle.
+
+### Fixed
+- One-to-many relations were missing from single-item and create responses.
+- Updating an item with a `unique` attribute failed when the value did not change; soft-deleted items no longer block unique values.
+- REST `PUT` did not emit `item:updated`.
+- Relations nested deeper than one level were not populated, and a deleted related item made the whole read fail.
+- Viewers could write singleton content; singleton writes now need the `update` permission.
+- Agent item updates (`collections.upsert_item` with `item_id`) are validated like API writes.
+- Item list errors use the standard error envelope.
+
+## [0.2.0] - 2026-10-18
+
 ### Security
 - **Registration privilege escalation**: `POST /auth/register` no longer accepts a client-chosen role. The first account on an empty instance becomes `admin`; later ones are `viewer`.
 - **GraphQL authorization bypass**: queries and mutations now enforce role permissions and item validation, like the REST API.

@@ -33,7 +33,8 @@ func SetupTestDB() *gorm.DB {
 		CREATE TABLE items (
 			id INTEGER PRIMARY KEY,
 			collection_id INTEGER,
-			data JSON
+			data JSON,
+			deleted_at DATETIME
 		);
 	`)
 
@@ -46,24 +47,39 @@ func TestCheckFieldUniqueness(t *testing.T) {
 	database.DB = testDB
 
 	// Seed the database with mock data
-	testDB.Exec(`INSERT INTO items (collection_id, data) VALUES
-		(1, '{"field_name": "existing_value"}'),
-		(1, '{"field_name": "another_value"}');`)
+	testDB.Exec(`INSERT INTO items (id, collection_id, data, deleted_at) VALUES
+		(1, 1, '{"field_name": "existing_value", "n": 5}', NULL),
+		(2, 1, '{"field_name": "another_value"}', NULL),
+		(3, 1, '{"field_name": "deleted_value"}', '2026-01-01 00:00:00');`)
 
 	t.Run("Unique field value", func(t *testing.T) {
-		err := CheckFieldUniqueness(1, "field_name", "unique_value")
+		err := CheckFieldUniqueness(nil, 1, "field_name", "unique_value", 0)
 		assert.NoError(t, err)
 	})
 
 	t.Run("Non-unique field value", func(t *testing.T) {
-		err := CheckFieldUniqueness(1, "field_name", "existing_value")
+		err := CheckFieldUniqueness(nil, 1, "field_name", "existing_value", 0)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "value for field 'field_name' must be unique")
 	})
 
 	t.Run("Different collection - should not conflict", func(t *testing.T) {
-		err := CheckFieldUniqueness(2, "field_name", "existing_value")
+		err := CheckFieldUniqueness(nil, 2, "field_name", "existing_value", 0)
 		assert.NoError(t, err)
+	})
+
+	t.Run("The item being updated keeps its own value", func(t *testing.T) {
+		assert.NoError(t, CheckFieldUniqueness(nil, 1, "field_name", "existing_value", 1))
+		assert.Error(t, CheckFieldUniqueness(nil, 1, "field_name", "existing_value", 2))
+	})
+
+	t.Run("Soft-deleted items do not count", func(t *testing.T) {
+		assert.NoError(t, CheckFieldUniqueness(nil, 1, "field_name", "deleted_value", 0))
+	})
+
+	t.Run("Numbers compare by value", func(t *testing.T) {
+		assert.Error(t, CheckFieldUniqueness(nil, 1, "n", float64(5), 0))
+		assert.NoError(t, CheckFieldUniqueness(nil, 1, "n", 6, 0))
 	})
 
 	t.Run("Error during validation - malformed JSON", func(t *testing.T) {
@@ -71,7 +87,7 @@ func TestCheckFieldUniqueness(t *testing.T) {
 		testDB.Exec(`INSERT INTO items (collection_id, data) VALUES
 			(1, '{malformed_json}');`)
 
-		err := CheckFieldUniqueness(1, "field_name", "unique_value")
+		err := CheckFieldUniqueness(nil, 1, "field_name", "unique_value", 0)
 		assert.Error(t, err) // The malformed row should not impact other checks
 	})
 }

@@ -36,9 +36,13 @@ the LLM can correct itself.
 | `collections.delete_item` | `item_id` (string) | Deletes an item **by ID, in any collection** |
 | `system.log` | `message`, optional `data` | Writes to the worker log |
 
+In [draft-and-publish](../guides/content-modeling.md#draft-and-publish) collections, items
+created by agents are drafts for a human to review and publish, and `collections.list_items`
+includes drafts.
+
 Creates through `collections.upsert_item` are validated like API writes (required fields,
-types, unique values); an update with `item_id` replaces the item's data as given. Agent
-writes do not emit content events.
+types, unique values), and so are updates with `item_id`, which replace the item's data.
+Agent writes do not emit content events.
 
 !!! danger "Grant deletes deliberately"
     `collections.delete_item` is not scoped to a collection. Only give it to agents that need

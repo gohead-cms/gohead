@@ -145,10 +145,9 @@ func TestProtectedHandlerWithPermissions(t *testing.T) {
 				// Assert successful data response
 				data, ok := response["data"].(map[string]any)
 				assert.True(t, ok, "Response should have a 'data' key")
-				attrs, _ := data["attributes"].(map[string]any)
 				assert.NotNil(t, data["id"])
-				assert.Equal(t, tc.expectedData.(map[string]any)["title"], attrs["title"])
-				assert.Equal(t, tc.expectedData.(map[string]any)["content"], attrs["content"])
+				assert.Equal(t, tc.expectedData.(map[string]any)["title"], data["title"])
+				assert.Equal(t, tc.expectedData.(map[string]any)["content"], data["content"])
 			}
 		})
 	}

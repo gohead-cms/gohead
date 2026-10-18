@@ -149,12 +149,12 @@ func TestQueryItems(t *testing.T) {
 func TestGetItemsByOffset(t *testing.T) {
 	ct := setupQueryFixtures(t)
 
-	items, total, err := GetItemsByOffset(ct.ID, 0, 2)
+	items, total, err := GetItemsByOffset(ct, 0, 2, "")
 	require.NoError(t, err)
 	assert.Equal(t, 4, total)
 	assert.Equal(t, []string{"Go generics", "Rust ownership"}, titles(items))
 
-	items, _, err = GetItemsByOffset(ct.ID, 3, 2)
+	items, _, err = GetItemsByOffset(ct, 3, 2, "")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"Kubernetes"}, titles(items))
 }

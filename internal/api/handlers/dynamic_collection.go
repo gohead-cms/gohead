@@ -10,7 +10,6 @@ import (
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
-	"github.com/gohead-cms/gohead/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -98,37 +97,57 @@ func handleCreate(c *gin.Context, userRole string, ct *models.Collection) {
 	body := bytes.TrimSpace(raw)
 	isBatch := len(body) > 0 && body[0] == '['
 
-	var batch []models.JSONMap
+	level, ok := parseLevel(c)
+	if !ok {
+		return
+	}
+
+	var bodies []itemWriteBody
 	if isBatch {
-		var inputs []struct {
-			Data map[string]any `json:"data"`
-		}
-		if err := json.Unmarshal(body, &inputs); err != nil || len(inputs) == 0 {
+		if err := json.Unmarshal(body, &bodies); err != nil || len(bodies) == 0 {
 			c.Set("response", "Invalid JSON array format. Expecting a non-empty array of objects with a 'data' key.")
 			c.Set("status", http.StatusBadRequest)
 			return
 		}
-		for _, in := range inputs {
-			batch = append(batch, in.Data)
-		}
 	} else if len(body) > 0 && body[0] == '{' {
-		var input struct {
-			Data map[string]any `json:"data"`
-		}
+		var input itemWriteBody
 		if err := json.Unmarshal(body, &input); err != nil || input.Data == nil {
 			c.Set("response", "Invalid JSON object format. Expecting an object with a 'data' key.")
 			c.Set("status", http.StatusBadRequest)
 			return
 		}
-		batch = []models.JSONMap{input.Data}
+		bodies = []itemWriteBody{input}
 	} else {
 		c.Set("response", "Invalid or empty JSON body")
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
 
+	inputs := make([]storage.ItemInput, 0, len(bodies))
+	for i, b := range bodies {
+		if b.Data == nil {
+			c.Set("response", "Validation failed for an item in the batch")
+			c.Set("details", gin.H{"item_index": i, "error": "missing 'data'"})
+			c.Set("status", http.StatusBadRequest)
+			return
+		}
+		publish, err := publishFlag(*ct, b.Status)
+		if err != nil {
+			if errors.Is(err, storage.ErrDraftAndPublishDisabled) {
+				err = errors.New("collection '" + ct.Name + "' does not use draft and publish")
+			}
+			c.Set("response", err.Error())
+			if isBatch {
+				c.Set("details", gin.H{"item_index": i})
+			}
+			c.Set("status", http.StatusBadRequest)
+			return
+		}
+		inputs = append(inputs, storage.ItemInput{Data: b.Data, Publish: publish != nil && *publish})
+	}
+
 	// All items are validated and stored in a single transaction.
-	created, err := storage.SaveItems(*ct, batch)
+	created, err := storage.CreateItems(*ct, inputs)
 	if err != nil {
 		var verr *storage.ItemValidationError
 		if errors.As(err, &verr) {
@@ -147,19 +166,93 @@ func handleCreate(c *gin.Context, userRole string, ct *models.Collection) {
 		return
 	}
 
-	if !isBatch {
-		c.Set("response", utils.FormatCollectionItem(created[0], ct))
-		c.Set("meta", gin.H{})
-		c.Set("status", http.StatusCreated)
-		return
-	}
 	out := make([]map[string]any, 0, len(created))
 	for _, item := range created {
-		out = append(out, utils.FormatCollectionItem(item, ct))
+		resp, err := itemResponse(*ct, *item, level, false)
+		if err != nil {
+			c.Set("response", "Failed to populate relations for response")
+			c.Set("status", http.StatusInternalServerError)
+			return
+		}
+		out = append(out, resp)
+	}
+	if !isBatch {
+		c.Set("response", out[0])
+		c.Set("status", http.StatusCreated)
+		return
 	}
 	c.Set("response", out)
 	c.Set("meta", gin.H{"created_count": len(out)})
 	c.Set("status", http.StatusCreated)
+}
+
+// readContext is what a read request may see.
+type readContext struct {
+	level         uint
+	publishedOnly bool   // hide drafts (also in populated relations)
+	listStatus    string // status filter for lists
+}
+
+// parseLevel reads the "level" query parameter (relation population depth,
+// 0 to maxRelationLevel, default 1). It answers 400 and returns false when
+// the value is invalid.
+func parseLevel(c *gin.Context) (uint, bool) {
+	levelParam := c.Query("level")
+	if levelParam == "" {
+		return 1, true
+	}
+	level, err := strconv.Atoi(levelParam)
+	if err != nil || level < 0 || level > maxRelationLevel {
+		c.Set("response", "Invalid level parameter (expected 0 to 5)")
+		c.Set("status", http.StatusBadRequest)
+		return 0, false
+	}
+	return uint(level), true
+}
+
+// parseReadContext resolves level and draft visibility. Drafts are only
+// visible to roles that can update content; lists default to published
+// items and accept status=draft|all, while fetching by ID returns drafts to
+// those roles.
+func parseReadContext(c *gin.Context, userRole string, ct *models.Collection, single bool) (readContext, bool) {
+	level, ok := parseLevel(c)
+	if !ok {
+		return readContext{}, false
+	}
+	rc := readContext{level: level}
+	canSeeDrafts := hasPermission(userRole, "update")
+	status := c.Query("status")
+
+	switch status {
+	case "", models.StatusPublished, models.StatusDraft, "all":
+	default:
+		c.Set("response", "Invalid status parameter (expected published, draft or all)")
+		c.Set("status", http.StatusBadRequest)
+		return rc, false
+	}
+	if (status == models.StatusDraft || status == "all") && !canSeeDrafts {
+		c.Set("response", "Drafts are only visible to roles that can edit content")
+		c.Set("status", http.StatusForbidden)
+		return rc, false
+	}
+
+	// What readers get by default is published content, including in
+	// populated relations; editors opt into drafts with status=draft|all,
+	// or by fetching an item by ID.
+	if single {
+		rc.publishedOnly = !canSeeDrafts || status == models.StatusPublished
+	} else {
+		rc.publishedOnly = !canSeeDrafts || status == "" || status == models.StatusPublished
+	}
+	if ct.DraftAndPublish {
+		switch status {
+		case "", models.StatusPublished:
+			rc.listStatus = models.StatusPublished
+		case models.StatusDraft:
+			rc.listStatus = models.StatusDraft
+		}
+	}
+	return rc, true
 }
 
 // handleRead handles fetching items or a single item by ID
@@ -178,31 +271,26 @@ func handleRead(c *gin.Context, userRole string, ct *models.Collection, id strin
 		return
 	}
 
-	levelParam := c.Query("level")
-	level := 1
-	if levelParam != "" {
-		parsedLevel, err := strconv.Atoi(levelParam)
-		if err != nil || parsedLevel < 1 || parsedLevel > maxRelationLevel {
-			logger.Log.WithField("level_param", levelParam).Warn("Invalid level parameter")
-			c.Set("response", "Invalid level parameter")
-			c.Set("status", http.StatusBadRequest)
-			return
-		}
-		level = parsedLevel
-	}
-
 	// Handle fetching all items or a single item by ID
 	if id == "" {
-		GetItems(*ct, uint(level))(c)
-	} else {
-		itemID, err := strconv.Atoi(id)
-		if err != nil {
-			c.Set("response", "Invalid ID format")
-			c.Set("status", http.StatusBadRequest)
+		rc, ok := parseReadContext(c, userRole, ct, false)
+		if !ok {
 			return
 		}
-		GetItemByID(*ct, uint(itemID), uint(level))(c)
+		GetItems(*ct, rc)(c)
+		return
 	}
+	itemID, err := strconv.Atoi(id)
+	if err != nil || itemID < 1 {
+		c.Set("response", "Invalid ID format")
+		c.Set("status", http.StatusBadRequest)
+		return
+	}
+	rc, ok := parseReadContext(c, userRole, ct, true)
+	if !ok {
+		return
+	}
+	GetItemByID(*ct, uint(itemID), rc)(c)
 }
 
 // handleUpdate handles updating an item by ID.

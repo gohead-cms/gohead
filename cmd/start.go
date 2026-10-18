@@ -308,6 +308,8 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc) {
 		// Dynamic Handlers
 		content.Any("/collections/:collection", handlers.DynamicCollectionHandler)
 		content.Any("/collections/:collection/:id", handlers.DynamicCollectionHandler)
+		content.POST("/collections/:collection/:id/publish", handlers.PublishItem(true))
+		content.POST("/collections/:collection/:id/unpublish", handlers.PublishItem(false))
 		content.GET("/singleton/:name", handlers.GetSingleItem)
 		content.POST("/singleton/:name", handlers.CreateOrUpdateSingletonItem)
 		content.PUT("/singleton/:name", handlers.CreateOrUpdateSingletonItem)

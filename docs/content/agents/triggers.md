@@ -4,7 +4,7 @@
 
 | Type | Runs when | Extra fields |
 |------|-----------|--------------|
-| `collection_event` | an item is created, updated or deleted | `event_trigger.collection`, `event_trigger.events` |
+| `collection_event` | an item is created, updated, deleted, published or unpublished | `event_trigger.collection`, `event_trigger.events` |
 | `webhook` | `POST /agents/webhook/{id}` with the right token | `webhook_token` |
 | `cron` | on a schedule | `cron` |
 | `manual` | never on its own (definition only) | |
@@ -18,8 +18,10 @@
 }
 ```
 
-Events: `item:created`, `item:updated`, `item:deleted`. They are emitted for REST and
-GraphQL writes. Writes made by agents (in the worker) do **not** emit events, so agents cannot
+Events: `item:created`, `item:updated`, `item:deleted`, and for
+[draft-and-publish](../guides/content-modeling.md#draft-and-publish) collections
+`item:published` and `item:unpublished` (when an item becomes visible to readers, or stops
+being visible). They are emitted for REST and GraphQL writes. Writes made by agents (in the worker) do **not** emit events, so agents cannot
 trigger each other in loops. The agent's first message contains the event type, the
 collection, the item ID and the item data.
 

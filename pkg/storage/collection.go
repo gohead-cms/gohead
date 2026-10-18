@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/gohead-cms/gohead/internal/agent/events"
 	"github.com/gohead-cms/gohead/internal/models"
@@ -232,6 +233,9 @@ func UpdateCollection(id uint, updated *models.Collection) error {
 
 	// Update the basic attributes of the collection
 	existing.Name = updated.Name
+	existing.Description = updated.Description
+	enablingDrafts := updated.DraftAndPublish && !existing.DraftAndPublish
+	existing.DraftAndPublish = updated.DraftAndPublish
 
 	// Start a transaction for updating associated attributes and relationships
 	tx := database.DB.Begin()
@@ -248,6 +252,17 @@ func UpdateCollection(id uint, updated *models.Collection) error {
 		logger.Log.WithField("collection_id", id).Error("Rollback failed to update fields")
 		tx.Rollback()
 		return fmt.Errorf("failed to update fields: %w", err)
+	}
+
+	// Items created while draft and publish was off were visible to
+	// everyone: keep them visible by publishing them.
+	if enablingDrafts {
+		if err := tx.Model(&models.Item{}).
+			Where("collection_id = ? AND published_at IS NULL", existing.ID).
+			Update("published_at", models.APITime(time.Now())).Error; err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to publish existing items: %w", err)
+		}
 	}
 
 	// Save the updated collection

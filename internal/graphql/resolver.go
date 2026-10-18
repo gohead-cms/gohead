@@ -1,9 +1,11 @@
 package graphql
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
 
@@ -27,50 +29,47 @@ func ResolveRelation(p graphql.ResolveParams, collectionID uint, attr models.Att
 		return nil, fmt.Errorf("failed to fetch target collection '%s': %w", attr.Target, err)
 	}
 
-	// Handle Many-to-Many and One-to-Many Relations
+	// Drafts stay hidden when the parent was read as published content, and
+	// always for roles that cannot edit.
+	publishedOnly, set := sourceMap[publishedOnlyKey].(bool)
+	if !set {
+		publishedOnly = true
+	}
+	if !auth.HasPermission(auth.RoleFromContext(p.Context), auth.ActionUpdate) {
+		publishedOnly = true
+	}
+	fetch := func(id uint) map[string]any {
+		item, err := storage.GetVisibleItem(*targetCollection, id, publishedOnly)
+		if err != nil {
+			if !errors.Is(err, storage.ErrItemNotFound) {
+				logger.Log.WithError(err).WithField("id", id).Warn("Failed to fetch related item, skipping.")
+			}
+			return nil
+		}
+		return mapItemToGraphQLResult(*item, *targetCollection, publishedOnly)
+	}
+
 	// Only manyToMany stores a list of IDs (see models.ValidateItemValues);
 	// the other kinds store a single ID.
 	if attr.Relation == "manyToMany" {
-		relatedIDs, ok := relationValue.([]any)
-		if !ok {
-			return nil, fmt.Errorf("invalid relation format for '%s', expected an array", attr.Name)
-		}
-
-		// Field resolvers expect plain map[string]any sources.
-		var results []map[string]any
-		for _, rawID := range relatedIDs {
-
-			id := models.ToUint(rawID)
-			if id == 0 {
-				continue
+		results := []map[string]any{}
+		for _, id := range models.ToUintSlice(relationValue) {
+			if related := fetch(id); related != nil {
+				results = append(results, related)
 			}
-
-			relatedItem, err := storage.GetItemByID(targetCollection.ID, id)
-			if err != nil {
-				logger.Log.WithError(err).WithField("id", id).Warn("Failed to fetch related item, skipping.")
-				continue
-			}
-
-			relatedItem.Data["id"] = relatedItem.ID
-			results = append(results, map[string]any(relatedItem.Data))
 		}
 		return results, nil
 	}
 
-	// Handle One-to-One and Many-to-One Relations
 	if attr.Relation == "oneToOne" || attr.Relation == "oneToMany" || attr.Relation == "manyToOne" {
 		id := models.ToUint(relationValue)
 		if id == 0 {
 			return nil, fmt.Errorf("invalid ID format for relation '%s'", attr.Name)
 		}
-
-		relatedItem, err := storage.GetItemByID(targetCollection.ID, id)
-		if err != nil {
-			return nil, nil // Return null if the related item isn't found
+		if related := fetch(id); related != nil {
+			return related, nil
 		}
-
-		relatedItem.Data["id"] = relatedItem.ID
-		return map[string]any(relatedItem.Data), nil
+		return nil, nil
 	}
 
 	return nil, fmt.Errorf("unsupported relation type '%s'", attr.Type)

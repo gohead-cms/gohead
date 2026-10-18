@@ -13,7 +13,6 @@ import (
 	"github.com/gohead-cms/gohead/pkg/storage"
 
 	"github.com/graphql-go/graphql"
-	"gorm.io/gorm"
 )
 
 // GenerateGraphQLMutations creates the root GraphQL mutation object for all collections.
@@ -43,13 +42,27 @@ func GenerateGraphQLMutations() (*graphql.Object, error) {
 		gqlInputType := generateGraphQLInputType(localCollection, false)
 		gqlUpdateInputType := generateGraphQLInputType(localCollection, true)
 
+		createArgs := graphql.FieldConfigArgument{
+			// Use the generated InputObject for the 'input' argument.
+			"input": &graphql.ArgumentConfig{Type: graphql.NewNonNull(gqlInputType)},
+		}
+		updateArgs := graphql.FieldConfigArgument{
+			"id":    &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.ID)},
+			"input": &graphql.ArgumentConfig{Type: graphql.NewNonNull(gqlUpdateInputType)},
+		}
+		if localCollection.DraftAndPublish {
+			statusArg := &graphql.ArgumentConfig{
+				Type:        graphql.String,
+				Description: "draft or published. New items are drafts by default; updates keep the current status.",
+			}
+			createArgs["status"] = statusArg
+			updateArgs["status"] = statusArg
+		}
+
 		// --- Mutation: Create Item ---
 		fields["create"+localCollection.Name] = &graphql.Field{
 			Type: gqlOutputType,
-			Args: graphql.FieldConfigArgument{
-				// Use the generated InputObject for the 'input' argument.
-				"input": &graphql.ArgumentConfig{Type: graphql.NewNonNull(gqlInputType)},
-			},
+			Args: createArgs,
 			Resolve: func(p graphql.ResolveParams) (any, error) {
 				// Extract the input map from the arguments.
 				inputData, _ := p.Args["input"].(map[string]any)
@@ -60,15 +73,31 @@ func GenerateGraphQLMutations() (*graphql.Object, error) {
 		// --- Mutation: Update Item ---
 		fields["update"+localCollection.Name] = &graphql.Field{
 			Type: gqlOutputType,
-			Args: graphql.FieldConfigArgument{
-				"id":    &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.ID)},
-				"input": &graphql.ArgumentConfig{Type: graphql.NewNonNull(gqlUpdateInputType)},
-			},
+			Args: updateArgs,
 			Resolve: func(p graphql.ResolveParams) (any, error) {
 				id, _ := p.Args["id"].(string)
 				inputData, _ := p.Args["input"].(map[string]any)
 				return updateCollectionItem(p, id, inputData, localCollection)
 			},
+		}
+
+		// --- Mutations: Publish / Unpublish ---
+		if localCollection.DraftAndPublish {
+			for _, publish := range []bool{true, false} {
+				name := "publish" + localCollection.Name
+				if !publish {
+					name = "unpublish" + localCollection.Name
+				}
+				fields[name] = &graphql.Field{
+					Type: gqlOutputType,
+					Args: graphql.FieldConfigArgument{
+						"id": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.ID)},
+					},
+					Resolve: func(p graphql.ResolveParams) (any, error) {
+						return setPublished(p, localCollection, publish)
+					},
+				}
+			}
 		}
 
 		// --- Mutation: Delete Item ---
@@ -103,6 +132,18 @@ func generateGraphQLInputType(collection models.Collection, partial bool) *graph
 		var gqlType graphql.Input
 		if attr.Type == "relation" {
 			gqlType = graphql.ID
+			if attr.Relation == "manyToMany" {
+				gqlType = graphql.NewList(graphql.ID)
+			}
+		} else if attr.Type == "component" {
+			in, err := componentFieldInput(models.BaseAttribute{
+				Type: "component", ComponentRef: attr.ComponentRef, Repeatable: attr.Repeatable,
+			})
+			if err != nil {
+				logger.Log.Warnf("Skipping attribute '%s' in '%sInput': %v", attr.Name, collection.Name, err)
+				continue
+			}
+			gqlType = in
 		} else {
 			outputType, err := types.GetGraphQLType(attr.Type)
 			if err != nil {
@@ -152,11 +193,35 @@ func requirePermission(p graphql.ResolveParams, action string) error {
 	return nil
 }
 
+// statusArg converts the optional "status" argument of a write mutation.
+func statusArg(p graphql.ResolveParams) (*bool, error) {
+	status, ok := p.Args["status"].(string)
+	if !ok {
+		return nil, nil
+	}
+	switch status {
+	case models.StatusPublished:
+		t := true
+		return &t, nil
+	case models.StatusDraft:
+		f := false
+		return &f, nil
+	}
+	return nil, fmt.Errorf("invalid status '%s' (expected draft or published)", status)
+}
+
 func createCollectionItem(p graphql.ResolveParams, inputData map[string]any, collection models.Collection) (any, error) {
 	if err := requirePermission(p, auth.ActionCreate); err != nil {
 		return nil, err
 	}
-	item, err := storage.SaveItem(collection, models.JSONMap(inputData))
+	publish, err := statusArg(p)
+	if err != nil {
+		return nil, err
+	}
+	items, err := storage.CreateItems(collection, []storage.ItemInput{{
+		Data:    models.JSONMap(inputData),
+		Publish: publish != nil && *publish,
+	}})
 	if err != nil {
 		var verr *storage.ItemValidationError
 		if errors.As(err, &verr) {
@@ -165,11 +230,15 @@ func createCollectionItem(p graphql.ResolveParams, inputData map[string]any, col
 		logger.Log.WithError(err).WithField("collection", collection.Name).Error("GraphQL create failed")
 		return nil, fmt.Errorf("failed to create item in %s", collection.Name)
 	}
-	return mapItemToGraphQLResult(*item, collection.Attributes), nil
+	return mapItemToGraphQLResult(*items[0], collection, false), nil
 }
 
 func updateCollectionItem(p graphql.ResolveParams, id string, inputData map[string]any, collection models.Collection) (any, error) {
 	if err := requirePermission(p, auth.ActionUpdate); err != nil {
+		return nil, err
+	}
+	publish, err := statusArg(p)
+	if err != nil {
 		return nil, err
 	}
 	itemID, err := strconv.ParseUint(id, 10, 64)
@@ -181,6 +250,7 @@ func updateCollectionItem(p graphql.ResolveParams, id string, inputData map[stri
 		return nil, fmt.Errorf("item with id %s not found in collection %s", id, collection.Name)
 	}
 
+	// Updates are partial: merge the input over the stored data.
 	merged := models.JSONMap{}
 	for k, v := range existing.Data {
 		merged[k] = v
@@ -189,21 +259,36 @@ func updateCollectionItem(p graphql.ResolveParams, id string, inputData map[stri
 		merged[k] = v
 	}
 
-	var processed models.JSONMap
-	if err := database.DB.Transaction(func(tx *gorm.DB) error {
-		var verr error
-		processed, verr = models.ValidateItemValues(collection, merged, tx)
-		return verr
-	}); err != nil {
-		return nil, err
-	}
-	if err := storage.UpdateItem(existing.ID, processed); err != nil {
+	item, err := storage.UpdateItemContent(collection, existing.ID, merged, publish)
+	if err != nil {
+		var verr *storage.ItemValidationError
+		if errors.As(err, &verr) {
+			return nil, verr
+		}
+		logger.Log.WithError(err).WithField("collection", collection.Name).Error("GraphQL update failed")
 		return nil, fmt.Errorf("failed to update item %s", id)
 	}
-	existing.Data = processed
-	return mapItemToGraphQLResult(*existing, collection.Attributes), nil
+	return mapItemToGraphQLResult(*item, collection, false), nil
 }
 
+func setPublished(p graphql.ResolveParams, collection models.Collection, publish bool) (any, error) {
+	if err := requirePermission(p, auth.ActionUpdate); err != nil {
+		return nil, err
+	}
+	id, _ := p.Args["id"].(string)
+	itemID, err := strconv.ParseUint(id, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid id '%s'", id)
+	}
+	item, err := storage.SetItemPublished(collection, uint(itemID), publish)
+	if err != nil {
+		if errors.Is(err, storage.ErrItemNotFound) {
+			return nil, fmt.Errorf("item with id %s not found in collection %s", id, collection.Name)
+		}
+		return nil, err
+	}
+	return mapItemToGraphQLResult(*item, collection, false), nil
+}
 func deleteCollectionItem(p graphql.ResolveParams, collection models.Collection) (any, error) {
 	if err := requirePermission(p, auth.ActionDelete); err != nil {
 		return false, err

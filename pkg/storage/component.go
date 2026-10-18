@@ -1,7 +1,9 @@
 package storage
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/database"
@@ -94,6 +96,15 @@ func UpdateComponent(name string, updated *models.Component) error {
 			tx.Rollback()
 			return err
 		}
+		refs, err := ComponentReferences(tx, existing.Name)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+		if len(refs) > 0 {
+			tx.Rollback()
+			return fmt.Errorf("%w: cannot rename '%s', it is used by %s", ErrComponentInUse, existing.Name, strings.Join(refs, ", "))
+		}
 		existing.Name = updated.Name // Update the name
 	}
 
@@ -153,8 +164,45 @@ func updateComponentAttributes(tx *gorm.DB, existing *models.Component, updatedA
 	return nil
 }
 
-// DeleteComponent removes a component definition by name.
-// GORM's cascading delete will handle the attributes.
+// ComponentReferences lists the attributes (as "collection.attribute",
+// "singleton.attribute" or "component.attribute") that use the component.
+func ComponentReferences(tx *gorm.DB, name string) ([]string, error) {
+	if tx == nil {
+		tx = database.DB
+	}
+	var refs []string
+	var attrs []models.Attribute
+	if err := tx.Preload("Collection").Preload("Singleton").
+		Where("type = ? AND component_ref = ?", "component", name).Find(&attrs).Error; err != nil {
+		return nil, err
+	}
+	for _, a := range attrs {
+		switch {
+		case a.Collection != nil:
+			refs = append(refs, a.Collection.Name+"."+a.Name)
+		case a.Singleton != nil:
+			refs = append(refs, a.Singleton.Name+"."+a.Name)
+		}
+	}
+	var cattrs []models.ComponentAttribute
+	if err := tx.Where("type = ? AND component_ref = ?", "component", name).Find(&cattrs).Error; err != nil {
+		return nil, err
+	}
+	for _, a := range cattrs {
+		var owner models.Component
+		if err := tx.Select("name").First(&owner, a.ComponentID).Error; err == nil && owner.Name != name {
+			refs = append(refs, owner.Name+"."+a.Name)
+		}
+	}
+	return refs, nil
+}
+
+// ErrComponentInUse is returned when deleting or renaming a component that
+// attributes still reference.
+var ErrComponentInUse = errors.New("component is in use")
+
+// DeleteComponent removes a component definition by name. It refuses to
+// delete a component that attributes still use.
 func DeleteComponent(name string) error {
 	var cmp models.Component
 	// Using .Select("ID") is efficient as we only need the ID for the delete operation.
@@ -164,6 +212,13 @@ func DeleteComponent(name string) error {
 			return fmt.Errorf("component '%s' not found", name)
 		}
 		return fmt.Errorf("failed to find component '%s': %w", name, err)
+	}
+	refs, err := ComponentReferences(nil, name)
+	if err != nil {
+		return fmt.Errorf("failed to check references to component '%s': %w", name, err)
+	}
+	if len(refs) > 0 {
+		return fmt.Errorf("%w: '%s' is used by %s", ErrComponentInUse, name, strings.Join(refs, ", "))
 	}
 
 	// The ON DELETE CASCADE constraint only fires on hard deletes (and only

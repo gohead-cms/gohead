@@ -32,7 +32,7 @@ func setupTestDatabase(t *testing.T) (*gorm.DB, func()) {
 	database.DB = db
 
 	// Apply migrations for the correct, new models
-	err = db.AutoMigrate(&models.Component{}, &models.ComponentAttribute{})
+	err = db.AutoMigrate(&models.Component{}, &models.ComponentAttribute{}, &models.Collection{}, &models.Singleton{}, &models.Attribute{})
 	assert.NoError(t, err, "Failed to apply migrations")
 
 	cleanup := func() {

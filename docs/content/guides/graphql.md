@@ -20,6 +20,11 @@ Each collection becomes a field named after it, returning a list:
 | `id` | `ID` | | Return just this item (a one-element list). |
 | `limit` | `Int` | 25 | 1–100. |
 | `offset` | `Int` | 0 | Items to skip. |
+| `status` | `String` | `published` | `published`, `draft` or `all`, as in [REST](rest-api.md#read). Drafts need the `update` permission. |
+
+Every type has `id`, `createdAt` and `updatedAt`; types of
+[draft-and-publish](content-modeling.md#draft-and-publish) collections also have `status` and
+`publishedAt`. Viewers never see drafts, including through relations.
 
 ```graphql
 {
@@ -33,6 +38,16 @@ Each collection becomes a field named after it, returning a list:
 }
 ```
 
+### Components
+
+Component attributes are typed objects (lists when repeatable), named `Component_<name>`:
+
+```graphql
+{
+  pages { title seo { meta_title } faq { question answer } }
+}
+```
+
 ## Mutations
 
 For a collection named `articles`:
@@ -42,13 +57,16 @@ For a collection named `articles`:
 | `createarticles` | `input: articlesInput!` | the created item |
 | `updatearticles` | `id: ID!`, `input: articlesUpdateInput!` | the updated item |
 | `deletearticles` | `id: ID!` | `Boolean` |
+| `publisharticles`, `unpublisharticles` | `id: ID!` | the item (draft-and-publish collections) |
 
 `articlesInput` marks required attributes as non-null; `articlesUpdateInput` makes every
-field optional because updates are **partial** (unlike REST `PUT`).
+field optional because updates are **partial** (unlike REST `PUT`). In draft-and-publish
+collections, create and update also take `status: "draft" | "published"`. Component inputs
+are input objects (`Component_seoInput`).
 
 ```graphql
-mutation Publish($id: ID!) {
-  updatearticles(id: $id, input: { published: true }) { id title published }
+mutation Launch($id: ID!) {
+  updatearticles(id: $id, status: "published", input: { title: "Launch day" }) { id status publishedAt }
 }
 ```
 
@@ -58,8 +76,8 @@ mutation Publish($id: ID!) {
   A forbidden operation returns an error such as `access denied: role 'viewer' cannot create items`.
 - Writes go through the same validation, nested-relation handling and events as REST,
   so agents react to GraphQL writes too.
-- Relation inputs take IDs (`author: 1` is passed as an ID field).
-- Component and dynamic-zone attributes are not exposed yet.
+- Relation inputs take IDs (`author: "1"`; a list of IDs for manyToMany).
+- Dynamic-zone attributes are not supported yet.
 
 ## Errors
 

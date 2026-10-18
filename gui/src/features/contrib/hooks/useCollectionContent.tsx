@@ -24,10 +24,15 @@ export function useCollectionContent(collectionName: string | null) {
         setLoading(true);
         setError(null);
         try {
-            const res = await apiFetchWithAuth(`/api/collections/${collectionName}`);
+            // Editors and admins see drafts too; viewers get 403 for
+            // status=all, so fall back to published content.
+            let res = await apiFetchWithAuth(`/api/collections/${collectionName}?status=all&pageSize=100`);
+            if (res.status === 403) {
+                res = await apiFetchWithAuth(`/api/collections/${collectionName}?pageSize=100`);
+            }
             if (!res.ok) throw new Error(`Failed to fetch content for ${collectionName}`);
             const json = await res.json();
-            const items = json.data?.items || json.data || [];
+            const items = json.data || [];
             setContent({ items: Array.isArray(items) ? items : [] });
         } catch (err: any) {
             setError(err.message);

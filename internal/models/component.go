@@ -93,6 +93,9 @@ func ValidateComponentSchema(cmp Component) error {
 				return fmt.Errorf("attribute '%s' in component '%s' has type 'component' but is missing the 'component' reference name", attr.Name, cmp.Name)
 			}
 		}
+		if attr.Type == "relation" || attr.Type == "dynamiczone" {
+			return fmt.Errorf("attribute '%s' in component '%s': type '%s' is not supported inside components", attr.Name, cmp.Name, attr.Type)
+		}
 	}
 
 	return nil
