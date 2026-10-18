@@ -14,6 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **Secrets in responses**: password hashes are never serialized; agent API keys and webhook tokens are masked.
 - **Per-agent LLM keys**: keys are passed to each client directly instead of through process-wide environment variables.
 - Login no longer logs issued tokens.
+- **Brute-force protection**: `/auth/login` and `/auth/register` are rate limited per client IP (20/min), and 5 failed logins for a username from one IP lock it out for 15 minutes (`429` + `Retry-After`). Unknown usernames take as long as known ones. Configurable under `rate_limit.*`.
+- `X-Forwarded-For` is only trusted from `trusted_proxies` (previously from anyone).
 - Collection list `filter`/`sort` parameters are restricted to known columns (they were interpolated into SQL).
 - **Dependencies**: upgraded to fix 15 reachable vulnerabilities reported by govulncheck (golang.org/x/net, x/text, OpenTelemetry, gRPC, pgx, quic-go). Go 1.26 is now the minimum; builds use Go 1.27.
 
@@ -22,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - The Docker image entrypoint is `gohead`; pass the command (`start`, `worker`, …).
 
 ### Added
+- **Multi-replica API**: collection changes are broadcast over Redis so every API replica rebuilds its GraphQL schema; replicas poll a version counter to catch up after missed messages or Redis outages. Rate-limit counters are shared through Redis too, with an in-memory fallback.
 - Admin user management: `/admin/users` (create, list, get, update, delete).
 - `GET /admin/components` and `GET /admin/singletons`.
 - Filtering (`filters[field][$op]=value`) and multi-key sorting (`sort=field:desc`) on item lists, validated against the collection schema.

@@ -3,6 +3,7 @@ module github.com/gohead-cms/gohead
 go 1.26.0
 
 require (
+	github.com/alicebob/miniredis/v2 v2.40.0
 	github.com/gertd/go-pluralize v0.2.1
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-co-op/gocron v1.37.0
@@ -10,6 +11,7 @@ require (
 	github.com/graphql-go/graphql v0.8.1
 	github.com/hibiken/asynq v0.26.0
 	github.com/prometheus/client_golang v1.25.0
+	github.com/redis/go-redis/v9 v9.23.0
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.10.2
 	github.com/spf13/cobra v1.10.2
@@ -76,7 +78,6 @@ require (
 	github.com/prometheus/procfs v0.22.0 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.64.0 // indirect
-	github.com/redis/go-redis/v9 v9.23.0 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/sagikazarmark/locafero v0.12.0 // indirect
 	github.com/spf13/afero v1.15.0 // indirect
@@ -85,6 +86,7 @@ require (
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.2 // indirect
+	github.com/yuin/gopher-lua v1.1.1 // indirect
 	go.mongodb.org/mongo-driver/v2 v2.9.2 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.47.0 // indirect

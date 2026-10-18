@@ -59,7 +59,7 @@ Supported URLs:
 
 The schema is migrated automatically when the API starts.
 
-### Redis (jobs)
+### Redis
 
 | Key | Env | Default |
 |-----|-----|---------|
@@ -67,8 +67,32 @@ The schema is migrated automatically when the API starts.
 | `redis.password` | `GOHEAD_REDIS_PASSWORD` | *(empty)* |
 | `redis.db` | `GOHEAD_REDIS_DB` | `0` |
 
-Redis carries content events and agent jobs. The API keeps working without it (events are
-dropped with an error log), but agents will not run.
+Redis carries content events and agent jobs, and lets API replicas cooperate: GraphQL schema
+changes are broadcast to every replica, and rate limits are shared. The API keeps working
+without it (events are dropped with an error log, limits are counted per process), but agents
+will not run and you should keep a single API replica.
+
+### Rate limiting
+
+| Key | Env | Default |
+|-----|-----|---------|
+| `rate_limit.enabled` | `GOHEAD_RATE_LIMIT_ENABLED` | `true` |
+| `rate_limit.auth_per_minute` | `GOHEAD_RATE_LIMIT_AUTH_PER_MINUTE` | `20` |
+| `rate_limit.login_failures` | `GOHEAD_RATE_LIMIT_LOGIN_FAILURES` | `5` |
+| `rate_limit.login_window` | `GOHEAD_RATE_LIMIT_LOGIN_WINDOW` | `15m` |
+| `trusted_proxies` | `GOHEAD_TRUSTED_PROXIES` | *(empty)* |
+
+- `auth_per_minute` caps requests to `/auth/login` and `/auth/register` per client IP.
+- After `login_failures` failed logins for one username from one IP, further attempts from that
+  IP are refused for `login_window` (other IPs, and a successful login, are unaffected). Set it
+  to `0` to disable the lockout.
+- Refused requests get `429 Too Many Requests` with a `Retry-After` header.
+- Counters live in Redis, so the budget is shared by all API replicas. If Redis is down, each
+  replica falls back to its own in-memory counters.
+- `trusted_proxies` lists the IPs or CIDRs of your load balancer / ingress (comma-separated in
+  the environment variable). Only requests from those addresses may set the client IP through
+  `X-Forwarded-For`; when it is empty the header is ignored. Behind an ingress, set it, or every
+  user shares the ingress's IP and its budget.
 
 ### CORS
 

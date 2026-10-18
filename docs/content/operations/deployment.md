@@ -17,6 +17,7 @@ You need PostgreSQL (recommended) or MySQL, and Redis if you use agents.
 - [ ] `GOHEAD_CORS_ALLOWED_ORIGINS` lists your front-ends
 - [ ] TLS terminated in front of the API and the admin UI
 - [ ] Admin account registered right after the first start
+- [ ] `GOHEAD_TRUSTED_PROXIES` set to your ingress/load balancer addresses
 - [ ] Exactly one `scheduler` replica
 - [ ] Database backups scheduled
 
@@ -101,10 +102,11 @@ pinning `newTag`.
 
 - **Workers and dispatchers** scale horizontally; add worker replicas for agent throughput.
 - **Scheduler:** one replica only (`strategy: Recreate` in the manifests).
-- **API:** stateless, but when a collection changes, only the replica that handled the
-  request rebuilds its GraphQL schema; the others pick it up on restart. Keep one API replica,
-  or roll the API deployment after schema changes (`kubectl rollout restart deploy/gohead-api`),
-  until reloads are broadcast.
+- **API:** scales horizontally when every replica shares the same database, Redis and
+  `GOHEAD_JWT_SECRET`. Collection changes are broadcast over Redis, so every replica rebuilds
+  its GraphQL schema (missed messages are caught up within 30 s), and auth rate limits are
+  counted across replicas. Set `GOHEAD_TRUSTED_PROXIES` to your ingress's IPs/CIDRs so limits
+  apply per user rather than per ingress pod. Without Redis, keep one API replica.
 - **SQLite** supports a single writer: use it only with one API replica and no separate
   workers on other hosts.
 

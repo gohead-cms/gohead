@@ -37,6 +37,11 @@ Send the token as `Authorization: Bearer <token>`. Tokens are HS256 JWTs that ex
 **72 hours**; they are signed with [`jwt_secret`](../getting-started/configuration.md#server).
 Changing the secret invalidates every token.
 
+A wrong username or password returns `401` with the same message either way. After 5 failed
+attempts for a username from one IP, that IP gets `429` with a `Retry-After` header for 15
+minutes; a successful login clears the count. Limits are
+[configurable](../getting-started/configuration.md#rate-limiting).
+
 ## Managing users (admin)
 
 | Method | Path | Body |

@@ -71,7 +71,8 @@ The HTTP status is `400` when the GraphQL request fails; the first GraphQL error
              "details": "Cannot query field \"articels\" on type \"Query\". Did you mean \"articles\"?" } }
 ```
 
-!!! warning "Multiple API replicas"
-    The schema is rebuilt in the API process that handled the collection change. With several
-    API replicas, the others keep the old schema until they restart. See
-    [operations](../operations/deployment.md#scaling).
+!!! note "Multiple API replicas"
+    The schema is rebuilt in the API process that handled the collection change, which then
+    tells the other replicas through Redis; they rebuild within milliseconds. If a notification
+    is lost (Redis restart, network blip), replicas catch up within 30 seconds. See
+    [scaling](../operations/deployment.md#scaling).

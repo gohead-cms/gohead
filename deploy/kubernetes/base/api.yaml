@@ -4,10 +4,9 @@ metadata:
   name: gohead-api
   labels: { app.kubernetes.io/name: gohead-api }
 spec:
-  # GraphQL schema reloads happen in the replica that handled the schema
-  # change; keep a single replica until reloads are broadcast (see the
-  # handbook's operations page).
-  replicas: 1
+  # Scales horizontally: schema changes and rate limits are shared through
+  # Redis. Set GOHEAD_TRUSTED_PROXIES in the ConfigMap for your ingress.
+  replicas: 2
   selector:
     matchLabels: { app.kubernetes.io/name: gohead-api }
   template:

@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	gqlschema "github.com/gohead-cms/gohead/internal/graphql"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/logger"
@@ -264,11 +266,26 @@ func formatContentRange(count, total int) string {
 	return "items 0-" + strconv.Itoa(count-1) + "/" + strconv.Itoa(total)
 }
 
+// SchemaNotifier tells other API replicas that the schema changed. It is set
+// at startup (see cmd/start.go); nil means single-replica mode.
+var SchemaNotifier interface {
+	Notify(ctx context.Context) error
+}
+
 // reloadGraphQLSchema rebuilds the GraphQL schema after a collection changes so
-// new or modified collections are queryable without a restart. A failure is
-// logged but does not fail the REST request that already succeeded.
+// new or modified collections are queryable without a restart, then notifies
+// the other replicas so they rebuild theirs. A failure is logged but does not
+// fail the REST request that already succeeded.
 func reloadGraphQLSchema() {
 	if err := gqlschema.InitializeGraphQLSchema(); err != nil {
 		logger.Log.WithError(err).Error("Failed to reload GraphQL schema")
+	}
+	if SchemaNotifier == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := SchemaNotifier.Notify(ctx); err != nil {
+		logger.Log.WithError(err).Warn("Failed to notify other replicas of the schema change; they will catch up on their next poll")
 	}
 }

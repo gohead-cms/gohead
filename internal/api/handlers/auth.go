@@ -1,13 +1,19 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/ratelimit"
 	"github.com/gohead-cms/gohead/pkg/storage"
 	"github.com/gohead-cms/gohead/pkg/utils"
 
@@ -125,6 +131,42 @@ func saveNewUser(user *models.User) (int, string, string) {
 	return http.StatusInternalServerError, "General database error", ""
 }
 
+// LoginAttemptGuard limits failed logins per (username, client IP) within a
+// window. Keying on both stops password guessing against an account without
+// letting anyone lock a user out from another address.
+type LoginAttemptGuard struct {
+	Counter     ratelimit.Counter
+	MaxFailures int
+	Window      time.Duration
+}
+
+// LoginGuard is set at startup; nil disables the check.
+var LoginGuard *LoginAttemptGuard
+
+func loginGuardKey(username, ip string) string {
+	return "login-fail:" + strings.ToLower(strings.TrimSpace(username)) + ":" + ip
+}
+
+func (g *LoginAttemptGuard) recordFailure(ctx context.Context, key string) {
+	if g == nil {
+		return
+	}
+	if _, _, err := g.Counter.Hit(ctx, key, g.Window); err != nil {
+		logger.Log.WithError(err).Warn("Login guard: cannot record failure")
+	}
+}
+
+func (g *LoginAttemptGuard) reset(ctx context.Context, key string) {
+	if g == nil {
+		return
+	}
+	_ = g.Counter.Reset(ctx, key)
+}
+
+// dummyPasswordHash is compared against when the user does not exist, so
+// unknown usernames take as long as wrong passwords.
+var dummyPasswordHash, _ = bcrypt.GenerateFromPassword([]byte("gohead-timing-equalizer"), bcrypt.DefaultCost)
+
 func Login(c *gin.Context) {
 	var input struct {
 		Username string `json:"username" binding:"required"`
@@ -137,22 +179,34 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// Fetch the user with their role
-	user, err := storage.GetUserByUsername(input.Username)
-	if err != nil {
-		logger.Log.WithError(err).Warn("Login: Invalid username or password")
-		c.Set("status", http.StatusUnauthorized)
-		c.Set("response", "Invalid username or password")
-		return
+	// Too many recent failures for this account from this client?
+	guardKey := loginGuardKey(input.Username, c.ClientIP())
+	if LoginGuard != nil {
+		if n, reset, err := LoginGuard.Counter.Count(c.Request.Context(), guardKey); err == nil && n >= int64(LoginGuard.MaxFailures) {
+			logger.Log.WithField("username", input.Username).Warn("Login: too many failed attempts")
+			c.Header("Retry-After", strconv.Itoa(max(int(math.Ceil(reset.Seconds())), 1)))
+			c.Set("status", http.StatusTooManyRequests)
+			c.Set("response", "Too many failed login attempts, please retry later")
+			return
+		}
 	}
 
-	// Compare the hashed password
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
-		logger.Log.WithError(err).Warn("Login: Invalid username or password")
+	// Fetch the user with their role. When the user does not exist, still
+	// run a bcrypt comparison so response time does not reveal whether the
+	// username exists.
+	user, err := storage.GetUserByUsername(input.Username)
+	hash := dummyPasswordHash
+	if err == nil {
+		hash = []byte(user.Password)
+	}
+	if cmpErr := bcrypt.CompareHashAndPassword(hash, []byte(input.Password)); err != nil || cmpErr != nil {
+		LoginGuard.recordFailure(c.Request.Context(), guardKey)
+		logger.Log.WithField("username", input.Username).Warn("Login: Invalid username or password")
 		c.Set("status", http.StatusUnauthorized)
 		c.Set("response", "Invalid username or password")
 		return
 	}
+	LoginGuard.reset(c.Request.Context(), guardKey)
 
 	// Validate the Role
 	if user.Role.Name == "" {

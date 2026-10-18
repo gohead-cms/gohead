@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hibiken/asynq"
+	"github.com/redis/go-redis/v9"
 	"io/fs"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 	yaml "gopkg.in/yaml.v3"
@@ -27,6 +29,18 @@ type LLMConfig struct {
 	APIKey    string `mapstructure:"api_key" yaml:"api_key"`
 	APISecret string `mapstructure:"api_secret" yaml:"api_secret"`
 	BaseURL   string `mapstructure:"base_url" yaml:"base_url"` // optional API endpoint override
+}
+
+// RateLimitConfig protects the authentication endpoints.
+type RateLimitConfig struct {
+	Enabled bool `mapstructure:"enabled" yaml:"enabled"`
+	// AuthPerMinute is the number of /auth/* requests allowed per client IP
+	// per minute (0 disables it).
+	AuthPerMinute int `mapstructure:"auth_per_minute" yaml:"auth_per_minute"`
+	// LoginFailures is the number of failed logins allowed per username and
+	// client IP within LoginWindow before further attempts get 429.
+	LoginFailures int           `mapstructure:"login_failures" yaml:"login_failures"`
+	LoginWindow   time.Duration `mapstructure:"login_window" yaml:"login_window"`
 }
 
 // RedisConfig holds settings for the Redis connection.
@@ -54,6 +68,13 @@ type Config struct {
 
 	// LLM settings
 	LLM LLMConfig `mapstructure:"llm" yaml:"llm"`
+
+	// Rate limiting for /auth/* (shared across replicas through Redis)
+	RateLimit RateLimitConfig `mapstructure:"rate_limit" yaml:"rate_limit"`
+
+	// TrustedProxies lists the proxies (IPs or CIDRs) whose X-Forwarded-For
+	// header is trusted to find the client IP. Empty: use the TCP peer.
+	TrustedProxies []string `mapstructure:"trusted_proxies" yaml:"trusted_proxies"`
 }
 
 // LoadConfig loads the configuration from file and environment variables.
@@ -75,6 +96,13 @@ func LoadConfig(configPath string) (Config, error) {
 	viper.SetDefault("cors.allowed_headers", []string{"Origin", "Accept", "Content-Type", "Authorization", "X-Requested-With", "Webhook-Token"})
 	viper.SetDefault("cors.allow_credentials", true)
 	viper.SetDefault("cors.max_age", 86400)
+
+	// Rate limiting and client IP
+	viper.SetDefault("rate_limit.enabled", true)
+	viper.SetDefault("rate_limit.auth_per_minute", 20)
+	viper.SetDefault("rate_limit.login_failures", 5)
+	viper.SetDefault("rate_limit.login_window", "15m")
+	viper.SetDefault("trusted_proxies", []string{})
 
 	// Redis default values
 	viper.SetDefault("redis.address", "localhost:6379")
@@ -144,5 +172,21 @@ func (c Config) RedisClientOpt() asynq.RedisClientOpt {
 		Addr:     c.Redis.Address,
 		Password: c.Redis.Password,
 		DB:       c.Redis.DB,
+	}
+}
+
+// RedisOptions returns go-redis options for the configured Redis.
+func (c Config) RedisOptions() *redis.Options {
+	return &redis.Options{
+		Addr:     c.Redis.Address,
+		Password: c.Redis.Password,
+		DB:       c.Redis.DB,
+		// Honour context deadlines so a Redis outage cannot stall requests
+		// (schema notifications, rate limits) for the full retry budget.
+		ContextTimeoutEnabled: true,
+		DialTimeout:           2 * time.Second,
+		ReadTimeout:           time.Second,
+		WriteTimeout:          time.Second,
+		MaxRetries:            1,
 	}
 }
