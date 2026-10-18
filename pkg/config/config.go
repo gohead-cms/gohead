@@ -23,6 +23,7 @@ type LLMConfig struct {
 	Model     string `mapstructure:"model" yaml:"model"`
 	APIKey    string `mapstructure:"api_key" yaml:"api_key"`
 	APISecret string `mapstructure:"api_secret" yaml:"api_secret"`
+	BaseURL   string `mapstructure:"base_url" yaml:"base_url"` // optional API endpoint override
 }
 
 // RedisConfig holds settings for the Redis connection.

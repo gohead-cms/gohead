@@ -2,12 +2,20 @@
 package auth
 
 import (
+	"errors"
+	"fmt"
 	"time"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 )
 
+// TokenTTL is how long an issued token stays valid.
+const TokenTTL = 72 * time.Hour
+
 var jwtKey []byte
+
+// ErrInvalidToken is returned for any token that fails parsing or validation.
+var ErrInvalidToken = errors.New("invalid token")
 
 func InitializeJWT(secret string) {
 	jwtKey = []byte(secret)
@@ -17,33 +25,39 @@ type Claims struct {
 	Username string `json:"username"`
 	Role     string `json:"role"`
 
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 }
 
 func GenerateJWT(username, role string) (string, error) {
-	expirationTime := time.Now().Add(72 * time.Hour)
+	now := time.Now()
 	claims := &Claims{
 		Username: username,
 		Role:     role,
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: expirationTime.Unix(),
-			IssuedAt:  time.Now().Unix(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   username,
+			ExpiresAt: jwt.NewNumericDate(now.Add(TokenTTL)),
+			IssuedAt:  jwt.NewNumericDate(now),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(jwtKey)
 }
 
+// ParseJWT validates signature, algorithm (HS256 only) and expiry. It never
+// returns nil claims together with a nil error.
 func ParseJWT(tokenStr string) (*Claims, error) {
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
 		return jwtKey, nil
-	})
+	},
+		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+		jwt.WithExpirationRequired(),
+	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", ErrInvalidToken, err)
 	}
 	if !token.Valid {
-		return nil, err
+		return nil, ErrInvalidToken
 	}
 	return claims, nil
 }

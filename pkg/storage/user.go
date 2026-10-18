@@ -3,6 +3,7 @@ package storage
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/database"
@@ -14,19 +15,14 @@ import (
 func CreateUser(user *models.User) error {
 	result := database.DB.Create(user)
 	if result.Error != nil {
-		if result.Error.Error() == "UNIQUE constraint failed: users.username" {
-			return &DuplicateEntryError{Field: "username"}
-		} else if result.Error.Error() == "UNIQUE constraint failed: users.email" {
-			return &DuplicateEntryError{Field: "email"}
-		}
-		if errors.Is(result.Error, gorm.ErrDuplicatedKey) {
+		if field, ok := duplicateField(result.Error); ok {
 			logger.Log.WithFields(map[string]interface{}{
 				"username": user.Username,
 				"email":    user.Email,
+				"field":    field,
 			}).Warn("Duplicate key error when saving user")
-
+			return &DuplicateEntryError{Field: field}
 		}
-
 		logger.Log.WithError(result.Error).Error("Failed to save user due to database error")
 		return &GeneralDatabaseError{Message: result.Error.Error()}
 	}
@@ -36,13 +32,41 @@ func CreateUser(user *models.User) error {
 	return nil
 }
 
+// duplicateField detects unique-constraint violations across SQLite, Postgres
+// and MySQL and returns the offending field when it can be identified.
+func duplicateField(err error) (string, bool) {
+	msg := strings.ToLower(err.Error())
+	isDup := errors.Is(err, gorm.ErrDuplicatedKey) ||
+		strings.Contains(msg, "unique constraint failed") || // sqlite
+		strings.Contains(msg, "duplicate key value") || // postgres
+		strings.Contains(msg, "duplicate entry") // mysql
+	if !isDup {
+		return "", false
+	}
+	for _, f := range []string{"username", "email", "slug"} {
+		if strings.Contains(msg, f) {
+			return f, true
+		}
+	}
+	return "unknown", true
+}
+
 // GetUserByID retrieves a user by their ID.
 func GetUserByID(id uint) (*models.User, error) {
 	var user models.User
-	if err := database.DB.First(&user, id).Error; err != nil {
+	if err := database.DB.Preload("Role").First(&user, id).Error; err != nil {
 		return nil, fmt.Errorf("user not found: %w", err)
 	}
 	return &user, nil
+}
+
+// CountUsers returns the total number of (non-deleted) users.
+func CountUsers() (int64, error) {
+	var count int64
+	if err := database.DB.Model(&models.User{}).Count(&count).Error; err != nil {
+		return 0, fmt.Errorf("failed to count users: %w", err)
+	}
+	return count, nil
 }
 
 // GetUserByUsername retrieves a user by their username.
@@ -62,7 +86,7 @@ func GetUserByUsername(username string) (*models.User, error) {
 // GetAllUsers retrieves all users from the database.
 func GetAllUsers() ([]models.User, error) {
 	var users []models.User
-	if err := database.DB.Select("id, username").Find(&users).Error; err != nil {
+	if err := database.DB.Preload("Role").Find(&users).Error; err != nil {
 		return nil, fmt.Errorf("failed to retrieve users: %w", err)
 	}
 	return users, nil

@@ -26,7 +26,7 @@ type User struct {
 	gorm.Model
 	Username        string    `json:"username" gorm:"uniqueIndex;size:191"` // Unique username with length limit for MySQL compatibility
 	Email           string    `json:"email" gorm:"uniqueIndex;size:191"`    // Unique email with length limit for MySQL compatibility
-	Password        string    `json:"password"`                             // Hashed password
+	Password        string    `json:"-"`                                    // Hashed password (never serialized)
 	UserRoleID      int       `json:"-"`                                    // Foreign key reference (not exposed in JSON)
 	Role            UserRole  `json:"role" gorm:"foreignKey:UserRoleID"`    // Associated role
 	Slug            string    `json:"slug" gorm:"uniqueIndex"`              // Unique slug for the user
@@ -42,6 +42,9 @@ type User struct {
 	URL             string    `json:"url"`                                  // Full URL to the user's profile
 	CreatedAt       time.Time `json:"created_at,omitempty"`                 // Auto-managed timestamp
 }
+
+// MinPasswordLength is the minimum accepted length for a plain-text password.
+const MinPasswordLength = 6
 
 func ValidateUser(user User) error {
 	// Check if username is provided and valid
@@ -62,14 +65,13 @@ func ValidateUser(user User) error {
 	}
 
 	// Validate password length
-	minPasswordLength := 6
-	if len(user.Password) < minPasswordLength {
+	if len(user.Password) < MinPasswordLength {
 		logger.Log.WithFields(logrus.Fields{
 			"field":   "password",
 			"length":  len(user.Password),
-			"minimum": minPasswordLength,
+			"minimum": MinPasswordLength,
 		}).Warn("Validation failed: password too short")
-		return fmt.Errorf("password must be at least %d characters long", minPasswordLength)
+		return fmt.Errorf("password must be at least %d characters long", MinPasswordLength)
 	}
 
 	// Check if slug is unique and provided

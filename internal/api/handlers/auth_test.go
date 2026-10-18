@@ -6,10 +6,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
+	"github.com/gohead-cms/gohead/internal/api/middleware"
 	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/storage"
 
 	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
@@ -31,35 +32,58 @@ func init() {
 }
 
 func TestRegister(t *testing.T) {
-	// Setup the test server and database
 	r, db := testutils.SetupTestServer()
 	defer testutils.CleanupTestDB()
-
-	// Apply necessary migrations
 	assert.NoError(t, db.AutoMigrate(&models.User{}))
-
-	// Define the test route and handler
+	r.Use(middleware.ResponseWrapper())
 	r.POST("/auth/register", Register)
 
-	// Create an example user payload for testing
-	examplePayload := map[string]string{
-		"username":  "testreader",
-		"password":  "securepassword",
-		"email":     "testreader@example.com",
-		"role_name": "viewer",
+	register := func(username string, extra map[string]string) *httptest.ResponseRecorder {
+		payload := map[string]string{
+			"username": username,
+			"password": "securepassword",
+			"email":    username + "@example.com",
+		}
+		for k, v := range extra {
+			payload[k] = v
+		}
+		body, _ := json.Marshal(payload)
+		req, _ := http.NewRequest(http.MethodPost, "/auth/register", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		return w
 	}
-	// Marshal the payload to JSON
-	userJSON, err := json.Marshal(examplePayload)
-	assert.NoError(t, err)
 
-	// Create the HTTP request
-	req, err := http.NewRequest(http.MethodPost, "/auth/register", strings.NewReader(string(userJSON)))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-	// I don't need to test more, integration tests will do the rest of the edge cases
-	assert.NoError(t, err)
-	assert.Equal(t, 200, w.Code)
+	t.Run("first account bootstraps as admin", func(t *testing.T) {
+		w := register("founder", nil)
+		assert.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+		u, err := storage.GetUserByUsername("founder")
+		assert.NoError(t, err)
+		assert.Equal(t, "admin", u.Role.Name)
+	})
+
+	t.Run("client cannot choose its role", func(t *testing.T) {
+		w := register("mallory", map[string]string{"role_name": "admin"})
+		assert.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+		u, err := storage.GetUserByUsername("mallory")
+		assert.NoError(t, err)
+		assert.Equal(t, DefaultRegistrationRole, u.Role.Name)
+	})
+
+	t.Run("short password rejected", func(t *testing.T) {
+		payload, _ := json.Marshal(map[string]string{"username": "shorty", "password": "123", "email": "s@example.com"})
+		req, _ := http.NewRequest(http.MethodPost, "/auth/register", bytes.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("duplicate username", func(t *testing.T) {
+		w := register("founder", nil)
+		assert.Equal(t, http.StatusConflict, w.Code, w.Body.String())
+	})
 }
 
 func TestLogin(t *testing.T) {

@@ -1,26 +1,8 @@
 package handlers
 
-func hasPermission(role, action string) bool {
-	permissions := map[string]map[string]bool{
-		"admin": {
-			"create": true,
-			"read":   true,
-			"update": true,
-			"delete": true,
-		},
-		"editor": {
-			"create": true,
-			"read":   true,
-			"update": true,
-			"delete": true,
-		},
-		"viewer": {
-			"read": true,
-		},
-	}
+import "github.com/gohead-cms/gohead/pkg/auth"
 
-	if rolePermissions, exists := permissions[role]; exists {
-		return rolePermissions[action]
-	}
-	return false
+// hasPermission delegates to the shared role/permission table.
+func hasPermission(role, action string) bool {
+	return auth.HasPermission(role, action)
 }

@@ -3,7 +3,6 @@ package llm
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/tmc/langchaingo/llms"
@@ -98,7 +97,7 @@ func (a *langChainAdapter) Chat(ctx context.Context, messages []Message, opts ..
 		opt(cfg)
 	}
 
-	logger.Log.Info("Running chat with proper history conversion")
+	logger.Log.Debug("Running chat with proper history conversion")
 
 	lcMessages := make([]llms.MessageContent, 0, len(messages))
 	for _, msg := range messages {
@@ -106,7 +105,7 @@ func (a *langChainAdapter) Chat(ctx context.Context, messages []Message, opts ..
 		logger.Log.WithFields(map[string]any{
 			"message": msg.Content,
 			"role":    msg.Role,
-		}).Info("Message")
+		}).Debug("Message")
 		switch msg.Role {
 		case RoleTool:
 			lcMessages = append(lcMessages, llms.MessageContent{
@@ -216,19 +215,16 @@ func convertRole(role Role) llms.ChatMessageType {
 func NewAdapter(cfg Config) (Client, error) {
 	var client llms.Model
 	var err error
-	if err := config.ApplyLLMEnv(cfg); err != nil {
-		return nil, err
-	}
 	switch cfg.Provider {
 	case "openai":
-		client, err = openai_client.New()
+		client, err = openai_client.New(cfg.APIKey, cfg.Model, cfg.BaseURL)
 	case "anthropic":
-		client, err = anthropic_client.New()
+		client, err = anthropic_client.New(cfg.APIKey, cfg.Model, cfg.BaseURL)
 	case "ollama":
 		// Ollama is typically  run locally and uses a model name
-		client, err = ollama_client.New(cfg.Model)
+		client, err = ollama_client.New(cfg.Model, cfg.BaseURL)
 	default:
-		return nil, errors.New("unsupported LLM provider")
+		return nil, fmt.Errorf("unsupported LLM provider: %s", cfg.Provider)
 	}
 
 	if err != nil {

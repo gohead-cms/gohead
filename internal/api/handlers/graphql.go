@@ -7,28 +7,35 @@ import (
 	"github.com/graphql-go/graphql"
 
 	schema "github.com/gohead-cms/gohead/internal/graphql"
+	"github.com/gohead-cms/gohead/pkg/auth"
 )
 
-// GraphQLHandler handles GraphQL queries
+// GraphQLHandler executes a GraphQL request. The caller's role is passed to
+// resolvers through the context so that queries and mutations enforce the
+// same permissions as the REST API.
 func GraphQLHandler(c *gin.Context) {
 	var request struct {
-		Query string `json:"query"`
+		Query         string         `json:"query"`
+		Variables     map[string]any `json:"variables"`
+		OperationName string         `json:"operationName"`
 	}
 
-	if err := c.ShouldBindJSON(&request); err != nil {
+	if err := c.ShouldBindJSON(&request); err != nil || request.Query == "" {
 		c.Set("response", "Invalid input format")
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
 
-	// Execute GraphQL query
 	result := graphql.Do(graphql.Params{
-		Schema:        schema.Schema,
-		RequestString: request.Query,
+		Schema:         schema.GetSchema(),
+		RequestString:  request.Query,
+		VariableValues: request.Variables,
+		OperationName:  request.OperationName,
+		Context:        auth.WithRole(c.Request.Context(), c.GetString("role")),
 	})
 
 	if len(result.Errors) > 0 {
-		c.Set("response", "Failed to fetch items")
+		c.Set("response", "GraphQL request failed")
 		c.Set("details", result.Errors[0].Message)
 		c.Set("status", http.StatusBadRequest)
 		return

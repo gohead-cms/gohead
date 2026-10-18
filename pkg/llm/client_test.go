@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -10,10 +11,15 @@ import (
 	"testing"
 
 	config "github.com/gohead-cms/gohead/pkg/config"
+	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tmc/langchaingo/llms"
 )
+
+func init() {
+	logger.InitLogger("error")
+}
 
 // TestNewAdapter validates the NewAdapter factory function for all providers.
 func TestNewAdapter(t *testing.T) {
@@ -88,6 +94,10 @@ func TestNewAdapter(t *testing.T) {
 			errText:     "Ollama model name cannot be empty",
 		},
 	}
+
+	// The env fallback must not mask the "missing key" cases.
+	t.Setenv("OPENAI_API_KEY", "")
+	t.Setenv("ANTHROPIC_API_KEY", "")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -194,7 +204,18 @@ func TestChatOpenAI(t *testing.T) {
                 }]
             }`,
 			mockApiStatusCode: http.StatusOK,
-			expectErr:         false,
+			expectedResponse: &Response{
+				Type: ResponseTypeToolCall,
+				ToolCall: &llms.ToolCall{
+					ID:   "call_abc",
+					Type: "function",
+					FunctionCall: &llms.FunctionCall{
+						Name:      "get_weather",
+						Arguments: `{"location": "Boston, MA"}`,
+					},
+				},
+			},
+			expectErr: false,
 		},
 		{
 			name: "request with tools option",
@@ -252,7 +273,7 @@ func TestChatOpenAI(t *testing.T) {
 			mockApiStatusCode: http.StatusInternalServerError,
 			expectedResponse:  nil,
 			expectErr:         true,
-			expectedErrText:   "status code 500",
+			expectedErrText:   "status code: 500",
 		},
 	}
 
@@ -273,6 +294,7 @@ func TestChatOpenAI(t *testing.T) {
 				Provider: "openai",
 				Model:    "gpt-4",
 				APIKey:   "fake-api-key",
+				BaseURL:  server.URL, // never reach the real API from tests
 			}
 			client, err := NewAdapter(cfg)
 			require.NoError(t, err)
@@ -360,6 +382,16 @@ func TestChatAnthropic(t *testing.T) {
                 ]
             }`,
 			mockApiStatusCode: http.StatusOK,
+			expectedResponse: &Response{
+				Type: ResponseTypeToolCall,
+				ToolCall: &llms.ToolCall{
+					ID: "toolu_01",
+					FunctionCall: &llms.FunctionCall{
+						Name:      "get_weather",
+						Arguments: `{"location":"Boston, MA"}`,
+					},
+				},
+			},
 		},
 		{
 			name: "request with tools option",
@@ -405,7 +437,7 @@ func TestChatAnthropic(t *testing.T) {
 			mockApiStatusCode: http.StatusInternalServerError,
 			expectedResponse:  nil,
 			expectErr:         true,
-			expectedErrText:   "API returned error: An unexpected error occurred.",
+			expectedErrText:   "status code: 500: An unexpected error occurred.",
 		},
 	}
 
@@ -421,6 +453,7 @@ func TestChatAnthropic(t *testing.T) {
 				Provider: "anthropic",
 				Model:    "claude-3-opus",
 				APIKey:   "fake-api-key",
+				BaseURL:  server.URL, // never reach the real API from tests
 			}
 			client, err := NewAdapter(cfg)
 			require.NoError(t, err)
@@ -515,7 +548,7 @@ func TestChatOllama(t *testing.T) {
 			mockApiStatusCode: http.StatusNotFound,
 			expectedResponse:  nil,
 			expectErr:         true,
-			expectedErrText:   "status code 404",
+			expectedErrText:   "was not found",
 		},
 	}
 
@@ -523,13 +556,20 @@ func TestChatOllama(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(tt.mockApiStatusCode)
-				_, _ = w.Write([]byte(tt.mockApiResponse))
+				// Ollama replies with newline-delimited JSON, so the mock
+				// body must be a single line.
+				var compact bytes.Buffer
+				if err := json.Compact(&compact, []byte(tt.mockApiResponse)); err != nil {
+					compact.WriteString(tt.mockApiResponse)
+				}
+				_, _ = w.Write(compact.Bytes())
 			}))
 			defer server.Close()
 
 			cfg := config.LLMConfig{
 				Provider: "ollama",
 				Model:    "llama3",
+				BaseURL:  server.URL, // never reach a real server from tests
 			}
 			client, err := NewAdapter(cfg)
 			require.NoError(t, err)

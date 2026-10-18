@@ -3,10 +3,10 @@ module github.com/gohead-cms/gohead
 go 1.25.0
 
 require (
-	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/gertd/go-pluralize v0.2.1
 	github.com/gin-gonic/gin v1.11.0
 	github.com/go-co-op/gocron v1.37.0
+	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/graphql-go/graphql v0.8.1
 	github.com/hibiken/asynq v0.25.1
 	github.com/prometheus/client_golang v1.23.2

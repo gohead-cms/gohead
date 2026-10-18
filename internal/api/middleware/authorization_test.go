@@ -53,7 +53,7 @@ func TestAuthorizationMiddleware(t *testing.T) {
 			name:           "Missing Token",
 			token:          "",
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `{"error":"Authorization header required"}`,
+			expectedBody:   `{"error":{"status":401,"name":"UnauthorizedError","message":"Authorization header required","details":null}}`,
 		},
 		{
 			name:           "Invalid Token",

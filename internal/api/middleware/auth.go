@@ -17,14 +17,14 @@ func AuthMiddleware() gin.HandlerFunc {
 		// Extract the Authorization header
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
+			abortWithError(c, http.StatusUnauthorized, "", "Authorization header required")
 			return
 		}
 
 		// Parse Bearer token
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 		if tokenString == authHeader {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Bearer token required"})
+			abortWithError(c, http.StatusUnauthorized, "", "Bearer token required")
 			return
 		}
 
@@ -39,7 +39,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		role, err := storage.GetRoleByName(claims.Role)
 		if err != nil {
 			logger.Log.Warnf("Role '%s' not found", claims.Role)
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Invalid role"})
+			abortWithError(c, http.StatusForbidden, "", "Invalid role")
 			return
 		}
 
@@ -50,8 +50,12 @@ func AuthMiddleware() gin.HandlerFunc {
 	}
 }
 
-// Helper function to abort with a standardized error
+// abortWithError aborts with the same error envelope ResponseWrapper uses, so
+// clients can always read error.message. An empty name derives it from status.
 func abortWithError(c *gin.Context, status int, name, message string) {
+	if name == "" {
+		name = getErrorName(status)
+	}
 	c.AbortWithStatusJSON(status, gin.H{
 		"error": gin.H{
 			"status":  status,

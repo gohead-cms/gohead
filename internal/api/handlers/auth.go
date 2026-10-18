@@ -14,16 +14,19 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
-	"gorm.io/gorm"
 )
 
+// Register creates a new account through the public endpoint.
+//
+// The caller can never choose its own role: the very first account created on
+// an empty instance becomes "admin" (bootstrap), every later account gets the
+// least-privileged DefaultRegistrationRole. Admins promote users through
+// PUT /admin/users/:id.
 func Register(c *gin.Context) {
-	// Parse input
 	var input struct {
 		Username string `json:"username" binding:"required"`
 		Password string `json:"password" binding:"required"`
 		Email    string `json:"email" binding:"required"`
-		RoleName string `json:"role_name" binding:"required"` // Role provided by the client
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		logger.Log.WithError(err).Warn("Register: Invalid input")
@@ -33,86 +36,93 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	logger.Log.WithField("request_body", c.Request.Body).Debug("Request received")
+	if len(input.Password) < models.MinPasswordLength {
+		c.Set("status", http.StatusBadRequest)
+		c.Set("response", "Register: User validation failed")
+		c.Set("details", fmt.Sprintf("password must be at least %d characters long", models.MinPasswordLength))
+		return
+	}
 
-	// Fetch the role
-	role, err := storage.GetRoleByName(input.RoleName)
+	roleName := DefaultRegistrationRole
+	count, err := storage.CountUsers()
 	if err != nil {
+		logger.Log.WithError(err).Error("Register: Failed to count users")
+		c.Set("status", http.StatusInternalServerError)
+		c.Set("response", "Register: General database error")
+		return
+	}
+	if count == 0 {
+		roleName = "admin"
+	}
+
+	role, err := storage.GetRoleByName(roleName)
+	if err != nil {
+		// Roles are seeded at startup, so a missing one is a server-side problem.
 		logger.Log.WithError(err).Error("Register: Failed to fetch role")
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.Set("status", http.StatusNotFound)
-			c.Set("response", fmt.Sprintf("Role '%s' does not exist", input.RoleName))
-			c.Set("details", err.Error())
-			return
-		}
-		c.Set("status", http.StatusNotFound)
-		c.Set("response", fmt.Sprintf("Role '%s' does not exist", input.RoleName))
-		c.Set("details", err.Error())
+		c.Set("status", http.StatusInternalServerError)
+		c.Set("response", fmt.Sprintf("Register: role '%s' is not configured", roleName))
 		return
 	}
 
-	// Hash the password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
+	user, status, err := buildUser(input.Username, input.Email, input.Password, role)
 	if err != nil {
-		logger.Log.WithError(err).Error("Register: Failed to hash password")
-		c.Set("status", http.StatusInternalServerError)
-		c.Set("response", "Register: Failed to hash password")
-		c.Set("details", err.Error())
-		return
-	}
-
-	// Generate slug for the user
-	slug := utils.GenerateSlug(input.Username)
-
-	// Create user instance
-	user := models.User{
-		Username:     input.Username,
-		Password:     string(hashedPassword),
-		Role:         *role,
-		Email:        input.Email,
-		Slug:         slug,
-		ProfileImage: "", // Default profile image can be set if needed
-	}
-
-	// Validate user
-	if err := models.ValidateUser(user); err != nil {
-		logger.Log.WithError(err).Warn("Register: User validation failed")
-		c.Set("status", http.StatusInternalServerError)
+		c.Set("status", status)
 		c.Set("response", "Register: User validation failed")
 		c.Set("details", err.Error())
 		return
 	}
 
-	// Save the user
-	err = storage.CreateUser(&user)
-	switch e := err.(type) {
-	case nil:
-		logger.Log.WithFields(logrus.Fields{
-			"username": user.Username,
-			"role":     role.Name,
-		}).Info("User registered successfully")
-		c.Set("status", http.StatusCreated)
-		c.Set("response", "User registered successfully")
-		return
-	case *storage.DuplicateEntryError:
-		logger.Log.WithError(err).Warn("Register: Duplicate entry")
-		c.Set("status", http.StatusBadRequest)
-		c.Set("response", "Register: Duplicate entry")
-		c.Set("details", e.Error())
-		return
-	case *storage.GeneralDatabaseError:
-		logger.Log.WithError(err).Error("Register: General database error")
-		c.Set("status", http.StatusInternalServerError)
-		c.Set("response", "Register: General database error")
-		c.Set("details", e.Error())
-		return
-	default:
-		logger.Log.WithError(err).Error("Register: Unknown error")
-		c.Set("status", http.StatusInternalServerError)
-		c.Set("response", "Register: Unknown error")
-		c.Set("details", e.Error())
+	if status, msg, details := saveNewUser(user); status != 0 {
+		c.Set("status", status)
+		c.Set("response", "Register: "+msg)
+		c.Set("details", details)
 		return
 	}
+
+	logger.Log.WithFields(logrus.Fields{
+		"username": user.Username,
+		"role":     role.Name,
+	}).Info("User registered successfully")
+	c.Set("status", http.StatusCreated)
+	c.Set("response", "User registered successfully")
+}
+
+// DefaultRegistrationRole is the role given to self-registered accounts.
+const DefaultRegistrationRole = "viewer"
+
+// buildUser hashes the password and assembles a validated user.
+func buildUser(username, email, password string, role *models.UserRole) (*models.User, int, error) {
+	user := models.User{
+		Username: username,
+		Email:    email,
+		Password: password, // validated in plain text first, hashed below
+		Role:     *role,
+		Slug:     utils.GenerateSlug(username),
+	}
+	if err := models.ValidateUser(user); err != nil {
+		return nil, http.StatusBadRequest, err
+	}
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, http.StatusInternalServerError, fmt.Errorf("failed to hash password: %w", err)
+	}
+	user.Password = string(hashed)
+	return &user, 0, nil
+}
+
+// saveNewUser persists a user and maps storage errors to HTTP status codes.
+// A zero status means success.
+func saveNewUser(user *models.User) (int, string, string) {
+	err := storage.CreateUser(user)
+	if err == nil {
+		return 0, "", ""
+	}
+	var dup *storage.DuplicateEntryError
+	if errors.As(err, &dup) {
+		return http.StatusConflict, "Duplicate entry", dup.Error()
+	}
+	logger.Log.WithError(err).Error("Failed to save user")
+	return http.StatusInternalServerError, "General database error", ""
 }
 
 func Login(c *gin.Context) {
@@ -164,7 +174,6 @@ func Login(c *gin.Context) {
 	logger.Log.WithFields(logrus.Fields{
 		"username": user.Username,
 		"role":     user.Role.Name,
-		"token":    tokenString,
 	}).Info("User logged in successfully")
 
 	c.Set("status", http.StatusOK)

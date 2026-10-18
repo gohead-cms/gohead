@@ -53,13 +53,13 @@ func TestAuthMiddleware(t *testing.T) {
 			name:           "Missing Authorization Header",
 			authHeader:     "",
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `{"error":"Authorization header required"}`,
+			expectedBody:   `{"error":{"status":401,"name":"UnauthorizedError","message":"Authorization header required","details":null}}`,
 		},
 		{
 			name:           "Malformed Authorization Header",
 			authHeader:     validToken, // Missing "Bearer " prefix
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   `{"error":"Bearer token required"}`,
+			expectedBody:   `{"error":{"status":401,"name":"UnauthorizedError","message":"Bearer token required","details":null}}`,
 		},
 		{
 			name:           "Invalid Token",
