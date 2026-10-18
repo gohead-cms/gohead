@@ -90,10 +90,10 @@ func RecordWebhookDelivery(d *models.WebhookDelivery) {
 		logger.Log.WithError(err).Warn("Failed to update webhook status")
 	}
 	// Keep the newest records only.
-	var cutoff models.WebhookDelivery
-	err := database.DB.Where("webhook_id = ?", d.WebhookID).Order("id DESC").Offset(deliveriesKept).First(&cutoff).Error
-	if err == nil {
-		database.DB.Where("webhook_id = ? AND id <= ?", d.WebhookID, cutoff.ID).Delete(&models.WebhookDelivery{})
+	var cutoff []models.WebhookDelivery
+	if err := database.DB.Select("id").Where("webhook_id = ?", d.WebhookID).Order("id DESC").
+		Offset(deliveriesKept).Limit(1).Find(&cutoff).Error; err == nil && len(cutoff) == 1 {
+		database.DB.Where("webhook_id = ? AND id <= ?", d.WebhookID, cutoff[0].ID).Delete(&models.WebhookDelivery{})
 	}
 }
 

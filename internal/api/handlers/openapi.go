@@ -65,13 +65,20 @@ func swaggerPage(public bool) string {
   <input id="token" type="password" autocomplete="off" placeholder="ght_…" required>
   <button type="submit">Open the API reference</button>
 </form>
+<p id="switch" hidden style="margin:8px 20px;font-size:13px"><a href="#" id="forget">Use another token</a></p>
 <div id="ui"></div>
 <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.17.14/swagger-ui-bundle.js" integrity="sha384-wmyclcVGX/WhUkdkATwhaK1X1JtiNrr2EoYJ+diV3vj4v6OC5yCeSu+yW13SYJep" crossorigin="anonymous"></script>
 <script>
 (function () {
   var needToken = ` + needToken + `;
   var key = "gohead-api-token";
+  document.getElementById("forget").addEventListener("click", function (e) {
+    e.preventDefault();
+    try { sessionStorage.removeItem(key); } catch (e2) {}
+    location.reload();
+  });
   function start(token) {
+    if (needToken) document.getElementById("switch").hidden = false;
     window.ui = SwaggerUIBundle({
       url: "openapi.json",
       dom_id: "#ui",

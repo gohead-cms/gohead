@@ -5,8 +5,11 @@
 package openapi
 
 import (
+	"fmt"
 	"regexp"
 	"sort"
+	"strings"
+	"sync"
 
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/database"
@@ -22,22 +25,51 @@ func schemaName(name string) string { return unsafeName.ReplaceAllString(name, "
 // reservedSchemas are the fixed schema names.
 var reservedSchemas = map[string]bool{"Error": true, "Pagination": true, "Media": true}
 
-// collectionSchema is the schema name of a collection, prefixed when it
-// would clash with a fixed schema (e.g. a collection named "Media").
-func collectionSchema(name string) string {
-	n := schemaName(name)
-	if reservedSchemas[n] {
-		return "Collection_" + n
+// collectionNames maps each collection to a schema name that cannot clash
+// with the fixed schemas, the Component_/Singleton_ names, or another
+// collection's "<name>Input". It is filled by Build before any schema is
+// generated.
+var collectionNames = map[string]string{}
+
+// assignCollectionNames gives every collection a unique schema name: its
+// own name when possible, "Collection_<name>" otherwise.
+func assignCollectionNames(collections []models.Collection) map[string]string {
+	plain := map[string]bool{}
+	for _, ct := range collections {
+		plain[schemaName(ct.Name)] = true
 	}
-	return n
+	out := map[string]string{}
+	used := map[string]bool{}
+	for _, ct := range collections {
+		n := schemaName(ct.Name)
+		clash := reservedSchemas[n] || strings.HasPrefix(n, "Component_") || strings.HasPrefix(n, "Singleton_") ||
+			strings.HasPrefix(n, "Collection_") || (strings.HasSuffix(n, "Input") && plain[strings.TrimSuffix(n, "Input")])
+		if clash {
+			n = "Collection_" + n
+		}
+		for i := 2; used[n]; i++ { // names that sanitize to the same string
+			n = fmt.Sprintf("%s_%d", strings.TrimRight(n, "_0123456789"), i)
+		}
+		used[n] = true
+		out[ct.Name] = n
+	}
+	return out
 }
+
+// collectionSchema is the schema name of a collection ("" if unknown).
+func collectionSchema(name string) string { return collectionNames[name] }
 
 func ref(name string) obj { return obj{"$ref": "#/components/schemas/" + name} }
 
 func nullable(s obj) obj { return obj{"oneOf": []any{s, obj{"type": "null"}}} }
 
+// buildMu serializes builds, which share collectionNames.
+var buildMu sync.Mutex
+
 // Build returns the OpenAPI document for the current content model.
 func Build(version string) (obj, error) {
+	buildMu.Lock()
+	defer buildMu.Unlock()
 	var collections []models.Collection
 	if err := database.DB.Preload("Attributes").Order("name").Find(&collections).Error; err != nil {
 		return nil, err
@@ -51,6 +83,7 @@ func Build(version string) (obj, error) {
 		return nil, err
 	}
 
+	collectionNames = assignCollectionNames(collections)
 	schemas := baseSchemas()
 	paths := obj{}
 	tags := []any{}
@@ -146,7 +179,7 @@ func attributeSchema(a models.Attribute, input bool) obj {
 			s["pattern"] = a.Pattern
 		}
 	case "password":
-		s = obj{"type": "string", "writeOnly": true}
+		s = obj{"type": "string", "description": "stored and returned as given"}
 	case "int", "integer":
 		s = obj{"type": "integer"}
 		if a.Min != nil {
@@ -181,6 +214,10 @@ func attributeSchema(a models.Attribute, input bool) obj {
 		}
 	case "relation":
 		target := collectionSchema(a.Target)
+		if target == "" { // target collection missing: IDs only
+			s = obj{"description": "relation to the missing collection " + a.Target}
+			break
+		}
 		one := obj{"oneOf": []any{ref(target), obj{"type": "integer", "description": "item ID (level=0, or beyond the requested level)"}}}
 		if input {
 			one = obj{"oneOf": []any{obj{"type": "integer", "description": "ID of an existing item"}, ref(target + "Input")}, "description": "an ID, {\"id\": …}, or a new item created in the same transaction"}

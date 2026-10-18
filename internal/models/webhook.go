@@ -28,7 +28,7 @@ type Webhook struct {
 	Format      string            `json:"format"`                                       // json | slack
 	Headers     map[string]string `json:"-" gorm:"type:json;serializer:json"`           // sent with each delivery
 	Secret      string            `json:"-"`                                            // HMAC signing key
-	Enabled     bool              `json:"enabled" gorm:"not null;default:true"`
+	Enabled     bool              `json:"enabled" gorm:"not null"`                      // no DB default: GORM would override false on create
 
 	LastStatus     int        `json:"lastStatus"`
 	LastError      string     `json:"lastError"`

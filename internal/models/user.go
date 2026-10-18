@@ -54,6 +54,9 @@ func ValidateUser(user User) error {
 		}).Warn("Validation failed: missing username")
 		return errors.New("username is required")
 	}
+	if strings.Contains(user.Username, ":") {
+		return errors.New("username cannot contain ':' (reserved for API tokens, e.g. token:website)")
+	}
 
 	// Validate email format
 	if !isValidEmail(user.Email) {
@@ -147,7 +150,7 @@ func ValidateUserUpdates(updates map[string]interface{}) error {
 	for key, value := range updates {
 		switch key {
 		case "username":
-			if username, ok := value.(string); !ok || username == "" {
+			if username, ok := value.(string); !ok || username == "" || strings.Contains(username, ":") {
 				logger.Log.WithFields(logrus.Fields{
 					"field": "username",
 					"value": value,

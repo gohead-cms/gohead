@@ -113,6 +113,33 @@ func TestRetryClassification(t *testing.T) {
 	}
 }
 
+func TestRedirectsAreNotFollowed(t *testing.T) {
+	setup(t)
+	target, got := receiver(t, http.StatusOK)
+	redirect := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL, http.StatusFound)
+	}))
+	defer redirect.Close()
+	w := models.Webhook{Name: "r", URL: redirect.URL, Enabled: true, Headers: map[string]string{"X-Api-Key": "k"}}
+	require.NoError(t, storage.CreateWebhook(&w))
+	res := Send(context.Background(), w, Delivery{WebhookID: w.ID, Event: "item:created"}, 1)
+	require.Error(t, res.Err)
+	assert.True(t, res.Permanent)
+	assert.Contains(t, res.Err.Error(), "redirects are not followed")
+	assert.Empty(t, got(), "headers never reach the redirect target")
+}
+
+func TestDisabledOnCreate(t *testing.T) {
+	setup(t)
+	w := models.Webhook{Name: "off", URL: "https://example.com", Enabled: false}
+	require.NoError(t, storage.CreateWebhook(&w))
+	stored, err := storage.GetWebhook(w.ID)
+	require.NoError(t, err)
+	assert.False(t, stored.Enabled, "a webhook created disabled stays disabled")
+	hooks, _ := storage.WebhooksFor("item:created", "any")
+	assert.Empty(t, hooks)
+}
+
 func TestSlackFormat(t *testing.T) {
 	setup(t)
 	srv, got := receiver(t, http.StatusOK)
@@ -127,16 +154,28 @@ func TestSlackFormat(t *testing.T) {
 
 func TestAddressGuard(t *testing.T) {
 	cases := map[string][2]bool{ // ip -> {allowed by default, allowed with private networks}
-		"8.8.8.8":         {true, true},
-		"127.0.0.1":       {false, true},
-		"10.1.2.3":        {false, true},
-		"192.168.1.10":    {false, true},
-		"100.64.0.1":      {false, true},
-		"169.254.169.254": {false, false}, // cloud metadata: never
-		"::1":             {false, true},
-		"fe80::1":         {false, false},
-		"fd00::1":         {false, true},
-		"0.0.0.0":         {false, false},
+		"8.8.8.8":                {true, true},
+		"127.0.0.1":              {false, true},
+		"10.1.2.3":               {false, true},
+		"192.168.1.10":           {false, true},
+		"100.64.0.1":             {false, true},
+		"169.254.169.254":        {false, false}, // cloud metadata: never
+		"::1":                    {false, true},
+		"fe80::1":                {false, false},
+		"fd00::1":                {false, true},
+		"0.0.0.0":                {false, false},
+		"0.1.2.3":                {false, false},
+		"198.18.0.1":             {false, false},
+		"240.0.0.1":              {false, false},
+		"fd00:ec2::254":          {false, false}, // AWS IPv6 metadata
+		"100.100.100.200":        {false, false}, // Alibaba metadata
+		"64:ff9b::a9fe:a9fe":     {false, false}, // NAT64 of 169.254.169.254
+		"64:ff9b::808:808":       {true, true},   // NAT64 of 8.8.8.8
+		"2002:a9fe:a9fe::1":      {false, false}, // 6to4 of 169.254.169.254
+		"2002:0a00:0001::1":      {false, true},  // 6to4 of 10.0.0.1
+		"::ffff:127.0.0.1":       {false, true},
+		"::ffff:169.254.169.254": {false, false},
+		"fec0::1":                {false, false},
 	}
 	for ip, want := range cases {
 		assert.Equal(t, want[0], AddressAllowed(net.ParseIP(ip), false), ip)
@@ -151,7 +190,8 @@ func TestAddressGuard(t *testing.T) {
 	res := Send(context.Background(), w, Delivery{WebhookID: w.ID, Event: "item:created"}, 1)
 	require.Error(t, res.Err)
 	assert.True(t, res.Permanent, "a blocked address is not retried")
-	assert.Contains(t, res.Err.Error(), "not allowed for webhooks")
+	assert.Contains(t, res.Err.Error(), "may not reach")
+	assert.NotContains(t, res.Err.Error(), "127.0.0.1", "errors do not reveal resolved addresses")
 	assert.Empty(t, got(), "nothing reached the loopback receiver")
 }
 
@@ -184,9 +224,12 @@ func TestFanout(t *testing.T) {
 	for _, w := range []*models.Webhook{&all, &onlyPublished, &disabled} {
 		require.NoError(t, storage.CreateWebhook(w))
 	}
-	require.NoError(t, storage.SaveWebhook(func() *models.Webhook { disabled.Enabled = false; return &disabled }()))
+	articles := models.Collection{Name: "articles", Kind: "collection", Attributes: []models.Attribute{
+		{Name: "title", Type: "string"}, {Name: "pin", Type: "password"},
+	}}
+	require.NoError(t, storage.SaveCollection(&articles))
 
-	ev := events.CollectionEventPayload{EventType: "item:published", CollectionName: "articles", ItemID: 9, ItemData: map[string]any{"title": "x"}}
+	ev := events.CollectionEventPayload{EventType: "item:published", CollectionName: "articles", ItemID: 9, ItemData: map[string]any{"title": "x", "pin": "1234"}}
 	ctx := context.Background()
 	require.NoError(t, Fanout(ctx, client, ev))
 	tasks, err := inspector.ListPendingTasks(Queue)
@@ -206,4 +249,7 @@ func TestFanout(t *testing.T) {
 	var d Delivery
 	require.NoError(t, json.Unmarshal(tasks[0].Payload, &d))
 	assert.Equal(t, float64(9), d.Item["id"], "the item ID is part of the data")
+	for _, task := range tasks {
+		assert.NotContains(t, string(task.Payload), "1234", "password attributes are never sent")
+	}
 }

@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 - `/admin/users` requires a user session (not an API token).
+- Usernames cannot contain `:` (reserved for `token:<name>` attribution).
 
 ## [0.4.0] - 2026-10-18
 

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -154,6 +155,19 @@ func TestOpenAPIDocument(t *testing.T) {
 	assert.Equal(t, []any{"title"}, schemas["articlesInput"].(map[string]any)["required"])
 	assert.Contains(t, schemas, "Component_seo")
 	assert.Contains(t, schemas, "Media")
+
+	// Names that would clash get a prefix, and every $ref resolves.
+	a.ok("admin", "POST", "/admin/collections", map[string]any{"name": "Media", "kind": "collection", "attributes": map[string]any{"x": map[string]any{"type": "string"}}})
+	a.ok("admin", "POST", "/admin/collections", map[string]any{"name": "articlesInput", "kind": "collection", "attributes": map[string]any{"x": map[string]any{"type": "string"}}})
+	_, doc = a.do("viewer", "GET", "/api/openapi.json", nil)
+	schemas = doc["components"].(map[string]any)["schemas"].(map[string]any)
+	assert.Contains(t, schemas, "Collection_Media")
+	assert.Contains(t, schemas, "Collection_articlesInput")
+	assert.Equal(t, "object", schemas["Media"].(map[string]any)["type"], "the fixed Media schema is intact")
+	raw, _ := json.Marshal(doc)
+	for _, m := range regexp.MustCompile(`#/components/schemas/([A-Za-z0-9._-]+)`).FindAllStringSubmatch(string(raw), -1) {
+		assert.Contains(t, schemas, m[1], "dangling $ref")
+	}
 
 	rr := httptest.NewRecorder()
 	a.router.ServeHTTP(rr, httptest.NewRequest("GET", "/api/docs", nil))

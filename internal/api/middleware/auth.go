@@ -53,6 +53,10 @@ func AuthMiddleware() gin.HandlerFunc {
 				abortWithError(c, http.StatusUnauthorized, "InvalidTokenError", "Invalid or revoked API token")
 				return
 			}
+			if _, err := storage.GetRoleByName(tok.Role); err != nil {
+				abortWithError(c, http.StatusForbidden, "", "Invalid role")
+				return
+			}
 			c.Set("username", "token:"+tok.Name)
 			c.Set("role", tok.Role)
 			c.Set(APITokenIDKey, tok.ID)

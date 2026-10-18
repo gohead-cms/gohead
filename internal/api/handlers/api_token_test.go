@@ -123,6 +123,10 @@ func TestAPITokens(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, code, "unknown tokens")
 	})
 
+	t.Run("usernames cannot look like tokens", func(t *testing.T) {
+		assert.Error(t, models.ValidateUser(models.User{Username: "token:website", Email: "a@b.io", Password: "longenough"}))
+	})
+
 	t.Run("validation", func(t *testing.T) {
 		for name, body := range map[string]map[string]any{
 			"no name":        {"role": "viewer"},

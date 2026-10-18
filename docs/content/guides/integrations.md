@@ -41,7 +41,8 @@ Use it like a JWT: `Authorization: Bearer ght_…`, for REST, GraphQL and upload
   `lastUsedAt` (updated at most once a minute).
 - Token management (and `/admin/users`) needs an admin **user session**: an API token, even an
   admin one, cannot create other tokens or users, so a leaked token cannot mint credentials.
-- Tokens start with `ght_`, so secret scanners and log filters can recognize them.
+- Tokens start with `ght_`, so secret scanners and log filters can recognize them. Requests
+  made with a token are attributed to `token:<name>` (usernames cannot contain `:`).
 
 !!! tip "Pick the smallest role"
     A public website only needs `viewer`: it sees published content only. Give `editor` to
@@ -131,6 +132,7 @@ With `"format": "slack"` the body is `{"text": "GoHead: \"Launch day\" (#12) pub
 which Slack incoming webhooks (and Discord's `/slack` endpoints, Mattermost…) accept.
 
 `X-Gohead-Delivery` is the same on every retry of one event: use it to ignore duplicates.
+`data` is the item as stored, except `password` attributes, which are never sent.
 
 ### Verify the signature
 
@@ -156,7 +158,8 @@ function verify(req, rawBody, secret) {
   Kubernetes setups; webhooks need Redis, like agents.
 - A `2xx` answer is a success. Network errors, timeouts, `5xx`, `408` and `429` are retried
   with exponential backoff (`webhooks.max_retries`, default 8, over several hours). Other
-  `4xx` answers are not retried.
+  `4xx` answers are not retried, and neither are redirects: GoHead does not follow them (they
+  would carry your custom headers to another host), so use the final URL.
 - `GET /admin/webhooks/{id}/deliveries` shows the last 100 attempts (status, error, duration);
   the webhook itself shows `lastStatus`, `lastError` and `lastDeliveryAt`.
 - `POST /admin/webhooks/{id}/test` sends a `webhook:test` event immediately and returns the
@@ -166,11 +169,15 @@ function verify(req, rawBody, secret) {
 
 ### Network safety
 
-Webhook URLs are resolved and checked at each connection (redirects included). Private and
-loopback addresses (`10.0.0.0/8`, `192.168.0.0/16`, `127.0.0.1`, …) are refused unless
-`webhooks.allow_private_networks` is on (for an internal rebuild service or local testing).
-Link-local addresses, including the cloud metadata endpoint `169.254.169.254`, are always
-refused. Proxies from the environment are not used for webhooks.
+Webhook URLs are resolved and checked at each connection, so DNS tricks do not help. Private
+and loopback addresses (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `100.64.0.0/10`,
+`127.0.0.0/8`, `fc00::/7`, …) are refused unless `webhooks.allow_private_networks` is on (for
+an internal rebuild service or local testing). Always refused: link-local addresses (including
+the cloud metadata endpoint `169.254.169.254`), the AWS IPv6 and Alibaba metadata addresses,
+reserved ranges, and NAT64/6to4 addresses that embed a forbidden IPv4 address. Proxies from the
+environment are not used for webhooks. Delivery errors are reported in generic terms
+("could not connect", "did not answer in time") so the test endpoint cannot be used to map
+internal networks.
 
 | Key | Env | Default |
 |-----|-----|---------|

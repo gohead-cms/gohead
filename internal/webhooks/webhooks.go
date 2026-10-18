@@ -49,7 +49,10 @@ type Config struct {
 	MaxRetries           int
 }
 
-var cfg = Config{Timeout: 10 * time.Second, MaxRetries: 8}
+var (
+	cfg    = Config{Timeout: 10 * time.Second, MaxRetries: 8}
+	client = newClient(cfg)
+)
 
 // Configure sets the delivery settings (call at startup).
 func Configure(c Config) {
@@ -60,7 +63,12 @@ func Configure(c Config) {
 		c.MaxRetries = 0
 	}
 	cfg = c
+	client = newClient(c)
 }
+
+// retention keeps finished delivery tasks in Redis long enough that a
+// retried event finds their IDs and does not deliver twice.
+const retention = 24 * time.Hour
 
 // Delivery is the payload of a queued delivery.
 type Delivery struct {
@@ -85,9 +93,20 @@ func Fanout(ctx context.Context, client *asynq.Client, ev events.CollectionEvent
 	if !ok {
 		eventID = newID()
 	}
+	// Password attributes are stored as given; never send them out.
+	secret := map[string]bool{}
+	if ct, err := storage.GetCollectionByName(ev.CollectionName); err == nil {
+		for _, a := range ct.Attributes {
+			if a.Type == "password" {
+				secret[a.Name] = true
+			}
+		}
+	}
 	item := map[string]any{}
 	for k, v := range ev.ItemData {
-		item[k] = v
+		if !secret[k] {
+			item[k] = v
+		}
 	}
 	if ev.ItemID != 0 {
 		item["id"] = ev.ItemID
@@ -108,7 +127,7 @@ func Fanout(ctx context.Context, client *asynq.Client, ev events.CollectionEvent
 		}
 		_, err = client.EnqueueContext(ctx, asynq.NewTask(TaskTypeDeliver, body),
 			asynq.Queue(Queue), asynq.TaskID("wh-"+d.DeliveryID),
-			asynq.MaxRetry(cfg.MaxRetries), asynq.Timeout(cfg.Timeout+5*time.Second))
+			asynq.MaxRetry(cfg.MaxRetries), asynq.Timeout(cfg.Timeout+5*time.Second), asynq.Retention(retention))
 		if err != nil && !errors.Is(err, asynq.ErrTaskIDConflict) {
 			return fmt.Errorf("enqueue delivery for webhook %d: %w", w.ID, err)
 		}
@@ -191,18 +210,40 @@ func send(ctx context.Context, w models.Webhook, d Delivery) Result {
 		req.Header.Set("X-Gohead-Signature", Sign(w.Secret, ts, body))
 	}
 
-	resp, err := Client().Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
-		var blocked *BlockedAddressError
-		return Result{Err: err, Permanent: errors.As(err, &blocked)}
+		return classify(err)
 	}
 	defer resp.Body.Close()
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10)) // reuse the connection
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		return Result{StatusCode: resp.StatusCode}
 	}
+	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+		return Result{StatusCode: resp.StatusCode, Permanent: true,
+			Err: fmt.Errorf("endpoint answered %d: redirects are not followed, use the final URL", resp.StatusCode)}
+	}
 	retry := resp.StatusCode >= 500 || resp.StatusCode == http.StatusRequestTimeout || resp.StatusCode == http.StatusTooManyRequests
 	return Result{StatusCode: resp.StatusCode, Err: fmt.Errorf("endpoint answered %d", resp.StatusCode), Permanent: !retry}
+}
+
+// classify turns a transport error into a short, generic message: details
+// such as resolved addresses or "connection refused" would let webhook
+// tests map internal networks.
+func classify(err error) Result {
+	var blocked *BlockedAddressError
+	var netErr net.Error
+	var dnsErr *net.DNSError
+	switch {
+	case errors.As(err, &blocked):
+		return Result{Err: errors.New("the URL points to an address webhooks may not reach"), Permanent: true}
+	case errors.As(err, &dnsErr):
+		return Result{Err: errors.New("the host name could not be resolved")}
+	case errors.As(err, &netErr) && netErr.Timeout():
+		return Result{Err: errors.New("the endpoint did not answer in time")}
+	default:
+		return Result{Err: errors.New("could not connect to the endpoint")}
+	}
 }
 
 // Body renders the request body for the webhook's format.
@@ -279,13 +320,43 @@ func truncate(s string, n int) string {
 type BlockedAddressError struct{ IP net.IP }
 
 func (e *BlockedAddressError) Error() string {
-	return fmt.Sprintf("address %s is not allowed for webhooks (see webhooks.allow_private_networks)", e.IP)
+	return "address not allowed for webhooks (see webhooks.allow_private_networks)"
 }
 
-var privateBlocks = mustCIDRs(
-	"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", // RFC 1918, CGNAT
-	"fc00::/7", // unique local IPv6
+var (
+	// privateBlocks are reachable only with allow_private_networks.
+	privateBlocks = mustCIDRs(
+		"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", // RFC 1918, CGNAT
+		"fc00::/7", // unique local IPv6
+	)
+	// neverBlocks are never reachable: "this network", IETF protocol
+	// assignments, benchmarking, reserved, deprecated site-local IPv6.
+	neverBlocks = mustCIDRs(
+		"0.0.0.0/8", "192.0.0.0/24", "198.18.0.0/15", "240.0.0.0/4", "fec0::/10",
+	)
+	// metadataIPs are cloud metadata endpoints outside link-local ranges
+	// (AWS IPv6, Alibaba Cloud): refused even with allow_private_networks.
+	metadataIPs = []net.IP{net.ParseIP("fd00:ec2::254"), net.ParseIP("100.100.100.200")}
+
+	nat64  = mustCIDRs("64:ff9b::/96")[0]
+	sixTo4 = mustCIDRs("2002::/16")[0]
 )
+
+// embeddedIPv4 returns the IPv4 address carried by a NAT64 or 6to4 IPv6
+// address, which reach that IPv4 host through a translator.
+func embeddedIPv4(ip net.IP) net.IP {
+	ip16 := ip.To16()
+	if ip16 == nil || ip.To4() != nil {
+		return nil
+	}
+	switch {
+	case nat64.Contains(ip16):
+		return net.IPv4(ip16[12], ip16[13], ip16[14], ip16[15])
+	case sixTo4.Contains(ip16):
+		return net.IPv4(ip16[2], ip16[3], ip16[4], ip16[5])
+	}
+	return nil
+}
 
 func mustCIDRs(cidrs ...string) []*net.IPNet {
 	out := make([]*net.IPNet, 0, len(cidrs))
@@ -301,6 +372,19 @@ func mustCIDRs(cidrs ...string) []*net.IPNet {
 
 // AddressAllowed reports whether a webhook may connect to ip.
 func AddressAllowed(ip net.IP, allowPrivate bool) bool {
+	if v4 := embeddedIPv4(ip); v4 != nil && !AddressAllowed(v4, allowPrivate) {
+		return false
+	}
+	for _, m := range metadataIPs {
+		if m.Equal(ip) {
+			return false
+		}
+	}
+	for _, n := range neverBlocks {
+		if n.Contains(ip) {
+			return false
+		}
+	}
 	switch {
 	case ip.IsUnspecified(), ip.IsMulticast(), ip.IsLinkLocalUnicast(), ip.IsLinkLocalMulticast(), ip.IsInterfaceLocalMulticast():
 		return false // includes 169.254.169.254 (cloud metadata)
@@ -315,10 +399,11 @@ func AddressAllowed(ip net.IP, allowPrivate bool) bool {
 	return true
 }
 
-// Client returns the HTTP client used for deliveries. Every connection,
-// including after redirects, is checked once the name is resolved, so DNS
-// tricks cannot reach forbidden addresses.
-func Client() *http.Client {
+// newClient builds the HTTP client used for deliveries. Every connection is
+// checked once the name is resolved, so DNS tricks cannot reach forbidden
+// addresses. Redirects are not followed: they would carry custom headers
+// to another host, and turn the POST into a GET.
+func newClient(cfg Config) *http.Client {
 	allowPrivate := cfg.AllowPrivateNetworks
 	dialer := &net.Dialer{
 		Timeout: 5 * time.Second,
@@ -345,11 +430,8 @@ func Client() *http.Client {
 	return &http.Client{
 		Timeout:   cfg.Timeout,
 		Transport: transport,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 3 {
-				return errors.New("too many redirects")
-			}
-			return nil
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
 		},
 	}
 }
