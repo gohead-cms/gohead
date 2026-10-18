@@ -1,34 +1,114 @@
-# .goreleaser.yml
-version: 1
+# GoReleaser v2: binaries, archives, checksums and (optionally) Homebrew.
+# Container images are built by .github/workflows/images.yml.
+version: 2
+
+project_name: gohead
 
 before:
   hooks:
-    - go mod tidy
-    - go generate ./...
+    - go mod download
+
 builds:
-  - main: ./main/main.go
+  - id: gohead
+    main: ./main
+    binary: gohead
+    # Prebuilt binaries are pure Go, so the SQLite driver (which needs cgo)
+    # is not available in them: use PostgreSQL/MySQL, the container image,
+    # or `make build` for SQLite.
     env:
       - CGO_ENABLED=0
-    goos:
-      - linux
-      - windows
-      - darwin
-brews:
-  -
-    name: "gohead"
-    tap:
-      owner: "gohead-cms"
-      name: "homebrew-tap"
-    url_template: "https://github.com/gohead-cms/gohead/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-    commit_author:
-      name: "gohead-contrib"
-      email: "gohead-cms@proton.me"
-    homepage: "https://github.com/"
-    description: "A brief description of your application"
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ignore:
+      - goos: windows
+        goarch: arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/gohead-cms/gohead/cmd.version={{ .Version }}
+      - -X github.com/gohead-cms/gohead/cmd.commit={{ .FullCommit }}
+      - -X github.com/gohead-cms/gohead/cmd.buildDate={{ .Date }}
+
+archives:
+  - id: default
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE.md
+      - README.md
+      - CHANGELOG.md
+      - config.sample.yaml
+
+checksum:
+  name_template: checksums.txt
+
+sboms:
+  - artifacts: archive
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
 
 changelog:
   sort: asc
+  use: github
   filters:
     exclude:
-      - "^docs:"
-      - "^test:"
+      - "^docs"
+      - "^test"
+      - "^chore"
+      - "Merge pull request"
+  groups:
+    - title: Security
+      regexp: '^.*?(fix|feat)\(security\)!?:.+$'
+      order: 0
+    - title: Features
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 1
+    - title: Bug fixes
+      regexp: '^.*?fix(\(.+\))??!?:.+$'
+      order: 2
+    - title: Other
+      order: 999
+
+release:
+  github:
+    owner: gohead-cms
+    name: gohead
+  prerelease: auto
+  footer: |
+    **Container images**
+
+    ```
+    docker pull ghcr.io/gohead-cms/gohead:{{ .Version }}
+    docker pull ghcr.io/gohead-cms/gohead-admin:{{ .Version }}
+    ```
+
+    Images are signed with cosign (keyless). See the [deployment guide](https://gohead-cms.github.io/gohead/operations/deployment/).
+
+# Published only when a HOMEBREW_TAP_TOKEN secret exists and the
+# gohead-cms/homebrew-tap repository has been created.
+homebrew_casks:
+  - name: gohead
+    repository:
+      owner: gohead-cms
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    skip_upload: '{{ if index .Env "HOMEBREW_TAP_TOKEN" }}false{{ else }}true{{ end }}'
+    directory: Casks
+    homepage: https://github.com/gohead-cms/gohead
+    description: Event-driven headless CMS with an AI agent engine
+    license: MIT
+    commit_author:
+      name: gohead-bot
+      email: gohead-cms@proton.me
+    # Binaries are not notarized; drop the quarantine flag on install.
+    hooks:
+      post:
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/gohead"]
+          end

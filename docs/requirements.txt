@@ -1,10 +1,4 @@
-mkdocs
-mkdocs-material
-mkdocs-awesome-pages-plugin
-mkdocs-redirects
-mkdocs-git-revision-date-localized-plugin
-mkdocs-minify-plugin
-mkdocs-mermaid2-plugin
-mkdocs-glightbox
-pymdown-extensions
-markdown-include
+mkdocs-material==9.*
+mkdocs-redirects==1.*
+mkdocs-git-revision-date-localized-plugin==1.*
+pymdown-extensions==10.*

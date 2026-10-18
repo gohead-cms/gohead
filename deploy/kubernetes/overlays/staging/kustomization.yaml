@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: gohead-staging
+resources:
+  - ../../base
+  - namespace.yaml
+  - external-secret.yaml
+images:
+  # Tags are rewritten by Flux image automation (see deploy/flux).
+  - name: ghcr.io/gohead-cms/gohead
+    newTag: edge # {"$imagepolicy": "flux-system:gohead-staging:tag"}
+  - name: ghcr.io/gohead-cms/gohead-admin
+    newTag: edge # {"$imagepolicy": "flux-system:gohead-staging-admin:tag"}
+patches:
+  - target: { kind: Deployment, name: gohead-admin }
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/env/0/value
+        value: https://api.staging.example.com

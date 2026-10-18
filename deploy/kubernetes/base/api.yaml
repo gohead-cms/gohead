@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gohead-api
+  labels: { app.kubernetes.io/name: gohead-api }
+spec:
+  # GraphQL schema reloads happen in the replica that handled the schema
+  # change; keep a single replica until reloads are broadcast (see the
+  # handbook's operations page).
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: gohead-api }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: gohead-api }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: api
+          image: ghcr.io/gohead-cms/gohead:latest # set by overlay / Flux
+          args: ["start"]
+          ports:
+            - { name: http, containerPort: 8080 }
+          envFrom:
+            - configMapRef: { name: gohead-config }
+            - secretRef: { name: gohead-secrets }
+          readinessProbe:
+            httpGet: { path: /_health, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /_health, port: http }
+            periodSeconds: 15
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gohead-api
+spec:
+  selector: { app.kubernetes.io/name: gohead-api }
+  ports:
+    - { name: http, port: 80, targetPort: http }

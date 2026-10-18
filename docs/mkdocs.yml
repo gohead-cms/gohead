@@ -1,62 +1,118 @@
-site_name: GoHead
-site_description: GoHead Documentation
-site_author: GoHead Contributors
-site_url: https://doc.gohead.com
-dev_addr: 0.0.0.0:8000
-
-repo_name: 'GoHead!'
-repo_url: 'https://github.com/gohead-cms/gohead'
-
-docs_dir: 'content'
+site_name: GoHead Handbook
+site_description: Event-driven headless CMS with an AI agent engine, written in Go.
+site_author: GoHead contributors
+site_url: https://gohead-cms.github.io/gohead/
+repo_name: gohead-cms/gohead
+repo_url: https://github.com/gohead-cms/gohead
+edit_uri: edit/master/docs/content/
+docs_dir: content
+copyright: Copyright &copy; 2024-2026 GoHead contributors — MIT License
 
 theme:
-  name: 'material'
+  name: material
   language: en
-  include_sidebar: true
-  favicon: assets/pic/gohead_logo.png
   logo: assets/pic/gohead_logo.png
-  feature:
-    tabs: true
+  favicon: assets/pic/gohead_logo.png
+  icon:
+    repo: fontawesome/brands/github
   palette:
-    primary: 'blue'
-    accent: 'orange'
-  i18n:
-    prev: 'Previous'
-    next: 'Next'
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: amber
+      toggle: { icon: material/weather-night, name: Switch to dark mode }
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: amber
+      toggle: { icon: material/weather-sunny, name: Switch to light mode }
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - navigation.indexes
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - content.action.edit
 
-copyright: 'GoHead • Copyright &copy; 2025'
-
-extra_javascript:
-  - assets/js/highlight.min.js
+extra_css:
+  - assets/stylesheets/extra.css
 
 plugins:
   - search
+  - git-revision-date-localized:
+      enable_creation_date: false
+      fallback_to_build_date: true
+      strict: false
+  - redirects:
+      redirect_maps:
+        getting-started/overview.md: index.md
+        getting-started/quick-start-with-docker.md: getting-started/quick-start.md
+        getting-started/configuration-overview.md: getting-started/configuration.md
+        getting-started/content-api.md: guides/rest-api.md
+        getting-started/faq.md: operations/troubleshooting.md
 
 markdown_extensions:
-  - meta
-  - attr_list
   - admonition
+  - attr_list
+  - md_in_html
   - footnotes
+  - tables
+  - toc:
+      permalink: true
   - pymdownx.details
   - pymdownx.inlinehilite
   - pymdownx.highlight:
-      use_pygments: false
-  - pymdownx.smartsymbols
-  - pymdownx.superfences
-  - pymdownx.tabbed
-  - pymdownx.tasklist
+      anchor_linenums: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
   - pymdownx.snippets:
+      base_path: ["."]
       check_paths: true
-  - markdown_include.include:
-      base_path: content/includes/
-      encoding: utf-8
-  - toc:
-      permalink: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
 
-# Page tree
 nav:
-  - 'Welcome': 'index.md'
-  - 'Getting Started':
-      - 'Overview': 'getting-started/overview.md'
-      - 'Content API': 'getting-started/content-api.md'
-
+  - Home: index.md
+  - Getting started:
+      - Installation: getting-started/installation.md
+      - Quick start: getting-started/quick-start.md
+      - Configuration: getting-started/configuration.md
+  - Handbook:
+      - Concepts: guides/concepts.md
+      - Content modeling: guides/content-modeling.md
+      - REST API: guides/rest-api.md
+      - GraphQL: guides/graphql.md
+      - Users & roles: guides/users-and-roles.md
+      - Admin UI: guides/admin-ui.md
+  - Agents:
+      - Overview: agents/index.md
+      - Triggers: agents/triggers.md
+      - Functions: agents/functions.md
+      - LLM providers: agents/llm-providers.md
+  - Operations:
+      - Architecture: operations/architecture.md
+      - Deployment: operations/deployment.md
+      - CI/CD & releases: operations/ci-cd.md
+      - Observability: operations/observability.md
+      - Security: operations/security.md
+      - Troubleshooting & FAQ: operations/troubleshooting.md
+  - Development:
+      - Contributing: development/contributing.md
+      - Project layout: development/project-layout.md
+  - Reference:
+      - API endpoints: reference/api-endpoints.md
+      - CLI: reference/cli.md
+      - Changelog: reference/changelog.md

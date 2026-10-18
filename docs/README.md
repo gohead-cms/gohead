@@ -1,17 +1,12 @@
-# Documentation
+# GoHead Handbook sources
 
-## Tooling
+The handbook is built with [MkDocs Material](https://squidfunk.github.io/mkdocs-material/)
+and published to GitHub Pages by `.github/workflows/docs.yml`.
 
-| Tool              | Documentation                       | Sources                           |
-|-------------------|-------------------------------------|-----------------------------------|
-| mkdocs            | [documentation][mkdocs]             | [Sources][mkdocs-src]             |
-| mkdocs-material   | [documentation][mkdocs-material]    | [Sources][mkdocs-material-src]    |
+```bash
+make docs                                   # from the repository root: http://localhost:8000
+mkdocs build --strict -f docs/mkdocs.yml    # what CI runs
+```
 
-[mkdocs]: https://www.mkdocs.org "Mkdocs"
-[mkdocs-src]: https://github.com/mkdocs/mkdocs "Mkdocs - Sources"
-
-[mkdocs-material]: https://squidfunk.github.io/mkdocs-material/ "Material for MkDocs"
-[mkdocs-material-src]: https://github.com/squidfunk/mkdocs-material "Material for MkDocs - Sources"
-
-[pymdown-extensions]: https://facelessuser.github.io/pymdown-extensions "PyMdown Extensions"
-[pymdown-extensions-src]: https://github.com/facelessuser/pymdown-extensions "PyMdown Extensions - Sources"
+- Pages: `docs/content/` · navigation: `nav` in `docs/mkdocs.yml`
+- Run commands from the repository root (the changelog page includes `CHANGELOG.md`).

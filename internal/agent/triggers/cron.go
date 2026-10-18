@@ -1,10 +1,13 @@
 package triggers
 
 import (
+	"context"
+	"fmt"
 	"time"
 
 	"github.com/go-co-op/gocron"
 
+	"github.com/gohead-cms/gohead/internal/agent/jobs"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
 )
@@ -51,19 +54,30 @@ func StartScheduler() {
 	Scheduler.StartAsync()
 }
 
-// StartJob is the core function that an agent's trigger will call.
-// This is where you would implement the agent's flow logic.
+// StartJob enqueues a run of the agent on the worker queue. It is called by
+// the cron scheduler at each tick of the agent's schedule.
 func StartJob(agentID uint) {
-	logger.Log.WithField("agent_id", agentID).Info("Starting agent job")
-
-	// Placeholder for the actual workflow execution.
-	// You would typically load the agent config, execute the steps, etc.
 	agent, err := storage.GetAgentByID(agentID)
 	if err != nil {
-		logger.Log.WithError(err).WithField("agent_id", agentID).Error("Failed to retrieve agent for job")
+		logger.Log.WithError(err).WithField("agent_id", agentID).Error("Failed to retrieve agent for scheduled run")
 		return
 	}
 
-	// For the MVP, let's just log a message.
-	logger.Log.WithField("Agent job for '%s' completed successfully.", agent.Name)
+	now := time.Now().UTC()
+	payload := jobs.AgentJobPayload{
+		AgentID: agent.ID,
+		InitialInput: fmt.Sprintf(
+			"Scheduled run at %s (cron: %s). Execute your task according to your system prompt.",
+			now.Format(time.RFC3339), agent.Trigger.Cron),
+		TriggerEvent: &jobs.TriggerEvent{
+			Type:         "schedule",
+			ScheduleData: map[string]any{"cron": agent.Trigger.Cron, "fired_at": now.Format(time.RFC3339)},
+		},
+		CreatedAt: now,
+	}
+	if err := jobs.EnqueueAgentJob(context.Background(), asynqClient, payload); err != nil {
+		logger.Log.WithError(err).WithField("agent_name", agent.Name).Error("Failed to enqueue scheduled agent run")
+		return
+	}
+	logger.Log.WithField("agent_name", agent.Name).Info("Scheduled agent run enqueued")
 }

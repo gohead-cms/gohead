@@ -41,8 +41,8 @@ func listCollections(ctx context.Context, args any) (string, error) {
 
 // getCollectionSchema retrieves the structure of a specific collection.
 func getCollectionSchema(ctx context.Context, args any) (string, error) {
-	argMap, ok := args.(map[string]any)
-	if !ok {
+	argMap, err := parseArgs(args)
+	if err != nil {
 		return `{"status": "error", "message": "invalid arguments format"}`, nil
 	}
 
@@ -64,16 +64,9 @@ func getCollectionSchema(ctx context.Context, args any) (string, error) {
 // upsertCollectionItem creates a new item or updates an existing one.
 // NOTE: It treats `item_id` as the primary key. If `item_id` is "0" or empty, it creates a new record.
 func upsertCollectionItem(ctx context.Context, args any) (string, error) {
-	argString, ok := args.(string)
-	if !ok {
-		// This would happen if something other than a string is passed.
-		return `{"status": "error", "message": "invalid arguments type, expected a string"}`, nil
-	}
-
-	var argMap map[string]any
-	err := json.Unmarshal([]byte(argString), &argMap)
+	// Arguments arrive as a JSON string from the runner or as a map.
+	argMap, err := parseArgs(args)
 	if err != nil {
-		// This handles cases where the LLM sends a malformed JSON string.
 		return `{"status": "error", "message": "invalid JSON format in arguments"}`, nil
 	}
 
@@ -137,8 +130,8 @@ func upsertCollectionItem(ctx context.Context, args any) (string, error) {
 
 // listCollectionItems finds and retrieves items from a collection with pagination.
 func listCollectionItems(ctx context.Context, args any) (string, error) {
-	argMap, ok := args.(map[string]any)
-	if !ok {
+	argMap, err := parseArgs(args)
+	if err != nil {
 		return `{"status": "error", "message": "invalid arguments format"}`, nil
 	}
 
@@ -187,8 +180,8 @@ func listCollectionItems(ctx context.Context, args any) (string, error) {
 
 // deleteCollectionItem removes a specific item from a collection using its ID.
 func deleteCollectionItem(ctx context.Context, args any) (string, error) {
-	argMap, ok := args.(map[string]any)
-	if !ok {
+	argMap, err := parseArgs(args)
+	if err != nil {
 		return `{"status": "error", "message": "invalid arguments format"}`, nil
 	}
 

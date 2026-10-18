@@ -14,6 +14,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **Secrets in responses**: password hashes are never serialized; agent API keys and webhook tokens are masked.
 - **Per-agent LLM keys**: keys are passed to each client directly instead of through process-wide environment variables.
 - Login no longer logs issued tokens.
+- Collection list `filter`/`sort` parameters are restricted to known columns (they were interpolated into SQL).
+
+### Changed
+- Telemetry is off by default.
+- The Docker image entrypoint is `gohead`; pass the command (`start`, `worker`, …).
 
 ### Added
 - Admin user management: `/admin/users` (create, list, get, update, delete).
@@ -23,6 +28,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - `base_url` option for LLM providers.
 - `GOHEAD_TEST_DATABASE_URL` to run the test suite against PostgreSQL.
 - Graceful shutdown on SIGINT/SIGTERM.
+- **Handbook** (MkDocs Material, published to GitHub Pages) and a new README.
+- **Delivery pipeline**: CI (lint, race tests, PostgreSQL tests, govulncheck, UI and docs builds), multi-arch signed images on GHCR with SBOM/provenance, GoReleaser v2 releases, CodeQL, Dependabot.
+- **Deployment**: Kubernetes manifests (kustomize, staging/production overlays, External Secrets) and Flux image automation; full-stack `docker-compose.yml`; admin UI image configurable at runtime (`GOHEAD_API_URL`).
+- Configuration works from environment variables alone; `redis.password`/`redis.db` and the `llm` block are honoured; `gohead version` reports the build.
+- The scheduler reloads cron agents every minute.
 
 ### Fixed
 - Item creation leaked an open database transaction on every request; single and bulk creation are now atomic and events are published after commit.
@@ -41,6 +51,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Relation population depth is capped (`level` ≤ 5).
 - Middleware errors now use the same `{"error": {...}}` envelope as handlers.
 - The test suite passes again (7 of 12 packages were failing), including under `-race`.
+- Enum attributes could not be saved; components could not be created (tables not migrated).
+- `float`, `decimal`, `integer`, `enumeration` and `password` values were rejected.
+- Cron triggers never ran an agent; agent functions failed on string arguments from the runner.
+- GraphQL relation fields resolved to `null`; relation IDs showed as `0` after nested creates.
+- Agent history replayed to the LLM is bounded (last 40 messages).
+- The default CORS headers did not allow `Authorization`, so the admin UI failed from another origin.
+- The Docker image did not build, and the admin UI did not type-check.
 
 ## [0.1.0] - 2025-01-05
 ### Added

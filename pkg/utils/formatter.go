@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"math"
 	"strings"
 
 	"github.com/gohead-cms/gohead/internal/models"
@@ -200,18 +201,13 @@ func capitalize(s string) string {
 }
 
 func toInt(val interface{}) int {
-	switch v := val.(type) {
-	case int:
-		return v
-	case int64:
-		return int(v)
-	case float64:
-		return int(v)
-	case float32:
-		return int(v)
-	default:
+	// Relation IDs may be stored as any numeric type (uint after a nested
+	// create, float64 after a JSON round-trip, ...).
+	u := models.ToUint(val)
+	if u > uint(math.MaxInt) {
 		return 0
 	}
+	return int(u)
 }
 
 // SecretMask replaces stored secrets in API responses. Sending it back

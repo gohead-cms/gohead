@@ -28,13 +28,16 @@ func ResolveRelation(p graphql.ResolveParams, collectionID uint, attr models.Att
 	}
 
 	// Handle Many-to-Many and One-to-Many Relations
-	if attr.Relation == "oneToMany" || attr.Relation == "manyToMany" {
+	// Only manyToMany stores a list of IDs (see models.ValidateItemValues);
+	// the other kinds store a single ID.
+	if attr.Relation == "manyToMany" {
 		relatedIDs, ok := relationValue.([]any)
 		if !ok {
 			return nil, fmt.Errorf("invalid relation format for '%s', expected an array", attr.Name)
 		}
 
-		var results []models.JSONMap
+		// Field resolvers expect plain map[string]any sources.
+		var results []map[string]any
 		for _, rawID := range relatedIDs {
 
 			id := models.ToUint(rawID)
@@ -49,13 +52,13 @@ func ResolveRelation(p graphql.ResolveParams, collectionID uint, attr models.Att
 			}
 
 			relatedItem.Data["id"] = relatedItem.ID
-			results = append(results, relatedItem.Data)
+			results = append(results, map[string]any(relatedItem.Data))
 		}
 		return results, nil
 	}
 
 	// Handle One-to-One and Many-to-One Relations
-	if attr.Relation == "oneToOne" || attr.Relation == "manyToOne" {
+	if attr.Relation == "oneToOne" || attr.Relation == "oneToMany" || attr.Relation == "manyToOne" {
 		id := models.ToUint(relationValue)
 		if id == 0 {
 			return nil, fmt.Errorf("invalid ID format for relation '%s'", attr.Name)
@@ -67,7 +70,7 @@ func ResolveRelation(p graphql.ResolveParams, collectionID uint, attr models.Att
 		}
 
 		relatedItem.Data["id"] = relatedItem.ID
-		return relatedItem.Data, nil
+		return map[string]any(relatedItem.Data), nil
 	}
 
 	return nil, fmt.Errorf("unsupported relation type '%s'", attr.Type)

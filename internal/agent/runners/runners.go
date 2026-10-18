@@ -67,17 +67,14 @@ func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Ag
 	registry := functions.NewRegistry(agent.Functions)
 
 	langchainTools := registry.ToLangchainTools()
-	logger.Log.WithFields(map[string]any{
-		"tools": langchainTools,
-	}).Info("tools")
+	logger.Log.WithField("tools", len(langchainTools)).Debug("Agent tools ready")
 	// 2. Prepare conversation history
 	history, err := storage.GetConversationHistory(agent.ID)
 	if err != nil {
 		return fmt.Errorf("could not load conversation history: %w", err)
 	}
-	logger.Log.WithFields(map[string]any{
-		"history": history,
-	}).Info("Agent History")
+	history = trimHistory(history, maxHistoryMessages)
+	logger.Log.WithField("history_messages", len(history)).Debug("Loaded agent history")
 	contextualInput := r.createContextualInput(payload)
 	messages := []llm.Message{
 		{Role: llm.RoleSystem, Content: agent.SystemPrompt},
@@ -94,17 +91,12 @@ func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Ag
 			"max_turns": agent.MaxTurns,
 		}).Info("Starting turn")
 
-		logger.Log.Info("ENVOI")
-
 		response, err := llmClient.Chat(
 			ctx,
 			messages,
 			llm.WithTools(langchainTools),
 		)
-		logger.Log.WithFields(map[string]any{
-			"response": response,
-		}).Info("LLM Response")
-		logger.Log.Info(response)
+		logger.Log.WithField("response", response).Debug("LLM response")
 		if err != nil {
 			return fmt.Errorf("LLM call failed on turn %d: %w", i+1, err)
 		}
@@ -172,8 +164,7 @@ func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Ag
 			break
 		}
 	}
-	logger.Log.Info("MESSAGE")
-	logger.Log.Info(messages)
+	logger.Log.WithField("messages", len(messages)).Debug("Conversation finished")
 	// 4. Save the final conversation history
 	if err := storage.SaveConversationHistory(agent.ID, messages[1:]); err != nil {
 		return fmt.Errorf("could not save conversation history: %w", err)
@@ -224,4 +215,24 @@ func (r *AgentRunner) createContextualInput(payload jobs.AgentJobPayload) string
 	}
 
 	return "You have been activated. Please execute your task according to your system prompt."
+}
+
+// maxHistoryMessages bounds how much past conversation is replayed to the LLM,
+// so that event-driven agents do not grow their context without limit.
+const maxHistoryMessages = 40
+
+// trimHistory keeps at most max recent messages and starts the window on a
+// user message, so a tool result is never separated from the assistant
+// message that requested it.
+func trimHistory(history []llm.Message, max int) []llm.Message {
+	if len(history) <= max {
+		return history
+	}
+	h := history[len(history)-max:]
+	for i, m := range h {
+		if m.Role == llm.RoleUser {
+			return h[i:]
+		}
+	}
+	return nil
 }

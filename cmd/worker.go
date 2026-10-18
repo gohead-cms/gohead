@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/gohead-cms/gohead/pkg/llm"
 	"log"
 
 	"github.com/hibiken/asynq"
@@ -40,6 +41,7 @@ func runWorker(cfgPath string) {
 
 	// 2. Initialize logger and database just like in start.go
 	logger.InitLogger(cfg.LogLevel)
+	llm.SetDefaultConfig(cfg.LLM)
 
 	var gormLogLevel gormlogger.LogLevel
 	switch cfg.LogLevel {
@@ -61,7 +63,7 @@ func runWorker(cfgPath string) {
 
 	// 3. Create the Asynq server for consuming jobs
 	srv := asynq.NewServer(
-		asynq.RedisClientOpt{Addr: cfg.Redis.Address},
+		cfg.RedisClientOpt(),
 		asynq.Config{
 			Concurrency: 10,
 			Logger:      &logger.AsynqLoggerAdapter{},

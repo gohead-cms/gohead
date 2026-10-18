@@ -16,7 +16,7 @@ type BaseAttribute struct {
 	Type         string   `json:"type"`
 	Required     bool     `json:"required"`
 	Unique       bool     `json:"unique,omitempty"`
-	Options      []string `gorm:"type:json" json:"options,omitempty"`
+	Options      []string `gorm:"type:json;serializer:json" json:"options,omitempty"`
 	Min          *int     `json:"min,omitempty"`
 	Max          *int     `json:"max,omitempty"`
 	Pattern      string   `json:"pattern,omitempty"`
@@ -38,7 +38,7 @@ type Attribute struct {
 	Type         string   `json:"type"` // e.g., "text", "int", "bool", "date", "richtext", "enum", "relation", "component"
 	Required     bool     `json:"required"`
 	Unique       bool     `json:"unique,omitempty"`
-	Options      []string `gorm:"type:json" json:"options,omitempty"`
+	Options      []string `gorm:"type:json;serializer:json" json:"options,omitempty"`
 	Min          *int     `json:"min,omitempty"`
 	Max          *int     `json:"max,omitempty"`
 	Pattern      string   `json:"pattern,omitempty"`

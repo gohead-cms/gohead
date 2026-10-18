@@ -57,7 +57,7 @@ func initializeDispatcher(cfgPath string) (*asynq.Server, *asynq.ServeMux, error
 		return nil, nil, err
 	}
 
-	redisOpt := asynq.RedisClientOpt{Addr: cfg.Redis.Address}
+	redisOpt := cfg.RedisClientOpt()
 
 	// The Asynq server for listening to events.
 	srv := asynq.NewServer(
