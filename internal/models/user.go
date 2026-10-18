@@ -16,9 +16,9 @@ import (
 // UserRole defines the role of a user
 type UserRole struct {
 	ID          uint    `json:"id"`
-	Name        string  `json:"name"`                                                // Role name (e.g., admin, editor, viewer)
-	Description string  `json:"description"`                                         // Role description
-	Permissions JSONMap `json:"permissions" gorm:"type:jsonb;default:'[]';not null"` // Use 'jsonb' for PostgreSQL // Permissions associated with the role
+	Name        string  `json:"name"`                                   // Role name (e.g., admin, editor, viewer)
+	Description string  `json:"description"`                            // Role description
+	Permissions JSONMap `json:"permissions" gorm:"type:jsonb;not null"` // Permissions associated with the role (JSON on MySQL)
 }
 
 // User represents a user in the system with extended profile information.
@@ -29,7 +29,7 @@ type User struct {
 	Password        string    `json:"-"`                                    // Hashed password (never serialized)
 	UserRoleID      int       `json:"-"`                                    // Foreign key reference (not exposed in JSON)
 	Role            UserRole  `json:"role" gorm:"foreignKey:UserRoleID"`    // Associated role
-	Slug            string    `json:"slug" gorm:"uniqueIndex"`              // Unique slug for the user
+	Slug            string    `json:"slug" gorm:"uniqueIndex;size:191"`     // Unique slug for the user
 	ProfileImage    string    `json:"profile_image"`                        // URL to the user's profile image
 	CoverImage      *string   `json:"cover_image"`                          // URL to the user's cover image (optional)
 	Bio             string    `json:"bio"`                                  // Short biography

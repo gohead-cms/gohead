@@ -350,7 +350,8 @@ func lookup(collection Collection, data map[string]any, tx *gorm.DB) (uint, bool
 	query := tx.Model(&Item{}).Where("collection_id = ?", collection.ID)
 
 	for _, field := range lookupFields {
-		query = query.Where("data ->> ? = ?", field, fmt.Sprintf("%v", data[field]))
+		expr, arg := validation.JSONTextExpr(tx.Dialector.Name(), field)
+		query = query.Where(expr+" = ?", arg, fmt.Sprintf("%v", data[field]))
 	}
 
 	var items []Item

@@ -74,7 +74,31 @@ jobs:
           go-version: "1.27.x"
           check-latest: true
       # Packages share one database, so run them one at a time.
-      - run: go test -count=1 -p 1 ./pkg/storage/... ./internal/api/... ./internal/graphql/...
+      - run: go test -count=1 -p 1 ./pkg/... ./internal/...
+
+  mysql:
+    name: Go tests on MySQL
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: gohead
+          MYSQL_DATABASE: gohead
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -pgohead" --health-interval 5s
+          --health-timeout 3s --health-retries 30
+    env:
+      GOHEAD_TEST_DATABASE_URL: mysql://root:gohead@tcp(127.0.0.1:3306)/gohead?charset=utf8mb4&parseTime=True&loc=UTC
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27.x"
+          check-latest: true
+      # Packages share one database, so run them one at a time.
+      - run: go test -count=1 -p 1 ./pkg/... ./internal/...
 
   vulncheck:
     name: govulncheck

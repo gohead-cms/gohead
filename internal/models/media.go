@@ -16,17 +16,17 @@ import (
 type Media struct {
 	gorm.Model
 	ID         uint   `json:"id"`
-	Name       string `json:"name"`                    // original file name
-	Key        string `json:"-" gorm:"uniqueIndex"`    // path in the store
-	Driver     string `json:"-"`                       // store that holds it
-	MimeType   string `json:"mime" gorm:"index"`       // detected from the content
-	Size       int64  `json:"size"`                    // bytes
-	Width      *int   `json:"width"`                   // images only
-	Height     *int   `json:"height"`                  // images only
-	Hash       string `json:"hash" gorm:"index"`       // SHA-256 of the content
-	Alt        string `json:"alt"`                     // alternative text
-	Caption    string `json:"caption"`                 //
-	UploadedBy string `json:"uploadedBy" gorm:"index"` // username
+	Name       string `json:"name"`                          // original file name
+	Key        string `json:"-" gorm:"uniqueIndex;size:255"` // path in the store
+	Driver     string `json:"-"`                             // store that holds it
+	MimeType   string `json:"mime" gorm:"index"`             // detected from the content
+	Size       int64  `json:"size"`                          // bytes
+	Width      *int   `json:"width"`                         // images only
+	Height     *int   `json:"height"`                        // images only
+	Hash       string `json:"hash" gorm:"index"`             // SHA-256 of the content
+	Alt        string `json:"alt"`                           // alternative text
+	Caption    string `json:"caption"`                       //
+	UploadedBy string `json:"uploadedBy" gorm:"index"`       // username
 }
 
 // MediaResponse is the JSON shape of a media file in API responses.

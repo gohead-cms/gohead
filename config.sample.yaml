@@ -15,7 +15,7 @@ server_port: "8080"
 
 # sqlite://path/to/file.db
 # postgres://user:pass@host:5432/db?sslmode=disable
-# mysql://user:pass@tcp(host:3306)/db?charset=utf8mb4&parseTime=True&loc=Local
+# mysql://user:pass@tcp(host:3306)/db?charset=utf8mb4&parseTime=True&loc=UTC
 database_url: sqlite://gohead.db
 
 # Signs login tokens. Use a long random value (openssl rand -hex 32).

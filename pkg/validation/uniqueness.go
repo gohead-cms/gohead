@@ -18,6 +18,20 @@ func JSONPath(key string) string {
 	return `$."` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(key) + `"`
 }
 
+// JSONTextExpr returns a SQL expression for the text value of a top-level
+// key of the JSON "data" column, and its argument. The key is always bound,
+// never interpolated.
+func JSONTextExpr(dialect, key string) (string, any) {
+	switch dialect {
+	case "mysql":
+		return "JSON_UNQUOTE(JSON_EXTRACT(data, ?))", JSONPath(key)
+	case "postgres":
+		return "(CAST(data AS JSONB) ->> CAST(? AS TEXT))", key
+	default: // sqlite
+		return "CAST(json_extract(data, ?) AS TEXT)", JSONPath(key)
+	}
+}
+
 // CheckFieldUniqueness checks that no other live item of the collection has
 // the same value for fieldName. excludeID (the item being updated, or 0) is
 // ignored, and so are soft-deleted items. tx may be nil.

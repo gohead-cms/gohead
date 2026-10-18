@@ -18,13 +18,13 @@ type APIToken struct {
 	ID          uint       `json:"id"`
 	Name        string     `json:"name"`
 	Description string     `json:"description"`
-	Role        string     `json:"role"`                   // viewer, editor or admin
-	Hash        string     `json:"-" gorm:"uniqueIndex"`   // hex SHA-256 of the secret
-	Prefix      string     `json:"prefix"`                 // first characters, to recognize it
-	CreatedBy   string     `json:"createdBy"`              //
-	ExpiresAt   *time.Time `json:"expiresAt"`              // nil: never
-	LastUsedAt  *time.Time `json:"lastUsedAt"`             // updated at most once a minute
-	RevokedAt   *time.Time `json:"revokedAt" gorm:"index"` //
+	Role        string     `json:"role"`                         // viewer, editor or admin
+	Hash        string     `json:"-" gorm:"uniqueIndex;size:64"` // hex SHA-256 of the secret
+	Prefix      string     `json:"prefix"`                       // first characters, to recognize it
+	CreatedBy   string     `json:"createdBy"`                    //
+	ExpiresAt   *time.Time `json:"expiresAt"`                    // nil: never
+	LastUsedAt  *time.Time `json:"lastUsedAt"`                   // updated at most once a minute
+	RevokedAt   *time.Time `json:"revokedAt" gorm:"index"`       //
 }
 
 // Active reports whether the token can still be used at t.
