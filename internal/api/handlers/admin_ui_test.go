@@ -1,13 +1,18 @@
 package handlers
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/gohead-cms/gohead/internal/accounts"
 	"github.com/gohead-cms/gohead/internal/api/middleware"
 	agents "github.com/gohead-cms/gohead/internal/models/agents"
+	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/storage"
 
 	"github.com/stretchr/testify/assert"
@@ -137,4 +142,46 @@ func TestCollectionSchemaRoundTrip(t *testing.T) {
 	// The relation still points at the collection (stored without the api:: prefix).
 	a.ok("editor", "POST", "/api/collections/authors", map[string]any{"data": map[string]any{"name": "Ada"}})
 	a.ok("editor", "POST", "/api/collections/posts", map[string]any{"data": map[string]any{"title": "Hello", "author": 1}})
+}
+
+func TestAdminsCannotLockThemselvesOut(t *testing.T) {
+	a := newContentAPI(t)
+	users := a.router.Group("/admin/users", middleware.AuthMiddleware(), middleware.AdminOnly())
+	users.POST("", CreateUser)
+	users.PUT("/:id", UpdateUser)
+	users.DELETE("/:id", DeleteUser)
+
+	me, err := accounts.CreateAdmin("admin-user", "admin@example.com", "a-long-admin-password")
+	require.NoError(t, err)
+	path := func(id any) string { return "/admin/users/" + fmt.Sprint(id) }
+
+	code, _ := a.do("admin", "PUT", path(me.ID), map[string]any{"role_name": "editor"})
+	assert.Equal(t, http.StatusConflict, code, "no self-demotion")
+
+	a.ok("admin", "POST", "/admin/users", map[string]any{"username": "alice", "email": "alice@example.com", "password": "alice-password", "role_name": "admin"})
+	alice, err := storage.GetUserByUsername("alice")
+	require.NoError(t, err)
+	a.ok("admin", "PUT", path(alice.ID), map[string]any{"role_name": "editor"}) // two admins: fine
+
+	// Another admin session cannot remove the last admin either.
+	asOther := func(method, target string, body any) (int, string) {
+		var buf bytes.Buffer
+		if body != nil {
+			require.NoError(t, json.NewEncoder(&buf).Encode(body))
+		}
+		req := httptest.NewRequest(method, target, &buf)
+		req.Header.Set("Content-Type", "application/json")
+		token, err := auth.GenerateJWT("other-admin", "admin")
+		require.NoError(t, err)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rr := httptest.NewRecorder()
+		a.router.ServeHTTP(rr, req)
+		return rr.Code, rr.Body.String()
+	}
+	code, body := asOther("PUT", path(me.ID), map[string]any{"role_name": "viewer"})
+	assert.Equal(t, http.StatusConflict, code)
+	assert.Contains(t, body, "last admin")
+	code, body = asOther("DELETE", path(me.ID), nil)
+	assert.Equal(t, http.StatusConflict, code)
+	assert.Contains(t, body, "last admin")
 }
