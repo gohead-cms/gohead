@@ -22,7 +22,7 @@ Admin UI (it calls the API at {{ include "gohead.apiUrl" . }}):
 {{- end }}
 {{- end }}
 
-{{- if .Values.bootstrapAdmin.username }}
+{{- if (dig "username" "" (.Values.bootstrapAdmin | default dict)) }}
 
 Administrator: {{ .Values.bootstrapAdmin.username }} (created on first start).
 {{- else }}

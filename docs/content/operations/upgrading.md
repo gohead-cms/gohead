@@ -16,7 +16,8 @@ GoHead follows [semantic versioning](https://semver.org/). Before 1.0, minor ver
     === "Helm"
 
         ```bash
-        helm upgrade gohead oci://ghcr.io/gohead-cms/charts/gohead --version 0.5.0 --reuse-values
+        helm upgrade gohead oci://ghcr.io/gohead-cms/charts/gohead --version 0.5.0 \
+          --reset-then-reuse-values   # new chart defaults + your values
         ```
 
         The API pods' `migrate` init container applies the migrations before the new API
@@ -55,6 +56,11 @@ gohead migrate status        # what ran, what is pending
 gohead migrate               # apply pending migrations
 gohead migrate down          # revert the last one, when it can be undone
 ```
+
+The lock is a session lock: with PgBouncer in transaction pooling mode, point
+`gohead migrate` at PostgreSQL directly (or a session-mode pool), or a stuck lock can make
+later runs wait for 10 minutes. On SQLite there is no lock: run migrations from one
+process (the API itself, or `gohead migrate` while the API is stopped).
 
 `0001_baseline` creates the schema on a new database, and brings a database created by an
 earlier version (which migrated automatically from the models) up to date. Later

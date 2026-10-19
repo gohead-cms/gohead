@@ -37,7 +37,7 @@ spec:
       {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      {{- if .Values.migrations.initContainer }}
+      {{- if (dig "initContainer" true (.Values.migrations | default dict)) }}
       initContainers:
         # Applies pending migrations once; replicas starting together wait
         # on the database lock, then find nothing to do.

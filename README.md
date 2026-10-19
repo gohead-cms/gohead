@@ -51,18 +51,19 @@ permissions as a human.
 
 ```bash
 git clone https://github.com/gohead-cms/gohead.git && cd gohead
-echo "GOHEAD_JWT_SECRET=$(openssl rand -hex 32)" > .env
-echo "GOHEAD_ADMIN_PASSWORD=change-me-please" >> .env   # first admin: "admin"
+printf 'GOHEAD_JWT_SECRET=%s\nGOHEAD_ADMIN_USERNAME=admin\nGOHEAD_ADMIN_PASSWORD=%s\n' \
+  "$(openssl rand -hex 32)" "$(openssl rand -hex 12)" > .env
 docker compose up -d        # API :8080 · admin UI :3000 · Postgres · Redis · MinIO · workers
+export ADMIN_PASSWORD=$(sed -n 's/^GOHEAD_ADMIN_PASSWORD=//p' .env)
 ```
 
-Log in as the admin and model a collection:
+Log in as the admin (password in `.env`) and model a collection:
 
 ```bash
 export GOHEAD=http://localhost:8080 JSON='Content-Type: application/json'
 
 export AUTH="Authorization: Bearer $(curl -s -X POST $GOHEAD/auth/login -H "$JSON" \
-  -d '{"username":"admin","password":"change-me-please"}' | jq -r .data.token)"
+  -d "{\"username\":\"admin\",\"password\":\"$ADMIN_PASSWORD\"}" | jq -r .data.token)"
 
 curl -s -X POST $GOHEAD/admin/collections -H "$JSON" -H "$AUTH" -d '{
   "name": "articles", "kind": "collection",

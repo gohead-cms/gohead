@@ -427,7 +427,12 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *medi
 
 // insecureJWTSecrets are well-known values (shipped in samples/defaults) that
 // would let anyone forge admin tokens.
-var insecureJWTSecrets = map[string]bool{"": true, "your-secret-key": true}
+var insecureJWTSecrets = map[string]bool{
+	"":                true,
+	"your-secret-key": true,
+	// docker-compose.yml's fallback when GOHEAD_JWT_SECRET is not set
+	"change-me-to-a-long-random-string-0123456789": true,
+}
 
 // resolveJWTSecret returns the configured secret, or a random one when the
 // configured value is missing or a published default. A random secret keeps

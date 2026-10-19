@@ -23,8 +23,8 @@ var adminCreateCmd = &cobra.Command{
 	Short: "Create an administrator",
 	Long: `Creates an account with the admin role.
 
-The password is read from --password-stdin (recommended), or from the
-GOHEAD_ADMIN_PASSWORD environment variable. It needs at least 12 characters.
+The password is read from standard input (--password-stdin) and needs at
+least 12 characters.
 
   echo "$PASSWORD" | gohead admin create --username alice --email alice@example.com --password-stdin`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
@@ -56,8 +56,8 @@ GOHEAD_ADMIN_PASSWORD environment variable. It needs at least 12 characters.
 var adminPasswordCmd = &cobra.Command{
 	Use:   "set-password",
 	Short: "Replace a user's password (to recover an admin account)",
-	Long: `Replaces the password of --username, read from --password-stdin or
-GOHEAD_ADMIN_PASSWORD.
+	Long: `Replaces the password of --username, read from standard input
+(--password-stdin). Sessions already open stay valid until they expire.
 
   echo "$PASSWORD" | gohead admin set-password --username alice --password-stdin`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
@@ -84,20 +84,18 @@ GOHEAD_ADMIN_PASSWORD.
 	},
 }
 
-// readPassword reads the password from stdin (--password-stdin) or the
-// environment, never from a flag that would end up in the shell history.
+// readPassword reads the password from stdin. Never from a flag (shell
+// history) nor implicitly from the environment: GOHEAD_ADMIN_PASSWORD is the
+// bootstrap admin's password and is set in every pod that has it.
 func readPassword(cmd *cobra.Command) (string, error) {
-	if fromStdin, _ := cmd.Flags().GetBool("password-stdin"); fromStdin {
-		line, err := bufio.NewReader(os.Stdin).ReadString('\n')
-		if err != nil && line == "" {
-			return "", fmt.Errorf("could not read the password from stdin: %w", err)
-		}
-		return strings.TrimRight(line, "\r\n"), nil
+	if fromStdin, _ := cmd.Flags().GetBool("password-stdin"); !fromStdin {
+		return "", fmt.Errorf("give the password on standard input with --password-stdin")
 	}
-	if p := os.Getenv("GOHEAD_ADMIN_PASSWORD"); p != "" {
-		return p, nil
+	line, err := bufio.NewReader(os.Stdin).ReadString('\n')
+	if err != nil && line == "" {
+		return "", fmt.Errorf("could not read the password from stdin: %w", err)
 	}
-	return "", fmt.Errorf("give the password with --password-stdin or GOHEAD_ADMIN_PASSWORD")
+	return strings.TrimRight(line, "\r\n"), nil
 }
 
 func init() {
