@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/gohead-cms/gohead/internal/models"
-	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/auth"
+	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
 
 	"gorm.io/gorm"
