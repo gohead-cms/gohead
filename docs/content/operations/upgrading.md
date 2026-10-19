@@ -98,7 +98,10 @@ migrations are explicit, reviewed steps; contributors add them in `pkg/migration
 
 Also new, without action needed: the versioned migrations above (the first start records
 `0001_baseline`, then `0002_revisions` for [content history](../guides/content-history.md);
-existing entries get their first revision on their next change), agent run history and limits, scoped agent functions, API tokens,
+existing entries get their first revision on their next change, then `0003_i18n` for
+[localization](../guides/localization.md): existing content is in the default locale, `en`
+unless `GOHEAD_I18N_DEFAULT_LOCALE` says otherwise, so set it before upgrading if your content
+is in another language), agent run history and limits, scoped agent functions, API tokens,
 outbound webhooks and the OpenAPI document. Use `loc=UTC` in MySQL URLs.
 
 ### 0.4.0

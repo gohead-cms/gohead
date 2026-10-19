@@ -21,6 +21,7 @@ Each collection becomes a field named after it, returning a list:
 | `limit` | `Int` | 25 | 1–100. |
 | `offset` | `Int` | 0 | Items to skip. |
 | `status` | `String` | `published` | `published`, `draft` or `all`, as in [REST](rest-api.md#read). Drafts need the `update` permission. |
+| `locale`, `fallback` | `String`, `Boolean` | default locale, `true` | Collections with [localized attributes](localization.md#graphql) only. |
 
 Every type has `id`, `createdAt` and `updatedAt`; types of
 [draft-and-publish](content-modeling.md#draft-and-publish) collections also have `status` and

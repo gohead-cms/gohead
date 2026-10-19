@@ -33,6 +33,7 @@ Base URL: your API, e.g. `http://localhost:8080`. **Auth** column: `–` public,
 | `GET` | `/api/collections/{collection}/{id}/revisions/{version}` | token (update) | One version with its data and diff; `?compare=<version>\|current` |
 | `POST` | `/api/collections/{collection}/{id}/revisions/{version}/restore` | token (update) | Make a version current (brings back a deleted item) |
 | `GET` | `/api/singleton/{name}/revisions` | token (update) | History of a singleton (also `/{version}` and `/{version}/restore`) |
+| `GET` | `/api/locales` | token | Content [locales](../guides/localization.md), the default first. Reads take `?locale=` and `?fallback=`, and `PUT ?locale=` writes a translation |
 | `GET` | `/api/revisions` | token (update) | Change feed across entries; `collection`, `singleton`, `action`, `actorKind`, `actor`, `agentRun` |
 | `POST` | `/api/media` | token (create) | Upload files (`multipart/form-data`, field `files`) |
 | `GET` | `/api/media` | token (create) | List the media library (`page`, `pageSize`, `mime`, `search`) |
@@ -59,6 +60,14 @@ Base URL: your API, e.g. `http://localhost:8080`. **Auth** column: `–` public,
 `GET /admin/collections` also accepts `filter` (JSON object of column → value), `sort`
 (`["name","DESC"]`) and `range` (`[0,9]`), react-admin style, and returns a `Content-Range`
 header.
+
+## Locales
+
+| Method | Path | Auth | Body |
+|--------|------|------|------|
+| `POST` | `/admin/locales` | admin | `code` (BCP 47), `name` |
+| `PUT` | `/admin/locales/{code}` | admin | `name`, and/or `isDefault: true` (refused while the locale has translations) |
+| `DELETE` | `/admin/locales/{code}` | admin | `?purge=true` also deletes its translations (required when there are some) |
 
 ## Users
 

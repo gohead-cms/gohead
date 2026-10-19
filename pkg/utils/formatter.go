@@ -27,6 +27,9 @@ func FormatCollectionSchema(collection *models.Collection) map[string]any {
 		if attr.Unique {
 			attrDef["unique"] = true
 		}
+		if attr.Localized {
+			attrDef["localized"] = true
+		}
 		if len(attr.Options) > 0 {
 			attrDef["options"] = attr.Options
 		}

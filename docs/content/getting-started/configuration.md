@@ -146,6 +146,12 @@ its own `llm_config`.
 
 Provider keys can also come from `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`.
 
+### Locales
+
+| Key | Env | Default |
+|-----|-----|---------|
+| `i18n.default_locale` | `GOHEAD_I18N_DEFAULT_LOCALE` | `en`: the locale of existing content when the database has no locale yet (first start or upgrade). Afterwards, locales are managed through the API ([localization](../guides/localization.md)). |
+
 ### Content history
 
 | Key | Env | Default |
