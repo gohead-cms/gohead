@@ -8,6 +8,8 @@ import { useNotify } from "../../../shared/hooks/useNotify";
 import { PageLoader } from "../../../shared/ui/page-loader";
 import type { Schema } from "../../../shared/types";
 import { useMe } from "../../auth/me";
+import { HistoryDrawer } from "../../history/HistoryDrawer";
+import { RecentlyDeletedButton } from "../../history/RecentlyDeleted";
 import { type ContentItem, useCollectionContent, useCollectionsList, useSingletonsList } from "../hooks";
 import { ContentSelector } from "./ContentSelector";
 import { ContentTable } from "./ContentTable";
@@ -77,6 +79,8 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
   const [editingItem, setEditingItem] = useState<ContentItem | null>(null);
   // Bumped on every open, so the form starts from the entry it opens for.
   const [formKey, setFormKey] = useState(0);
+  // The entry whose history is open.
+  const [historyItem, setHistoryItem] = useState<ContentItem | null>(null);
   const base = `/api/collections/${encodeURIComponent(collectionName)}`;
 
   const openForm = (item: ContentItem | null) => {
@@ -106,6 +110,13 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
     }
   };
 
+  // A restored version replaces the entry: an open form for it would be
+  // stale, so it closes, and the list reloads.
+  const handleRestored = () => {
+    if (isOpen && editingItem && historyItem && String(editingItem.id) === String(historyItem.id)) onClose();
+    refetch();
+  };
+
   const handleTogglePublish = async (item: ContentItem) => {
     const action = item.status === "published" ? "unpublish" : "publish";
     try {
@@ -125,6 +136,7 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
         </Box>
         {canWrite && (
         <HStack>
+          <RecentlyDeletedButton collection={collectionName} onRestored={refetch} />
           <Button bg="white" variant="outline" size="sm" leftIcon={<Icon as={FiPlus} />} onClick={() => openForm(null)}>
             Quick Add
           </Button>
@@ -149,6 +161,7 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
           canWrite={canWrite}
           onAdd={() => openForm(null)}
           onEdit={openForm}
+          onHistory={setHistoryItem}
           onTogglePublish={handleTogglePublish}
           onDelete={handleDelete}
         />
@@ -160,7 +173,26 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
           </Button>
         </Flex>
       )}
-      <EntryFormModal key={`${collectionName}-${formKey}`} isOpen={isOpen} onClose={onClose} schema={schema} itemToEdit={editingItem} onSubmit={handleSaveItem} />
+      <EntryFormModal
+        key={`${collectionName}-${formKey}`}
+        isOpen={isOpen}
+        onClose={onClose}
+        schema={schema}
+        itemToEdit={editingItem}
+        onSubmit={handleSaveItem}
+        onShowHistory={canWrite ? setHistoryItem : undefined}
+      />
+      <HistoryDrawer
+        target={historyItem ? { kind: "item", collection: collectionName, id: historyItem.id, label: entryLabel(schema, historyItem) } : null}
+        onClose={() => setHistoryItem(null)}
+        onRestored={handleRestored}
+      />
     </>
   );
+}
+
+/** "Title (#12)" for an entry, or "#12" when it has no title. */
+function entryLabel(schema: Schema, item: ContentItem): string {
+  const title = ["title", "name"].map((k) => item[k]).find((v) => typeof v === "string" && v);
+  return title ? `${title} (#${item.id})` : `${schema.info?.displayName || schema.collectionName} #${item.id}`;
 }

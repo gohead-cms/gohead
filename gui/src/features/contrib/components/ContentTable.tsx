@@ -1,5 +1,5 @@
 import { Table, Thead, Tbody, Tr, Th, Td, TableContainer, IconButton, HStack, Box, Badge, Button, Tooltip } from "@chakra-ui/react";
-import { FiEdit, FiTrash2, FiEye, FiEyeOff, FiInbox, FiPlus } from "react-icons/fi";
+import { FiClock, FiEdit, FiTrash2, FiEye, FiEyeOff, FiInbox, FiPlus } from "react-icons/fi";
 import type { Schema } from "../../../shared/types";
 import { ConfirmButton } from "../../../shared/ui/ConfirmButton";
 import { EmptyState } from "../../../shared/ui/EmptyState";
@@ -13,11 +13,13 @@ interface ContentTableProps {
   canWrite: boolean;
   onAdd: () => void;
   onEdit: (item: ContentItem) => void;
+  /** Opens the entry's history (editors and admins). */
+  onHistory?: (item: ContentItem) => void;
   onTogglePublish: (item: ContentItem) => void;
   onDelete: (item: ContentItem) => Promise<void>;
 }
 
-export function ContentTable({ schema, items, canWrite, onAdd, onEdit, onTogglePublish, onDelete }: ContentTableProps) {
+export function ContentTable({ schema, items, canWrite, onAdd, onEdit, onHistory, onTogglePublish, onDelete }: ContentTableProps) {
   const drafts = !!schema.options?.draftAndPublish;
   const headers = tableColumns(schema);
 
@@ -81,6 +83,11 @@ export function ContentTable({ schema, items, canWrite, onAdd, onEdit, onToggleP
                           </Tooltip>
                         )}
                         <IconButton aria-label="Edit item" icon={<FiEdit />} size="sm" variant="ghost" onClick={() => onEdit(item)} />
+                        {onHistory && (
+                          <Tooltip label="History">
+                            <IconButton aria-label="Item history" icon={<FiClock />} size="sm" variant="ghost" onClick={() => onHistory(item)} />
+                          </Tooltip>
+                        )}
                         <ConfirmButton
                           trigger={<IconButton aria-label="Delete item" icon={<FiTrash2 />} size="sm" variant="ghost" colorScheme="red" />}
                           title="Delete this entry?"

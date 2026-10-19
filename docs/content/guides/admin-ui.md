@@ -47,12 +47,12 @@ An expired or revoked session signs you out.
 | Page | Path | What you can do |
 |------|------|-----------------|
 | Dashboard | `/dashboard` | Counts of content, media, users, agents and webhooks; agent runs and webhook deliveries of the last 24 hours; recent changes; quick actions |
-| Content editor | `/contrib` | Browse, create, edit, publish and delete entries of every collection; edit single types; a full-page editor for long-form content |
+| Content editor | `/contrib` | Browse, create, edit, publish and delete entries of every collection; edit single types; a full-page editor for long-form content; each entry's [history](content-history.md) with field-by-field diffs and restore; recently deleted entries |
 | Media library | `/media` | Upload by button or drag and drop, search and filter, edit name, alt text and caption, copy URLs, delete |
 | Types | `/model` | Create, edit and delete collections, components and single types: attributes of every type with their options (required, unique, enum values, ranges, relations, media, components), draft and publish |
 | Schema designer | `/workspace` | The saved content model as a graph: collections, relations and the agents listening to them |
-| Agents | `/agents` | Create and edit agents (model, prompt, trigger, functions from the built-in catalog with collection scopes, limits), run one now, inspect its runs step by step |
-| Activity | `/activity` | Runs of every agent with status, tokens, cost and duration, and usage against limits |
+| Agents | `/agents` | Create and edit agents (model, prompt, trigger, functions from the built-in catalog with collection scopes, limits), run one now, inspect its runs step by step, see the content a run changed and revert it |
+| Activity | `/activity` | **Agent runs**: runs of every agent with status, tokens, cost and duration, and usage against limits. **Content changes**: every change to content, filtered by who made it (people, API tokens, agents) and action |
 | Users | `/settings/users` | Create accounts, change roles, reset passwords. Admins can't demote or delete themselves or the last admin |
 | API tokens | `/settings/tokens` | Create role-scoped tokens (the secret is shown once) and revoke them |
 | Webhooks | `/settings/webhooks` | Outbound webhooks: events, collections, format, headers, signing secret, test sends and the delivery log |

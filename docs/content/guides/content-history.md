@@ -25,10 +25,10 @@ The newest **100 revisions per entry** are kept. Older ones are pruned as new on
 
 ## In the admin UI
 
-- **History** on an entry (in the content editor) lists its revisions with who made each change and when. Pick a revision to see what changed, field by field, against the previous version or the current one. **Restore this version** makes it current.
-- **Recently deleted** on a collection lists deleted entries. You can bring each one back.
-- **Activity → Content changes** is the change feed across all entries, filtered by actor (people, API tokens, agents) and action.
-- On an agent run, **Content changes** lists what the run changed, and **Revert content changes** undoes them (see [below](#reverting-an-agent-run)).
+- **History** opens from the clock icon on a row of the content table, from the edit drawer, or from a singleton's editor. It lists the entry's revisions with who made each one and when. For an agent, it links to the run. Pick a revision to see its changes field by field: against the previous version, or against the current content, which shows what restoring it would change. **Restore this version** makes it current.
+- **Recently deleted**, in a collection's header, lists the entries that are still deleted and brings them back.
+- **Activity → Content changes** is the change feed across all entries. You can filter it by who made the change (people, API tokens, agents) and by action.
+- An agent run's details list the **content changes** it made. Admins can **revert** them (see [below](#reverting-an-agent-run)).
 
 ## API
 

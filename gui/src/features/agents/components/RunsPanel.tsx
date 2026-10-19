@@ -66,10 +66,10 @@ function UsageStat({
 }
 
 /** Run history of an agent: usage against limits, then every run, newest first. */
-export function RunsPanel({ agentName }: { agentName: string }) {
+export function RunsPanel({ agentName, initialRun }: { agentName: string; initialRun?: number }) {
   const [status, setStatus] = useState<RunStatus | "">("");
   const [page, setPage] = useState(1);
-  const [openRun, setOpenRun] = useState<number | null>(null);
+  const [openRun, setOpenRun] = useState<number | null>(initialRun ?? null);
   const { runs, pagination, usage, loading, error, refresh } = useAgentRuns(agentName, status, page);
   const hover = useColorModeValue("gray.50", "gray.700");
 

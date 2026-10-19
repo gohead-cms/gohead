@@ -10,7 +10,7 @@ import { useAgentDetails } from "../hook/useAgentDetails";
 import { AgentSidebar } from "./AgentSidebar";
 import { AgentDetails } from "./AgentDetails";
 
-/** Agents list and the selected agent (?name=…; the first agent otherwise). */
+/** Agents list and the selected agent (?name=…; the first agent otherwise; ?run=… opens one of its runs). */
 export default function AgentsPage() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
@@ -66,7 +66,13 @@ export default function AgentsPage() {
         ) : detailsLoading && !agentDetails ? (
           <Spinner />
         ) : agentDetails ? (
-          <AgentDetails agent={agentDetails} onDelete={isAdmin ? () => remove(agentDetails.name) : undefined} />
+          <AgentDetails
+            // ?run=… opens that run; a new one starts the details again.
+            key={params.get("run") ?? ""}
+            agent={agentDetails}
+            initialRun={Number(params.get("run")) || undefined}
+            onDelete={isAdmin ? () => remove(agentDetails.name) : undefined}
+          />
         ) : !listLoading && !error ? (
           <Text color="gray.400">Select an agent to view its details</Text>
         ) : null}

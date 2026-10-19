@@ -9,6 +9,7 @@ import {
   DrawerFooter,
   Button,
 } from "@chakra-ui/react";
+import { FiClock } from "react-icons/fi";
 import type { Schema } from "../../../shared/types";
 import type { ContentItem } from "../hooks/useCollectionContent";
 import { EntryFields } from "./EntryFields";
@@ -20,13 +21,15 @@ interface EntryFormDrawerProps {
   schema: Schema;
   onSubmit: (payload: { data: Partial<ContentItem> }, id?: string | number) => Promise<void>;
   itemToEdit?: ContentItem | null; // Optional prop for the item being edited
+  /** Opens the history of the entry being edited (editors and admins). */
+  onShowHistory?: (item: ContentItem) => void;
 }
 
 /**
  * Creates or edits an entry. The form starts from schema and itemToEdit when
  * it mounts: give it a new key each time it is opened for another entry.
  */
-export function EntryFormModal({ isOpen, onClose, schema, itemToEdit, onSubmit }: EntryFormDrawerProps) {
+export function EntryFormModal({ isOpen, onClose, schema, itemToEdit, onSubmit, onShowHistory }: EntryFormDrawerProps) {
   const [formData, setFormData] = useState<Record<string, unknown>>(() => initialValues(schema.attributes, itemToEdit));
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -58,6 +61,11 @@ export function EntryFormModal({ isOpen, onClose, schema, itemToEdit, onSubmit }
           <EntryFields attributes={schema.attributes} values={formData} onChange={handleChange} idPrefix="entry-" />
         </DrawerBody>
         <DrawerFooter borderTopWidth="1px">
+          {itemToEdit && onShowHistory && (
+            <Button variant="ghost" leftIcon={<FiClock />} mr="auto" onClick={() => onShowHistory(itemToEdit)} isDisabled={isSubmitting}>
+              History
+            </Button>
+          )}
           <Button variant="outline" mr={3} onClick={onClose} isDisabled={isSubmitting}>
             Cancel
           </Button>
