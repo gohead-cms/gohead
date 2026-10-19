@@ -1,0 +1,2103 @@
+{
+  "components": {
+    "responses": {
+      "Error": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "description": "Error"
+      }
+    },
+    "schemas": {
+      "Component_seo": {
+        "additionalProperties": false,
+        "properties": {
+          "metaDescription": {
+            "type": "string"
+          },
+          "metaTitle": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "metaTitle"
+        ],
+        "type": "object"
+      },
+      "Error": {
+        "properties": {
+          "error": {
+            "properties": {
+              "details": {},
+              "message": {},
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "status",
+              "name",
+              "message"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
+      "Media": {
+        "properties": {
+          "alt": {
+            "type": "string"
+          },
+          "caption": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "hash": {
+            "type": "string"
+          },
+          "height": {
+            "oneOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": "integer"
+          },
+          "mime": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "uploadedBy": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "width": {
+            "oneOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "name",
+          "mime",
+          "size"
+        ],
+        "type": "object"
+      },
+      "Pagination": {
+        "properties": {
+          "page": {
+            "type": "integer"
+          },
+          "pageCount": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "Singleton_site": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "tagline": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "Singleton_siteInput": {
+        "additionalProperties": false,
+        "properties": {
+          "tagline": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "type": "object"
+      },
+      "articles": {
+        "properties": {
+          "author": {
+            "oneOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/authors"
+                  },
+                  {
+                    "description": "item ID (level=0, or beyond the requested level)",
+                    "type": "integer"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "body": {
+            "type": "string"
+          },
+          "category": {
+            "enum": [
+              "news",
+              "tutorial"
+            ],
+            "type": "string"
+          },
+          "coauthors": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/authors"
+                },
+                {
+                  "description": "item ID (level=0, or beyond the requested level)",
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array"
+          },
+          "cover": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Media"
+              },
+              {
+                "description": "file ID (level=0)",
+                "type": "integer"
+              },
+              {
+                "description": "external URL",
+                "type": "string"
+              }
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "faq": {
+            "items": {
+              "$ref": "#/components/schemas/Component_seo"
+            },
+            "type": "array"
+          },
+          "featured": {
+            "type": "boolean"
+          },
+          "gallery": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/Media"
+                },
+                {
+                  "description": "file ID (level=0)",
+                  "type": "integer"
+                },
+                {
+                  "description": "external URL",
+                  "type": "string"
+                }
+              ]
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "publishedAt": {
+            "oneOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "publishedOn": {
+            "format": "date",
+            "type": "string"
+          },
+          "rating": {
+            "type": "number"
+          },
+          "seo": {
+            "$ref": "#/components/schemas/Component_seo"
+          },
+          "stars": {
+            "maximum": 5,
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "published"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedOn": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "views": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "createdAt",
+          "updatedAt",
+          "status",
+          "publishedAt"
+        ],
+        "type": "object"
+      },
+      "articlesInput": {
+        "additionalProperties": false,
+        "properties": {
+          "author": {
+            "oneOf": [
+              {
+                "description": "an ID, {\"id\": …}, or a new item created in the same transaction",
+                "oneOf": [
+                  {
+                    "description": "ID of an existing item",
+                    "type": "integer"
+                  },
+                  {
+                    "$ref": "#/components/schemas/authorsInput"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "body": {
+            "type": "string"
+          },
+          "category": {
+            "enum": [
+              "news",
+              "tutorial"
+            ],
+            "type": "string"
+          },
+          "coauthors": {
+            "items": {
+              "description": "an ID, {\"id\": …}, or a new item created in the same transaction",
+              "oneOf": [
+                {
+                  "description": "ID of an existing item",
+                  "type": "integer"
+                },
+                {
+                  "$ref": "#/components/schemas/authorsInput"
+                }
+              ]
+            },
+            "type": "array"
+          },
+          "cover": {
+            "oneOf": [
+              {
+                "description": "file ID from POST /api/media",
+                "type": "integer"
+              },
+              {
+                "properties": {
+                  "id": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "file ID, or an external URL",
+                "type": "string"
+              }
+            ]
+          },
+          "faq": {
+            "items": {
+              "$ref": "#/components/schemas/Component_seo"
+            },
+            "type": "array"
+          },
+          "featured": {
+            "type": "boolean"
+          },
+          "gallery": {
+            "items": {
+              "oneOf": [
+                {
+                  "description": "file ID from POST /api/media",
+                  "type": "integer"
+                },
+                {
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "description": "file ID, or an external URL",
+                  "type": "string"
+                }
+              ]
+            },
+            "type": "array"
+          },
+          "publishedOn": {
+            "format": "date",
+            "type": "string"
+          },
+          "rating": {
+            "type": "number"
+          },
+          "seo": {
+            "$ref": "#/components/schemas/Component_seo"
+          },
+          "stars": {
+            "maximum": 5,
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedOn": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "views": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "type": "object"
+      },
+      "authors": {
+        "properties": {
+          "bio": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "authorsInput": {
+        "additionalProperties": false,
+        "properties": {
+          "bio": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "description": "A user JWT from POST /auth/login, or an API token (ght_…) from /admin/tokens.",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "REST API generated from this GoHead instance's content model. Authenticate with a user JWT (POST /auth/login) or an API token (ght_…).",
+    "title": "GoHead API",
+    "version": "contract"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/collections/articles": {
+      "get": {
+        "operationId": "list_articles",
+        "parameters": [
+          {
+            "description": "filters[field]=value or filters[field][$op]=value; ops: $eq $ne $lt $lte $gt $gte $contains",
+            "explode": true,
+            "in": "query",
+            "name": "filters",
+            "schema": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "style": "deepObject"
+          },
+          {
+            "description": "How deep relations are populated (0: IDs only).",
+            "in": "query",
+            "name": "level",
+            "schema": {
+              "default": 1,
+              "maximum": 5,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "default": 10,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "field[:asc|:desc],… (attributes, id, createdAt, updatedAt, publishedAt)",
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Draft-and-publish collections: published (default), draft or all. Drafts need the update permission.",
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "enum": [
+                "published",
+                "draft",
+                "all"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/articles"
+                      },
+                      "type": "array"
+                    },
+                    "meta": {
+                      "properties": {
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Items"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "List articles",
+        "tags": [
+          "articles"
+        ]
+      },
+      "post": {
+        "operationId": "create_articles",
+        "parameters": [
+          {
+            "description": "How deep relations are populated (0: IDs only).",
+            "in": "query",
+            "name": "level",
+            "schema": {
+              "default": 1,
+              "maximum": 5,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "properties": {
+                      "data": {
+                        "$ref": "#/components/schemas/articlesInput"
+                      },
+                      "status": {
+                        "enum": [
+                          "draft",
+                          "published"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "data"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "items": {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/articlesInput"
+                        },
+                        "status": {
+                          "enum": [
+                            "draft",
+                            "published"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "data"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/articles"
+                        },
+                        {
+                          "items": {
+                            "$ref": "#/components/schemas/articles"
+                          },
+                          "type": "array"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Create one item, or a batch (all or nothing)",
+        "tags": [
+          "articles"
+        ]
+      }
+    },
+    "/api/collections/articles/{id}": {
+      "delete": {
+        "operationId": "delete_articles",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "null"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Deleted"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Delete an item",
+        "tags": [
+          "articles"
+        ]
+      },
+      "get": {
+        "operationId": "get_articles",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "How deep relations are populated (0: IDs only).",
+            "in": "query",
+            "name": "level",
+            "schema": {
+              "default": 1,
+              "maximum": 5,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "published to hide drafts; editors get drafts by ID by default.",
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "enum": [
+                "published",
+                "draft",
+                "all"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/articles"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Item"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Get one item",
+        "tags": [
+          "articles"
+        ]
+      },
+      "put": {
+        "operationId": "update_articles",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "How deep relations are populated (0: IDs only).",
+            "in": "query",
+            "name": "level",
+            "schema": {
+              "default": 1,
+              "maximum": 5,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "data": {
+                    "$ref": "#/components/schemas/articlesInput"
+                  },
+                  "status": {
+                    "enum": [
+                      "draft",
+                      "published"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "data"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/articles"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Updated"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Replace an item's data",
+        "tags": [
+          "articles"
+        ]
+      }
+    },
+    "/api/collections/articles/{id}/publish": {
+      "post": {
+        "operationId": "publish_articles",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "How deep relations are populated (0: IDs only).",
+            "in": "query",
+            "name": "level",
+            "schema": {
+              "default": 1,
+              "maximum": 5,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/articles"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Item"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "publish an item",
+        "tags": [
+          "articles"
+        ]
+      }
+    },
+    "/api/collections/articles/{id}/unpublish": {
+      "post": {
+        "operationId": "unpublish_articles",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "How deep relations are populated (0: IDs only).",
+            "in": "query",
+            "name": "level",
+            "schema": {
+              "default": 1,
+              "maximum": 5,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/articles"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Item"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "unpublish an item",
+        "tags": [
+          "articles"
+        ]
+      }
+    },
+    "/api/collections/authors": {
+      "get": {
+        "operationId": "list_authors",
+        "parameters": [
+          {
+            "description": "filters[field]=value or filters[field][$op]=value; ops: $eq $ne $lt $lte $gt $gte $contains",
+            "explode": true,
+            "in": "query",
+            "name": "filters",
+            "schema": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "style": "deepObject"
+          },
+          {
+            "description": "How deep relations are populated (0: IDs only).",
+            "in": "query",
+            "name": "level",
+            "schema": {
+              "default": 1,
+              "maximum": 5,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "default": 10,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "field[:asc|:desc],… (attributes, id, createdAt, updatedAt, publishedAt)",
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/authors"
+                      },
+                      "type": "array"
+                    },
+                    "meta": {
+                      "properties": {
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Items"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "List authors",
+        "tags": [
+          "authors"
+        ]
+      },
+      "post": {
+        "operationId": "create_authors",
+        "parameters": [
+          {
+            "description": "How deep relations are populated (0: IDs only).",
+            "in": "query",
+            "name": "level",
+            "schema": {
+              "default": 1,
+              "maximum": 5,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "properties": {
+                      "data": {
+                        "$ref": "#/components/schemas/authorsInput"
+                      }
+                    },
+                    "required": [
+                      "data"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "items": {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/authorsInput"
+                        }
+                      },
+                      "required": [
+                        "data"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/authors"
+                        },
+                        {
+                          "items": {
+                            "$ref": "#/components/schemas/authors"
+                          },
+                          "type": "array"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Create one item, or a batch (all or nothing)",
+        "tags": [
+          "authors"
+        ]
+      }
+    },
+    "/api/collections/authors/{id}": {
+      "delete": {
+        "operationId": "delete_authors",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "null"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Deleted"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Delete an item",
+        "tags": [
+          "authors"
+        ]
+      },
+      "get": {
+        "operationId": "get_authors",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "How deep relations are populated (0: IDs only).",
+            "in": "query",
+            "name": "level",
+            "schema": {
+              "default": 1,
+              "maximum": 5,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/authors"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Item"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Get one item",
+        "tags": [
+          "authors"
+        ]
+      },
+      "put": {
+        "operationId": "update_authors",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "How deep relations are populated (0: IDs only).",
+            "in": "query",
+            "name": "level",
+            "schema": {
+              "default": 1,
+              "maximum": 5,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "data": {
+                    "$ref": "#/components/schemas/authorsInput"
+                  }
+                },
+                "required": [
+                  "data"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/authors"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Updated"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Replace an item's data",
+        "tags": [
+          "authors"
+        ]
+      }
+    },
+    "/api/graphql": {
+      "post": {
+        "operationId": "graphql",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "operationName": {
+                    "type": "string"
+                  },
+                  "query": {
+                    "type": "string"
+                  },
+                  "variables": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "query"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "GraphQL result"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "GraphQL queries and mutations",
+        "tags": [
+          "graphql"
+        ]
+      }
+    },
+    "/api/media": {
+      "get": {
+        "operationId": "list_media",
+        "parameters": [
+          {
+            "description": "type prefix, e.g. image/",
+            "in": "query",
+            "name": "mime",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "part of the file name",
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/Media"
+                      },
+                      "type": "array"
+                    },
+                    "meta": {
+                      "properties": {
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Files"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "List the media library (create permission)",
+        "tags": [
+          "media"
+        ]
+      },
+      "post": {
+        "operationId": "upload_media",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "alt": {
+                    "type": "string"
+                  },
+                  "caption": {
+                    "type": "string"
+                  },
+                  "files": {
+                    "items": {
+                      "format": "binary",
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "files"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/Media"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Uploaded"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Upload files (all or nothing)",
+        "tags": [
+          "media"
+        ]
+      }
+    },
+    "/api/media/{id}": {
+      "delete": {
+        "operationId": "delete_media",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "tags": [
+          "media"
+        ]
+      },
+      "get": {
+        "operationId": "get_media",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Media"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "File"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "tags": [
+          "media"
+        ]
+      },
+      "put": {
+        "operationId": "update_media",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "data": {
+                    "properties": {
+                      "alt": {
+                        "type": "string"
+                      },
+                      "caption": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "data"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Media"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "File"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "tags": [
+          "media"
+        ]
+      }
+    },
+    "/api/singleton/site": {
+      "get": {
+        "operationId": "get_Singleton_site",
+        "parameters": [
+          {
+            "description": "How deep relations are populated (0: IDs only).",
+            "in": "query",
+            "name": "level",
+            "schema": {
+              "default": 1,
+              "maximum": 5,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Singleton_site"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Content"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Get the site singleton",
+        "tags": [
+          "singleton:site"
+        ]
+      },
+      "put": {
+        "operationId": "put_Singleton_site",
+        "parameters": [
+          {
+            "description": "How deep relations are populated (0: IDs only).",
+            "in": "query",
+            "name": "level",
+            "schema": {
+              "default": 1,
+              "maximum": 5,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "data": {
+                    "$ref": "#/components/schemas/Singleton_siteInput"
+                  }
+                },
+                "required": [
+                  "data"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Singleton_site"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Saved"
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Singleton_site"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Create or replace the site singleton",
+        "tags": [
+          "singleton:site"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "password": {
+                    "format": "password",
+                    "type": "string"
+                  },
+                  "username": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "username",
+                  "password"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "properties": {
+                        "token": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Token"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "security": [],
+        "summary": "Get a JWT (72 hours)",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "operationId": "register",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "email": {
+                    "format": "email",
+                    "type": "string"
+                  },
+                  "password": {
+                    "format": "password",
+                    "type": "string"
+                  },
+                  "username": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "username",
+                  "email",
+                  "password"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "security": [],
+        "summary": "Create a viewer account (when auth.registration is open)",
+        "tags": [
+          "auth"
+        ]
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "tags": [
+    {
+      "description": "Items of the articles collection",
+      "name": "articles"
+    },
+    {
+      "description": "Sessions",
+      "name": "auth"
+    },
+    {
+      "description": "Items of the authors collection",
+      "name": "authors"
+    },
+    {
+      "description": "GraphQL endpoint",
+      "name": "graphql"
+    },
+    {
+      "description": "Uploaded files",
+      "name": "media"
+    },
+    {
+      "description": "The site singleton",
+      "name": "singleton:site"
+    }
+  ]
+}
