@@ -14,7 +14,7 @@ test.describe("admin", () => {
     await page.goto("/model");
     await expect(page.getByRole("cell", { name: "articles", exact: true })).toBeVisible();
 
-    await page.getByRole("button", { name: "New collection" }).click();
+    await page.getByRole("link", { name: "New collection" }).click();
     await expect(page).toHaveURL(/\/model\/collections\/new$/);
     await page.getByRole("textbox", { name: /^Name/ }).fill(name);
     await page.getByRole("textbox", { name: /^Attribute name/ }).first().fill("headline");
@@ -48,7 +48,7 @@ test.describe("admin", () => {
     await page.getByRole("button", { name: "Create token" }).click();
     await expect(page.getByText(/ght_[A-Za-z0-9_-]{10,}/)).toBeVisible();
     await page.getByRole("button", { name: "I have stored it" }).click();
-    await expect(page.getByRole("cell", { name: `ci${test.info().retry}`, exact: true })).toBeVisible();
+    await expect(page.getByRole("table").getByText(`ci${test.info().retry}`, { exact: true })).toBeVisible();
   });
 
   test("media: upload a file", async ({ page }) => {
