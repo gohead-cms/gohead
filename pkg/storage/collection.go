@@ -440,3 +440,52 @@ func IsReferencedByOtherCollections(collectionName string, tx *gorm.DB) ([]model
 	err := tx.Where("type = ? AND target = ?", "relation", collectionName).Find(&referencingAttrs).Error
 	return referencingAttrs, err
 }
+
+// NestedWriteTargets lists the collections that writing data into ct may
+// look up or create items in: relations given as objects without an "id"
+// are matched against, or created in, their target (see
+// models.ValidateItemValues). Raw IDs and {"id": …} only link items.
+func NestedWriteTargets(ct models.Collection, data map[string]any) ([]string, error) {
+	seen := map[string]bool{}
+	var out []string
+	var walk func(ct models.Collection, data map[string]any, depth int) error
+	walk = func(ct models.Collection, data map[string]any, depth int) error {
+		if depth > 5 {
+			return nil
+		}
+		for _, attr := range ct.Attributes {
+			if attr.Type != "relation" || attr.Target == "" {
+				continue
+			}
+			var objects []map[string]any
+			switch v := data[attr.Name].(type) {
+			case map[string]any:
+				objects = append(objects, v)
+			case []any:
+				for _, el := range v {
+					if m, ok := el.(map[string]any); ok {
+						objects = append(objects, m)
+					}
+				}
+			}
+			for _, obj := range objects {
+				if _, hasID := obj["id"]; hasID {
+					continue
+				}
+				if !seen[attr.Target] {
+					seen[attr.Target] = true
+					out = append(out, attr.Target)
+				}
+				target, err := GetCollectionByName(attr.Target)
+				if err != nil {
+					return err
+				}
+				if err := walk(*target, obj, depth+1); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+	return out, walk(ct, data, 0)
+}

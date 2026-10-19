@@ -152,6 +152,9 @@ func handleCreate(c *gin.Context, userRole string, ct *models.Collection) {
 		if publish != nil && *publish && !allow(c, auth.ActionPublish, ct.Name) {
 			return
 		}
+		if !allowNested(c, *ct, b.Data) {
+			return
+		}
 	}
 
 	// All items are validated and stored in a single transaction.

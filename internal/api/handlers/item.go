@@ -241,6 +241,9 @@ func UpdateItem(collection models.Collection) gin.HandlerFunc {
 		if publish != nil && !allow(c, auth.ActionPublish, collection.Name) {
 			return
 		}
+		if !allowNested(c, collection, input.Data) {
+			return
+		}
 
 		var item *models.Item
 		if rc.translated() {

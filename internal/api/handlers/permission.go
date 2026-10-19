@@ -5,6 +5,7 @@ import (
 
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/auth"
+	"github.com/gohead-cms/gohead/pkg/storage"
 
 	"github.com/gin-gonic/gin"
 )
@@ -52,4 +53,23 @@ func readableCollections(c *gin.Context, collections []models.Collection) []mode
 		}
 	}
 	return out
+}
+
+// allowNested answers 403 and returns false when data would look up or
+// create items (relations given as objects) in a collection the caller
+// cannot read and create in.
+func allowNested(c *gin.Context, ct models.Collection, data map[string]any) bool {
+	targets, err := storage.NestedWriteTargets(ct, data)
+	if err != nil {
+		return true // validation reports unknown targets
+	}
+	for _, name := range targets {
+		if !can(c, auth.ActionCreate, name) {
+			c.Set("response", "Access denied")
+			c.Set("details", "relation values given as objects create items in "+name+", which your role cannot do; link existing items by ID instead")
+			c.Set("status", http.StatusForbidden)
+			return false
+		}
+	}
+	return true
 }

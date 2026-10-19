@@ -125,6 +125,13 @@ func TestCustomRolesEnforced(t *testing.T) {
 		assert.Equal(t, http.StatusForbidden, code)
 		code, _ = a.do("writer", "POST", "/api/collections/pages", map[string]any{"data": map[string]any{"title": "x"}})
 		assert.Equal(t, http.StatusForbidden, code)
+		code, out := a.do("writer", "POST", "/api/collections/articles", map[string]any{
+			"data": map[string]any{"title": "x", "page": map[string]any{"title": "Sneaky"}},
+		})
+		assert.Equal(t, http.StatusForbidden, code, "relation objects would create a page: %v", out)
+		a.ok("writer", "POST", "/api/collections/articles", map[string]any{
+			"data": map[string]any{"title": "x", "page": map[string]any{"id": page["id"]}},
+		})
 
 		schemas := a.ok("writer", "GET", "/api/schema/collections", nil).([]any)
 		require.Len(t, schemas, 1)

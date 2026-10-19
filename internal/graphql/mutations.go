@@ -193,6 +193,21 @@ func generateGraphQLInputType(collection models.Collection, partial bool) *graph
 // same permission table as the REST API, and writes go through the storage
 // layer so validation, nested relations and events behave identically.
 
+// requireNested refuses writes whose relation objects would create items
+// in collections the role cannot create in.
+func requireNested(p graphql.ResolveParams, collection models.Collection, data map[string]any) error {
+	targets, err := storage.NestedWriteTargets(collection, data)
+	if err != nil {
+		return nil
+	}
+	for _, name := range targets {
+		if err := requirePermission(p, auth.ActionCreate, name); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func requirePermission(p graphql.ResolveParams, action, collection string) error {
 	role := auth.RoleFromContext(p.Context)
 	if !auth.Can(role, action, collection) {
@@ -231,6 +246,9 @@ func createCollectionItem(p graphql.ResolveParams, inputData map[string]any, col
 		if err := requirePermission(p, auth.ActionPublish, collection.Name); err != nil {
 			return nil, err
 		}
+	}
+	if err := requireNested(p, collection, inputData); err != nil {
+		return nil, err
 	}
 	items, err := storage.CreateItems(storage.ActorFrom(p.Context), collection, []storage.ItemInput{{
 		Data:    models.JSONMap(inputData),
@@ -271,6 +289,9 @@ func updateCollectionItem(p graphql.ResolveParams, id string, inputData map[stri
 	}
 	loc, err := localeArgs(p)
 	if err != nil {
+		return nil, err
+	}
+	if err := requireNested(p, collection, inputData); err != nil {
 		return nil, err
 	}
 
