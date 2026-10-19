@@ -205,8 +205,8 @@ func queueRun(c *gin.Context, agent *agents.Agent, payload jobs.AgentJobPayload)
 		logger.Log.WithError(err).WithField("agent", agent.Name).Error("Failed to queue a run")
 		run.Status, run.Error = agents.RunFailed, "could not be queued"
 		_ = storage.SaveAgentRun(run)
-		c.Set("response", "Failed to queue the run")
-		c.Set("status", http.StatusInternalServerError)
+		c.Set("response", "Could not queue the run: the job queue (Redis) is unreachable")
+		c.Set("status", http.StatusServiceUnavailable)
 		return
 	}
 	c.Set("response", gin.H{"status": "queued", "runId": run.ID, "dryRun": payload.DryRun})

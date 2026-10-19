@@ -1,6 +1,7 @@
 import {
   Alert,
   AlertIcon,
+  Box,
   Button,
   Checkbox,
   CheckboxGroup,
@@ -15,6 +16,7 @@ import {
   InputLeftAddon,
   Select,
   SimpleGrid,
+  Switch,
   Text,
   Textarea,
   VStack,
@@ -312,6 +314,31 @@ export function MemorySection({ draft, set, errors }: SectionProps) {
           <Input value={draft.session_scope} onChange={(e) => set("session_scope", e.target.value)} placeholder="user" />
         </Field>
       </SimpleGrid>
+    </EditorSection>
+  );
+}
+
+export function ApprovalSection({ draft, set }: SectionProps) {
+  return (
+    <EditorSection title="Review" description="Whether people check the agent's content changes before they are made.">
+      <FormControl display="flex" alignItems="start" gap={3}>
+        <Switch
+          id="agent-require-approval"
+          mt={0.5}
+          colorScheme="teal"
+          isChecked={draft.require_approval}
+          onChange={(e) => set("require_approval", e.target.checked)}
+        />
+        <Box>
+          <FormLabel htmlFor="agent-require-approval" mb={0}>
+            Require approval
+          </FormLabel>
+          <FormHelperText mt={1}>
+            Creates, updates, translations and deletes are not applied: they wait on the Approvals page until an editor approves, edits or
+            rejects them.
+          </FormHelperText>
+        </Box>
+      </FormControl>
     </EditorSection>
   );
 }

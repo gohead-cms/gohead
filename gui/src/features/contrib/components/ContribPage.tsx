@@ -75,6 +75,9 @@ export function ContributionsPage() {
 
 function CollectionContent({ collectionName, schema }: { collectionName: string; schema: Schema }) {
   const navigate = useNavigate();
+  // ?item=… opens that entry (links from Approvals), once it is loaded.
+  const [params] = useSearchParams();
+  const linkedItem = params.get("item");
   const notify = useNotify();
   const perms = useEntryPermissions(collectionName);
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -91,6 +94,21 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
   // The entry whose history is open.
   const [historyItem, setHistoryItem] = useState<ContentItem | null>(null);
   const base = `/api/collections/${encodeURIComponent(collectionName)}`;
+
+  // The linked entry is opened once per link (closing it keeps the list).
+  const [openedLink, setOpenedLink] = useState<string | null>(null);
+  if (linkedItem && linkedItem !== openedLink) {
+    const item = content.items.find((i) => String(i.id) === linkedItem);
+    if (item) {
+      setOpenedLink(linkedItem);
+      setEditingItem(item);
+      setFormKey((k) => k + 1);
+      onOpen();
+    } else if (!loading && !hasMore) {
+      // Not in this collection (deleted, or never created).
+      setOpenedLink(linkedItem);
+    }
+  }
 
   const openForm = (item: ContentItem | null) => {
     setEditingItem(item);

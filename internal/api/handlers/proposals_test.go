@@ -103,10 +103,11 @@ func TestAgentTemplatesAndTestRuns(t *testing.T) {
 		"attributes": map[string]any{"title": map[string]any{"type": "string"}, "summary": map[string]any{"type": "text"}},
 	})
 	rendered := a.ok("admin", "POST", "/admin/agent-templates/summarizer/render", map[string]any{
-		"params": map[string]any{"collection": "pages", "source": "title", "target": "summary"},
+		"params": map[string]any{"collection": "pages", "source": "title", "target": "summary", "approval": true},
 	})
 	created := a.ok("admin", "POST", "/admin/agents", rendered).(map[string]any)
 	assert.Equal(t, "summarizer-pages", created["name"])
+	assert.Equal(t, true, field(created["schema"], "requireApproval"), "the setting is returned, so editing keeps it")
 
 	// Without Redis there are no runs, test runs included.
 	code, _ = a.do("admin", "POST", "/admin/agents/summarizer-pages/test", map[string]any{"input": "hi"})

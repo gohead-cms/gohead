@@ -2,7 +2,6 @@ import { useState } from "react";
 import {
   Alert,
   AlertIcon,
-  Badge,
   Box,
   Button,
   HStack,
@@ -28,6 +27,7 @@ import {
 import { FiRefreshCw } from "react-icons/fi";
 import { type RunStatus } from "../../../shared/types";
 import { useAgentRuns } from "../hook/useAgentRuns";
+import { RunStatusBadge } from "./RunBadges";
 import { RunDetailDrawer } from "./RunDetailDrawer";
 import {
   formatCost,
@@ -35,7 +35,7 @@ import {
   formatShortTime,
   formatTime,
   formatTokens,
-  statusColor,
+  RUN_STATUS_OPTIONS,
   triggerSummary,
 } from "./runFormat";
 
@@ -129,10 +129,11 @@ export function RunsPanel({ agentName, initialRun }: { agentName: string; initia
           }}
         >
           <option value="">All runs</option>
-          <option value="succeeded">Succeeded</option>
-          <option value="failed">Failed</option>
-          <option value="limited">Limited</option>
-          <option value="running">Running</option>
+          {RUN_STATUS_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
         </Select>
         <IconButton aria-label="Refresh" size="sm" icon={<FiRefreshCw />} onClick={refresh} isLoading={loading} />
         {pagination && (
@@ -176,9 +177,7 @@ export function RunsPanel({ agentName, initialRun }: { agentName: string; initia
                     {formatShortTime(r.startedAt)}
                   </Td>
                   <Td>
-                    <Badge colorScheme={statusColor[r.status]} title={r.error || undefined}>
-                      {r.status}
-                    </Badge>
+                    <RunStatusBadge run={r} />
                   </Td>
                   <Td maxW="180px" overflow="hidden" textOverflow="ellipsis" title={triggerSummary(r.triggerType, r.trigger)}>
                     {triggerSummary(r.triggerType, r.trigger)}
@@ -210,7 +209,15 @@ export function RunsPanel({ agentName, initialRun }: { agentName: string; initia
         </HStack>
       )}
 
-      <RunDetailDrawer agentName={agentName} runId={openRun} onClose={() => setOpenRun(null)} />
+      <RunDetailDrawer
+        agentName={agentName}
+        runId={openRun}
+        onClose={() => {
+          setOpenRun(null);
+          // The run may have ended while it was open.
+          refresh();
+        }}
+      />
     </Box>
   );
 }

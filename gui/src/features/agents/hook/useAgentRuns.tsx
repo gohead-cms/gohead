@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { type AgentRun, type AgentUsage, type RunStatus } from "../../../shared/types";
 import { getJSON, useApiQuery } from "../../../shared/hooks/useApiQuery";
 
@@ -40,9 +41,18 @@ export function useAgentRuns(agentName: string | null, status: RunStatus | "", p
   };
 }
 
-/** Loads one run with its steps. */
+/** How often a run that has not ended is reloaded. */
+const RUN_POLL_MS = 2000;
+
+/** Loads one run with its steps, and reloads it until it ends (queued or running). */
 export function useAgentRun(agentName: string | null, runId: number | null) {
   const key = agentName && runId ? `/admin/agents/${encodeURIComponent(agentName)}/runs/${runId}` : null;
-  const { data, loading, error } = useApiQuery(key, async () => (await getJSON<AgentRun>(key!, "Failed to load run")).data ?? null);
-  return { run: data, loading, error };
+  const { data, loading, error, refetch } = useApiQuery(key, async () => (await getJSON<AgentRun>(key!, "Failed to load run")).data ?? null);
+  const inProgress = data?.status === "queued" || data?.status === "running";
+  useEffect(() => {
+    if (!inProgress) return;
+    const id = window.setInterval(refetch, RUN_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [inProgress, refetch]);
+  return { run: data, loading, error, inProgress };
 }

@@ -20,9 +20,10 @@ import { FiPlay } from "react-icons/fi";
 import { api } from "../../../services/api";
 import { useNotify } from "../../../shared/hooks/useNotify";
 import { errorMessage } from "../../../shared/utils/errors";
+import { type QueuedRun } from "./TestRunButton";
 
-/** Queues a manual run (POST /admin/agents/{name}/run) with an optional input. */
-export function RunNowButton({ agentName, onQueued }: { agentName: string; onQueued: () => void }) {
+/** Queues a manual run (POST /admin/agents/{name}/run) with an optional input; onQueued gets the run to follow. */
+export function RunNowButton({ agentName, onQueued }: { agentName: string; onQueued: (runId?: number) => void }) {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -38,11 +39,11 @@ export function RunNowButton({ agentName, onQueued }: { agentName: string; onQue
     setBusy(true);
     setError(null);
     try {
-      await api("POST", `/admin/agents/${encodeURIComponent(agentName)}/run`, { input: input.trim() });
-      notify.success("Run queued", "It appears in the Runs tab as soon as a worker picks it up.");
+      const res = await api<QueuedRun>("POST", `/admin/agents/${encodeURIComponent(agentName)}/run`, { input: input.trim() });
+      notify.success("Run queued", "It starts as soon as a worker picks it up.");
       setInput("");
       onClose();
-      onQueued();
+      onQueued(res.data?.runId);
     } catch (err) {
       setError(errorMessage(err));
     } finally {

@@ -14,6 +14,7 @@ import {
   useColorModeValue,
   type BoxProps,
   HStack,
+  Badge,
 } from "@chakra-ui/react";
 import {
   FiHome,
@@ -30,6 +31,7 @@ import {
   FiLayers,
   FiGlobe,
   FiShield,
+  FiCheckSquare,
 } from 'react-icons/fi';
 import { type IconType } from 'react-icons';
 import { NavLink, useLocation } from "react-router-dom";
@@ -38,6 +40,7 @@ import { LuBrain } from "react-icons/lu";
 import { VscRobot } from "react-icons/vsc";
 import { useMe } from "../../../features/auth/me";
 import { MEDIA } from "../../../features/auth/permissions";
+import { usePendingCount } from "../../../features/approvals/useProposals";
 
 // --- Menu Structure ---
 interface NavItemProps {
@@ -47,9 +50,14 @@ interface NavItemProps {
   children?: NavItemProps[];
   /** Only shown to admins (the pages behind it need the admin role). */
   adminOnly?: boolean;
-  /** Only shown when the signed-in role has this permission. */
-  needs?: "content" | "media";
+  /** Only shown when the signed-in role has this permission (review: can change some content). */
+  needs?: "content" | "media" | "review";
+  /** A count shown next to the name. */
+  badge?: "approvals";
 }
+
+/** Counts shown next to menu items, by NavItemProps.badge. */
+type Badges = Partial<Record<NonNullable<NavItemProps["badge"]>, number | null>>;
 
 const LinkItems: Array<NavItemProps> = [
   { name: 'Dashboard', icon: FiHome, href: '/dashboard' },
@@ -59,6 +67,7 @@ const LinkItems: Array<NavItemProps> = [
     children: [
       { name: 'Content Editor', icon: FiGrid, href: '/contrib', needs: 'content' },
       { name: 'Media Library', icon: FiImage, href: '/media', needs: 'media' },
+      { name: 'Approvals', icon: FiCheckSquare, href: '/approvals', needs: 'review', badge: 'approvals' },
     ],
   },
   {
@@ -136,12 +145,15 @@ interface SidebarContentProps extends BoxProps {
 }
 
 function SidebarContent({ onClose, ...rest }: SidebarContentProps) {
-  const { me, isAdmin, canReadContent, can } = useMe();
-  // Until the account is known, content pages stay listed (as before roles).
+  const { me, isAdmin, canReadContent, canReview, can } = useMe();
+  // Until the account is known, content pages stay listed (as before roles);
+  // approvals wait for it (viewers never review).
   const allowed = (l: NavItemProps) =>
     (isAdmin || !l.adminOnly) &&
     (l.needs !== "content" || !me || canReadContent) &&
-    (l.needs !== "media" || !me || can("read", MEDIA));
+    (l.needs !== "media" || !me || can("read", MEDIA)) &&
+    (l.needs !== "review" || (!!me && canReview));
+  const badges: Badges = { approvals: usePendingCount(!!me && canReview) };
   // A section is shown when at least one of its pages is.
   const visibleLinks = LinkItems.filter(allowed)
     .map((l) => (l.children ? { ...l, children: l.children.filter(allowed) } : l))
@@ -167,7 +179,7 @@ function SidebarContent({ onClose, ...rest }: SidebarContentProps) {
       </Flex>
       <Box overflowY="auto" h="calc(100% - 80px)" pb={10}>
         {visibleLinks.map((link) => (
-          <NavItem key={link.name} icon={link.icon} href={link.href} childrenItems={link.children} onNavItemClick={onClose}>
+          <NavItem key={link.name} icon={link.icon} href={link.href} childrenItems={link.children} onNavItemClick={onClose} badges={badges} badge={link.badge}>
             {link.name}
           </NavItem>
         ))}
@@ -177,7 +189,7 @@ function SidebarContent({ onClose, ...rest }: SidebarContentProps) {
 }
 
 // --- Navigation Item Component ---
-function NavItem({ icon, children, href, childrenItems, onNavItemClick }: { icon: IconType; children: React.ReactNode; href?: string; childrenItems?: NavItemProps[]; onNavItemClick?: () => void; }) {
+function NavItem({ icon, children, href, childrenItems, onNavItemClick, badges, badge }: { icon: IconType; children: React.ReactNode; href?: string; childrenItems?: NavItemProps[]; onNavItemClick?: () => void; badges?: Badges; badge?: NavItemProps["badge"] }) {
   const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
   const location = useLocation();
   
@@ -211,6 +223,7 @@ function NavItem({ icon, children, href, childrenItems, onNavItemClick }: { icon
   const activeBg = useColorModeValue('purple.50', 'purple.900');
   const activeColor = useColorModeValue('purple.700', 'white');
   const childBorder = useColorModeValue('gray.200', 'gray.700');
+  const count = badge ? badges?.[badge] : null;
 
   if (childrenItems) {
     return (
@@ -243,6 +256,8 @@ function NavItem({ icon, children, href, childrenItems, onNavItemClick }: { icon
                 href={child.href}
                 childrenItems={child.children}
                 onNavItemClick={onNavItemClick}
+                badges={badges}
+                badge={child.badge}
               >
                 {child.name}
               </NavItem>
@@ -266,9 +281,14 @@ function NavItem({ icon, children, href, childrenItems, onNavItemClick }: { icon
         fontWeight: 'semibold',
       }}
     >
-      <HStack>
+      <HStack flex="1">
         <Icon mr="2" fontSize="16" as={icon} />
         <Text>{children}</Text>
+        {count ? (
+          <Badge ml="auto" colorScheme="orange" variant="solid" borderRadius="full" px={2} title={`${count} pending`} data-testid="approvals-count">
+            {count > 99 ? "99+" : count}
+          </Badge>
+        ) : null}
       </HStack>
     </Flex>
   );

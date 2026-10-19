@@ -9,6 +9,7 @@ import {
   Heading,
   Text,
   Badge,
+  Link,
   List,
   ListItem,
   VStack,
@@ -23,9 +24,11 @@ import { FiEdit2, FiTrash2 } from "react-icons/fi";
 import { API_BASE_URL } from "../../../services/api";
 import { type AgentLimits, type AgentNodeData } from "../../../shared/types";
 import { ConfirmButton } from "../../../shared/ui/ConfirmButton";
+import { approvalsLink } from "../../approvals/proposals";
 import { CopyButton } from "./EditorParts";
 import { RunNowButton } from "./RunNowButton";
 import { RunsPanel } from "./RunsPanel";
+import { TestRunButton } from "./TestRunButton";
 
 interface AgentDetailsProps {
   agent: AgentNodeData;
@@ -58,6 +61,13 @@ export function AgentDetails({ agent, onDelete, initialRun }: AgentDetailsProps)
   const [startRun, setStartRun] = useState(initialRun);
   // Bumped after "Run now" so the Runs tab reloads.
   const [runsVersion, setRunsVersion] = useState(0);
+  /** After "Run now" or "Test run": the Runs tab, reloaded, with the new run open (it updates until it ends). */
+  const follow = (runId?: number) => {
+    setTab(1);
+    setStartRun(runId);
+    setRunsVersion((v) => v + 1);
+  };
+  const requireApproval = Boolean(schema.requireApproval ?? schema.require_approval);
   const { llmConfig, trigger, limits } = schema;
   const functions = schema.functions ?? [];
   const events = trigger.event_trigger?.events ?? [];
@@ -73,16 +83,8 @@ export function AgentDetails({ agent, onDelete, initialRun }: AgentDetailsProps)
         </Heading>
         {onDelete && (
           <HStack spacing={2}>
-            <RunNowButton
-              agentName={name}
-              onQueued={() => {
-                setTab(1);
-                setStartRun(undefined);
-                setRunsVersion((v) => v + 1);
-                // The worker usually starts the run a moment later.
-                window.setTimeout(() => setRunsVersion((v) => v + 1), 4000);
-              }}
-            />
+            <RunNowButton agentName={name} onQueued={follow} />
+            <TestRunButton agent={agent} onQueued={follow} />
             <Button as={RouterLink} to={`/agents/${encodeURIComponent(name)}/edit`} size="sm" leftIcon={<FiEdit2 />}>
               Edit
             </Button>
@@ -167,6 +169,21 @@ export function AgentDetails({ agent, onDelete, initialRun }: AgentDetailsProps)
                   </HStack>
                 )}
               </Box>
+              {requireApproval && (
+                <Box>
+                  <Label>Review</Label>
+                  <Text fontSize="sm">
+                    <Badge colorScheme="yellow" mr={2}>
+                      Requires approval
+                    </Badge>
+                    Content changes wait on the{" "}
+                    <Link as={RouterLink} to={approvalsLink({ agent: name })} color="purple.600">
+                      Approvals
+                    </Link>{" "}
+                    page for an editor.
+                  </Text>
+                </Box>
+              )}
               <Box>
                 <Label>Limits</Label>
                 {setLimits.length > 0 ? (
