@@ -1,7 +1,7 @@
 import { Link as RouterLink } from "react-router-dom";
 import { Box, Text, Badge, Spinner, List, ListItem, Button, Flex } from "@chakra-ui/react";
 import { FiPlus } from "react-icons/fi";
-import { AgentNodeData } from "../../../shared/types";
+import { type AgentNodeData } from "../../../shared/types";
 
 interface AgentSidebarProps {
   agents: AgentNodeData[];

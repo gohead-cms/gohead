@@ -84,4 +84,14 @@ func TestAdminUIEndpoints(t *testing.T) {
 
 	code, _ = a.do("editor", "GET", "/admin/overview", nil)
 	assert.Equal(t, http.StatusForbidden, code)
+
+	// Every signed-in user can read the content model; only admins change it.
+	a.router.GET("/api/schema/collections", middleware.AuthMiddleware(), GetCollections)
+	a.router.GET("/api/schema/collections/:name", middleware.AuthMiddleware(), GetCollection)
+	for _, role := range []string{"editor", "viewer"} {
+		list := a.ok(role, "GET", "/api/schema/collections", nil).([]any)
+		assert.Len(t, list, 1, role)
+		one := a.ok(role, "GET", "/api/schema/collections/posts", nil).(map[string]any)
+		assert.Contains(t, one, "schema")
+	}
 }

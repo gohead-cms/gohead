@@ -2,7 +2,7 @@ import { Link as RouterLink } from "react-router-dom";
 import { Badge, Button, Table, TableContainer, Tbody, Td, Th, Thead, Tr } from "@chakra-ui/react";
 import { FiCpu } from "react-icons/fi";
 import { EmptyState } from "../../../shared/ui/EmptyState";
-import { formatCost, formatDuration, formatTime, statusColor } from "../../agents/components/runFormat";
+import { formatCost, formatTime, statusColor } from "../../agents/components/runFormat";
 import type { RecentRun } from "../overview";
 import { timeAgo } from "../overview";
 
@@ -31,7 +31,6 @@ export function RecentRuns({ runs, hasAgents }: { runs: RecentRun[]; hasAgents: 
             <Th>Agent</Th>
             <Th>Status</Th>
             <Th>Trigger</Th>
-            <Th isNumeric>Duration</Th>
             <Th isNumeric>Cost</Th>
             <Th>Started</Th>
           </Tr>
@@ -44,7 +43,6 @@ export function RecentRuns({ runs, hasAgents }: { runs: RecentRun[]; hasAgents: 
                 <Badge colorScheme={statusColor[r.status] ?? "gray"}>{r.status}</Badge>
               </Td>
               <Td color="gray.600">{r.triggerType.replace(/_/g, " ")}</Td>
-              <Td isNumeric>{r.status === "running" ? "–" : formatDuration(r.durationMs)}</Td>
               <Td isNumeric>{formatCost(r.costUsd)}</Td>
               <Td title={formatTime(r.startedAt)} color="gray.600">
                 {timeAgo(r.startedAt)}

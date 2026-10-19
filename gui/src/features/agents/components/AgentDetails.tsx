@@ -21,7 +21,7 @@ import {
 } from "@chakra-ui/react";
 import { FiEdit2, FiTrash2 } from "react-icons/fi";
 import { API_BASE_URL } from "../../../services/api";
-import { AgentLimits, AgentNodeData } from "../../../shared/types";
+import { type AgentLimits, type AgentNodeData } from "../../../shared/types";
 import { ConfirmButton } from "../../../shared/ui/ConfirmButton";
 import { CopyButton } from "./EditorParts";
 import { RunNowButton } from "./RunNowButton";

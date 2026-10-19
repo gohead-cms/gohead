@@ -68,7 +68,11 @@ export function TokenFormModal({
     setSaving(true);
     setServerError(null);
     try {
-      const body: Record<string, unknown> = { name: name.trim(), description: description.trim(), role };
+      const body: Record<string, unknown> = {
+        name: name.trim(),
+        description: description.trim(),
+        role,
+      };
       if (days !== null) body.expires_in_days = days;
       const res = await api<CreatedApiToken>("POST", "/admin/tokens", body);
       onCreated(res.data);
@@ -82,57 +86,59 @@ export function TokenFormModal({
   return (
     <Modal isOpen={isOpen} onClose={onClose} closeOnOverlayClick={!saving}>
       <ModalOverlay />
-      <ModalContent as="form" onSubmit={submit} noValidate>
-        <ModalHeader>New API token</ModalHeader>
-        <ModalCloseButton isDisabled={saving} />
-        <ModalBody>
-          <VStack spacing={4} align="stretch">
-            {serverError && (
-              <Alert status="error" borderRadius="md">
-                <AlertIcon />
-                <AlertDescription>{serverError}</AlertDescription>
-              </Alert>
-            )}
-            <FormControl isRequired isInvalid={submitted && !!nameError}>
-              <FormLabel>Name</FormLabel>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="website, ci-deploy…" autoFocus />
-              <FormErrorMessage>{nameError}</FormErrorMessage>
-            </FormControl>
-            <FormControl>
-              <FormLabel>Description</FormLabel>
-              <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What uses it, who to ask" />
-            </FormControl>
-            <RoleSelect value={role} onChange={setRole} />
-            <FormControl>
-              <FormLabel>Expires</FormLabel>
-              <Select value={expiry} onChange={(e) => setExpiry(e.target.value)}>
-                {EXPIRY_PRESETS.map((p) => (
-                  <option key={p.value} value={p.value}>
-                    {p.label}
-                  </option>
-                ))}
-              </Select>
-              <FormHelperText>Short-lived tokens limit the damage if one leaks.</FormHelperText>
-            </FormControl>
-            {expiry === "custom" && (
-              <FormControl isRequired isInvalid={submitted && !!daysError}>
-                <FormLabel>Days until expiry</FormLabel>
-                <NumberInput min={1} max={MAX_DAYS} value={customDays} onChange={(v) => setCustomDays(v)}>
-                  <NumberInputField />
-                </NumberInput>
-                <FormErrorMessage>{daysError}</FormErrorMessage>
+      <ModalContent>
+        <form onSubmit={submit} noValidate>
+          <ModalHeader>New API token</ModalHeader>
+          <ModalCloseButton isDisabled={saving} />
+          <ModalBody>
+            <VStack spacing={4} align="stretch">
+              {serverError && (
+                <Alert status="error" borderRadius="md">
+                  <AlertIcon />
+                  <AlertDescription>{serverError}</AlertDescription>
+                </Alert>
+              )}
+              <FormControl isRequired isInvalid={submitted && !!nameError}>
+                <FormLabel>Name</FormLabel>
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="website, ci-deploy…" autoFocus />
+                <FormErrorMessage>{nameError}</FormErrorMessage>
               </FormControl>
-            )}
-          </VStack>
-        </ModalBody>
-        <ModalFooter gap={3}>
-          <Button onClick={onClose} isDisabled={saving}>
-            Cancel
-          </Button>
-          <Button type="submit" colorScheme="blue" isLoading={saving}>
-            Create token
-          </Button>
-        </ModalFooter>
+              <FormControl>
+                <FormLabel>Description</FormLabel>
+                <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What uses it, who to ask" />
+              </FormControl>
+              <RoleSelect value={role} onChange={setRole} />
+              <FormControl>
+                <FormLabel>Expires</FormLabel>
+                <Select value={expiry} onChange={(e) => setExpiry(e.target.value)}>
+                  {EXPIRY_PRESETS.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                </Select>
+                <FormHelperText>Short-lived tokens limit the damage if one leaks.</FormHelperText>
+              </FormControl>
+              {expiry === "custom" && (
+                <FormControl isRequired isInvalid={submitted && !!daysError}>
+                  <FormLabel>Days until expiry</FormLabel>
+                  <NumberInput min={1} max={MAX_DAYS} value={customDays} onChange={(v) => setCustomDays(v)}>
+                    <NumberInputField />
+                  </NumberInput>
+                  <FormErrorMessage>{daysError}</FormErrorMessage>
+                </FormControl>
+              )}
+            </VStack>
+          </ModalBody>
+          <ModalFooter gap={3}>
+            <Button onClick={onClose} isDisabled={saving}>
+              Cancel
+            </Button>
+            <Button type="submit" colorScheme="blue" isLoading={saving}>
+              Create token
+            </Button>
+          </ModalFooter>
+        </form>
       </ModalContent>
     </Modal>
   );

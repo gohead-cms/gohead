@@ -143,6 +143,12 @@ func staticPaths() obj {
 			"requestBody": obj{"required": true, "content": jsonContent(credentials)},
 			"responses":   merge(obj{"200": ok("Token", dataEnvelope(obj{"type": "object", "properties": obj{"token": obj{"type": "string"}}}, nil))}, errorResponses("401", "429")),
 		}},
+		"/api/schema/collections":        schemaPath("List collection schemas", "listCollectionSchemas", true),
+		"/api/schema/collections/{name}": schemaPath("A collection schema", "getCollectionSchema", false),
+		"/api/schema/singletons":         schemaPath("List singleton schemas", "listSingletonSchemas", true),
+		"/api/schema/singletons/{name}":  schemaPath("A singleton schema", "getSingletonSchema", false),
+		"/api/schema/components":         schemaPath("List component schemas", "listComponentSchemas", true),
+		"/api/schema/components/{name}":  schemaPath("A component schema", "getComponentSchema", false),
 		"/auth/me": obj{"get": obj{
 			"tags": []string{"auth"}, "operationId": "me", "summary": "The authenticated user or API token",
 			"responses": merge(obj{"200": ok("Caller", dataEnvelope(obj{"type": "object", "properties": obj{
@@ -213,4 +219,21 @@ func baseSchemas() obj {
 			"createdAt": obj{"type": "string", "format": "date-time"}, "updatedAt": obj{"type": "string", "format": "date-time"},
 		}, "required": []string{"id", "url", "name", "mime", "size"}},
 	}
+}
+
+// schemaPath describes a read-only content model endpoint. The schemas are
+// free-form objects (the admin format), not part of the generated types.
+func schemaPath(summary, operationID string, list bool) obj {
+	var body obj = obj{"type": "object"}
+	if list {
+		body = obj{"type": "array", "items": obj{"type": "object"}}
+	}
+	op := obj{
+		"tags": []string{"schema"}, "operationId": operationID, "summary": summary,
+		"responses": merge(obj{"200": ok("Schema", dataEnvelope(body, nil))}, errorResponses("401", "404")),
+	}
+	if !list {
+		op["parameters"] = []any{obj{"name": "name", "in": "path", "required": true, "schema": obj{"type": "string"}}}
+	}
+	return obj{"get": op}
 }

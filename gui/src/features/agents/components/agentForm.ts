@@ -1,4 +1,4 @@
-import { AgentFunctionInfo, AgentLimits, AgentNodeData } from "../../../shared/types";
+import { type AgentFunctionInfo, type AgentLimits, type AgentNodeData } from "../../../shared/types";
 
 /** The value the API returns in place of a stored secret; sending it back keeps the secret. */
 export const SECRET_MASK = "********";

@@ -22,8 +22,8 @@ import {
   WrapItem,
 } from "@chakra-ui/react";
 import { API_BASE_URL } from "../../../services/api";
-import { CollectionChoice } from "../hook/useEditorData";
-import { AgentDraft, DraftErrors, EVENTS, LIMIT_FIELDS, PROVIDERS, TRIGGER_TYPES, generateToken } from "./agentForm";
+import { type CollectionChoice } from "../hook/useEditorData";
+import { type AgentDraft, type DraftErrors, EVENTS, LIMIT_FIELDS, PROVIDERS, TRIGGER_TYPES, generateToken } from "./agentForm";
 import { CopyButton, EditorSection, Field } from "./EditorParts";
 
 export interface SectionProps {

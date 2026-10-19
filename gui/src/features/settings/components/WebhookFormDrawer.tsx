@@ -14,6 +14,7 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerOverlay,
+  Flex,
   FormControl,
   FormErrorMessage,
   FormHelperText,
@@ -93,7 +94,15 @@ export function WebhookFormDrawer({
     e.preventDefault();
     setSubmitted(true);
     if (nameError || urlError || headersError) return;
-    const body: WebhookInput = { name: name.trim(), url: url.trim(), events, collections, format, enabled, signed };
+    const body: WebhookInput = {
+      name: name.trim(),
+      url: url.trim(),
+      events,
+      collections,
+      format,
+      enabled,
+      signed,
+    };
     if (replaceHeaders) body.headers = headersFromRows(rows);
     if (!creating && signed && webhook.signed && rotate) body.rotate_secret = true;
     setSaving(true);
@@ -113,141 +122,147 @@ export function WebhookFormDrawer({
   return (
     <Drawer isOpen={isOpen} onClose={onClose} size="md" closeOnOverlayClick={!saving}>
       <DrawerOverlay />
-      <DrawerContent as="form" onSubmit={submit} noValidate>
-        <DrawerCloseButton isDisabled={saving} />
-        <DrawerHeader borderBottomWidth="1px">{creating ? "New webhook" : `Edit ${webhook.name}`}</DrawerHeader>
-        <DrawerBody>
-          <VStack spacing={5} align="stretch" py={2}>
-            {serverError && (
-              <Alert status="error" borderRadius="md">
-                <AlertIcon />
-                <AlertDescription>{serverError}</AlertDescription>
-              </Alert>
-            )}
-            <FormControl isRequired isInvalid={submitted && !!nameError}>
-              <FormLabel>Name</FormLabel>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Rebuild website" autoFocus />
-              <FormErrorMessage>{nameError}</FormErrorMessage>
-            </FormControl>
-            <FormControl isRequired isInvalid={submitted && !!urlError}>
-              <FormLabel>URL</FormLabel>
-              <Input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/hooks/gohead" />
-              <FormErrorMessage>{urlError}</FormErrorMessage>
-            </FormControl>
+      <DrawerContent>
+        <Flex as="form" onSubmit={submit} noValidate direction="column" h="full">
+          <DrawerCloseButton isDisabled={saving} />
+          <DrawerHeader borderBottomWidth="1px">{creating ? "New webhook" : `Edit ${webhook.name}`}</DrawerHeader>
+          <DrawerBody>
+            <VStack spacing={5} align="stretch" py={2}>
+              {serverError && (
+                <Alert status="error" borderRadius="md">
+                  <AlertIcon />
+                  <AlertDescription>{serverError}</AlertDescription>
+                </Alert>
+              )}
+              <FormControl isRequired isInvalid={submitted && !!nameError}>
+                <FormLabel>Name</FormLabel>
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Rebuild website" autoFocus />
+                <FormErrorMessage>{nameError}</FormErrorMessage>
+              </FormControl>
+              <FormControl isRequired isInvalid={submitted && !!urlError}>
+                <FormLabel>URL</FormLabel>
+                <Input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/hooks/gohead" />
+                <FormErrorMessage>{urlError}</FormErrorMessage>
+              </FormControl>
 
-            <FormControl as="fieldset">
-              <FormLabel as="legend">Events</FormLabel>
-              <CheckboxGroup value={events} onChange={(v) => setEvents(v.map(String))}>
-                <Wrap spacingX={4} spacingY={1}>
-                  {WEBHOOK_EVENTS.map((ev) => (
-                    <WrapItem key={ev}>
-                      <Checkbox value={ev}>{ev}</Checkbox>
-                    </WrapItem>
-                  ))}
-                </Wrap>
-              </CheckboxGroup>
-              <FormHelperText>{events.length === 0 ? "None selected: every event is sent." : `${events.length} selected.`}</FormHelperText>
-            </FormControl>
-
-            <FormControl as="fieldset">
-              <FormLabel as="legend">Collections</FormLabel>
-              {cols.loading && !cols.data ? (
-                <Spinner size="sm" />
-              ) : cols.error ? (
-                <Text color="red.500" fontSize="sm">
-                  {cols.error}
-                </Text>
-              ) : collectionOptions.length === 0 ? (
-                <Text color="gray.500" fontSize="sm">
-                  No collections yet.
-                </Text>
-              ) : (
-                <CheckboxGroup value={collections} onChange={(v) => setCollections(v.map(String))}>
+              <FormControl as="fieldset">
+                <FormLabel as="legend">Events</FormLabel>
+                <CheckboxGroup value={events} onChange={(v) => setEvents(v.map(String))}>
                   <Wrap spacingX={4} spacingY={1}>
-                    {collectionOptions.map((c) => (
-                      <WrapItem key={c}>
-                        <Checkbox value={c}>{c}</Checkbox>
+                    {WEBHOOK_EVENTS.map((ev) => (
+                      <WrapItem key={ev}>
+                        <Checkbox value={ev}>{ev}</Checkbox>
                       </WrapItem>
                     ))}
                   </Wrap>
                 </CheckboxGroup>
-              )}
-              <FormHelperText>
-                {collections.length === 0 ? "None selected: events from every collection are sent." : `Only ${collections.join(", ")}.`}
-              </FormHelperText>
-            </FormControl>
-
-            <FormControl as="fieldset">
-              <FormLabel as="legend">Format</FormLabel>
-              <RadioGroup value={format} onChange={(v) => setFormat(v as WebhookFormat)}>
-                <Stack direction="row" spacing={6}>
-                  <Radio value="json">JSON</Radio>
-                  <Radio value="slack">Slack</Radio>
-                </Stack>
-              </RadioGroup>
-              <FormHelperText>
-                {format === "json" ? "The full event (item included) as JSON." : 'A {"text": "…"} message for Slack-compatible incoming webhooks.'}
-              </FormHelperText>
-            </FormControl>
-
-            <FormControl display="flex" alignItems="center" gap={3}>
-              <Switch id="webhook-enabled" isChecked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-              <FormLabel htmlFor="webhook-enabled" mb={0}>
-                Enabled
-              </FormLabel>
-            </FormControl>
-
-            <FormControl>
-              <Stack spacing={2}>
-                <Stack direction="row" align="center" spacing={3}>
-                  <Switch id="webhook-signed" isChecked={signed} onChange={(e) => setSigned(e.target.checked)} />
-                  <FormLabel htmlFor="webhook-signed" mb={0}>
-                    Sign deliveries
-                  </FormLabel>
-                </Stack>
-                <FormHelperText mt={0}>
-                  Adds an <Code fontSize="xs">X-Gohead-Signature</Code> header (HMAC-SHA256 of <Code fontSize="xs">timestamp.body</Code>) so the
-                  receiver can check the request came from GoHead.{" "}
-                  {creating || (signed && !webhook.signed) ? "A secret is generated and shown once after saving." : ""}
+                <FormHelperText>
+                  {events.length === 0 ? "None selected: every event is sent." : `${events.length} selected.`}
                 </FormHelperText>
-                {!creating && webhook.signed && signed && (
-                  <Checkbox isChecked={rotate} onChange={(e) => setRotate(e.target.checked)}>
-                    Generate a new secret (the old one stops working)
-                  </Checkbox>
-                )}
-              </Stack>
-            </FormControl>
+              </FormControl>
 
-            <FormControl isInvalid={submitted && !!headersError}>
-              <FormLabel as="div">Custom headers</FormLabel>
-              {replaceHeaders ? (
-                <HeadersEditor rows={rows} onChange={setRows} />
-              ) : (
-                <Stack spacing={2} align="start">
-                  <Text fontSize="sm" color="gray.600">
-                    {webhook?.headers.length ? `${webhook.headers.join(", ")} (values hidden)` : "None"}
+              <FormControl as="fieldset">
+                <FormLabel as="legend">Collections</FormLabel>
+                {cols.loading && !cols.data ? (
+                  <Spinner size="sm" />
+                ) : cols.error ? (
+                  <Text color="red.500" fontSize="sm">
+                    {cols.error}
                   </Text>
-                  <Button size="sm" variant="outline" onClick={() => setReplaceHeaders(true)}>
-                    {webhook?.headers.length ? "Replace headers" : "Add headers"}
-                  </Button>
+                ) : collectionOptions.length === 0 ? (
+                  <Text color="gray.500" fontSize="sm">
+                    No collections yet.
+                  </Text>
+                ) : (
+                  <CheckboxGroup value={collections} onChange={(v) => setCollections(v.map(String))}>
+                    <Wrap spacingX={4} spacingY={1}>
+                      {collectionOptions.map((c) => (
+                        <WrapItem key={c}>
+                          <Checkbox value={c}>{c}</Checkbox>
+                        </WrapItem>
+                      ))}
+                    </Wrap>
+                  </CheckboxGroup>
+                )}
+                <FormHelperText>
+                  {collections.length === 0 ? "None selected: events from every collection are sent." : `Only ${collections.join(", ")}.`}
+                </FormHelperText>
+              </FormControl>
+
+              <FormControl as="fieldset">
+                <FormLabel as="legend">Format</FormLabel>
+                <RadioGroup value={format} onChange={(v) => setFormat(v as WebhookFormat)}>
+                  <Stack direction="row" spacing={6}>
+                    <Radio value="json">JSON</Radio>
+                    <Radio value="slack">Slack</Radio>
+                  </Stack>
+                </RadioGroup>
+                <FormHelperText>
+                  {format === "json"
+                    ? "The full event (item included) as JSON."
+                    : 'A {"text": "…"} message for Slack-compatible incoming webhooks.'}
+                </FormHelperText>
+              </FormControl>
+
+              <FormControl display="flex" alignItems="center" gap={3}>
+                <Switch id="webhook-enabled" isChecked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+                <FormLabel htmlFor="webhook-enabled" mb={0}>
+                  Enabled
+                </FormLabel>
+              </FormControl>
+
+              <FormControl>
+                <Stack spacing={2}>
+                  <Stack direction="row" align="center" spacing={3}>
+                    <Switch id="webhook-signed" isChecked={signed} onChange={(e) => setSigned(e.target.checked)} />
+                    <FormLabel htmlFor="webhook-signed" mb={0}>
+                      Sign deliveries
+                    </FormLabel>
+                  </Stack>
+                  <FormHelperText mt={0}>
+                    Adds an <Code fontSize="xs">X-Gohead-Signature</Code> header (HMAC-SHA256 of <Code fontSize="xs">timestamp.body</Code>)
+                    so the receiver can check the request came from GoHead.{" "}
+                    {creating || (signed && !webhook.signed) ? "A secret is generated and shown once after saving." : ""}
+                  </FormHelperText>
+                  {!creating && webhook.signed && signed && (
+                    <Checkbox isChecked={rotate} onChange={(e) => setRotate(e.target.checked)}>
+                      Generate a new secret (the old one stops working)
+                    </Checkbox>
+                  )}
                 </Stack>
-              )}
-              <FormErrorMessage>{headersError}</FormErrorMessage>
-              <FormHelperText>
-                Sent with every delivery, e.g. a token the receiver expects. Values are stored but never shown again
-                {replaceHeaders && !creating ? ": re-enter them all, saving replaces the whole list." : "."}
-              </FormHelperText>
-            </FormControl>
-          </VStack>
-        </DrawerBody>
-        <DrawerFooter borderTopWidth="1px" gap={3}>
-          <Button onClick={onClose} isDisabled={saving}>
-            Cancel
-          </Button>
-          <Button type="submit" colorScheme="blue" isLoading={saving}>
-            {creating ? "Create webhook" : "Save changes"}
-          </Button>
-        </DrawerFooter>
+              </FormControl>
+
+              <FormControl isInvalid={submitted && !!headersError}>
+                <FormLabel as="div">Custom headers</FormLabel>
+                {replaceHeaders ? (
+                  <HeadersEditor rows={rows} onChange={setRows} />
+                ) : (
+                  <Stack spacing={2} align="start">
+                    <Text fontSize="sm" color="gray.600">
+                      {webhook?.headers.length ? `${webhook.headers.join(", ")} (values hidden)` : "None"}
+                    </Text>
+                    <Button size="sm" variant="outline" onClick={() => setReplaceHeaders(true)}>
+                      {webhook?.headers.length ? "Replace headers" : "Add headers"}
+                    </Button>
+                  </Stack>
+                )}
+                <FormErrorMessage>{headersError}</FormErrorMessage>
+                <FormHelperText>
+                  Sent with every delivery, e.g. a token the receiver expects. Values are stored but never shown again
+                  {replaceHeaders && !creating ? ": re-enter them all, saving replaces the whole list." : "."}
+                </FormHelperText>
+              </FormControl>
+            </VStack>
+          </DrawerBody>
+          <DrawerFooter borderTopWidth="1px" gap={3}>
+            <Button onClick={onClose} isDisabled={saving}>
+              Cancel
+            </Button>
+            <Button type="submit" colorScheme="blue" isLoading={saving}>
+              {creating ? "Create webhook" : "Save changes"}
+            </Button>
+          </DrawerFooter>
+        </Flex>
       </DrawerContent>
     </Drawer>
   );

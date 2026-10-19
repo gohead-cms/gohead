@@ -17,15 +17,11 @@ export function HeadersEditor({ rows, onChange }: { rows: HeaderRow[]; onChange:
       {rows.map((r, i) => (
         <HStack key={r.key}>
           <FormControl flex="2">
-            <FormLabel srOnly>
-              Header name {i + 1}
-            </FormLabel>
+            <FormLabel srOnly>Header name {i + 1}</FormLabel>
             <Input size="sm" value={r.name} placeholder="Authorization" onChange={(e) => update(r.key, { name: e.target.value })} />
           </FormControl>
           <FormControl flex="3">
-            <FormLabel srOnly>
-              Header value {i + 1}
-            </FormLabel>
+            <FormLabel srOnly>Header value {i + 1}</FormLabel>
             <Input size="sm" value={r.value} placeholder="Bearer …" onChange={(e) => update(r.key, { value: e.target.value })} />
           </FormControl>
           <IconButton

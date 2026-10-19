@@ -90,7 +90,12 @@ export function UserFormModal({
         await api("PUT", `/admin/users/${user.ID}`, changes);
         onSaved(`User ${user.username} updated`);
       } else {
-        await api("POST", "/admin/users", { username: username.trim(), email: email.trim(), password, role_name: role });
+        await api("POST", "/admin/users", {
+          username: username.trim(),
+          email: email.trim(),
+          password,
+          role_name: role,
+        });
         onSaved(`User ${username.trim()} created`);
       }
     } catch (err) {
@@ -103,58 +108,60 @@ export function UserFormModal({
   return (
     <Modal isOpen={isOpen} onClose={onClose} closeOnOverlayClick={!saving}>
       <ModalOverlay />
-      <ModalContent as="form" onSubmit={submit} noValidate>
-        <ModalHeader>{creating ? "New user" : `Edit ${user.username}`}</ModalHeader>
-        <ModalCloseButton isDisabled={saving} />
-        <ModalBody>
-          <VStack spacing={4} align="stretch">
-            {serverError && (
-              <Alert status="error" borderRadius="md">
-                <AlertIcon />
-                <AlertDescription>{serverError}</AlertDescription>
-              </Alert>
-            )}
-            {creating && (
-              <FormControl isRequired isInvalid={submitted && !!usernameError}>
-                <FormLabel>Username</FormLabel>
-                <Input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="off" autoFocus />
-                <FormErrorMessage>{usernameError}</FormErrorMessage>
-              </FormControl>
-            )}
-            <FormControl isRequired isInvalid={submitted && !!emailError}>
-              <FormLabel>Email</FormLabel>
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" />
-              <FormErrorMessage>{emailError}</FormErrorMessage>
-            </FormControl>
-            <FormControl isRequired={creating} isInvalid={submitted && !!passwordError}>
-              <FormLabel>{creating ? "Password" : "New password"}</FormLabel>
-              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
-              {submitted && passwordError ? (
-                <FormErrorMessage>{passwordError}</FormErrorMessage>
-              ) : (
-                <FormHelperText>
-                  {creating
-                    ? `At least ${MIN_PASSWORD_LENGTH} characters. Share it with the user through a safe channel.`
-                    : "Leave empty to keep the current password."}
-                </FormHelperText>
+      <ModalContent>
+        <form onSubmit={submit} noValidate>
+          <ModalHeader>{creating ? "New user" : `Edit ${user.username}`}</ModalHeader>
+          <ModalCloseButton isDisabled={saving} />
+          <ModalBody>
+            <VStack spacing={4} align="stretch">
+              {serverError && (
+                <Alert status="error" borderRadius="md">
+                  <AlertIcon />
+                  <AlertDescription>{serverError}</AlertDescription>
+                </Alert>
               )}
-            </FormControl>
-            <RoleSelect
-              value={role}
-              onChange={setRole}
-              isDisabled={isSelf}
-              disabledReason="You cannot change your own role: another admin must do it, so the site always keeps an admin."
-            />
-          </VStack>
-        </ModalBody>
-        <ModalFooter gap={3}>
-          <Button onClick={onClose} isDisabled={saving}>
-            Cancel
-          </Button>
-          <Button type="submit" colorScheme="blue" isLoading={saving} isDisabled={unchanged}>
-            {creating ? "Create user" : "Save changes"}
-          </Button>
-        </ModalFooter>
+              {creating && (
+                <FormControl isRequired isInvalid={submitted && !!usernameError}>
+                  <FormLabel>Username</FormLabel>
+                  <Input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="off" autoFocus />
+                  <FormErrorMessage>{usernameError}</FormErrorMessage>
+                </FormControl>
+              )}
+              <FormControl isRequired isInvalid={submitted && !!emailError}>
+                <FormLabel>Email</FormLabel>
+                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" />
+                <FormErrorMessage>{emailError}</FormErrorMessage>
+              </FormControl>
+              <FormControl isRequired={creating} isInvalid={submitted && !!passwordError}>
+                <FormLabel>{creating ? "Password" : "New password"}</FormLabel>
+                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
+                {submitted && passwordError ? (
+                  <FormErrorMessage>{passwordError}</FormErrorMessage>
+                ) : (
+                  <FormHelperText>
+                    {creating
+                      ? `At least ${MIN_PASSWORD_LENGTH} characters. Share it with the user through a safe channel.`
+                      : "Leave empty to keep the current password."}
+                  </FormHelperText>
+                )}
+              </FormControl>
+              <RoleSelect
+                value={role}
+                onChange={setRole}
+                isDisabled={isSelf}
+                disabledReason="You cannot change your own role: another admin must do it, so the site always keeps an admin."
+              />
+            </VStack>
+          </ModalBody>
+          <ModalFooter gap={3}>
+            <Button onClick={onClose} isDisabled={saving}>
+              Cancel
+            </Button>
+            <Button type="submit" colorScheme="blue" isLoading={saving} isDisabled={unchanged}>
+              {creating ? "Create user" : "Save changes"}
+            </Button>
+          </ModalFooter>
+        </form>
       </ModalContent>
     </Modal>
   );

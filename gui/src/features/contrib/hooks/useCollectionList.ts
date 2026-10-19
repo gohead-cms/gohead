@@ -6,8 +6,8 @@ interface CollectionResponse {
 }
 
 export function useCollectionsList() {
-  const { data, loading, error } = useApiQuery("/admin/collections", async () => {
-    const json = await getJSON<CollectionResponse[]>("/admin/collections", "Failed to fetch collections list");
+  const { data, loading, error } = useApiQuery("/api/schema/collections", async () => {
+    const json = await getJSON<CollectionResponse[]>("/api/schema/collections", "Failed to fetch collections list");
     return Array.isArray(json.data) ? json.data : [];
   });
   return { collections: data ?? [], loading, error };

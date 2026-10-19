@@ -2,7 +2,7 @@ import { ApiError } from "../../../services/api";
 import { getJSON, useApiQuery } from "../../../shared/hooks/useApiQuery";
 import type { Attribute } from "../../../shared/types";
 
-/** A singleton (single type) definition, as GET /admin/singletons lists it. */
+/** A singleton (single type) definition, as GET /api/schema/singletons lists it. */
 export interface SingletonDef {
   name: string;
   description?: string;
@@ -12,10 +12,10 @@ export interface SingletonDef {
 /** A singleton's content: its attributes, flat, next to id and timestamps. */
 export type SingletonContent = Record<string, unknown> & { id?: number; updatedAt?: string };
 
-/** Lists singletons. The endpoint is admin-only: pass enabled=false otherwise. */
+/** Lists singletons (enabled=false loads nothing). */
 export function useSingletonsList(enabled: boolean) {
-  const { data, loading, error } = useApiQuery(enabled ? "/admin/singletons" : null, async () => {
-    const json = await getJSON<SingletonDef[]>("/admin/singletons", "Failed to fetch single types");
+  const { data, loading, error } = useApiQuery(enabled ? "/api/schema/singletons" : null, async () => {
+    const json = await getJSON<SingletonDef[]>("/api/schema/singletons", "Failed to fetch single types");
     return Array.isArray(json.data) ? json.data : [];
   });
   return { singletons: data ?? [], loading, error };

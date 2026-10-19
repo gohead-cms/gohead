@@ -1,5 +1,5 @@
 import React from 'react';
-import { EdgeProps, EdgeLabelRenderer, BaseEdge, Edge, getBezierPath } from '@xyflow/react';
+import { type EdgeProps, EdgeLabelRenderer, BaseEdge, type Edge, getBezierPath } from '@xyflow/react';
 import { Box, HStack, Icon, Badge } from '@chakra-ui/react';
 import { FaPlusCircle, FaPencilAlt, FaTrashAlt, FaBolt, FaEye } from 'react-icons/fa';
 

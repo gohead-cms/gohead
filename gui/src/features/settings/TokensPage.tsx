@@ -94,13 +94,12 @@ export function TokensPage() {
         </EmptyState>
       ) : data ? (
         <Box bg="white" borderWidth="1px" borderRadius="lg" overflow="hidden">
-          <TableContainer>
+          <TableContainer whiteSpace="normal">
             <Table size="sm">
               <Thead>
                 <Tr>
                   <Th>Name</Th>
                   <Th>Role</Th>
-                  <Th>Prefix</Th>
                   <Th>Status</Th>
                   <Th>Created</Th>
                   <Th>Last used</Th>
@@ -113,21 +112,21 @@ export function TokensPage() {
                   const active = t.status === "active";
                   return (
                     <Tr key={t.id} opacity={active ? 1 : 0.65}>
-                      <Td maxW="260px">
-                        <Text fontWeight="medium" isTruncated>
+                      <Td maxW="240px">
+                        <Text fontWeight="medium" noOfLines={1} title={t.name}>
                           {t.name}
                         </Text>
+                        <Code fontSize="xs" title="The token starts with these characters">
+                          {t.prefix}…
+                        </Code>
                         {t.description && (
-                          <Text fontSize="xs" color="gray.500" isTruncated title={t.description}>
+                          <Text fontSize="xs" color="gray.500" noOfLines={1} title={t.description}>
                             {t.description}
                           </Text>
                         )}
                       </Td>
                       <Td>
                         <RoleBadge role={t.role} />
-                      </Td>
-                      <Td>
-                        <Code fontSize="xs">{t.prefix}…</Code>
                       </Td>
                       <Td>
                         <Badge colorScheme={tokenStatusColor[t.status] ?? "gray"}>{t.status}</Badge>
@@ -141,9 +140,7 @@ export function TokensPage() {
                         )}
                       </Td>
                       <Td color="gray.600">{optTime(t.lastUsedAt, "Never")}</Td>
-                      <Td color="gray.600">
-                        {t.revokedAt ? `Revoked ${optTime(t.revokedAt)}` : optTime(t.expiresAt, "Never")}
-                      </Td>
+                      <Td color="gray.600">{t.revokedAt ? `Revoked ${optTime(t.revokedAt)}` : optTime(t.expiresAt, "Never")}</Td>
                       <Td textAlign="right">
                         {active && (
                           <ConfirmButton
@@ -152,13 +149,7 @@ export function TokensPage() {
                             confirmLabel="Revoke"
                             onConfirm={() => revoke(t)}
                             trigger={
-                              <IconButton
-                                aria-label={`Revoke ${t.name}`}
-                                icon={<FiSlash />}
-                                size="sm"
-                                variant="ghost"
-                                colorScheme="red"
-                              />
+                              <IconButton aria-label={`Revoke ${t.name}`} icon={<FiSlash />} size="sm" variant="ghost" colorScheme="red" />
                             }
                           />
                         )}
@@ -190,8 +181,7 @@ export function TokensPage() {
         onClose={() => setCreated(null)}
       >
         <Text fontSize="sm" color="gray.600">
-          Send it as <Code fontSize="xs">Authorization: Bearer &lt;token&gt;</Code>. It acts as a{" "}
-          <strong>{created?.role}</strong>.
+          Send it as <Code fontSize="xs">Authorization: Bearer &lt;token&gt;</Code>. It acts as a <strong>{created?.role}</strong>.
         </Text>
       </SecretDialog>
     </Page>

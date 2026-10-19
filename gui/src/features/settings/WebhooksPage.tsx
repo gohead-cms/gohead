@@ -20,6 +20,7 @@ import {
   Thead,
   Tooltip,
   Tr,
+  Wrap,
 } from "@chakra-ui/react";
 import { FiEdit2, FiList, FiPlus, FiSend, FiTrash2, FiZap } from "react-icons/fi";
 import { api } from "../../services/api";
@@ -45,13 +46,16 @@ function listOrAll(list: string[], all: string) {
 
 function LastDelivery({ w }: { w: Webhook }) {
   if (!w.lastDeliveryAt) return <Text color="gray.500">Never</Text>;
-  const failed = deliveryFailed({ statusCode: w.lastStatus, error: w.lastError });
+  const failed = deliveryFailed({
+    statusCode: w.lastStatus,
+    error: w.lastError,
+  });
   return (
     <Box>
-      <HStack spacing={2}>
-        <Badge colorScheme={failed ? "red" : "green"}>{w.lastStatus || "error"}</Badge>
-        <Text color="gray.600">{optTime(w.lastDeliveryAt)}</Text>
-      </HStack>
+      <Badge colorScheme={failed ? "red" : "green"}>{w.lastStatus || "no response"}</Badge>
+      <Text color="gray.600" fontSize="xs" whiteSpace="nowrap">
+        {optTime(w.lastDeliveryAt)}
+      </Text>
       {w.lastError && (
         <Text fontSize="xs" color="red.600" noOfLines={2} title={w.lastError} whiteSpace="normal">
           {w.lastError}
@@ -146,7 +150,6 @@ export function WebhooksPage() {
                   <Th>Webhook</Th>
                   <Th>Events</Th>
                   <Th>Collections</Th>
-                  <Th>Format</Th>
                   <Th>Last delivery</Th>
                   <Th textAlign="right">Actions</Th>
                 </Tr>
@@ -154,32 +157,31 @@ export function WebhooksPage() {
               <Tbody>
                 {hooks.map((w) => (
                   <Tr key={w.id}>
-                    <Td maxW="280px">
-                      <HStack spacing={2}>
-                        <Text fontWeight="medium" noOfLines={1}>
-                          {w.name}
-                        </Text>
-                        {!w.enabled && <Badge>disabled</Badge>}
+                    <Td maxW="300px">
+                      <Text fontWeight="medium" noOfLines={1} title={w.name}>
+                        {w.name}
+                      </Text>
+                      <Text fontSize="xs" color="gray.500" wordBreak="break-all" noOfLines={1} title={w.url}>
+                        {w.url}
+                      </Text>
+                      <Wrap spacing={1} mt={1}>
+                        <Badge variant="outline">{w.format}</Badge>
+                        {!w.enabled && <Badge colorScheme="orange">disabled</Badge>}
                         {w.signed && (
                           <Badge colorScheme="purple" title="Deliveries carry an X-Gohead-Signature">
                             signed
                           </Badge>
                         )}
-                      </HStack>
-                      <Text fontSize="xs" color="gray.500" wordBreak="break-all" noOfLines={1} title={w.url}>
-                        {w.url}
-                      </Text>
-                      {w.headers.length > 0 && (
-                        <Text fontSize="xs" color="gray.500">
-                          Headers: {w.headers.join(", ")}
-                        </Text>
-                      )}
+                        {w.headers.length > 0 && (
+                          <Badge title={`Custom headers: ${w.headers.join(", ")}`}>
+                            {w.headers.length} header
+                            {w.headers.length > 1 ? "s" : ""}
+                          </Badge>
+                        )}
+                      </Wrap>
                     </Td>
                     <Td fontSize="xs">{listOrAll(w.events, "All events")}</Td>
                     <Td fontSize="xs">{listOrAll(w.collections, "All collections")}</Td>
-                    <Td>
-                      <Code fontSize="xs">{w.format}</Code>
-                    </Td>
                     <Td>
                       <LastDelivery w={w} />
                     </Td>
@@ -205,7 +207,13 @@ export function WebhooksPage() {
                           />
                         </Tooltip>
                         <Tooltip label="Edit" hasArrow>
-                          <IconButton aria-label={`Edit ${w.name}`} icon={<FiEdit2 />} size="sm" variant="ghost" onClick={() => openForm(w)} />
+                          <IconButton
+                            aria-label={`Edit ${w.name}`}
+                            icon={<FiEdit2 />}
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => openForm(w)}
+                          />
                         </Tooltip>
                         <ConfirmButton
                           title={`Delete ${w.name}?`}

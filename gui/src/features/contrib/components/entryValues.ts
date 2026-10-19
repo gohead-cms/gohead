@@ -94,3 +94,22 @@ export function missingRequired(attributes: Record<string, Attribute>, values: R
     })
     .map(([key]) => key);
 }
+
+/** The table columns of a collection: id, then up to four preferred attributes. */
+export function tableColumns(schema: { attributes: Record<string, Attribute> }): string[] {
+  const attributes = Object.keys(schema.attributes).filter((a) => schema.attributes[a].type !== "relation");
+  const preferred = ["title", "name", "slug"];
+  const ordered = [...attributes.filter((a) => preferred.includes(a.toLowerCase())), ...attributes.filter((a) => !preferred.includes(a.toLowerCase()))];
+  return ["id", ...ordered.filter((h) => h !== "id")].slice(0, 5);
+}
+
+/** A short text for a table cell. */
+export function displayValue(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "–";
+  if (typeof value === "object") {
+    const s = JSON.stringify(value);
+    return s.length > 30 ? `${s.substring(0, 30)}…` : s;
+  }
+  const s = String(value);
+  return s.length > 50 ? `${s.substring(0, 50)}…` : s;
+}

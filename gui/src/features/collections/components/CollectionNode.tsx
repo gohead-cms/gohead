@@ -1,23 +1,25 @@
 import React from 'react';
-import { Handle, NodeProps, Position } from '@xyflow/react';
+import { Handle, Position } from '@xyflow/react';
+import type { NodeProps } from '@xyflow/react';
 import { Box, VStack, HStack, Text, Icon, Divider } from '@chakra-ui/react';
 import { FaDatabase, FaQuoteLeft, FaHashtag, FaToggleOn, FaLink, FaCalendarAlt, FaCheckSquare, FaImage } from 'react-icons/fa';
-import { AttributeItem, CollectionNodeType } from '../../../shared/types';
+import type { AttributeItem, CollectionNode as CollectionNodeType } from '../../../shared/types/workspace';
 
 // Map attribute types to specific icons for a better visual representation
 const attributeIcons: Record<string, React.ElementType> = {
   string: FaQuoteLeft,
   text: FaQuoteLeft,
   number: FaHashtag,
+  int: FaHashtag,
   integer: FaHashtag,
   float: FaHashtag,
+  bool: FaToggleOn,
   boolean: FaToggleOn,
   relation: FaLink,
   date: FaCalendarAlt,
   datetime: FaCalendarAlt,
   richtext: FaQuoteLeft,
-  media: FaImage, // Added new icon for media type
-  // Add other types as needed
+  media: FaImage,
 };
 
 const getAttributeIcon = (type: string) => {

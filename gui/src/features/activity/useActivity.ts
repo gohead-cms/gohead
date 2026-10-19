@@ -1,6 +1,6 @@
-import { AgentNodeData, AgentRun, AgentUsage, RunStatus } from "../../shared/types";
+import { type AgentNodeData, type AgentRun, type AgentUsage, type RunStatus } from "../../shared/types";
 import { getJSON, useApiQuery } from "../../shared/hooks/useApiQuery";
-import { RunPagination } from "../agents/hook/useAgentRuns";
+import { type RunPagination } from "../agents/hook/useAgentRuns";
 
 /** Usage is loaded for at most this many agents, to keep the page light. */
 export const USAGE_AGENT_LIMIT = 20;
@@ -40,9 +40,8 @@ export interface UsageSummary {
  * request per agent (up to USAGE_AGENT_LIMIT), in parallel; a failing agent
  * does not fail the others.
  */
-export function useUsageSummary(version: number) {
-  const key = `activity-usage#${version}`;
-  const { data, loading, error } = useApiQuery(key, async (): Promise<UsageSummary> => {
+export function useUsageSummary() {
+  const { data, loading, error, refetch } = useApiQuery("activity-usage", async (): Promise<UsageSummary> => {
     const json = await getJSON<AgentNodeData[]>("/admin/agents", "Failed to load agents");
     const agents = Array.isArray(json.data) ? json.data : [];
     const shown = agents.slice(0, USAGE_AGENT_LIMIT);
@@ -57,5 +56,5 @@ export function useUsageSummary(version: number) {
     });
     return { rows, skipped: agents.length - shown.length };
   });
-  return { summary: data, loading, error };
+  return { summary: data, loading, error, refetch };
 }

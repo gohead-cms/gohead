@@ -1,4 +1,4 @@
-import { AgentFunctionInfo, Schema } from "../../../shared/types";
+import { type AgentFunctionInfo, type Schema } from "../../../shared/types";
 import { getJSON, useApiQuery } from "../../../shared/hooks/useApiQuery";
 
 /** The built-in functions agents can use (GET /admin/agent-functions). */

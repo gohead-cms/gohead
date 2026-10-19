@@ -17,7 +17,7 @@ import {
   VStack,
   useColorModeValue,
 } from "@chakra-ui/react";
-import { AgentRunStep } from "../../../shared/types";
+import { type AgentRunStep } from "../../../shared/types";
 import { useAgentRun } from "../hook/useAgentRuns";
 import {
   formatCost,

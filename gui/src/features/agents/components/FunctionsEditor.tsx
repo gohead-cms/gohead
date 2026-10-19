@@ -21,9 +21,9 @@ import {
   WrapItem,
 } from "@chakra-ui/react";
 import { FiPlus, FiTrash2 } from "react-icons/fi";
-import { AgentFunctionInfo } from "../../../shared/types";
-import { CollectionChoice } from "../hook/useEditorData";
-import { DraftErrors, FunctionDraft, applyCatalog, emptyFunction, functionWarning } from "./agentForm";
+import { type AgentFunctionInfo } from "../../../shared/types";
+import { type CollectionChoice } from "../hook/useEditorData";
+import { type DraftErrors, type FunctionDraft, applyCatalog, emptyFunction, functionWarning } from "./agentForm";
 import { EditorSection, Field } from "./EditorParts";
 
 interface FunctionsEditorProps {

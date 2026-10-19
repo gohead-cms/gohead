@@ -1,12 +1,12 @@
-import { FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { Alert, AlertDescription, AlertIcon, AlertTitle, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { api } from "../../../services/api";
 import { useNotify } from "../../../shared/hooks/useNotify";
 import { errorMessage } from "../../../shared/utils/errors";
-import { AgentFunctionInfo } from "../../../shared/types";
-import { CollectionChoice } from "../hook/useEditorData";
-import { AgentDraft, buildPayload, validateDraft } from "./agentForm";
+import { type AgentFunctionInfo } from "../../../shared/types";
+import { type CollectionChoice } from "../hook/useEditorData";
+import { type AgentDraft, buildPayload, validateDraft } from "./agentForm";
 import { BasicsSection, LimitsSection, MemorySection, ModelSection, TriggerSection } from "./AgentFormSections";
 import { FunctionsEditor } from "./FunctionsEditor";
 

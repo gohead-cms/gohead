@@ -411,6 +411,15 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *medi
 	content.Use(middleware.AuthMiddleware())
 	{
 		content.POST("/graphql", handlers.GraphQLHandler)
+
+		// The content model, read-only, for every signed-in user (editors
+		// need it to edit content; changing it stays under /admin).
+		content.GET("/schema/collections", handlers.GetCollections)
+		content.GET("/schema/collections/:name", handlers.GetCollection)
+		content.GET("/schema/singletons", handlers.GetSingletons)
+		content.GET("/schema/singletons/:name", handlers.GetSingleton)
+		content.GET("/schema/components", handlers.GetComponents)
+		content.GET("/schema/components/:name", handlers.GetComponent)
 		if openAPI.Enabled && !openAPI.Public {
 			content.GET("/openapi.json", handlers.OpenAPISpec)
 		}

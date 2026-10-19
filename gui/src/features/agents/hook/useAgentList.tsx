@@ -1,4 +1,4 @@
-import { AgentNodeData } from "../../../shared/types";
+import { type AgentNodeData } from "../../../shared/types";
 import { getJSON, useApiQuery } from "../../../shared/hooks/useApiQuery";
 
 export function useAgentsList() {
