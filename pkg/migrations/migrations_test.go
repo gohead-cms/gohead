@@ -29,8 +29,9 @@ func TestBaselineAndStatus(t *testing.T) {
 
 	applied, err := Up(db)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"0001_baseline"}, applied)
+	assert.Equal(t, []string{"0001_baseline", "0002_revisions"}, applied)
 	assert.True(t, db.Migrator().HasTable(&models.Item{}))
+	assert.True(t, db.Migrator().HasTable(&models.Revision{}))
 	assert.NoError(t, Check(db))
 
 	applied, err = Up(db)
@@ -43,8 +44,14 @@ func TestBaselineAndStatus(t *testing.T) {
 	assert.NotNil(t, states[0].AppliedAt)
 	assert.False(t, states[0].Reversible)
 
+	reverted, err := Down(db, 1)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"0002_revisions"}, reverted)
+	assert.False(t, db.Migrator().HasTable(&models.Revision{}))
 	_, err = Down(db, 1)
 	assert.Error(t, err, "the baseline cannot be undone")
+	_, err = Up(db)
+	require.NoError(t, err)
 
 	// A newer GoHead version migrated this database: an older binary
 	// refuses to revert underneath it.

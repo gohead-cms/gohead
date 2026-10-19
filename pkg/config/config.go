@@ -141,6 +141,9 @@ type Config struct {
 	// Agents
 	Agents AgentsConfig `mapstructure:"agents" yaml:"agents"`
 
+	// Content controls content history.
+	Content ContentConfig `mapstructure:"content" yaml:"content"`
+
 	// AutoMigrate applies pending database migrations when the API starts.
 	// When false, the API refuses to start on an outdated schema: run
 	// `gohead migrate` first (the Helm chart does, in an init container).
@@ -172,6 +175,12 @@ type AdminConfig struct {
 type AgentsConfig struct {
 	// RunsKept is how many runs (with their steps) are kept per agent.
 	RunsKept int `mapstructure:"runs_kept" yaml:"runs_kept"`
+}
+
+// ContentConfig controls content history.
+type ContentConfig struct {
+	// RevisionsKept is how many revisions are kept per entry (0: all).
+	RevisionsKept int `mapstructure:"revisions_kept" yaml:"revisions_kept"`
 }
 
 // LoadConfig loads the configuration from file and environment variables.
@@ -241,6 +250,7 @@ func LoadConfig(configPath string) (Config, error) {
 
 	// Agent run history
 	viper.SetDefault("agents.runs_kept", 200)
+	viper.SetDefault("content.revisions_kept", 100)
 	viper.SetDefault("auto_migrate", true)
 	viper.SetDefault("auth.registration", "disabled")
 	viper.SetDefault("admin.username", "")

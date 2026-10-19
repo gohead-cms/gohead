@@ -29,6 +29,11 @@ Base URL: your API, e.g. `http://localhost:8080`. **Auth** column: `–` public,
 | `DELETE` | `/api/collections/{collection}/{id}` | token | Delete an item |
 | `POST` | `/api/collections/{collection}/{id}/publish` | token (update) | Publish a draft |
 | `POST` | `/api/collections/{collection}/{id}/unpublish` | token (update) | Unpublish an item |
+| `GET` | `/api/collections/{collection}/{id}/revisions` | token (update) | [History](../guides/content-history.md) of an item, newest first |
+| `GET` | `/api/collections/{collection}/{id}/revisions/{version}` | token (update) | One version with its data and diff; `?compare=<version>\|current` |
+| `POST` | `/api/collections/{collection}/{id}/revisions/{version}/restore` | token (update) | Make a version current (brings back a deleted item) |
+| `GET` | `/api/singleton/{name}/revisions` | token (update) | History of a singleton (also `/{version}` and `/{version}/restore`) |
+| `GET` | `/api/revisions` | token (update) | Change feed across entries; `collection`, `singleton`, `action`, `actorKind`, `actor`, `agentRun` |
 | `POST` | `/api/media` | token (create) | Upload files (`multipart/form-data`, field `files`) |
 | `GET` | `/api/media` | token (create) | List the media library (`page`, `pageSize`, `mime`, `search`) |
 | `GET`, `PUT`, `DELETE` | `/api/media/{id}` | token (create / update / delete) | One file; `PUT` changes `name`, `alt`, `caption` |
@@ -70,6 +75,7 @@ header.
 | `GET`, `PUT`, `DELETE` | `/admin/agents/{name}` | admin |
 | `GET` | `/admin/agents/{name}/runs` | admin |
 | `GET` | `/admin/agents/{name}/runs/{id}` | admin |
+| `POST` | `/admin/agents/{name}/runs/{id}/revert` | admin ([revert a run's content changes](../guides/content-history.md#reverting-an-agent-run); `?force=true`) |
 | `GET` | `/admin/agents/{name}/usage` | admin |
 | `POST` | `/agents/webhook/{id}` | webhook |
 

@@ -146,6 +146,12 @@ its own `llm_config`.
 
 Provider keys can also come from `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`.
 
+### Content history
+
+| Key | Env | Default |
+|-----|-----|---------|
+| `content.revisions_kept` | `GOHEAD_CONTENT_REVISIONS_KEPT` | `100` revisions per entry; `0` keeps all ([content history](../guides/content-history.md)) |
+
 ### Tracing
 
 When `telemetry_enabled` is true, traces go to the OTLP endpoint given by the standard

@@ -13,6 +13,7 @@ import (
 	"github.com/gohead-cms/gohead/pkg/config"
 	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/storage"
 )
 
 // workerCmd represents the worker command
@@ -82,6 +83,7 @@ func runWorker(cfgPath string) {
 	if cfg.Agents.RunsKept > 0 {
 		runner.RunsKept = cfg.Agents.RunsKept
 	}
+	storage.RevisionLimit = max(cfg.Content.RevisionsKept, 0)
 
 	// 5. Create a new ServeMux to map task types to handlers
 	mux := asynq.NewServeMux()

@@ -86,3 +86,53 @@ test("an editor edits content but sees no admin sections", async ({ page }) => {
   await expect(page).toHaveURL(/\/dashboard$/);
   expect(errors).toEqual([]);
 });
+
+test("content history: an editor restores an earlier version", async ({ page }) => {
+  const errors = trackErrors(page);
+  await login(page, editor);
+  // Unique per attempt: a retry must not find the first attempt's entry.
+  const original = `Versioned article #${test.info().retry}`;
+  const edited = `${original} (edited)`;
+  await page.goto("/contrib?collection=articles");
+  await expect(page.getByRole("heading", { name: /articles/i })).toBeVisible();
+
+  // Version 1: create the entry.
+  await page.getByRole("button", { name: "Quick Add" }).click();
+  const form = page.getByRole("dialog");
+  await form.getByLabel("title").fill(original);
+  await form.getByRole("button", { name: "Save Changes" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const row = () => page.getByRole("row").filter({ hasText: original });
+  await expect(row()).toHaveCount(1);
+
+  // Version 2: edit its title.
+  await row().getByRole("button", { name: "Edit item" }).click();
+  await expect(form.getByLabel("title")).toHaveValue(original);
+  await form.getByLabel("title").fill(edited);
+  await form.getByRole("button", { name: "Save Changes" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("cell", { name: edited, exact: true })).toBeVisible();
+
+  // The history lists both versions; version 1 shows the original title.
+  await row().getByRole("button", { name: "Item history" }).click();
+  const history = page.getByRole("dialog");
+  await expect(history.getByText("History", { exact: true })).toBeVisible();
+  const versions = history.getByRole("button", { name: /^Version \d+,/ });
+  await expect(versions).toHaveCount(2);
+  await history.getByRole("button", { name: /^Version 1,/ }).click();
+  await expect(history.getByRole("heading", { name: "Version 1" })).toBeVisible();
+  await expect(history.getByTestId("change-title")).toContainText(original);
+
+  // Restoring version 1 records version 3 with the original title.
+  await history.getByRole("button", { name: "Restore this version" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Restore", exact: true }).click();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await expect(versions).toHaveCount(3);
+  await expect(history.getByRole("button", { name: /^Version 3, restore/ })).toBeVisible();
+  await history.getByRole("button", { name: "Close" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  await expect(page.getByRole("cell", { name: original, exact: true })).toBeVisible();
+  await expect(page.getByRole("cell", { name: edited, exact: true })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

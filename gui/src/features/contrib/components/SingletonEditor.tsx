@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { Alert, AlertIcon, Badge, Box, Button, Flex, Heading, HStack, Icon, Text } from "@chakra-ui/react";
-import { FiSave } from "react-icons/fi";
+import { FiClock, FiSave } from "react-icons/fi";
 import { api } from "../../../services/api";
 import { useNotify } from "../../../shared/hooks/useNotify";
 import { PageLoader } from "../../../shared/ui/page-loader";
 import type { Attribute } from "../../../shared/types";
 import { formatTime } from "../../agents/components/runFormat";
 import { useMe } from "../../auth/me";
+import { HistoryDrawer } from "../../history/HistoryDrawer";
 import { type SingletonContent, type SingletonDef, singletonPath, useSingletonContent } from "../hooks/useSingletons";
 import { EntryFields } from "./EntryFields";
 import { attributeMap, initialValues, missingRequired, toEntryPayload } from "./entryValues";
@@ -14,6 +15,8 @@ import { attributeMap, initialValues, missingRequired, toEntryPayload } from "./
 /** Loads a singleton's content and shows its form. */
 export function SingletonEditor({ singleton }: { singleton: SingletonDef }) {
   const { content, loading, error, refetch } = useSingletonContent(singleton.name);
+  const { canWrite } = useMe();
+  const [historyOpen, setHistoryOpen] = useState(false);
   const attributes = useMemo(() => attributeMap(singleton.attributes ?? undefined), [singleton.attributes]);
   // While saved content reloads, the form stays on screen.
   const ready = !loading || !!content;
@@ -31,6 +34,12 @@ export function SingletonEditor({ singleton }: { singleton: SingletonDef }) {
               (content?.updatedAt ? `Last updated ${formatTime(content.updatedAt)}` : "One entry, edited in place.")}
           </Text>
         </Box>
+        {/* Also without content: deleted content can be restored from history. */}
+        {canWrite && (
+          <Button bg="white" variant="outline" size="sm" leftIcon={<Icon as={FiClock} />} onClick={() => setHistoryOpen(true)}>
+            History
+          </Button>
+        )}
       </Flex>
       {!ready && <PageLoader text="Fetching content..." />}
       {error && (
@@ -49,6 +58,12 @@ export function SingletonEditor({ singleton }: { singleton: SingletonDef }) {
           onSaved={refetch}
         />
       )}
+      <HistoryDrawer
+        target={historyOpen ? { kind: "singleton", name: singleton.name } : null}
+        onClose={() => setHistoryOpen(false)}
+        // The form restarts from the reloaded content (its key is the update time).
+        onRestored={refetch}
+      />
     </Box>
   );
 }

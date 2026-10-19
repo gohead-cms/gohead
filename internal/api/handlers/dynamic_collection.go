@@ -147,7 +147,7 @@ func handleCreate(c *gin.Context, userRole string, ct *models.Collection) {
 	}
 
 	// All items are validated and stored in a single transaction.
-	created, err := storage.CreateItems(*ct, inputs)
+	created, err := storage.CreateItems(actorFrom(c), *ct, inputs)
 	if err != nil {
 		var verr *storage.ItemValidationError
 		if errors.As(err, &verr) {

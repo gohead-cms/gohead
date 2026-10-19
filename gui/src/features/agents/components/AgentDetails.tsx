@@ -31,6 +31,8 @@ interface AgentDetailsProps {
   agent: AgentNodeData;
   /** Deletes the agent; omitted for read-only viewers. */
   onDelete?: () => Promise<void>;
+  /** A run to show when the details open (the Runs tab, with that run open). */
+  initialRun?: number;
 }
 
 function Label({ children }: { children: React.ReactNode }) {
@@ -49,9 +51,11 @@ const limitLabels: [keyof AgentLimits, string][] = [
   ["max_cost_per_day", "USD / day"],
 ];
 
-export function AgentDetails({ agent, onDelete }: AgentDetailsProps) {
+export function AgentDetails({ agent, onDelete, initialRun }: AgentDetailsProps) {
   const { name, schema } = agent;
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = useState(initialRun ? 1 : 0);
+  // The run to open, until the user moves on (the Runs tab remounts lazily).
+  const [startRun, setStartRun] = useState(initialRun);
   // Bumped after "Run now" so the Runs tab reloads.
   const [runsVersion, setRunsVersion] = useState(0);
   const { llmConfig, trigger, limits } = schema;
@@ -73,6 +77,7 @@ export function AgentDetails({ agent, onDelete }: AgentDetailsProps) {
               agentName={name}
               onQueued={() => {
                 setTab(1);
+                setStartRun(undefined);
                 setRunsVersion((v) => v + 1);
                 // The worker usually starts the run a moment later.
                 window.setTimeout(() => setRunsVersion((v) => v + 1), 4000);
@@ -94,7 +99,15 @@ export function AgentDetails({ agent, onDelete }: AgentDetailsProps) {
           </HStack>
         )}
       </Flex>
-      <Tabs isLazy colorScheme="teal" index={tab} onChange={setTab}>
+      <Tabs
+        isLazy
+        colorScheme="teal"
+        index={tab}
+        onChange={(i) => {
+          setTab(i);
+          setStartRun(undefined);
+        }}
+      >
         <TabList>
           <Tab>Overview</Tab>
           <Tab>Runs</Tab>
@@ -200,7 +213,7 @@ export function AgentDetails({ agent, onDelete }: AgentDetailsProps) {
             </VStack>
           </TabPanel>
           <TabPanel px={0}>
-            <RunsPanel key={runsVersion} agentName={name} />
+            <RunsPanel key={runsVersion} agentName={name} initialRun={startRun} />
           </TabPanel>
         </TabPanels>
       </Tabs>

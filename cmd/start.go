@@ -134,6 +134,7 @@ func InitializeServer(cfgPath string) (*gin.Engine, *config.Config, func(), erro
 		cleanup()
 		return nil, nil, func() {}, err
 	}
+	storage.RevisionLimit = max(cfg.Content.RevisionsKept, 0)
 	if cfg.AutoMigrate {
 		if _, err := migrations.Up(db); err != nil {
 			cleanup()
@@ -404,6 +405,7 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *medi
 			agents.GET("/:name/runs/:run", handlers.GetAgentRun)
 			agents.GET("/:name/usage", handlers.GetAgentUsage)
 			agents.POST("/:name/run", handlers.RunAgentNow)
+			agents.POST("/:name/runs/:run/revert", handlers.RevertAgentRun)
 		}
 	}
 
@@ -430,6 +432,14 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *medi
 		content.Any("/collections/:collection/:id", handlers.DynamicCollectionHandler)
 		content.POST("/collections/:collection/:id/publish", handlers.PublishItem(true))
 		content.POST("/collections/:collection/:id/unpublish", handlers.PublishItem(false))
+		// Content history (editors and admins)
+		content.GET("/collections/:collection/:id/revisions", handlers.ListItemRevisions)
+		content.GET("/collections/:collection/:id/revisions/:version", handlers.GetItemRevision)
+		content.POST("/collections/:collection/:id/revisions/:version/restore", handlers.RestoreItemRevision)
+		content.GET("/singleton/:name/revisions", handlers.ListSingletonRevisions)
+		content.GET("/singleton/:name/revisions/:version", handlers.GetSingletonRevision)
+		content.POST("/singleton/:name/revisions/:version/restore", handlers.RestoreSingletonRevision)
+		content.GET("/revisions", handlers.ListRevisions)
 		content.POST("/media", handlers.UploadMedia)
 		content.GET("/media", handlers.ListMedia)
 		content.GET("/media/:id", handlers.GetMedia)

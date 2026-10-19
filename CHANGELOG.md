@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **The first administrator** is created from `admin.username` / `admin.email` / `admin.password` (`GOHEAD_ADMIN_*`, password 12+ characters) when the API starts on a database without users, or with `gohead admin create`.
 
 ### Added
+- **Content history**: every change to an item or a singleton (create, update, publish, unpublish, delete, restore) is recorded as a revision with the data, who made it (user, API token or agent with its run) and when, in the same transaction (migration `0002_revisions`). Compare versions field by field, restore any version (including deleted items, under the same ID), browse a change feed (`GET /api/revisions`), and revert everything an agent run changed (`POST /admin/agents/{name}/runs/{run}/revert`, skipping entries changed since unless forced). `content.revisions_kept` (100) per entry are kept. In the admin UI: history with diffs and restore on every entry, recently deleted entries, content changes in Activity, and run revert.
 - **Versioned database migrations** recorded in `schema_migrations` and serialized by a database lock, so replicas starting together no longer race: `gohead migrate`, `migrate status`, `migrate down`. The API applies them at startup unless `auto_migrate` is false (then it refuses to start on an outdated schema); the Helm chart runs them in an init container.
 - `gohead admin create` and `gohead admin set-password` (passwords from standard input only).
 - **API contract**: `api/openapi.json` and `api/graphql.json` snapshot the public API; CI fails when they drift from the code and reports breaking changes against the last release (oasdiff, GraphQL Inspector). See *API stability*.
@@ -31,6 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Playwright smoke test of the admin UI (login, schema designer, content creation, agents) against the real API in CI.
 
 ### Changed
+- Deleting a singleton's content removes it for good (it was soft-deleted, which blocked creating new content); its revisions keep the old content. `storage.UpdateItem`, which saved unvalidated data, was removed.
 - MySQL: JSON columns are created as `JSON` (they used PostgreSQL's `JSONB`, which MySQL rejects), and unique text columns (collection, component, singleton, agent and user slug names, token hashes, media keys) have a length. On PostgreSQL these columns become `varchar(191)` (`varchar(64)` and `varchar(255)` for token hashes and media keys) instead of `text`, changed by the automatic migration at startup: it fails if an existing value is longer, so check first, e.g. `SELECT max(length(name)) FROM collections` (and `components`, `singletons`, `agents`, `users.slug`).
 - Use `loc=UTC` in MySQL URLs (the examples did not), so times are stored in UTC like on the other databases.
 - The admin UI lint (ESLint, React hooks rules) is clean and blocks CI.

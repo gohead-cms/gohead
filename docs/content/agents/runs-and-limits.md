@@ -39,6 +39,9 @@ each agent are kept; change it with [`agents.runs_kept`](../getting-started/conf
 Runs in progress are never pruned. Deleting an agent deletes its runs and its conversation
 history.
 
+Content an agent's functions write is recorded in the [content history](../guides/content-history.md)
+with the agent's name and the run ID. An admin can [revert everything a run changed](../guides/content-history.md#reverting-an-agent-run).
+
 ### API
 
 ```bash

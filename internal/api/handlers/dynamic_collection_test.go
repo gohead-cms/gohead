@@ -167,7 +167,7 @@ func TestRetrieveContentItem(t *testing.T) {
 		Data:         models.JSONMap{"title": "Existing Article", "content": "This is an existing article."},
 	}
 
-	saved, err := storage.SaveItem(collection, contentItem.Data)
+	saved, err := storage.SaveItem(storage.SystemActor, collection, contentItem.Data)
 	assert.NoError(t, err)
 	// Apply AuthMiddleware to protected routes
 	protected := router.Group("/")

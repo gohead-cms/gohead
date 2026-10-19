@@ -19,15 +19,21 @@ export function ConfirmButton({
   title,
   body,
   confirmLabel = "Delete",
+  confirmColorScheme = "red",
   onConfirm,
+  onClose: onClosed,
 }: {
   trigger: ReactElement<{ onClick?: () => void }>;
   title: string;
   body: React.ReactNode;
   confirmLabel?: string;
+  /** The confirm button's color: red for destructive actions. */
+  confirmColorScheme?: string;
   onConfirm: () => Promise<void> | void;
+  /** Called whenever the dialog closes (cancelled or confirmed). */
+  onClose?: () => void;
 }) {
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen, onOpen, onClose } = useDisclosure({ onClose: onClosed });
   const cancelRef = useRef<HTMLButtonElement>(null);
   const [busy, setBusy] = useState(false);
 
@@ -55,7 +61,7 @@ export function ConfirmButton({
               <Button ref={cancelRef} onClick={onClose} isDisabled={busy}>
                 Cancel
               </Button>
-              <Button colorScheme="red" onClick={confirm} ml={3} isLoading={busy}>
+              <Button colorScheme={confirmColorScheme} onClick={confirm} ml={3} isLoading={busy}>
                 {confirmLabel}
               </Button>
             </AlertDialogFooter>

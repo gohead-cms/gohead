@@ -8,6 +8,7 @@ import (
 
 	schema "github.com/gohead-cms/gohead/internal/graphql"
 	"github.com/gohead-cms/gohead/pkg/auth"
+	"github.com/gohead-cms/gohead/pkg/storage"
 )
 
 // GraphQLHandler executes a GraphQL request. The caller's role is passed to
@@ -31,7 +32,7 @@ func GraphQLHandler(c *gin.Context) {
 		RequestString:  request.Query,
 		VariableValues: request.Variables,
 		OperationName:  request.OperationName,
-		Context:        auth.WithRole(c.Request.Context(), c.GetString("role")),
+		Context:        storage.WithActor(auth.WithRole(c.Request.Context(), c.GetString("role")), actorFrom(c)),
 	})
 
 	if len(result.Errors) > 0 {

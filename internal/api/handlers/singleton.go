@@ -223,9 +223,9 @@ func CreateOrUpdateSingletonItem(c *gin.Context) {
 	var item *models.SingleItem
 	status := http.StatusOK
 	if _, getErr := storage.GetSingleItemByType(name); getErr == nil {
-		item, err = storage.UpdateSingleItem(name, input.Data)
+		item, err = storage.UpdateSingleItem(actorFrom(c), name, input.Data)
 	} else {
-		item, err = storage.CreateSingleItem(st, input.Data)
+		item, err = storage.CreateSingleItem(actorFrom(c), st, input.Data)
 		status = http.StatusCreated
 	}
 	if err != nil {

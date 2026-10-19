@@ -165,9 +165,9 @@ func TestRunIsRecorded(t *testing.T) {
 func TestFunctionScopes(t *testing.T) {
 	f := setup(t)
 	a := f.agent(agents.Limits{}, upsert, del)
-	article, err := storage.SaveItem(f.articles, models.JSONMap{"title": "Keep me"})
+	article, err := storage.SaveItem(storage.SystemActor, f.articles, models.JSONMap{"title": "Keep me"})
 	require.NoError(t, err)
-	draft, err := storage.SaveItem(f.drafts, models.JSONMap{"title": "Old draft"})
+	draft, err := storage.SaveItem(storage.SystemActor, f.drafts, models.JSONMap{"title": "Old draft"})
 	require.NoError(t, err)
 
 	f.llm.responses = []llm.Response{
@@ -309,7 +309,7 @@ func TestNestedRelationsRespectScopes(t *testing.T) {
 		{Name: "draft", Type: "relation", Target: "drafts", Relation: "oneToOne"},
 	}}
 	require.NoError(t, storage.SaveCollection(&posts))
-	draft, err := storage.SaveItem(f.drafts, models.JSONMap{"title": "Existing"})
+	draft, err := storage.SaveItem(storage.SystemActor, f.drafts, models.JSONMap{"title": "Existing"})
 	require.NoError(t, err)
 
 	savePost := agents.FunctionSpec{Name: "save_post", ImplKey: "collections.upsert_item", Parameters: models.JSONMap{"type": "object"}, Collections: []string{"posts"}}
