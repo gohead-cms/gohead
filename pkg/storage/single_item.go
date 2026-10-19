@@ -40,7 +40,7 @@ func CreateSingleItem(actor Actor, st *models.Singleton, itemData map[string]any
 		}
 		_, err = recordRevision(tx, actor, revisionInput{
 			entityType: models.RevisionEntitySingleton, entityID: st.ID, typeName: st.Name,
-			action: models.RevisionCreate, data: item.Data,
+			action: models.RevisionCreate, data: item.Data, translations: item.Translations,
 		})
 		return err
 	})
@@ -100,7 +100,7 @@ func UpdateSingleItem(actor Actor, SingletonName string, newData map[string]any)
 			return fmt.Errorf("failed to retrieve single item: %w", err)
 		}
 		previous := item.Data
-		before := &entryState{data: previous}
+		before := &entryState{data: previous, translations: item.Translations}
 		item.Data = newData
 		if err := tx.Save(&item).Error; err != nil {
 			return fmt.Errorf("failed to update single item: %w", err)
@@ -110,7 +110,7 @@ func UpdateSingleItem(actor Actor, SingletonName string, newData map[string]any)
 		}
 		_, err := recordRevision(tx, actor, revisionInput{
 			entityType: models.RevisionEntitySingleton, entityID: st.ID, typeName: st.Name,
-			action: models.RevisionUpdate, data: item.Data, before: before,
+			action: models.RevisionUpdate, data: item.Data, translations: item.Translations, before: before,
 		})
 		return err
 	})
@@ -140,7 +140,7 @@ func DeleteSingleItem(actor Actor, SingletonName string) error {
 		}
 		if _, err := recordRevision(tx, actor, revisionInput{
 			entityType: models.RevisionEntitySingleton, entityID: st.ID, typeName: st.Name,
-			action: models.RevisionDelete, data: item.Data, before: &entryState{data: item.Data},
+			action: models.RevisionDelete, data: item.Data, translations: item.Translations, before: &entryState{data: item.Data, translations: item.Translations},
 		}); err != nil {
 			return err
 		}

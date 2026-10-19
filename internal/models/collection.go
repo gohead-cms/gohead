@@ -40,6 +40,10 @@ var ReservedAttributeNames = []string{"id", "createdAt", "updatedAt", "published
 // ReservedDraftAttributeNames are also reserved when draft and publish is on.
 var ReservedDraftAttributeNames = []string{"status"}
 
+// ReservedLocaleAttributeNames are also reserved in types with localized
+// attributes.
+var ReservedLocaleAttributeNames = []string{"locale", "locales"}
+
 func ParseCollectionInput(input map[string]any) (Collection, error) {
 	// Initialize a Collection struct
 	var collection Collection
@@ -115,6 +119,10 @@ func mapToAttribute(attrMap map[string]any, attribute *Attribute) error {
 
 	if unique, ok := attrMap["unique"].(bool); ok {
 		attribute.Unique = unique
+	}
+
+	if localized, ok := attrMap["localized"].(bool); ok {
+		attribute.Localized = localized
 	}
 
 	if options, ok := attrMap["options"].([]any); ok {
@@ -219,6 +227,9 @@ func ValidateCollectionSchema(ct Collection) error {
 		}
 		if ct.DraftAndPublish && slices.Contains(ReservedDraftAttributeNames, attribute.Name) {
 			return fmt.Errorf("attribute name '%s' is reserved when draft and publish is enabled", attribute.Name)
+		}
+		if err := validateLocalized(ct.Attributes, attribute); err != nil {
+			return err
 		}
 
 		if attribute.Type == "component" {

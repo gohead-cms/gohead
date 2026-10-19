@@ -87,7 +87,7 @@ func CreateItems(actor Actor, collection models.Collection, inputs []ItemInput) 
 			}
 			if _, err := recordRevision(tx, actor, revisionInput{
 				entityType: models.RevisionEntityItem, entityID: item.ID, typeName: collection.Name,
-				action: models.RevisionCreate, status: itemStatus(collection, item), data: item.Data,
+				action: models.RevisionCreate, status: itemStatus(collection, item), data: item.Data, translations: item.Translations,
 			}); err != nil {
 				return err
 			}
@@ -130,7 +130,7 @@ func UpdateItemContent(actor Actor, collection models.Collection, itemID uint, d
 			}
 			return err
 		}
-		before := &entryState{data: item.Data, status: itemStatus(collection, &item)}
+		before := &entryState{data: item.Data, translations: item.Translations, status: itemStatus(collection, &item)}
 		previous := item.Data
 		processed, err := models.ValidateItemUpdate(collection, data, models.WithNestedCollector(tx, nested), item.ID)
 		if err != nil {
@@ -165,7 +165,7 @@ func UpdateItemContent(actor Actor, collection models.Collection, itemID uint, d
 		}
 		_, err = recordRevision(tx, actor, revisionInput{
 			entityType: models.RevisionEntityItem, entityID: item.ID, typeName: collection.Name,
-			action: action, status: itemStatus(collection, &item), data: item.Data, before: before,
+			action: action, status: itemStatus(collection, &item), data: item.Data, translations: item.Translations, before: before,
 		})
 		return err
 	})
@@ -195,7 +195,7 @@ func SetItemPublished(actor Actor, collection models.Collection, itemID uint, pu
 			}
 			return err
 		}
-		before := &entryState{data: item.Data, status: itemStatus(collection, &item)}
+		before := &entryState{data: item.Data, translations: item.Translations, status: itemStatus(collection, &item)}
 		var err error
 		if transition, err = setPublishedTx(tx, &item, publish); err != nil {
 			return err
@@ -212,7 +212,7 @@ func SetItemPublished(actor Actor, collection models.Collection, itemID uint, pu
 		}
 		_, err = recordRevision(tx, actor, revisionInput{
 			entityType: models.RevisionEntityItem, entityID: item.ID, typeName: collection.Name,
-			action: action, status: itemStatus(collection, &item), data: item.Data, before: before,
+			action: action, status: itemStatus(collection, &item), data: item.Data, translations: item.Translations, before: before,
 		})
 		return err
 	})
@@ -376,8 +376,8 @@ func DeleteItem(actor Actor, id uint) error {
 		}
 		if _, err := recordRevision(tx, actor, revisionInput{
 			entityType: models.RevisionEntityItem, entityID: item.ID, typeName: collection.Name,
-			action: models.RevisionDelete, status: itemStatus(collection, &item), data: item.Data,
-			before: &entryState{data: item.Data, status: itemStatus(collection, &item)},
+			action: models.RevisionDelete, status: itemStatus(collection, &item), data: item.Data, translations: item.Translations,
+			before: &entryState{data: item.Data, translations: item.Translations, status: itemStatus(collection, &item)},
 		}); err != nil {
 			return err
 		}

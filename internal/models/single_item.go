@@ -16,6 +16,8 @@ type SingleItem struct {
 	SingleTypeID uint      `json:"single_type_id" gorm:"uniqueIndex"`
 	SingleType   Singleton `json:"-" gorm:"constraint:OnDelete:CASCADE;foreignKey:SingleTypeID;references:ID"`
 	Data         JSONMap   `json:"data" gorm:"type:json"`
+	// Translations: see Item.Translations.
+	Translations JSONMap `json:"translations,omitempty" gorm:"type:json"`
 }
 
 // SingleItemResponse is the JSON shape of a singleton's content: its

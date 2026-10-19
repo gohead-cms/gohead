@@ -42,9 +42,11 @@ type Revision struct {
 	Action     string  `json:"action" gorm:"size:16;not null"`
 	Status     string  `json:"status,omitempty" gorm:"size:16"` // draft or published (draft-and-publish collections)
 	Data       JSONMap `json:"data" gorm:"type:json"`
-	ActorKind  string  `json:"actorKind" gorm:"size:16;not null"`
-	ActorName  string  `json:"actorName" gorm:"size:191"`
-	AgentRunID *uint   `json:"agentRunId,omitempty" gorm:"index"`
+	// Translations are the entry's localized values in other locales.
+	Translations JSONMap `json:"translations,omitempty" gorm:"type:json"`
+	ActorKind    string  `json:"actorKind" gorm:"size:16;not null"`
+	ActorName    string  `json:"actorName" gorm:"size:191"`
+	AgentRunID   *uint   `json:"agentRunId,omitempty" gorm:"index"`
 	// RestoredFrom is the version a restore copied.
 	RestoredFrom *uint     `json:"restoredFrom,omitempty"`
 	CreatedAt    time.Time `json:"createdAt" gorm:"index"`

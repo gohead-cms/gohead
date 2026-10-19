@@ -38,6 +38,10 @@ func newContentAPI(t *testing.T) *contentAPI {
 	admin.POST("/components", CreateComponent)
 	admin.DELETE("/components/:name", DeleteComponent)
 	admin.POST("/singleton", CreateOrUpdateSingleton)
+	admin.PUT("/singleton/:name", CreateOrUpdateSingleton)
+	admin.POST("/locales", CreateLocale)
+	admin.PUT("/locales/:code", UpdateLocale)
+	admin.DELETE("/locales/:code", DeleteLocale)
 
 	api := router.Group("/api", middleware.AuthMiddleware())
 	api.Any("/collections/:collection", DynamicCollectionHandler)
@@ -53,6 +57,7 @@ func newContentAPI(t *testing.T) *contentAPI {
 	api.GET("/singleton/:name/revisions/:version", GetSingletonRevision)
 	api.POST("/singleton/:name/revisions/:version/restore", RestoreSingletonRevision)
 	api.GET("/revisions", ListRevisions)
+	api.GET("/locales", ListLocales)
 	return &contentAPI{t: t, router: router}
 }
 

@@ -59,6 +59,10 @@ type Attribute struct {
 	Multiple     bool     `json:"multiple,omitempty"`                                       // Type="media": a list of files
 	AllowedTypes []string `gorm:"type:json;serializer:json" json:"allowed_types,omitempty"` // Type="media": MIME patterns, e.g. "image/*"
 
+	// Localized attributes have a value per locale (see Item.Translations).
+	// Relations cannot be localized. Component attributes do not use it.
+	Localized bool `json:"localized,omitempty" gorm:"not null;default:false"`
+
 	// Foreign keys (an attribute can belong to either a Collection, a SingleType, or a Component)
 	CollectionID *uint       `json:"collection_id,omitempty"`
 	Collection   *Collection `json:"-" gorm:"constraint:OnDelete:CASCADE;"`

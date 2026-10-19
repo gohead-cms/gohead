@@ -47,6 +47,12 @@ var All = []Migration{
 		Up:          func(tx *gorm.DB) error { return tx.AutoMigrate(&revision0002{}) },
 		Down:        func(tx *gorm.DB) error { return tx.Migrator().DropTable(&revision0002{}) },
 	},
+	{
+		ID:          "0003_i18n",
+		Description: "Locales, localized attributes and translations",
+		Up:          i18nUp,
+		Down:        i18nDown,
+	},
 }
 
 // baseline creates or updates every table from the models, as GoHead did at

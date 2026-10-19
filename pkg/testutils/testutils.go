@@ -79,9 +79,21 @@ type revision struct {
 	AgentRunID   *uint   `gorm:"index:idx_revisions_agent_run_id"`
 	RestoredFrom *uint
 	CreatedAt    time.Time `gorm:"index:idx_revisions_created_at"`
+	Translations JSONMap   `gorm:"type:json"`
 }
 
 func (revision) TableName() string { return "revisions" }
+
+// locale mirrors models.Locale.
+type locale struct {
+	ID        uint   `gorm:"primaryKey"`
+	Code      string `gorm:"size:35;not null;uniqueIndex:idx_locales_code"`
+	Name      string `gorm:"size:191"`
+	IsDefault bool   `gorm:"not null;default:false"`
+	CreatedAt time.Time
+}
+
+func (locale) TableName() string { return "locales" }
 
 // setupTestServer initializes a Gin router and database for testing.
 func SetupTestServer() (*gin.Engine, *gorm.DB) {
@@ -110,7 +122,7 @@ func SetupTestServer() (*gin.Engine, *gorm.DB) {
 
 	// Content writes record revisions, so every test database has the
 	// table, including tests that migrate only the models they use.
-	err = db.AutoMigrate(&UserRole{}, &revision{})
+	err = db.AutoMigrate(&UserRole{}, &revision{}, &locale{})
 	if err != nil {
 		logger.Log.Error("Failed to migrate : ", err.Error())
 		panic("Failed to migrate :  " + err.Error())
