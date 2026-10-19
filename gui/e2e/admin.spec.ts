@@ -43,7 +43,8 @@ test.describe("admin", () => {
 
   test("API tokens: the secret is shown once", async ({ page }) => {
     await page.goto("/settings/tokens");
-    await page.getByRole("button", { name: "New token" }).click();
+    // The header button (an empty list shows a second one).
+    await page.getByRole("button", { name: "New token" }).first().click();
     await page.getByRole("dialog").getByRole("textbox", { name: /^Name/ }).fill(`ci${test.info().retry}`);
     await page.getByRole("button", { name: "Create token" }).click();
     await expect(page.getByText(/ght_[A-Za-z0-9_-]{10,}/)).toBeVisible();

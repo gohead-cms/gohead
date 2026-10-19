@@ -24,12 +24,14 @@ import {
 import { useNavigate, useParams } from "react-router-dom";
 import { FiSave, FiX } from "react-icons/fi";
 import { api } from "../../../services/api";
+import { localeLabel, useLocales } from "../../../shared/hooks/useLocales";
 import { useNotify } from "../../../shared/hooks/useNotify";
 import { PageLoader } from "../../../shared/ui/page-loader";
 import type { Attribute, Schema } from "../../../shared/types";
 import { useCollectionSchema } from "../../collections/hook/useCollectionSchema";
 import { EntryFields } from "./EntryFields";
-import { initialValues, missingRequired, toEntryPayload } from "./entryValues";
+import { hasLocalizedAttributes, initialValues, missingRequired, toEntryPayload } from "./entryValues";
+import { LocaleSwitcher } from "./LocaleSwitcher";
 
 type Field = { key: string; attr: Attribute };
 
@@ -73,6 +75,8 @@ function ContributionEditor({ collectionName, schema }: { collectionName: string
   const [formData, setFormData] = useState<Record<string, unknown>>(() => initialValues(schema.attributes));
   const [missing, setMissing] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const localized = hasLocalizedAttributes(schema.attributes);
+  const { locales, defaultLocale } = useLocales(localized);
 
   const handleChange = (key: string, value: unknown) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
@@ -104,6 +108,16 @@ function ContributionEditor({ collectionName, schema }: { collectionName: string
           </Text>
         </Box>
         <HStack>
+          {localized && locales.length > 1 && defaultLocale && (
+            // Entries are created in the default locale; translations are
+            // added from the entry's editor once it exists.
+            <LocaleSwitcher
+              locales={locales}
+              value={defaultLocale.code}
+              onChange={() => {}}
+              disabledReason={`New entries are written in ${localeLabel(defaultLocale)}. Once saved, open the entry from the list to translate it.`}
+            />
+          )}
           <Button variant="ghost" leftIcon={<Icon as={FiX} />} onClick={() => navigate("/contrib")}>
             Cancel
           </Button>

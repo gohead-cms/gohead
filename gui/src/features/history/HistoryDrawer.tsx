@@ -367,7 +367,13 @@ function RevisionPanel({ target, revision: r, isLatest, latest, compare, onCompa
           </Button>
           {showData && (
             <Code display="block" whiteSpace="pre-wrap" wordBreak="break-word" p={3} mt={2} fontSize="xs" bg={codeBg} maxH="360px" overflowY="auto">
-              {JSON.stringify(detail.data, null, 2)}
+              {JSON.stringify(
+                detail.translations && Object.keys(detail.translations).length > 0
+                  ? { ...detail.data, translations: detail.translations }
+                  : detail.data,
+                null,
+                2,
+              )}
             </Code>
           )}
         </Box>

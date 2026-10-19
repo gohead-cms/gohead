@@ -32,6 +32,9 @@ type LocaleInUseError struct {
 }
 
 func (e *LocaleInUseError) Error() string {
+	if e.Entries == 1 {
+		return fmt.Sprintf("1 entry has content in locale '%s'", e.Code)
+	}
 	return fmt.Sprintf("%d entries have content in locale '%s'", e.Entries, e.Code)
 }
 

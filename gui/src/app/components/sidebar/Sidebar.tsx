@@ -28,6 +28,7 @@ import {
   FiKey,
   FiSend,
   FiLayers,
+  FiGlobe,
 } from 'react-icons/fi';
 import { type IconType } from 'react-icons';
 import { NavLink, useLocation } from "react-router-dom";
@@ -82,6 +83,7 @@ const LinkItems: Array<NavItemProps> = [
       { name: 'Users', icon: FiUsers, href: '/settings/users' },
       { name: 'API Tokens', icon: FiKey, href: '/settings/tokens' },
       { name: 'Webhooks', icon: FiSend, href: '/settings/webhooks' },
+      { name: 'Locales', icon: FiGlobe, href: '/settings/locales' },
     ],
   },
 ];

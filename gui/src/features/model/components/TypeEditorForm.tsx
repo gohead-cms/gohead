@@ -29,6 +29,7 @@ import {
   emptyAttribute,
   formToPayload,
   hasErrors,
+  kindSupportsLocalized,
   KIND_LABELS,
   moveItem,
   saveRequest,
@@ -175,6 +176,8 @@ export function TypeEditorForm({ kind, existingName, initial, collections, compo
           </Flex>
           <Text fontSize="sm" color="gray.500" mb={4}>
             The API stores attributes by name, so the order here is not saved.
+            {kindSupportsLocalized(kind) &&
+              " Localized attributes have a value per locale (see Settings → Locales); the others are shared by every locale."}
           </Text>
           <VStack align="stretch" spacing={3}>
             {form.attributes.length === 0 && (
@@ -192,6 +195,7 @@ export function TypeEditorForm({ kind, existingName, initial, collections, compo
                 errors={shown.attributes[attr.key] ?? {}}
                 collections={collections}
                 components={kind === "components" ? components.filter((c) => c !== existingName) : components}
+                localizable={kindSupportsLocalized(kind)}
                 onChange={(patch) => setAttributes((list) => list.map((a) => (a.key === attr.key ? { ...a, ...patch } : a)))}
                 onMove={(delta) => setAttributes((list) => moveItem(list, list.findIndex((a) => a.key === attr.key), delta))}
                 onRemove={() => setAttributes((list) => list.filter((a) => a.key !== attr.key))}

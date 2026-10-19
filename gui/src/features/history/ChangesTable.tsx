@@ -1,5 +1,6 @@
-import { Badge, Box, Code, Table, TableContainer, Tbody, Td, Text, Th, Thead, Tr, useColorModeValue } from "@chakra-ui/react";
-import { type FieldChange, REDACTED } from "./history";
+import { Badge, Box, Code, HStack, Icon, Table, TableContainer, Tbody, Td, Text, Th, Thead, Tr, useColorModeValue } from "@chakra-ui/react";
+import { FiGlobe } from "react-icons/fi";
+import { type FieldChange, REDACTED, splitField } from "./history";
 import { type DiffPart, isLongText, wordDiff } from "./wordDiff";
 
 const changeColor: Record<FieldChange["change"], string> = {
@@ -78,14 +79,32 @@ export function ChangesTable({ changes, beforeLabel, afterLabel }: { changes: Fi
         </Thead>
         <Tbody>
           {changes.map((c) => {
+            const { name, locale } = splitField(c.field);
             // Long texts on both sides read better as one inline diff.
             const parts = c.change === "changed" && isLongText(c.before) && isLongText(c.after) ? wordDiff(c.before, c.after) : null;
             return (
               <Tr key={c.field} data-testid={`change-${c.field}`}>
                 <Td>
-                  <Text fontWeight="medium" wordBreak="break-word">
-                    {c.field}
-                  </Text>
+                  <HStack spacing={1.5} align="center" wrap="wrap">
+                    <Text fontWeight="medium" wordBreak="break-word">
+                      {name}
+                    </Text>
+                    {locale && (
+                      <Badge
+                        colorScheme="purple"
+                        variant="outline"
+                        fontSize="2xs"
+                        textTransform="none"
+                        display="inline-flex"
+                        alignItems="center"
+                        gap={0.5}
+                        title={`The ${locale} translation`}
+                      >
+                        <Icon as={FiGlobe} boxSize="0.8em" />
+                        {locale}
+                      </Badge>
+                    )}
+                  </HStack>
                   <Badge mt={1} colorScheme={changeColor[c.change]} fontSize="2xs">
                     {c.change}
                   </Badge>

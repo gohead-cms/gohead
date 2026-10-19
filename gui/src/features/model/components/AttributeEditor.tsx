@@ -6,14 +6,16 @@ import {
   FormErrorMessage,
   FormLabel,
   HStack,
+  Icon,
   IconButton,
   Input,
   Select,
   Text,
+  Tooltip,
 } from "@chakra-ui/react";
-import { FiArrowDown, FiArrowUp, FiTrash2 } from "react-icons/fi";
+import { FiArrowDown, FiArrowUp, FiGlobe, FiTrash2 } from "react-icons/fi";
 import type { AttributeField, AttributeForm } from "../schema";
-import { supportsUnique, TYPE_HINTS, typeLabel } from "../schema";
+import { supportsLocalized, supportsUnique, TYPE_HINTS, typeLabel } from "../schema";
 import { AttributeOptions } from "./AttributeOptions";
 
 interface Props {
@@ -24,13 +26,15 @@ interface Props {
   errors: Partial<Record<AttributeField, string>>;
   collections: string[];
   components: string[];
+  /** The type can have localized attributes (collections and singletons). */
+  localizable: boolean;
   onChange: (patch: Partial<AttributeForm>) => void;
   onMove: (delta: -1 | 1) => void;
   onRemove: () => void;
 }
 
 /** One attribute: name, type, flags and type-specific options. */
-export function AttributeEditor({ attr, index, count, types, errors, collections, components, onChange, onMove, onRemove }: Props) {
+export function AttributeEditor({ attr, index, count, types, errors, collections, components, localizable, onChange, onMove, onRemove }: Props) {
   const label = attr.name.trim() || `attribute ${index + 1}`;
   // A type the editor does not offer (e.g. "time") stays selectable.
   const typeOptions = types.some((t) => t.value === attr.type) ? types : [...types, { value: attr.type, label: typeLabel(attr.type) }];
@@ -63,6 +67,7 @@ export function AttributeEditor({ attr, index, count, types, errors, collections
               Unique
             </Checkbox>
           )}
+          {localizable && <LocalizedCheckbox attr={attr} onChange={onChange} />}
         </HStack>
         <HStack spacing={1} pt={{ base: 0, lg: 7 }} ml="auto" flexShrink={0}>
           <IconButton
@@ -93,5 +98,35 @@ export function AttributeEditor({ attr, index, count, types, errors, collections
         <AttributeOptions attr={attr} errors={errors} onChange={onChange} collections={collections} components={components} />
       </Box>
     </Box>
+  );
+}
+
+/** "Localized": a value per locale. Relations are shared by every locale. */
+function LocalizedCheckbox({ attr, onChange }: Pick<Props, "attr" | "onChange">) {
+  const allowed = supportsLocalized(attr);
+  const box = (
+    <Checkbox
+      isChecked={allowed && attr.localized}
+      isDisabled={!allowed}
+      onChange={(e) => onChange({ localized: e.target.checked })}
+    >
+      <HStack as="span" spacing={1}>
+        <Icon as={FiGlobe} color={allowed && attr.localized ? "purple.500" : "gray.400"} />
+        <span>Localized</span>
+      </HStack>
+    </Checkbox>
+  );
+  return (
+    <Tooltip
+      hasArrow
+      openDelay={300}
+      label={
+        allowed
+          ? "A value per locale: translators edit it in each locale, other attributes are shared."
+          : "Relations cannot be localized: links are shared by every locale."
+      }
+    >
+      <span>{box}</span>
+    </Tooltip>
   );
 }

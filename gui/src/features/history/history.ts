@@ -21,6 +21,7 @@ export interface Revision {
 }
 
 export interface FieldChange {
+  /** An attribute, or "attribute@locale" for a translated value. */
   field: string;
   change: "added" | "removed" | "changed";
   before?: unknown;
@@ -30,6 +31,8 @@ export interface FieldChange {
 /** A revision with its stored data and the changes from another version. */
 export interface RevisionDetail extends Revision {
   data: Record<string, unknown> | null;
+  /** Localized values in other locales than the default, by locale. */
+  translations?: Record<string, Record<string, unknown>> | null;
   comparedTo: number | null;
   changes: FieldChange[];
 }
@@ -134,6 +137,13 @@ export const actionLabel: Record<RevisionAction, string> = {
   delete: "delete",
   restore: "restore",
 };
+
+/** "title@fr" → { name: "title", locale: "fr" }; a plain field has no locale. */
+export function splitField(field: string): { name: string; locale?: string } {
+  const at = field.lastIndexOf("@");
+  if (at <= 0 || at === field.length - 1) return { name: field };
+  return { name: field.slice(0, at), locale: field.slice(at + 1) };
+}
 
 /** Password attributes come back redacted as this string. */
 export const REDACTED = "********";

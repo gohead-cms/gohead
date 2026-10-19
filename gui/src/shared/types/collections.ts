@@ -12,6 +12,8 @@ export interface Attribute {
   repeatable?: boolean;
   multiple?: boolean;
   allowed_types?: string[];
+  /** A value per locale (see GET /api/locales). */
+  localized?: boolean;
 }
 
 /** A value of a simple form field (text, number, date, boolean). */
