@@ -96,13 +96,28 @@ migrations are explicit, reviewed steps; contributors add them in `pkg/migration
     - **MySQL** users of earlier versions: GoHead did not work on MySQL before 0.5 (JSONB
       columns). Start from a new database.
 
-Also new, without action needed: the versioned migrations above (the first start records
-`0001_baseline`, then `0002_revisions` for [content history](../guides/content-history.md);
-existing entries get their first revision on their next change, then `0003_i18n` for
-[localization](../guides/localization.md): existing content is in the default locale, `en`
-unless `GOHEAD_I18N_DEFAULT_LOCALE` says otherwise, so set it before upgrading if your content
-is in another language), agent run history and limits, scoped agent functions, API tokens,
-outbound webhooks and the OpenAPI document. Use `loc=UTC` in MySQL URLs.
+!!! note "Before upgrading"
+
+    - **Content language:** existing content is labelled with the default locale, `en`
+      unless `GOHEAD_I18N_DEFAULT_LOCALE` says otherwise. If your content is in another
+      language, set it before the first start of 0.5 ([localization](../guides/localization.md)).
+    - **MySQL:** use `loc=UTC` in MySQL URLs.
+
+The first start applies three migrations:
+
+- `0001_baseline`: the schema as earlier versions created it.
+- `0002_revisions`: [content history](../guides/content-history.md). Existing entries get
+  their first revision on their next change.
+- `0003_i18n`: [localization](../guides/localization.md).
+
+Also new, with no action needed:
+
+- [custom roles](../guides/users-and-roles.md#custom-roles). Built-in roles keep their rights.
+  Publishing now needs the `publish` permission, which `editor` and `admin` have.
+- agent run history and limits, and scoped agent functions;
+- API tokens and outbound webhooks;
+- the OpenAPI document;
+- the complete admin UI.
 
 ### 0.4.0
 
