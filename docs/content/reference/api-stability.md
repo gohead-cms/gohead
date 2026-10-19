@@ -9,7 +9,8 @@ major version. Before 1.0, minor versions may break it, always with an entry in 
 
 | Surface | What is covered |
 |---------|-----------------|
-| REST API | Every path, method, parameter, request body and response in `/api/openapi.json`, including `/auth/*` and `/admin/*`; the response envelope (`data`, `meta`, `error`); status codes |
+| Content and auth API | Every path, method, parameter, request body and response in `/api/openapi.json` (`/api/*` and `/auth/*`); the response envelope (`data`, `meta`, `error`); status codes |
+| Admin API | The `/admin/*` endpoints in the [API endpoints reference](api-endpoints.md) (not in the OpenAPI document or its CI check yet) |
 | GraphQL | Every type, field, argument and mutation generated from the content model, and their naming rules |
 | Content events and webhooks | Event names (`item:created`…), the webhook JSON payload and signature headers |
 | Configuration | Keys and `GOHEAD_*` variables in the [configuration reference](../getting-started/configuration.md) |
