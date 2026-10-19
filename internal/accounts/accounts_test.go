@@ -51,6 +51,8 @@ func TestBootstrapAdminNeedsPassword(t *testing.T) {
 	setup(t)
 	_, err := BootstrapAdmin("root", "", "")
 	assert.True(t, errors.Is(err, ErrInvalid))
+	_, err = BootstrapAdmin("root", "", "a-long-enough-password")
+	assert.True(t, errors.Is(err, ErrInvalid), "the email is required")
 }
 
 func TestSetPassword(t *testing.T) {

@@ -28,7 +28,7 @@ lives at the root of the repository.
 | Key | Env | Default |
 |-----|-----|---------|
 | `admin.username` | `GOHEAD_ADMIN_USERNAME` | *(empty)* |
-| `admin.email` | `GOHEAD_ADMIN_EMAIL` | *(empty: `<username>@localhost`)* |
+| `admin.email` | `GOHEAD_ADMIN_EMAIL` | *(empty)*, required with a username |
 | `admin.password` | `GOHEAD_ADMIN_PASSWORD` | *(empty)*, 12+ characters |
 | `auth.registration` | `GOHEAD_AUTH_REGISTRATION` | `disabled` (`open`: anyone can create a viewer account) |
 

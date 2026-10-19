@@ -64,7 +64,8 @@ then run them:
 
 ```bash
 GOHEAD_DATABASE_URL=sqlite://e2e.db GOHEAD_RATE_LIMIT_ENABLED=false \
-  GOHEAD_ADMIN_USERNAME=e2e-admin GOHEAD_ADMIN_PASSWORD=e2e-password-123 make run &
+  GOHEAD_ADMIN_USERNAME=e2e-admin GOHEAD_ADMIN_EMAIL=e2e@example.com \
+  GOHEAD_ADMIN_PASSWORD=e2e-password-123 make run &
 cd gui && npx playwright install chromium && npm run test:e2e
 ```
 

@@ -12,6 +12,8 @@
 package migrations
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"sort"
@@ -105,13 +107,14 @@ func Up(db *gorm.DB) ([]string, error) {
 				continue
 			}
 			start := time.Now()
-			if err := conn.Transaction(func(tx *gorm.DB) error {
-				if err := m.Up(tx); err != nil {
-					return err
-				}
-				return tx.Create(&record{ID: m.ID, Description: m.Description, AppliedAt: time.Now().UTC()}).Error
-			}); err != nil {
+			// Not wrapped in a transaction: MySQL commits DDL implicitly,
+			// and GORM's migrator does not run reliably inside one. A
+			// migration that needs atomic data changes opens its own.
+			if err := m.Up(conn); err != nil {
 				return fmt.Errorf("migration %s failed: %w", m.ID, err)
+			}
+			if err := conn.Create(&record{ID: m.ID, Description: m.Description, AppliedAt: time.Now().UTC()}).Error; err != nil {
+				return fmt.Errorf("migration %s ran but could not be recorded: %w", m.ID, err)
 			}
 			logger.Log.WithField("migration", m.ID).WithField("ms", time.Since(start).Milliseconds()).Info("Applied database migration")
 			applied = append(applied, m.ID)
@@ -138,13 +141,11 @@ func Down(db *gorm.DB, steps int) ([]string, error) {
 			if m.Down == nil {
 				return fmt.Errorf("migration %s cannot be undone; restore a backup instead", m.ID)
 			}
-			if err := conn.Transaction(func(tx *gorm.DB) error {
-				if err := m.Down(tx); err != nil {
-					return err
-				}
-				return tx.Delete(&record{ID: m.ID}).Error
-			}); err != nil {
+			if err := m.Down(conn); err != nil {
 				return fmt.Errorf("reverting %s failed: %w", m.ID, err)
+			}
+			if err := conn.Delete(&record{ID: m.ID}).Error; err != nil {
+				return fmt.Errorf("%s was reverted but is still recorded: %w", m.ID, err)
 			}
 			logger.Log.WithField("migration", m.ID).Info("Reverted database migration")
 			reverted = append(reverted, m.ID)
@@ -220,34 +221,44 @@ const (
 	lockTimeout = 10 * time.Minute
 )
 
-// withLock runs fn on a single connection holding the migration lock.
-func withLock(db *gorm.DB, fn func(conn *gorm.DB) error) error {
+// withLock runs fn while holding the migration lock. The lock lives on a
+// dedicated connection (locks are per session), and fn uses the normal pool.
+func withLock(db *gorm.DB, fn func(db *gorm.DB) error) error {
 	if err := db.AutoMigrate(&record{}); err != nil {
 		return fmt.Errorf("could not create schema_migrations: %w", err)
 	}
-	switch db.Dialector.Name() {
-	case "postgres":
-		return db.Connection(func(conn *gorm.DB) error {
-			if err := conn.Exec("SELECT pg_advisory_lock(?)", lockKey).Error; err != nil {
-				return fmt.Errorf("could not take the migration lock: %w", err)
-			}
-			defer conn.Exec("SELECT pg_advisory_unlock(?)", lockKey)
-			return fn(conn)
-		})
-	case "mysql":
-		return db.Connection(func(conn *gorm.DB) error {
-			var got *int
-			if err := conn.Raw("SELECT GET_LOCK(?, ?)", lockName, int(lockTimeout.Seconds())).Scan(&got).Error; err != nil {
-				return fmt.Errorf("could not take the migration lock: %w", err)
-			}
-			if got == nil || *got != 1 {
-				return fmt.Errorf("timed out waiting for the migration lock (another `gohead migrate` running?)")
-			}
-			defer conn.Exec("SELECT RELEASE_LOCK(?)", lockName)
-			return fn(conn)
-		})
-	default:
+	dialect := db.Dialector.Name()
+	if dialect != "postgres" && dialect != "mysql" {
 		// SQLite: one process owns the file; writes are serialized anyway.
 		return fn(db)
 	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), lockTimeout)
+	defer cancel()
+	conn, err := sqlDB.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("could not open a connection for the migration lock: %w", err)
+	}
+	defer conn.Close()
+
+	if dialect == "postgres" {
+		// Blocks until the lock is free (or the context times out).
+		if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", lockKey); err != nil {
+			return fmt.Errorf("could not take the migration lock: %w", err)
+		}
+		defer func() { _, _ = conn.ExecContext(context.Background(), "SELECT pg_advisory_unlock($1)", lockKey) }()
+	} else {
+		var got sql.NullInt64
+		if err := conn.QueryRowContext(ctx, "SELECT GET_LOCK(?, ?)", lockName, int(lockTimeout.Seconds())).Scan(&got); err != nil {
+			return fmt.Errorf("could not take the migration lock: %w", err)
+		}
+		if !got.Valid || got.Int64 != 1 {
+			return fmt.Errorf("timed out waiting for the migration lock (another `gohead migrate` running?)")
+		}
+		defer func() { _, _ = conn.ExecContext(context.Background(), "SELECT RELEASE_LOCK(?)", lockName) }()
+	}
+	return fn(db)
 }

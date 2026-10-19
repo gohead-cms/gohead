@@ -87,11 +87,8 @@ func BootstrapAdmin(username, email, password string) (created bool, err error) 
 	if count > 0 {
 		return false, nil
 	}
-	if password == "" {
-		return false, invalidf("admin.username is set but admin.password is empty")
-	}
-	if email == "" {
-		email = username + "@localhost"
+	if password == "" || email == "" {
+		return false, invalidf("admin.username is set: admin.email and admin.password are required too")
 	}
 	if _, err := CreateAdmin(username, email, password); err != nil {
 		var dup *storage.DuplicateEntryError
