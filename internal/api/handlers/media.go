@@ -15,6 +15,7 @@ import (
 	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/media"
+	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/storage"
 
 	"github.com/gin-gonic/gin"
@@ -47,9 +48,7 @@ func mediaJSON(c *gin.Context, m models.Media) map[string]any {
 // "files" or "file"; optional "alt" and "caption"). Requires the create
 // permission. All files are stored, or none.
 func UploadMedia(c *gin.Context) {
-	if !hasPermission(c.GetString("role"), "create") {
-		c.Set("response", "Access denied")
-		c.Set("status", http.StatusForbidden)
+	if !allow(c, auth.ActionCreate, auth.ResourceMedia) {
 		return
 	}
 	if mediaUnavailable(c) {
@@ -140,12 +139,11 @@ func saveUploadedFile(c *gin.Context, fh *multipart.FileHeader, alt, caption str
 
 // ListMedia lists the media library: page, pageSize, mime (type prefix such
 // as "image/") and search (file name). Browsing the library needs the
-// create permission: it includes files only drafts use, so readers only
-// reach files through the content that references them.
+// media read permission (not given to viewers): it includes files only
+// drafts use, so readers only reach files through the content that
+// references them.
 func ListMedia(c *gin.Context) {
-	if !hasPermission(c.GetString("role"), "create") {
-		c.Set("response", "Access denied")
-		c.Set("status", http.StatusForbidden)
+	if !allow(c, auth.ActionRead, auth.ResourceMedia) {
 		return
 	}
 	q := storage.MediaQuery{Page: 1, PageSize: 25, MimePrefix: c.Query("mime"), Search: c.Query("search")}
@@ -204,12 +202,10 @@ func mediaLookupError(c *gin.Context, err error) {
 	c.Set("status", http.StatusInternalServerError)
 }
 
-// GetMedia returns one media file. Requires the create permission, like
+// GetMedia returns one media file. Requires the media read permission, like
 // ListMedia.
 func GetMedia(c *gin.Context) {
-	if !hasPermission(c.GetString("role"), "create") {
-		c.Set("response", "Access denied")
-		c.Set("status", http.StatusForbidden)
+	if !allow(c, auth.ActionRead, auth.ResourceMedia) {
 		return
 	}
 	id, ok := mediaID(c)
@@ -228,9 +224,7 @@ func GetMedia(c *gin.Context) {
 // UpdateMedia changes a file's name, alt text or caption:
 // {"data": {"alt": "…"}}. Requires the update permission.
 func UpdateMedia(c *gin.Context) {
-	if !hasPermission(c.GetString("role"), "update") {
-		c.Set("response", "Access denied")
-		c.Set("status", http.StatusForbidden)
+	if !allow(c, auth.ActionUpdate, auth.ResourceMedia) {
 		return
 	}
 	id, ok := mediaID(c)
@@ -259,9 +253,7 @@ func UpdateMedia(c *gin.Context) {
 
 // DeleteMedia removes a file and its content. Requires the delete permission.
 func DeleteMedia(c *gin.Context) {
-	if !hasPermission(c.GetString("role"), "delete") {
-		c.Set("response", "Access denied")
-		c.Set("status", http.StatusForbidden)
+	if !allow(c, auth.ActionDelete, auth.ResourceMedia) {
 		return
 	}
 	if mediaUnavailable(c) {

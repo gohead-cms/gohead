@@ -35,7 +35,11 @@ func ResolveRelation(p graphql.ResolveParams, collectionID uint, attr models.Att
 	if !set {
 		publishedOnly = true
 	}
-	if !auth.HasPermission(auth.RoleFromContext(p.Context), auth.ActionUpdate) {
+	role := auth.RoleFromContext(p.Context)
+	if !auth.Can(role, auth.ActionRead, targetCollection.Name) {
+		return nil, nil // a type the role cannot read: no related entries
+	}
+	if !auth.CanSeeDrafts(role, targetCollection.Name) {
 		publishedOnly = true
 	}
 	fetch := func(id uint) map[string]any {

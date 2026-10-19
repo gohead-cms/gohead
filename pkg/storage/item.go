@@ -410,6 +410,9 @@ func PopulateRelations(collection models.Collection, data models.JSONMap, level 
 type ReadLocale struct {
 	Locale, Default string
 	Fallback        bool
+	// CanRead, when set, hides related entries of collections it refuses
+	// (types the reader's role cannot read).
+	CanRead func(collection string) bool
 }
 
 // resolved fills in the default locale when it is not known yet.
@@ -443,6 +446,9 @@ func PopulateRelationsIn(collection models.Collection, data models.JSONMap, leve
 		}
 
 		raw, exists := data[attr.Name]
+		if loc.CanRead != nil && !loc.CanRead(attr.Target) {
+			exists = false
+		}
 		if !exists || raw == nil {
 			// Always output as empty array/object if missing
 			switch attr.Relation {

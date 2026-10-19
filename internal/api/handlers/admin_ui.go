@@ -9,6 +9,7 @@ import (
 	"github.com/gohead-cms/gohead/internal/agent/functions"
 	"github.com/gohead-cms/gohead/internal/agent/jobs"
 	agents "github.com/gohead-cms/gohead/internal/models/agents"
+	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
 
@@ -20,7 +21,7 @@ func Me(c *gin.Context) {
 	username := c.GetString("username")
 	role := c.GetString("role")
 	if name, ok := strings.CutPrefix(username, "token:"); ok {
-		c.Set("response", gin.H{"kind": "token", "username": username, "name": name, "role": role})
+		c.Set("response", gin.H{"kind": "token", "username": username, "name": name, "role": role, "permissions": auth.PermissionsOf(role)})
 		c.Set("status", http.StatusOK)
 		return
 	}
@@ -32,6 +33,7 @@ func Me(c *gin.Context) {
 	}
 	c.Set("response", gin.H{
 		"kind": "user", "id": user.ID, "username": user.Username, "email": user.Email, "role": user.Role.Name,
+		"permissions": auth.PermissionsOf(user.Role.Name),
 	})
 	c.Set("status", http.StatusOK)
 }

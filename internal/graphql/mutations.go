@@ -193,10 +193,10 @@ func generateGraphQLInputType(collection models.Collection, partial bool) *graph
 // same permission table as the REST API, and writes go through the storage
 // layer so validation, nested relations and events behave identically.
 
-func requirePermission(p graphql.ResolveParams, action string) error {
+func requirePermission(p graphql.ResolveParams, action, collection string) error {
 	role := auth.RoleFromContext(p.Context)
-	if !auth.HasPermission(role, action) {
-		return fmt.Errorf("access denied: role '%s' cannot %s items", role, action)
+	if !auth.Can(role, action, collection) {
+		return fmt.Errorf("access denied: role '%s' cannot %s items of %s", role, action, collection)
 	}
 	return nil
 }
@@ -220,12 +220,17 @@ func statusArg(p graphql.ResolveParams) (*bool, error) {
 
 func createCollectionItem(p graphql.ResolveParams, inputData map[string]any, collection models.Collection) (any, error) {
 	collection = currentCollection(collection)
-	if err := requirePermission(p, auth.ActionCreate); err != nil {
+	if err := requirePermission(p, auth.ActionCreate, collection.Name); err != nil {
 		return nil, err
 	}
 	publish, err := statusArg(p)
 	if err != nil {
 		return nil, err
+	}
+	if publish != nil && *publish {
+		if err := requirePermission(p, auth.ActionPublish, collection.Name); err != nil {
+			return nil, err
+		}
 	}
 	items, err := storage.CreateItems(storage.ActorFrom(p.Context), collection, []storage.ItemInput{{
 		Data:    models.JSONMap(inputData),
@@ -244,12 +249,17 @@ func createCollectionItem(p graphql.ResolveParams, inputData map[string]any, col
 
 func updateCollectionItem(p graphql.ResolveParams, id string, inputData map[string]any, collection models.Collection) (any, error) {
 	collection = currentCollection(collection)
-	if err := requirePermission(p, auth.ActionUpdate); err != nil {
+	if err := requirePermission(p, auth.ActionUpdate, collection.Name); err != nil {
 		return nil, err
 	}
 	publish, err := statusArg(p)
 	if err != nil {
 		return nil, err
+	}
+	if publish != nil {
+		if err := requirePermission(p, auth.ActionPublish, collection.Name); err != nil {
+			return nil, err
+		}
 	}
 	itemID, err := strconv.ParseUint(id, 10, 32)
 	if err != nil {
@@ -301,7 +311,7 @@ func updateCollectionItem(p graphql.ResolveParams, id string, inputData map[stri
 
 func setPublished(p graphql.ResolveParams, collection models.Collection, publish bool) (any, error) {
 	collection = currentCollection(collection)
-	if err := requirePermission(p, auth.ActionUpdate); err != nil {
+	if err := requirePermission(p, auth.ActionPublish, collection.Name); err != nil {
 		return nil, err
 	}
 	id, _ := p.Args["id"].(string)
@@ -319,7 +329,7 @@ func setPublished(p graphql.ResolveParams, collection models.Collection, publish
 	return mapItemToGraphQLResult(*item, collection, false, gqlLocale{fallback: true}), nil
 }
 func deleteCollectionItem(p graphql.ResolveParams, collection models.Collection) (any, error) {
-	if err := requirePermission(p, auth.ActionDelete); err != nil {
+	if err := requirePermission(p, auth.ActionDelete, collection.Name); err != nil {
 		return false, err
 	}
 	id, ok := p.Args["id"].(string)

@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
 
@@ -76,7 +77,7 @@ func DynamicCollectionHandler(c *gin.Context) {
 // handleCreate handles the creation of a single item or a batch of items.
 func handleCreate(c *gin.Context, userRole string, ct *models.Collection) {
 	// 1. Permission Check
-	if !hasPermission(userRole, "create") {
+	if !auth.Can(userRole, auth.ActionCreate, ct.Name) {
 		logger.Log.WithFields(logrus.Fields{
 			"user_role":  userRole,
 			"collection": ct.Name,
@@ -148,6 +149,9 @@ func handleCreate(c *gin.Context, userRole string, ct *models.Collection) {
 			return
 		}
 		inputs = append(inputs, storage.ItemInput{Data: b.Data, Publish: publish != nil && *publish})
+		if publish != nil && *publish && !allow(c, auth.ActionPublish, ct.Name) {
+			return
+		}
 	}
 
 	// All items are validated and stored in a single transaction.
@@ -195,7 +199,17 @@ type readContext struct {
 	level         uint
 	publishedOnly bool   // hide drafts (also in populated relations)
 	listStatus    string // status filter for lists
+	role          string // hides related entries of types it cannot read
 	localeContext
+}
+
+// readOptions are how related entries are read: in the request's locale,
+// hiding types the role cannot read.
+func (rc readContext) readOptions() storage.ReadLocale {
+	opts := rc.readLocale()
+	role := rc.role
+	opts.CanRead = func(collection string) bool { return auth.Can(role, auth.ActionRead, collection) }
+	return opts
 }
 
 // writeContext is the read context of a write's response: drafts included,
@@ -209,7 +223,7 @@ func writeContext(c *gin.Context) (readContext, bool) {
 	if !ok {
 		return readContext{}, false
 	}
-	return readContext{level: level, localeContext: lc}, true
+	return readContext{level: level, role: c.GetString("role"), localeContext: lc}, true
 }
 
 // parseLevel reads the "level" query parameter (relation population depth,
@@ -238,11 +252,11 @@ func parseReadContext(c *gin.Context, userRole string, ct *models.Collection, si
 	if !ok {
 		return readContext{}, false
 	}
-	rc := readContext{level: level}
+	rc := readContext{level: level, role: userRole}
 	if rc.localeContext, ok = parseLocale(c); !ok {
 		return rc, false
 	}
-	canSeeDrafts := hasPermission(userRole, "update")
+	canSeeDrafts := auth.CanSeeDrafts(userRole, ct.Name)
 	status := c.Query("status")
 
 	switch status {
@@ -283,7 +297,7 @@ func parseReadContext(c *gin.Context, userRole string, ct *models.Collection, si
 const maxRelationLevel = 5
 
 func handleRead(c *gin.Context, userRole string, ct *models.Collection, id string) {
-	if !hasPermission(userRole, "read") {
+	if !auth.Can(userRole, auth.ActionRead, ct.Name) {
 		logger.Log.WithFields(logrus.Fields{
 			"user_role":  userRole,
 			"collection": ct.Name,
@@ -317,7 +331,7 @@ func handleRead(c *gin.Context, userRole string, ct *models.Collection, id strin
 
 // handleUpdate handles updating an item by ID.
 func handleUpdate(c *gin.Context, userRole string, ct *models.Collection, id string) {
-	if !hasPermission(userRole, "update") {
+	if !auth.Can(userRole, auth.ActionUpdate, ct.Name) {
 		logger.Log.WithFields(logrus.Fields{
 			"user_role":  userRole,
 			"collection": ct.Name,
@@ -338,7 +352,7 @@ func handleUpdate(c *gin.Context, userRole string, ct *models.Collection, id str
 
 // handleDelete handles deleting an item by ID.
 func handleDelete(c *gin.Context, userRole string, ct *models.Collection, id string) {
-	if !hasPermission(userRole, "delete") {
+	if !auth.Can(userRole, auth.ActionDelete, ct.Name) {
 		logger.Log.WithFields(logrus.Fields{
 			"user_role":  userRole,
 			"collection": ct.Name,

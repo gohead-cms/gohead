@@ -129,7 +129,7 @@ func GenerateGraphQLQueries() (*graphql.Object, error) {
 			Resolve: func(p graphql.ResolveParams) (any, error) {
 				logger.Log.WithField("collection", coll.Name).Debug("Resolver triggered")
 				coll := currentCollection(coll)
-				if err := requirePermission(p, auth.ActionRead); err != nil {
+				if err := requirePermission(p, auth.ActionRead, coll.Name); err != nil {
 					return nil, err
 				}
 				status, _ := p.Args["status"].(string)
@@ -138,7 +138,7 @@ func GenerateGraphQLQueries() (*graphql.Object, error) {
 				default:
 					return nil, fmt.Errorf("invalid status '%s' (expected published, draft or all)", status)
 				}
-				canSeeDrafts := auth.HasPermission(auth.RoleFromContext(p.Context), auth.ActionUpdate)
+				canSeeDrafts := auth.CanSeeDrafts(auth.RoleFromContext(p.Context), coll.Name)
 				if (status == models.StatusDraft || status == "all") && !canSeeDrafts {
 					return nil, fmt.Errorf("drafts are only visible to roles that can edit content")
 				}

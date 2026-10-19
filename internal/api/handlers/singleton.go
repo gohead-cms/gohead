@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
 
@@ -15,9 +16,7 @@ import (
 // GetSingleItem returns a singleton's content in the flat item shape, with
 // relations populated down to "level" (default 1).
 func GetSingleItem(c *gin.Context) {
-	if !hasPermission(c.GetString("role"), "read") {
-		c.Set("response", "Access denied")
-		c.Set("status", http.StatusForbidden)
+	if !allow(c, auth.ActionRead, auth.SingletonResource(c.Param("name"))) {
 		return
 	}
 	rc, ok := writeContext(c) // level and locale
@@ -30,9 +29,9 @@ func GetSingleItem(c *gin.Context) {
 	switch c.Query("status") {
 	case "", models.StatusPublished:
 	case "all":
-		if !hasPermission(c.GetString("role"), "update") {
+		if !auth.CanSeeDrafts(c.GetString("role"), auth.SingletonResource(c.Param("name"))) {
 			c.Set("response", "Access denied")
-			c.Set("details", "status=all needs the editor or admin role")
+			c.Set("details", "status=all needs a role that can edit this singleton")
 			c.Set("status", http.StatusForbidden)
 			return
 		}
@@ -69,7 +68,7 @@ func GetSingleItem(c *gin.Context) {
 // by the caller.
 func singleItemResponseFor(st *models.Singleton, item *models.SingleItem, rc readContext) (map[string]any, error) {
 	data := rc.localize(st.Attributes, item.Data, item.Translations)
-	data, err := storage.PopulateRelationsIn(models.Collection{Attributes: st.Attributes}, data, rc.level, rc.publishedOnly, rc.readLocale())
+	data, err := storage.PopulateRelationsIn(models.Collection{Attributes: st.Attributes}, data, rc.level, rc.publishedOnly, rc.readOptions())
 	if err != nil {
 		return nil, err
 	}
@@ -84,6 +83,9 @@ func GetSingleton(c *gin.Context) {
 
 	// Retrieve single type from storage
 	st, err := storage.GetSingletonByName(name)
+	if err == nil && !can(c, auth.ActionRead, auth.SingletonResource(st.Name)) {
+		err = storage.ErrItemNotFound
+	}
 	if err != nil {
 		logger.Log.WithField("name", name).Warn("GetSingleton: single type not found")
 		c.Set("response", "Single type not found")
@@ -187,9 +189,7 @@ func DeleteSingleton(c *gin.Context) {
 // CreateOrUpdateSingletonItem creates or replaces a singleton's content.
 // Requires the update permission.
 func CreateOrUpdateSingletonItem(c *gin.Context) {
-	if !hasPermission(c.GetString("role"), "update") {
-		c.Set("response", "Access denied")
-		c.Set("status", http.StatusForbidden)
+	if !allow(c, auth.ActionUpdate, auth.SingletonResource(c.Param("name"))) {
 		return
 	}
 	rc, ok := writeContext(c)
@@ -285,7 +285,13 @@ func GetSingletons(c *gin.Context) {
 		c.Set("status", http.StatusInternalServerError)
 		return
 	}
-	c.Set("response", sts)
-	c.Set("meta", gin.H{"total": len(sts)})
+	visible := sts[:0:0]
+	for _, st := range sts {
+		if can(c, auth.ActionRead, auth.SingletonResource(st.Name)) {
+			visible = append(visible, st)
+		}
+	}
+	c.Set("response", visible)
+	c.Set("meta", gin.H{"total": len(visible)})
 	c.Set("status", http.StatusOK)
 }

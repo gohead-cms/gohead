@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
 	"github.com/gohead-cms/gohead/pkg/utils"
@@ -88,6 +89,12 @@ func GetCollections(c *gin.Context) {
 		return
 	}
 
+	// The read-only schema routes are open to every role: list only the
+	// collections the role can read.
+	if visible := readableCollections(c, collections); len(visible) != len(collections) {
+		collections, total = visible, len(visible)
+	}
+
 	pageCount := (total + pageSize - 1) / pageSize
 
 	// Format response
@@ -111,7 +118,7 @@ func GetCollection(c *gin.Context) {
 
 	// Retrieve collection
 	ct, err := storage.GetCollectionByName(name)
-	if err != nil {
+	if err != nil || !can(c, auth.ActionRead, ct.Name) {
 		c.Set("response", "Collection not found")
 		c.Set("status", http.StatusNotFound)
 		return
