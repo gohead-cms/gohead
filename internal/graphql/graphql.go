@@ -1,6 +1,7 @@
 package graphql
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -97,29 +98,34 @@ func GenerateGraphQLQueries() (*graphql.Object, error) {
 			return nil, err
 		}
 
+		args := graphql.FieldConfigArgument{
+			"id": &graphql.ArgumentConfig{
+				Type:        graphql.ID,
+				Description: "Fetch a single item by its ID.",
+			},
+			"limit": &graphql.ArgumentConfig{
+				Type:         graphql.Int,
+				DefaultValue: 25,
+				Description:  "The number of items to return.",
+			},
+			"offset": &graphql.ArgumentConfig{
+				Type:         graphql.Int,
+				DefaultValue: 0,
+				Description:  "The number of items to skip for pagination.",
+			},
+			"status": &graphql.ArgumentConfig{
+				Type:        graphql.String,
+				Description: "published (default for lists), draft or all. Drafts need the update permission; this also applies to populated relations.",
+			},
+		}
+		if models.HasLocalized(coll.Attributes) {
+			args["locale"] = &graphql.ArgumentConfig{Type: graphql.String, Description: "Locale of localized attributes (default: the default locale); applies to populated relations too."}
+			args["fallback"] = &graphql.ArgumentConfig{Type: graphql.Boolean, DefaultValue: true, Description: "Missing localized values fall back to the default locale."}
+		}
 		fields[coll.Name] = &graphql.Field{
 			// Use graphql.NewList to signify that this query can return multiple items.
 			Type: graphql.NewList(gqlType),
-			Args: graphql.FieldConfigArgument{
-				"id": &graphql.ArgumentConfig{
-					Type:        graphql.ID,
-					Description: "Fetch a single item by its ID.",
-				},
-				"limit": &graphql.ArgumentConfig{
-					Type:         graphql.Int,
-					DefaultValue: 25,
-					Description:  "The number of items to return.",
-				},
-				"offset": &graphql.ArgumentConfig{
-					Type:         graphql.Int,
-					DefaultValue: 0,
-					Description:  "The number of items to skip for pagination.",
-				},
-				"status": &graphql.ArgumentConfig{
-					Type:        graphql.String,
-					Description: "published (default for lists), draft or all. Drafts need the update permission; this also applies to populated relations.",
-				},
-			},
+			Args: args,
 			Resolve: func(p graphql.ResolveParams) (any, error) {
 				logger.Log.WithField("collection", coll.Name).Debug("Resolver triggered")
 				coll := currentCollection(coll)
@@ -135,6 +141,10 @@ func GenerateGraphQLQueries() (*graphql.Object, error) {
 				canSeeDrafts := auth.HasPermission(auth.RoleFromContext(p.Context), auth.ActionUpdate)
 				if (status == models.StatusDraft || status == "all") && !canSeeDrafts {
 					return nil, fmt.Errorf("drafts are only visible to roles that can edit content")
+				}
+				loc, err := localeArgs(p)
+				if err != nil {
+					return nil, err
 				}
 
 				// Case 1: Fetch a single item by ID (drafts included for editors)
@@ -152,7 +162,7 @@ func GenerateGraphQLQueries() (*graphql.Object, error) {
 						return nil, nil
 					}
 
-					return []any{mapItemToGraphQLResult(*item, coll, publishedOnly)}, nil
+					return []any{mapItemToGraphQLResult(*item, coll, publishedOnly, loc)}, nil
 				}
 
 				// Case 2: Fetch a list of items with pagination (published by default)
@@ -175,7 +185,7 @@ func GenerateGraphQLQueries() (*graphql.Object, error) {
 
 				results := make([]map[string]any, 0, len(items))
 				for _, item := range items {
-					results = append(results, mapItemToGraphQLResult(item, coll, publishedOnly))
+					results = append(results, mapItemToGraphQLResult(item, coll, publishedOnly, loc))
 				}
 
 				return results, nil
@@ -214,14 +224,53 @@ func currentCollection(c models.Collection) models.Collection {
 // is never returned to clients.
 const publishedOnlyKey = "__publishedOnly"
 
+// localeKey is a hidden key carrying the locale a result was read in, so
+// populated relations use it too.
+const localeKey = "__locale"
+
+// gqlLocale is the locale of a GraphQL read ("" locale: the default).
+type gqlLocale struct {
+	locale, defaultLocale string
+	fallback              bool
+}
+
+// localeArgs reads the locale and fallback arguments.
+func localeArgs(p graphql.ResolveParams) (gqlLocale, error) {
+	loc := gqlLocale{fallback: true}
+	if f, ok := p.Args["fallback"].(bool); ok {
+		loc.fallback = f
+	}
+	requested, _ := p.Args["locale"].(string)
+	locale, def, err := storage.ResolveLocale(requested)
+	if err != nil {
+		if errors.Is(err, storage.ErrLocaleNotFound) {
+			return loc, fmt.Errorf("unknown locale '%s'", requested)
+		}
+		return loc, fmt.Errorf("failed to resolve the locale")
+	}
+	loc.locale, loc.defaultLocale = locale, def
+	return loc, nil
+}
+
 // mapItemToGraphQLResult converts a stored item into the map GraphQL field
-// resolvers read: the collection's attributes plus system fields.
-func mapItemToGraphQLResult(item models.Item, ct models.Collection, publishedOnly bool) map[string]any {
+// resolvers read: the collection's attributes, in loc's locale, plus
+// system fields.
+func mapItemToGraphQLResult(item models.Item, ct models.Collection, publishedOnly bool, loc gqlLocale) map[string]any {
 	result := map[string]any{
 		"id":             item.ID,
 		"createdAt":      item.CreatedAt.UTC().Format(time.RFC3339),
 		"updatedAt":      item.UpdatedAt.UTC().Format(time.RFC3339),
 		publishedOnlyKey: publishedOnly,
+		localeKey:        loc,
+	}
+	data := item.Data
+	if models.HasLocalized(ct.Attributes) {
+		if loc.defaultLocale == "" {
+			loc.defaultLocale, _ = storage.DefaultLocale()
+			loc.locale = loc.defaultLocale
+		}
+		data = models.LocalizeData(ct.Attributes, item.Data, item.Translations, loc.locale, loc.defaultLocale, loc.fallback)
+		models.LocalizedResponse(result, ct.Attributes, item.Translations, loc.locale, loc.defaultLocale)
 	}
 	if ct.DraftAndPublish {
 		result["status"] = item.Status()
@@ -231,7 +280,7 @@ func mapItemToGraphQLResult(item models.Item, ct models.Collection, publishedOnl
 		}
 	}
 	for _, attr := range ct.Attributes {
-		if value, exists := item.Data[attr.Name]; exists {
+		if value, exists := data[attr.Name]; exists {
 			result[attr.Name] = value
 		}
 	}

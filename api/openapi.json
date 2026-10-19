@@ -54,6 +54,33 @@
         ],
         "type": "object"
       },
+      "Locale": {
+        "properties": {
+          "code": {
+            "description": "BCP 47 code, e.g. fr or pt-BR",
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "isDefault"
+        ],
+        "type": "object"
+      },
       "Media": {
         "properties": {
           "alt": {
@@ -310,6 +337,13 @@
             ],
             "type": "string"
           },
+          "translations": {
+            "additionalProperties": {
+              "type": "object"
+            },
+            "description": "Localized values in other locales than the default, by locale",
+            "type": "object"
+          },
           "typeName": {
             "type": "string"
           },
@@ -330,6 +364,52 @@
           "data",
           "changes"
         ],
+        "type": "object"
+      },
+      "Singleton_navigation": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "label": {
+            "type": "string"
+          },
+          "locale": {
+            "description": "Locale of the localized values",
+            "type": "string"
+          },
+          "locales": {
+            "description": "Locales with content: the default, then translations",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "createdAt",
+          "updatedAt",
+          "locale",
+          "locales"
+        ],
+        "type": "object"
+      },
+      "Singleton_navigationInput": {
+        "additionalProperties": false,
+        "properties": {
+          "label": {
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "Singleton_site": {
@@ -699,6 +779,67 @@
         },
         "required": [
           "name"
+        ],
+        "type": "object"
+      },
+      "pages": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "locale": {
+            "description": "Locale of the localized values",
+            "type": "string"
+          },
+          "locales": {
+            "description": "Locales with content: the default, then translations",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "order": {
+            "type": "integer"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "createdAt",
+          "updatedAt",
+          "locale",
+          "locales"
+        ],
+        "type": "object"
+      },
+      "pagesInput": {
+        "additionalProperties": false,
+        "properties": {
+          "order": {
+            "type": "integer"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
         ],
         "type": "object"
       }
@@ -2103,6 +2244,655 @@
         ]
       }
     },
+    "/api/collections/pages": {
+      "get": {
+        "operationId": "list_pages",
+        "parameters": [
+          {
+            "description": "Missing localized values fall back to the default locale (default true); false leaves them out.",
+            "in": "query",
+            "name": "fallback",
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "filters[field]=value or filters[field][$op]=value; ops: $eq $ne $lt $lte $gt $gte $contains",
+            "explode": true,
+            "in": "query",
+            "name": "filters",
+            "schema": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "style": "deepObject"
+          },
+          {
+            "description": "How deep relations are populated (0: IDs only).",
+            "in": "query",
+            "name": "level",
+            "schema": {
+              "default": 1,
+              "maximum": 5,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Locale of localized attributes (GET /api/locales); default: the default locale.",
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "default": 10,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "field[:asc|:desc],… (attributes, id, createdAt, updatedAt, publishedAt)",
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/pages"
+                      },
+                      "type": "array"
+                    },
+                    "meta": {
+                      "properties": {
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Items"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "List pages",
+        "tags": [
+          "pages"
+        ]
+      },
+      "post": {
+        "operationId": "create_pages",
+        "parameters": [
+          {
+            "description": "How deep relations are populated (0: IDs only).",
+            "in": "query",
+            "name": "level",
+            "schema": {
+              "default": 1,
+              "maximum": 5,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "properties": {
+                      "data": {
+                        "$ref": "#/components/schemas/pagesInput"
+                      }
+                    },
+                    "required": [
+                      "data"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "items": {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/pagesInput"
+                        }
+                      },
+                      "required": [
+                        "data"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/pages"
+                        },
+                        {
+                          "items": {
+                            "$ref": "#/components/schemas/pages"
+                          },
+                          "type": "array"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Create one item, or a batch (all or nothing)",
+        "tags": [
+          "pages"
+        ]
+      }
+    },
+    "/api/collections/pages/{id}": {
+      "delete": {
+        "operationId": "delete_pages",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "null"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Deleted"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Delete an item",
+        "tags": [
+          "pages"
+        ]
+      },
+      "get": {
+        "operationId": "get_pages",
+        "parameters": [
+          {
+            "description": "Missing localized values fall back to the default locale (default true); false leaves them out.",
+            "in": "query",
+            "name": "fallback",
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "How deep relations are populated (0: IDs only).",
+            "in": "query",
+            "name": "level",
+            "schema": {
+              "default": 1,
+              "maximum": 5,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Locale of localized attributes (GET /api/locales); default: the default locale.",
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/pages"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Item"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Get one item",
+        "tags": [
+          "pages"
+        ]
+      },
+      "put": {
+        "operationId": "update_pages",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "How deep relations are populated (0: IDs only).",
+            "in": "query",
+            "name": "level",
+            "schema": {
+              "default": 1,
+              "maximum": 5,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Write the values of this locale (localized attributes only; {} removes the translation). Default: the default locale.",
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "data": {
+                    "$ref": "#/components/schemas/pagesInput"
+                  }
+                },
+                "required": [
+                  "data"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/pages"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Updated"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Replace an item's data",
+        "tags": [
+          "pages"
+        ]
+      }
+    },
+    "/api/collections/pages/{id}/revisions": {
+      "get": {
+        "operationId": "list_revisions_pages",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/Revision"
+                      },
+                      "type": "array"
+                    },
+                    "meta": {
+                      "properties": {
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Revisions"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "History of changes, newest first (editors and admins)",
+        "tags": [
+          "pages"
+        ]
+      }
+    },
+    "/api/collections/pages/{id}/revisions/{version}": {
+      "get": {
+        "operationId": "get_revision_pages",
+        "parameters": [
+          {
+            "description": "Version to diff against: a number, or current. Default: the previous version.",
+            "in": "query",
+            "name": "compare",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/RevisionDetail"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Revision"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "One version, with its data and the changes from another version",
+        "tags": [
+          "pages"
+        ]
+      }
+    },
+    "/api/collections/pages/{id}/revisions/{version}/restore": {
+      "post": {
+        "operationId": "restore_revision_pages",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/pages"
+                    },
+                    "meta": {
+                      "properties": {
+                        "dropped": {
+                          "description": "Attributes of the old version the type no longer has",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "revision": {
+                          "$ref": "#/components/schemas/Revision"
+                        },
+                        "unchanged": {
+                          "description": "The entry already had this content: no revision was recorded",
+                          "type": "boolean"
+                        },
+                        "undeleted": {
+                          "type": "boolean"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Restored"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Make a version the current content (a new revision; brings back deleted content)",
+        "tags": [
+          "pages"
+        ]
+      }
+    },
     "/api/graphql": {
       "post": {
         "operationId": "graphql",
@@ -2144,6 +2934,41 @@
         "summary": "GraphQL queries and mutations",
         "tags": [
           "graphql"
+        ]
+      }
+    },
+    "/api/locales": {
+      "get": {
+        "operationId": "list_locales",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/Locale"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Locales"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Content locales, the default first",
+        "tags": [
+          "locales"
         ]
       }
     },
@@ -2838,6 +3663,377 @@
         ]
       }
     },
+    "/api/singleton/navigation": {
+      "get": {
+        "operationId": "get_Singleton_navigation",
+        "parameters": [
+          {
+            "description": "Missing localized values fall back to the default locale (default true); false leaves them out.",
+            "in": "query",
+            "name": "fallback",
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "How deep relations are populated (0: IDs only).",
+            "in": "query",
+            "name": "level",
+            "schema": {
+              "default": 1,
+              "maximum": 5,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Locale of localized attributes (GET /api/locales); default: the default locale.",
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Singleton_navigation"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Content"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Get the navigation singleton",
+        "tags": [
+          "singleton:navigation"
+        ]
+      },
+      "put": {
+        "operationId": "put_Singleton_navigation",
+        "parameters": [
+          {
+            "description": "How deep relations are populated (0: IDs only).",
+            "in": "query",
+            "name": "level",
+            "schema": {
+              "default": 1,
+              "maximum": 5,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Write the values of this locale (localized attributes only; {} removes the translation). Default: the default locale.",
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "data": {
+                    "$ref": "#/components/schemas/Singleton_navigationInput"
+                  }
+                },
+                "required": [
+                  "data"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Singleton_navigation"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Saved"
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Singleton_navigation"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Create or replace the navigation singleton",
+        "tags": [
+          "singleton:navigation"
+        ]
+      }
+    },
+    "/api/singleton/navigation/revisions": {
+      "get": {
+        "operationId": "list_revisions_Singleton_navigation",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/Revision"
+                      },
+                      "type": "array"
+                    },
+                    "meta": {
+                      "properties": {
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Revisions"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "History of changes, newest first (editors and admins)",
+        "tags": [
+          "singleton:navigation"
+        ]
+      }
+    },
+    "/api/singleton/navigation/revisions/{version}": {
+      "get": {
+        "operationId": "get_revision_Singleton_navigation",
+        "parameters": [
+          {
+            "description": "Version to diff against: a number, or current. Default: the previous version.",
+            "in": "query",
+            "name": "compare",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/RevisionDetail"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Revision"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "One version, with its data and the changes from another version",
+        "tags": [
+          "singleton:navigation"
+        ]
+      }
+    },
+    "/api/singleton/navigation/revisions/{version}/restore": {
+      "post": {
+        "operationId": "restore_revision_Singleton_navigation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Singleton_navigation"
+                    },
+                    "meta": {
+                      "properties": {
+                        "dropped": {
+                          "description": "Attributes of the old version the type no longer has",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "revision": {
+                          "$ref": "#/components/schemas/Revision"
+                        },
+                        "unchanged": {
+                          "description": "The entry already had this content: no revision was recorded",
+                          "type": "boolean"
+                        },
+                        "undeleted": {
+                          "type": "boolean"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Restored"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Make a version the current content (a new revision; brings back deleted content)",
+        "tags": [
+          "singleton:navigation"
+        ]
+      }
+    },
     "/api/singleton/site": {
       "get": {
         "operationId": "get_Singleton_site",
@@ -3395,8 +4591,20 @@
       "name": "history"
     },
     {
+      "description": "Content locales",
+      "name": "locales"
+    },
+    {
       "description": "Uploaded files",
       "name": "media"
+    },
+    {
+      "description": "Items of the pages collection",
+      "name": "pages"
+    },
+    {
+      "description": "The navigation singleton",
+      "name": "singleton:navigation"
     },
     {
       "description": "The site singleton",

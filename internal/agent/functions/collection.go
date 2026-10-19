@@ -21,6 +21,21 @@ func init() {
 	StaticFunctionMap["collections.upsert_item"] = upsertCollectionItem
 	StaticFunctionMap["collections.list_items"] = listCollectionItems // Renamed from query_items
 	StaticFunctionMap["collections.delete_item"] = deleteCollectionItem
+	StaticFunctionMap["collections.list_locales"] = listLocales
+}
+
+// listLocales lists the content locales.
+func listLocales(ctx context.Context, args any) (string, error) {
+	locales, err := storage.ListLocales()
+	if err != nil {
+		return `{"status": "error", "message": "failed to list locales"}`, nil
+	}
+	out := make([]map[string]any, 0, len(locales))
+	for _, l := range locales {
+		out = append(out, map[string]any{"code": l.Code, "name": l.Name, "default": l.IsDefault})
+	}
+	b, _ := json.Marshal(out)
+	return string(b), nil
 }
 
 // listCollections lists all available collection names.
@@ -107,6 +122,24 @@ func upsertCollectionItem(ctx context.Context, args any) (string, error) {
 	}
 
 	itemID, _ := strconv.ParseUint(itemIDStr, 10, 32)
+	locale, _ := argMap["locale"].(string)
+	if locale != "" {
+		def, err := storage.DefaultLocale()
+		if err != nil {
+			return `{"status": "error", "message": "failed to read the default locale"}`, nil
+		}
+		if locale != def {
+			if itemID == 0 {
+				return fmt.Sprintf(`{"status": "error", "message": "create items in the default locale (%s), then write translations with item_id and locale"}`, def), nil
+			}
+			if _, err := storage.SetItemTranslation(storage.ActorFrom(ctx), *collection, uint(itemID), locale, data, nil); err != nil {
+				msg, _ := json.Marshal(err.Error())
+				return fmt.Sprintf(`{"status": "error", "message": %s}`, msg), nil
+			}
+			b, _ := json.Marshal(map[string]any{"status": "success", "item_id": itemID, "action": "translated", "locale": locale})
+			return string(b), nil
+		}
+	}
 
 	// 2. Decide whether to UPDATE or CREATE
 	if itemID > 0 {

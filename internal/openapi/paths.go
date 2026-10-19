@@ -40,6 +40,24 @@ var (
 	paramLevel = obj{"name": "level", "in": "query", "description": "How deep relations are populated (0: IDs only).", "schema": obj{"type": "integer", "minimum": 0, "maximum": 5, "default": 1}}
 )
 
+// localeParams are the query parameters of reads in localized types.
+func localeParams() []any {
+	return []any{
+		obj{"name": "locale", "in": "query", "description": "Locale of localized attributes (GET /api/locales); default: the default locale.", "schema": obj{"type": "string"}},
+		obj{"name": "fallback", "in": "query", "description": "Missing localized values fall back to the default locale (default true); false leaves them out.", "schema": obj{"type": "boolean", "default": true}},
+	}
+}
+
+// writeLocaleParam is the locale of a write: another locale than the
+// default replaces that locale's localized values (a translation).
+var writeLocaleParam = obj{"name": "locale", "in": "query", "description": "Write the values of this locale (localized attributes only; {} removes the translation). Default: the default locale.", "schema": obj{"type": "string"}}
+
+// addLocaleProps adds the locale fields of localized entries.
+func addLocaleProps(props obj) {
+	props["locale"] = obj{"type": "string", "description": "Locale of the localized values"}
+	props["locales"] = obj{"type": "array", "items": obj{"type": "string"}, "description": "Locales with content: the default, then translations"}
+}
+
 func statusParam(single bool) obj {
 	desc := "Draft-and-publish collections: published (default), draft or all. Drafts need the update permission."
 	if single {
@@ -66,9 +84,15 @@ func collectionPaths(ct models.Collection, name string) obj {
 		paramLevel,
 	}
 	singleParams := []any{paramID, paramLevel}
+	writeParams := []any{paramID, paramLevel}
 	if ct.DraftAndPublish {
 		listParams = append(listParams, statusParam(false))
 		singleParams = append(singleParams, statusParam(true))
+	}
+	if models.HasLocalized(ct.Attributes) {
+		listParams = append(listParams, localeParams()...)
+		singleParams = append(singleParams, localeParams()...)
+		writeParams = append(writeParams, writeLocaleParam)
 	}
 
 	paths := obj{
@@ -93,7 +117,7 @@ func collectionPaths(ct models.Collection, name string) obj {
 			},
 			"put": obj{
 				"tags": tag, "operationId": "update_" + name, "summary": "Replace an item's data",
-				"parameters":  []any{paramID, paramLevel},
+				"parameters":  writeParams,
 				"requestBody": obj{"required": true, "content": jsonContent(writeBody)},
 				"responses":   merge(obj{"200": ok("Updated", dataEnvelope(item, nil))}, errorResponses("400", "401", "403", "404")),
 			},
@@ -154,17 +178,22 @@ func historyPaths(base string, tag []string, name string, params []any, restored
 	}
 }
 
-func singletonPath(stName, name string) obj {
+func singletonPath(stName, name string, localized bool) obj {
 	tag := []string{"singleton:" + stName}
+	readParams, writeParams := []any{paramLevel}, []any{paramLevel}
+	if localized {
+		readParams = append(readParams, localeParams()...)
+		writeParams = append(writeParams, writeLocaleParam)
+	}
 	return obj{
 		"get": obj{
 			"tags": tag, "operationId": "get_" + name, "summary": "Get the " + stName + " singleton",
-			"parameters": []any{paramLevel},
+			"parameters": readParams,
 			"responses":  merge(obj{"200": ok("Content", dataEnvelope(ref(name), nil))}, errorResponses("401", "403", "404")),
 		},
 		"put": obj{
 			"tags": tag, "operationId": "put_" + name, "summary": "Create or replace the " + stName + " singleton",
-			"parameters":  []any{paramLevel},
+			"parameters":  writeParams,
 			"requestBody": obj{"required": true, "content": jsonContent(obj{"type": "object", "properties": obj{"data": ref(name + "Input")}, "required": []string{"data"}})},
 			"responses":   merge(obj{"200": ok("Saved", dataEnvelope(ref(name), nil)), "201": ok("Created", dataEnvelope(ref(name), nil))}, errorResponses("400", "401", "403", "404")),
 		},
@@ -238,6 +267,10 @@ func staticPaths() obj {
 			"delete": obj{"tags": []string{"media"}, "operationId": "delete_media", "parameters": []any{paramID},
 				"responses": merge(obj{"200": obj{"description": "Deleted"}}, errorResponses("401", "403", "404", "503"))},
 		},
+		"/api/locales": obj{"get": obj{
+			"tags": []string{"locales"}, "operationId": "list_locales", "summary": "Content locales, the default first",
+			"responses": merge(obj{"200": ok("Locales", dataEnvelope(obj{"type": "array", "items": ref("Locale")}, nil))}, errorResponses("401")),
+		}},
 		"/api/revisions": obj{"get": obj{
 			"tags": []string{"history"}, "operationId": "list_revisions", "summary": "Changes across all entries, newest first (editors and admins)",
 			"parameters": []any{
@@ -269,6 +302,10 @@ func baseSchemas() obj {
 		"Pagination": obj{"type": "object", "properties": obj{
 			"page": obj{"type": "integer"}, "pageSize": obj{"type": "integer"}, "total": obj{"type": "integer"}, "pageCount": obj{"type": "integer"},
 		}},
+		"Locale": obj{"type": "object", "properties": obj{
+			"id": obj{"type": "integer"}, "code": obj{"type": "string", "description": "BCP 47 code, e.g. fr or pt-BR"},
+			"name": obj{"type": "string"}, "isDefault": obj{"type": "boolean"}, "createdAt": obj{"type": "string", "format": "date-time"},
+		}, "required": []string{"code", "name", "isDefault"}},
 		"Revision":       revisionSchema(false),
 		"RevisionDetail": revisionSchema(true),
 		"Media": obj{"type": "object", "properties": obj{
@@ -316,6 +353,7 @@ func revisionSchema(detail bool) obj {
 	required := []string{"id", "entityType", "entityId", "version", "typeName", "action", "actorKind", "actorName", "createdAt"}
 	if detail {
 		props["data"] = obj{"type": "object", "additionalProperties": true, "description": "The stored data after the change (relations as IDs)"}
+		props["translations"] = obj{"type": "object", "additionalProperties": obj{"type": "object"}, "description": "Localized values in other locales than the default, by locale"}
 		props["comparedTo"] = nullable(obj{"type": "integer"})
 		props["changes"] = obj{"type": "array", "items": obj{"type": "object", "properties": obj{
 			"field":  obj{"type": "string"},

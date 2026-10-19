@@ -58,6 +58,12 @@ func GenerateGraphQLMutations() (*graphql.Object, error) {
 			createArgs["status"] = statusArg
 			updateArgs["status"] = statusArg
 		}
+		if models.HasLocalized(localCollection.Attributes) {
+			updateArgs["locale"] = &graphql.ArgumentConfig{
+				Type:        graphql.String,
+				Description: "Update the values of this locale (localized attributes only). Default: the default locale.",
+			}
+		}
 
 		// --- Mutation: Create Item ---
 		fields["create"+localCollection.Name] = &graphql.Field{
@@ -233,7 +239,7 @@ func createCollectionItem(p graphql.ResolveParams, inputData map[string]any, col
 		logger.Log.WithError(err).WithField("collection", collection.Name).Error("GraphQL create failed")
 		return nil, fmt.Errorf("failed to create item in %s", collection.Name)
 	}
-	return mapItemToGraphQLResult(*items[0], collection, false), nil
+	return mapItemToGraphQLResult(*items[0], collection, false, gqlLocale{fallback: true}), nil
 }
 
 func updateCollectionItem(p graphql.ResolveParams, id string, inputData map[string]any, collection models.Collection) (any, error) {
@@ -253,17 +259,32 @@ func updateCollectionItem(p graphql.ResolveParams, id string, inputData map[stri
 	if err != nil {
 		return nil, fmt.Errorf("item with id %s not found in collection %s", id, collection.Name)
 	}
+	loc, err := localeArgs(p)
+	if err != nil {
+		return nil, err
+	}
 
-	// Updates are partial: merge the input over the stored data.
+	// Updates are partial: merge the input over the stored data (or, in
+	// another locale, over that locale's values).
 	merged := models.JSONMap{}
-	for k, v := range existing.Data {
-		merged[k] = v
+	var item *models.Item
+	if loc.locale != loc.defaultLocale {
+		for k, v := range models.Translation(existing.Translations, loc.locale) {
+			merged[k] = v
+		}
+		for k, v := range inputData {
+			merged[k] = v
+		}
+		item, err = storage.SetItemTranslation(storage.ActorFrom(p.Context), collection, existing.ID, loc.locale, merged, publish)
+	} else {
+		for k, v := range existing.Data {
+			merged[k] = v
+		}
+		for k, v := range inputData {
+			merged[k] = v
+		}
+		item, err = storage.UpdateItemContent(storage.ActorFrom(p.Context), collection, existing.ID, merged, publish)
 	}
-	for k, v := range inputData {
-		merged[k] = v
-	}
-
-	item, err := storage.UpdateItemContent(storage.ActorFrom(p.Context), collection, existing.ID, merged, publish)
 	if err != nil {
 		var verr *storage.ItemValidationError
 		if errors.As(err, &verr) {
@@ -272,7 +293,7 @@ func updateCollectionItem(p graphql.ResolveParams, id string, inputData map[stri
 		logger.Log.WithError(err).WithField("collection", collection.Name).Error("GraphQL update failed")
 		return nil, fmt.Errorf("failed to update item %s", id)
 	}
-	return mapItemToGraphQLResult(*item, collection, false), nil
+	return mapItemToGraphQLResult(*item, collection, false, loc), nil
 }
 
 func setPublished(p graphql.ResolveParams, collection models.Collection, publish bool) (any, error) {
@@ -292,7 +313,7 @@ func setPublished(p graphql.ResolveParams, collection models.Collection, publish
 		}
 		return nil, err
 	}
-	return mapItemToGraphQLResult(*item, collection, false), nil
+	return mapItemToGraphQLResult(*item, collection, false, gqlLocale{fallback: true}), nil
 }
 func deleteCollectionItem(p graphql.ResolveParams, collection models.Collection) (any, error) {
 	if err := requirePermission(p, auth.ActionDelete); err != nil {

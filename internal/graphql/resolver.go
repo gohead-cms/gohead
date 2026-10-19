@@ -46,7 +46,8 @@ func ResolveRelation(p graphql.ResolveParams, collectionID uint, attr models.Att
 			}
 			return nil
 		}
-		return mapItemToGraphQLResult(*item, *targetCollection, publishedOnly)
+		loc, _ := sourceMap[localeKey].(gqlLocale)
+		return mapItemToGraphQLResult(*item, *targetCollection, publishedOnly, loc)
 	}
 
 	// Only manyToMany stores a list of IDs (see models.ValidateItemValues);

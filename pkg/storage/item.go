@@ -266,10 +266,11 @@ func publishEvent(db *gorm.DB, eventType events.EventType, item *models.Item) {
 
 	// 3. Payload Creation: Construct the event payload with all necessary information.
 	payload := events.CollectionEventPayload{
-		EventType:      eventType,
-		CollectionName: collection.Name,
-		ItemID:         item.ID,
-		ItemData:       item.Data,
+		EventType:        eventType,
+		CollectionName:   collection.Name,
+		ItemID:           item.ID,
+		ItemData:         item.Data,
+		ItemTranslations: copyTranslations(item.Translations),
 	}
 
 	// 4. Enqueue Event: Send the event to the dispatcher via the Asynq message queue.
