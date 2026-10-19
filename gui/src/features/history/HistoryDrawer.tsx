@@ -19,6 +19,7 @@ import {
   Icon,
   Spinner,
   Text,
+  Tooltip,
   VStack,
   useColorModeValue,
 } from "@chakra-ui/react";
@@ -26,10 +27,12 @@ import { FiClock, FiRotateCcw } from "react-icons/fi";
 import { useNotify } from "../../shared/hooks/useNotify";
 import { ConfirmButton } from "../../shared/ui/ConfirmButton";
 import { formatShortTime, formatTime } from "../agents/components/runFormat";
+import { useMe } from "../auth/me";
 import {
   type HistoryTarget,
   type RestoreMeta,
   type Revision,
+  restoreBlockReason,
   restoreRevision,
   restoreToast,
   targetKey,
@@ -233,8 +236,19 @@ function RevisionPanel({ target, revision: r, isLatest, latest, compare, onCompa
   const { revision: detail, loading, error } = useRevision(target, r.version, compare);
   const [showData, setShowData] = useState(false);
   const codeBg = useColorModeValue("gray.50", "gray.800");
+  const { can } = useMe();
   // Restoring the current version changes nothing, unless it is a delete.
   const canRestore = !isLatest || r.action === "delete";
+  // Singletons have no draft state: history already needs update.
+  const blocked =
+    target.kind === "item"
+      ? restoreBlockReason(
+          r,
+          latest,
+          { create: can("create", target.collection), publish: can("publish", target.collection) },
+          !!target.drafts,
+        )
+      : null;
 
   // A deleted entry has no current content: "current" is the delete
   // revision, which holds the content it had when it was deleted.
@@ -265,7 +279,16 @@ function RevisionPanel({ target, revision: r, isLatest, latest, compare, onCompa
             </Text>
           )}
         </Box>
-        {canRestore ? (
+        {canRestore && blocked ? (
+          <Tooltip label={blocked} hasArrow>
+            {/* A disabled button gets no hover events: the span shows the reason. */}
+            <span tabIndex={0} aria-label={blocked}>
+              <Button size="sm" colorScheme="purple" leftIcon={<FiRotateCcw />} isDisabled>
+                Restore this version
+              </Button>
+            </span>
+          </Tooltip>
+        ) : canRestore ? (
           <ConfirmButton
             trigger={
               <Button size="sm" colorScheme="purple" leftIcon={<FiRotateCcw />}>

@@ -18,6 +18,7 @@ import {
   Text,
   Th,
   Thead,
+  Tooltip,
   Tr,
   useDisclosure,
 } from "@chakra-ui/react";
@@ -25,7 +26,8 @@ import { FiRotateCcw, FiTrash } from "react-icons/fi";
 import { useNotify } from "../../shared/hooks/useNotify";
 import { formatShortTime, formatTime } from "../agents/components/runFormat";
 import { DELETED_LIMIT, DELETES_SCANNED, type DeletedEntry, useDeletedEntries } from "./useHistory";
-import { type RestoreMeta, restoreRevision, restoreToast } from "./history";
+import { useMe } from "../auth/me";
+import { type RestoreMeta, restoreBlockReason, restoreRevision, restoreToast } from "./history";
 import { ActorTag } from "./RevisionBadges";
 
 /**
@@ -33,7 +35,16 @@ import { ActorTag } from "./RevisionBadges";
  * and not brought back since, and restores one (the content it had when it
  * was deleted).
  */
-export function RecentlyDeletedButton({ collection, onRestored }: { collection: string; onRestored: () => void }) {
+export function RecentlyDeletedButton({
+  collection,
+  drafts,
+  onRestored,
+}: {
+  collection: string;
+  /** The collection is draft-and-publish: published entries need publish to come back. */
+  drafts: boolean;
+  onRestored: () => void;
+}) {
   const { isOpen, onOpen, onClose } = useDisclosure();
   return (
     <>
@@ -45,15 +56,17 @@ export function RecentlyDeletedButton({ collection, onRestored }: { collection: 
         <ModalContent>
           <ModalHeader>Recently deleted</ModalHeader>
           <ModalCloseButton />
-          <ModalBody pb={6}>{isOpen && <DeletedList collection={collection} onRestored={onRestored} />}</ModalBody>
+          <ModalBody pb={6}>{isOpen && <DeletedList collection={collection} drafts={drafts} onRestored={onRestored} />}</ModalBody>
         </ModalContent>
       </Modal>
     </>
   );
 }
 
-function DeletedList({ collection, onRestored }: { collection: string; onRestored: () => void }) {
+function DeletedList({ collection, drafts, onRestored }: { collection: string; drafts: boolean; onRestored: () => void }) {
   const notify = useNotify();
+  const { can } = useMe();
+  const rights = { create: can("create", collection), publish: can("publish", collection) };
   const { entries, loading, error, refetch } = useDeletedEntries(collection);
   const [restoring, setRestoring] = useState<number | null>(null);
 
@@ -129,17 +142,13 @@ function DeletedList({ collection, onRestored }: { collection: string; onRestore
                   {formatShortTime(e.revision.createdAt)}
                 </Td>
                 <Td isNumeric>
-                  <Button
-                    size="xs"
-                    colorScheme="purple"
-                    variant="outline"
-                    leftIcon={<FiRotateCcw />}
+                  <RestoreButton
+                    // The delete revision is the latest: restoring brings the entry back.
+                    blocked={restoreBlockReason(e.revision, e.revision, rights, drafts)}
                     isLoading={restoring === e.revision.entityId}
                     isDisabled={restoring !== null && restoring !== e.revision.entityId}
                     onClick={() => restore(e)}
-                  >
-                    Restore
-                  </Button>
+                  />
                 </Td>
               </Tr>
             ))}
@@ -148,6 +157,41 @@ function DeletedList({ collection, onRestored }: { collection: string; onRestore
       </TableContainer>
       <ScanNote />
     </>
+  );
+}
+
+function RestoreButton({
+  blocked,
+  isLoading,
+  isDisabled,
+  onClick,
+}: {
+  blocked: string | null;
+  isLoading: boolean;
+  isDisabled: boolean;
+  onClick: () => void;
+}) {
+  const button = (
+    <Button
+      size="xs"
+      colorScheme="purple"
+      variant="outline"
+      leftIcon={<FiRotateCcw />}
+      isLoading={isLoading}
+      isDisabled={isDisabled || !!blocked}
+      onClick={onClick}
+    >
+      Restore
+    </Button>
+  );
+  if (!blocked) return button;
+  return (
+    <Tooltip label={blocked} hasArrow>
+      {/* A disabled button gets no hover events: the span shows the reason. */}
+      <span tabIndex={0} aria-label={blocked}>
+        {button}
+      </span>
+    </Tooltip>
   );
 }
 

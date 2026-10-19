@@ -148,8 +148,10 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
           {translatable && defaultLocale && (
             <LocaleSwitcher label="View in locale" locales={locales} value={viewLocale ?? defaultLocale.code} onChange={setListLocale} />
           )}
-          {/* Bringing an entry back writes it: it needs update. */}
-          {perms.update && <RecentlyDeletedButton collection={collectionName} onRestored={refetch} />}
+          {/* Listing history needs update; bringing an entry back is a create. */}
+          {perms.update && perms.create && (
+            <RecentlyDeletedButton collection={collectionName} drafts={!!schema.options?.draftAndPublish} onRestored={refetch} />
+          )}
           {perms.create && (
           <>
           <Button bg="white" variant="outline" size="sm" leftIcon={<Icon as={FiPlus} />} onClick={() => openForm(null)}>
@@ -208,7 +210,11 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
         onTranslationSaved={refetch}
       />
       <HistoryDrawer
-        target={historyItem ? { kind: "item", collection: collectionName, id: historyItem.id, label: entryLabel(schema, historyItem) } : null}
+        target={
+          historyItem
+            ? { kind: "item", collection: collectionName, id: historyItem.id, label: entryLabel(schema, historyItem), drafts: !!schema.options?.draftAndPublish }
+            : null
+        }
         onClose={() => setHistoryItem(null)}
         onRestored={handleRestored}
       />

@@ -85,6 +85,24 @@ test("roles: a custom role writes drafts in one collection only", async ({ page,
     await expect(row.getByRole("button", { name: /^(Publish|Unpublish) item$/ })).toHaveCount(0);
     await expect(row.getByRole("button", { name: "Delete item" })).toHaveCount(0);
 
+    // Once someone who can publish does, the entry is live: the writer can
+    // no longer change it, nor restore an earlier version.
+    const listed = await request.get(`${apiURL}/api/collections/${collection}?status=all`, { headers });
+    const item = ((await listed.json()).data as { id: number; title: string }[]).find((i) => i.title === draft);
+    expect(item).toBeTruthy();
+    const published = await request.post(`${apiURL}/api/collections/${collection}/${item!.id}/publish`, { headers });
+    expect(published.ok(), await published.text()).toBeTruthy();
+    await page.reload();
+    await expect(row.getByText("published", { exact: true })).toBeVisible();
+    await expect(row.getByRole("button", { name: "Edit item" })).toBeDisabled();
+    await row.getByRole("button", { name: "Item history" }).click();
+    const history = page.getByRole("dialog");
+    await history.getByRole("button", { name: /^Version 1,/ }).click();
+    await expect(history.getByRole("heading", { name: "Version 1" })).toBeVisible();
+    await expect(history.getByRole("button", { name: "Restore this version" })).toBeDisabled();
+    await history.getByRole("button", { name: "Close" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+
     // Other collections are out of reach.
     await page.goto("/contrib?collection=articles");
     await expect(page.getByText("“articles” was not found.")).toBeVisible();

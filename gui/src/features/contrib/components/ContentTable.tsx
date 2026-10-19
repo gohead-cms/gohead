@@ -5,6 +5,7 @@ import type { Schema } from "../../../shared/types";
 import { ConfirmButton } from "../../../shared/ui/ConfirmButton";
 import { EmptyState } from "../../../shared/ui/EmptyState";
 import type { ContentItem } from "../hooks";
+import { PUBLISHED_LOCKED } from "../../history/history";
 import type { EntryPermissions } from "./entryPermissions";
 import { displayValue, tableColumns } from "./entryValues";
 
@@ -94,9 +95,17 @@ export function ContentTable({ schema, items, perms, locales, onAdd, onEdit, onH
                             />
                           </Tooltip>
                         )}
-                        {perms.update && (
-                          <IconButton aria-label="Edit item" icon={<FiEdit />} size="sm" variant="ghost" onClick={() => onEdit(item)} />
-                        )}
+                        {perms.update &&
+                          (drafts && published && !perms.publish ? (
+                            // Changing published content needs publish (the server says 403).
+                            <Tooltip label={PUBLISHED_LOCKED} hasArrow>
+                              <span tabIndex={0} aria-label={PUBLISHED_LOCKED}>
+                                <IconButton aria-label="Edit item" icon={<FiEdit />} size="sm" variant="ghost" isDisabled />
+                              </span>
+                            </Tooltip>
+                          ) : (
+                            <IconButton aria-label="Edit item" icon={<FiEdit />} size="sm" variant="ghost" onClick={() => onEdit(item)} />
+                          ))}
                         {onHistory && (
                           <Tooltip label="History">
                             <IconButton aria-label="Item history" icon={<FiClock />} size="sm" variant="ghost" onClick={() => onHistory(item)} />
