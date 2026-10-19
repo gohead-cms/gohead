@@ -65,6 +65,22 @@ openapi:
   enabled: true
   public: false   # true serves the document without a token
 
+# First administrator, created at startup when the database has no users
+# (or run `gohead admin create`). The password needs 12+ characters; prefer
+# GOHEAD_ADMIN_PASSWORD over writing it here.
+admin:
+  username: ""
+  email: ""
+  password: ""
+
+# Self-registration at POST /auth/register: disabled | open (viewer accounts).
+auth:
+  registration: disabled
+
+# Apply database migrations when the API starts. Set to false when
+# `gohead migrate` runs separately (the Helm chart does, in an init container).
+auto_migrate: true
+
 # Brute-force protection for /auth/login and /auth/register.
 rate_limit:
   enabled: true

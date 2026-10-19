@@ -47,6 +47,10 @@ test-postgres: test-db
 test-e2e: ## Run the admin UI smoke tests (needs an API on :8080 with an empty database)
 	$Q cd gui && npx playwright test
 
+.PHONY: api-contract
+api-contract: ## Regenerate the public API snapshots in api/ after an intended API change
+	$Q UPDATE_API_CONTRACT=1 $(go) test -count=1 -run TestAPIContract ./internal/openapi ./internal/graphql
+
 .PHONY: helm-lint
 helm-lint: ## Lint the Helm chart with every CI values file
 	$Q for v in charts/gohead/ci/*-values.yaml; do helm lint --strict charts/gohead -f $$v || exit 1; done

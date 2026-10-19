@@ -144,9 +144,9 @@ func staticPaths() obj {
 			"responses":   merge(obj{"200": ok("Token", dataEnvelope(obj{"type": "object", "properties": obj{"token": obj{"type": "string"}}}, nil))}, errorResponses("401", "429")),
 		}},
 		"/auth/register": obj{"post": obj{
-			"tags": []string{"auth"}, "operationId": "register", "summary": "Create an account (the first one becomes admin)", "security": noAuth,
+			"tags": []string{"auth"}, "operationId": "register", "summary": "Create a viewer account (when auth.registration is open)", "security": noAuth,
 			"requestBody": obj{"required": true, "content": jsonContent(merge(obj{}, obj{"type": "object", "properties": obj{"username": obj{"type": "string"}, "email": obj{"type": "string", "format": "email"}, "password": obj{"type": "string", "format": "password"}}, "required": []string{"username", "email", "password"}}))},
-			"responses":   merge(obj{"201": obj{"description": "Created"}}, errorResponses("400", "409", "429")),
+			"responses":   merge(obj{"201": obj{"description": "Created"}}, errorResponses("400", "403", "409", "429")),
 		}},
 		"/api/media": obj{
 			"get": obj{

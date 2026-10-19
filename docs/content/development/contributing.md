@@ -63,12 +63,14 @@ The Playwright smoke tests in `gui/e2e` drive a real API. Start one on an empty 
 then run them:
 
 ```bash
-GOHEAD_DATABASE_URL=sqlite://e2e.db GOHEAD_RATE_LIMIT_ENABLED=false make run &
+GOHEAD_DATABASE_URL=sqlite://e2e.db GOHEAD_RATE_LIMIT_ENABLED=false \
+  GOHEAD_ADMIN_USERNAME=e2e-admin GOHEAD_ADMIN_EMAIL=e2e@example.com \
+  GOHEAD_ADMIN_PASSWORD=e2e-password-123 make run &
 cd gui && npx playwright install chromium && npm run test:e2e
 ```
 
-They register the first user (who becomes admin), so never point them at a database you
-care about.
+They create collections, entries and agents, so never point them at a database you care
+about.
 
 ## Docs
 

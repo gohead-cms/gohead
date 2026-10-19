@@ -108,6 +108,7 @@ nav:
   - Operations:
       - Architecture: operations/architecture.md
       - Deployment: operations/deployment.md
+      - Upgrading: operations/upgrading.md
       - CI/CD & releases: operations/ci-cd.md
       - Observability: operations/observability.md
       - Security: operations/security.md
@@ -117,5 +118,6 @@ nav:
       - Project layout: development/project-layout.md
   - Reference:
       - API endpoints: reference/api-endpoints.md
+      - API stability: reference/api-stability.md
       - CLI: reference/cli.md
       - Changelog: reference/changelog.md

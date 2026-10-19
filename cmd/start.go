@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gohead-cms/gohead/internal/accounts"
 	"github.com/gohead-cms/gohead/internal/agent/triggers"
 	"github.com/gohead-cms/gohead/internal/api/handlers"
 	"github.com/gohead-cms/gohead/internal/api/middleware"
@@ -133,7 +134,12 @@ func InitializeServer(cfgPath string) (*gin.Engine, *config.Config, func(), erro
 		cleanup()
 		return nil, nil, func() {}, err
 	}
-	if err := migrations.MigrateDatabase(db); err != nil {
+	if cfg.AutoMigrate {
+		if _, err := migrations.Up(db); err != nil {
+			cleanup()
+			return nil, nil, func() {}, err
+		}
+	} else if err := migrations.Check(db); err != nil {
 		cleanup()
 		return nil, nil, func() {}, err
 	}
@@ -154,6 +160,10 @@ func InitializeServer(cfgPath string) (*gin.Engine, *config.Config, func(), erro
 
 	// --- Application Services ---
 	seed.SeedRoles()
+	if err := setupAccounts(cfg); err != nil {
+		cleanup()
+		return nil, nil, func() {}, err
+	}
 	auth.InitializeJWT(resolveJWTSecret(cfg.JWTSecret))
 	metrics.InitMetrics()
 
@@ -417,7 +427,12 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *medi
 
 // insecureJWTSecrets are well-known values (shipped in samples/defaults) that
 // would let anyone forge admin tokens.
-var insecureJWTSecrets = map[string]bool{"": true, "your-secret-key": true}
+var insecureJWTSecrets = map[string]bool{
+	"":                true,
+	"your-secret-key": true,
+	// docker-compose.yml's fallback when GOHEAD_JWT_SECRET is not set
+	"change-me-to-a-long-random-string-0123456789": true,
+}
 
 // resolveJWTSecret returns the configured secret, or a random one when the
 // configured value is missing or a published default. A random secret keeps
@@ -456,5 +471,25 @@ func connectRedis(cfg config.Config) *redis.Client {
 	}
 	logger.Log.WithError(err).Warn("Redis unreachable: schema changes will not be shared between replicas and rate limits are per process. Run a single API replica or fix GOHEAD_REDIS_ADDRESS.")
 	_ = rdb.Close()
+	return nil
+}
+
+// setupAccounts applies the registration mode and creates the configured
+// first administrator on an empty instance.
+func setupAccounts(cfg config.Config) error {
+	switch cfg.Auth.Registration {
+	case handlers.RegistrationDisabled, handlers.RegistrationOpen:
+		handlers.Registration = cfg.Auth.Registration
+	default:
+		return fmt.Errorf("auth.registration must be %q or %q, not %q",
+			handlers.RegistrationDisabled, handlers.RegistrationOpen, cfg.Auth.Registration)
+	}
+	if _, err := accounts.BootstrapAdmin(cfg.Admin.Username, cfg.Admin.Email, cfg.Admin.Password); err != nil {
+		return fmt.Errorf("could not create the first administrator: %w", err)
+	}
+	if count, err := storage.CountUsers(); err == nil && count == 0 {
+		logger.Log.Warn("No account exists yet. Create an administrator with `gohead admin create`, " +
+			"or set GOHEAD_ADMIN_USERNAME, GOHEAD_ADMIN_EMAIL and GOHEAD_ADMIN_PASSWORD and restart.")
+	}
 	return nil
 }

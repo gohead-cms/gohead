@@ -1,7 +1,12 @@
 import { expect, Page } from "@playwright/test";
 
 export const apiURL = process.env.E2E_API_URL ?? "http://localhost:8080";
-export const admin = { username: "e2e-admin", email: "e2e-admin@example.com", password: "e2e-password-123" };
+// The API must be started with this administrator:
+// GOHEAD_ADMIN_USERNAME=e2e-admin GOHEAD_ADMIN_PASSWORD=e2e-password-123
+export const admin = {
+  username: process.env.E2E_ADMIN_USERNAME ?? "e2e-admin",
+  password: process.env.E2E_ADMIN_PASSWORD ?? "e2e-password-123",
+};
 
 /** Logs in through the login form and waits for the app shell. */
 export async function login(page: Page) {

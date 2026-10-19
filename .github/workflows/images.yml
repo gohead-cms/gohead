@@ -107,6 +107,19 @@ jobs:
           DIGEST: ${{ steps.build.outputs.digest }}
         run: cosign sign --yes "${IMAGE}@${DIGEST}"
 
+      # Users pull without credentials: warn when the package is private
+      # (GHCR packages start private; make them public once in the
+      # organisation's package settings).
+      - name: Anonymous pull works
+        if: env.PUSH == 'true'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          docker logout ghcr.io
+          if ! docker buildx imagetools inspect "${IMAGE}@${DIGEST}" > /dev/null 2>&1; then
+            echo "::warning title=Private image::${IMAGE} cannot be pulled anonymously. Set the package to public: https://github.com/orgs/${GITHUB_REPOSITORY_OWNER}/packages/container/package/$(basename "${IMAGE}")/settings"
+          fi
+
       - name: Summary
         if: env.PUSH == 'true'
         run: |

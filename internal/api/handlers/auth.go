@@ -10,25 +10,44 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gohead-cms/gohead/internal/accounts"
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/ratelimit"
 	"github.com/gohead-cms/gohead/pkg/storage"
-	"github.com/gohead-cms/gohead/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Register creates a new account through the public endpoint.
-//
-// The caller can never choose its own role: the very first account created on
-// an empty instance becomes "admin" (bootstrap), every later account gets the
-// least-privileged DefaultRegistrationRole. Admins promote users through
-// PUT /admin/users/:id.
+// Registration modes for POST /auth/register.
+const (
+	// RegistrationDisabled refuses self-registration: accounts are created
+	// by an admin (POST /admin/users), the configuration (admin.*) or the
+	// `gohead admin create` command.
+	RegistrationDisabled = "disabled"
+	// RegistrationOpen lets anyone create an account with the
+	// DefaultRegistrationRole.
+	RegistrationOpen = "open"
+)
+
+// Registration is the current registration mode, set at startup from
+// auth.registration.
+var Registration = RegistrationDisabled
+
+// Register creates a new account through the public endpoint, when
+// registration is open. The caller never chooses its role: accounts get the
+// least-privileged DefaultRegistrationRole, and admins promote users through
+// PUT /admin/users/:id. No account is ever made admin here.
 func Register(c *gin.Context) {
+	if Registration != RegistrationOpen {
+		c.Set("status", http.StatusForbidden)
+		c.Set("response", "Registration is disabled")
+		c.Set("details", "ask an administrator for an account")
+		return
+	}
 	var input struct {
 		Username string `json:"username" binding:"required"`
 		Password string `json:"password" binding:"required"`
@@ -50,17 +69,6 @@ func Register(c *gin.Context) {
 	}
 
 	roleName := DefaultRegistrationRole
-	count, err := storage.CountUsers()
-	if err != nil {
-		logger.Log.WithError(err).Error("Register: Failed to count users")
-		c.Set("status", http.StatusInternalServerError)
-		c.Set("response", "Register: General database error")
-		return
-	}
-	if count == 0 {
-		roleName = "admin"
-	}
-
 	role, err := storage.GetRoleByName(roleName)
 	if err != nil {
 		// Roles are seeded at startup, so a missing one is a server-side problem.
@@ -98,22 +106,14 @@ const DefaultRegistrationRole = "viewer"
 
 // buildUser hashes the password and assembles a validated user.
 func buildUser(username, email, password string, role *models.UserRole) (*models.User, int, error) {
-	user := models.User{
-		Username: username,
-		Email:    email,
-		Password: password, // validated in plain text first, hashed below
-		Role:     *role,
-		Slug:     utils.GenerateSlug(username),
-	}
-	if err := models.ValidateUser(user); err != nil {
+	user, err := accounts.Build(username, email, password, role)
+	if errors.Is(err, accounts.ErrInvalid) {
 		return nil, http.StatusBadRequest, err
 	}
-	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return nil, http.StatusInternalServerError, fmt.Errorf("failed to hash password: %w", err)
+		return nil, http.StatusInternalServerError, err
 	}
-	user.Password = string(hashed)
-	return &user, 0, nil
+	return user, 0, nil
 }
 
 // saveNewUser persists a user and maps storage errors to HTTP status codes.

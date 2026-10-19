@@ -15,23 +15,35 @@ captured from a real server.
 
 ## 1. Create the first account
 
-The first account registered on an empty instance becomes the **admin**. Every later
-self-registration gets the read-only **viewer** role.
+GoHead creates the first **admin** when it starts on an empty database with
+`GOHEAD_ADMIN_USERNAME`, `GOHEAD_ADMIN_EMAIL` and `GOHEAD_ADMIN_PASSWORD` set (the
+password needs 12+ characters). With Docker Compose, put them in `.env` before the first
+`docker compose up`:
 
 ```bash
-curl -s -X POST $GOHEAD/auth/register -H "$JSON" \
-  -d '{"username":"admin","email":"admin@example.com","password":"change-me-please"}'
+export ADMIN_PASSWORD=$(openssl rand -hex 12)
+printf 'GOHEAD_JWT_SECRET=%s\nGOHEAD_ADMIN_USERNAME=admin\nGOHEAD_ADMIN_PASSWORD=%s\n' \
+  "$(openssl rand -hex 32)" "$ADMIN_PASSWORD" > .env
 ```
 
-```json
-{ "data": "User registered successfully" }
+On an instance that is already running, use the command line:
+
+```bash
+export ADMIN_PASSWORD=$(openssl rand -hex 12)
+echo "$ADMIN_PASSWORD" | gohead admin create --username admin --email admin@example.com --password-stdin
+# with Docker Compose:
+echo "$ADMIN_PASSWORD" | docker compose exec -T api gohead admin create \
+  --username admin --email admin@example.com --password-stdin
 ```
+
+Self-registration (`POST /auth/register`) is off by default; see
+[users and roles](../guides/users-and-roles.md#registration-and-the-first-admin).
 
 Log in and keep the token:
 
 ```bash
 export TOKEN=$(curl -s -X POST $GOHEAD/auth/login -H "$JSON" \
-  -d '{"username":"admin","password":"change-me-please"}' | jq -r .data.token)
+  -d "{\"username\":\"admin\",\"password\":\"$ADMIN_PASSWORD\"}" | jq -r .data.token)
 export AUTH="Authorization: Bearer $TOKEN"
 ```
 

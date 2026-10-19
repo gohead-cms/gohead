@@ -15,7 +15,7 @@ Base URL: your API, e.g. `http://localhost:8080`. **Auth** column: `–` public,
 
 | Method | Path | Auth | Body |
 |--------|------|------|------|
-| `POST` | `/auth/register` | – | `username`, `email`, `password` |
+| `POST` | `/auth/register` | – (only when `auth.registration` is `open`) | `username`, `email`, `password` → viewer account |
 | `POST` | `/auth/login` | – | `username`, `password` → `{"data":{"token":…}}` |
 
 ## Content

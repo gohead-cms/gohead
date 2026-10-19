@@ -13,18 +13,33 @@ API and by GraphQL resolvers.
 
 ## Registration and the first admin
 
-`POST /auth/register` is public, but the caller **cannot choose a role**:
+The first administrator never comes from the public API. Create it either way:
 
-- the first account created on an empty instance becomes `admin`;
-- every later account becomes `viewer`.
+- **Configuration**: set `admin.username`, `admin.email` and `admin.password`
+  (`GOHEAD_ADMIN_USERNAME`, `GOHEAD_ADMIN_EMAIL`, `GOHEAD_ADMIN_PASSWORD`). The API creates
+  that account at startup when the database has no users, and ignores the settings
+  afterwards, so they can stay in place (or be removed).
+- **Command line**, at any time:
+
+    ```bash
+    echo "$PASSWORD" | gohead admin create --username alice --email alice@example.com --password-stdin
+    echo "$PASSWORD" | gohead admin set-password --username alice --password-stdin   # recovery
+    ```
+
+Administrator passwords need at least 12 characters.
+
+Other accounts are created by an admin (`POST /admin/users`, or the admin UI). Public
+self-registration is controlled by `auth.registration` (`GOHEAD_AUTH_REGISTRATION`):
+
+| Value | `POST /auth/register` |
+|-------|-----------------------|
+| `disabled` *(default)* | `403` |
+| `open` | creates a **viewer** account; the caller cannot choose a role |
 
 ```bash
 curl -X POST $GOHEAD/auth/register -H "$JSON" \
   -d '{"username":"alice","email":"alice@example.com","password":"at-least-6-chars"}'
 ```
-
-!!! tip "Lock the first account"
-    Register the admin account right after the first deployment, before the URL is public.
 
 ## Logging in
 
