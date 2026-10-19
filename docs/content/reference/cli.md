@@ -10,7 +10,7 @@ gohead <command> [--config path]
 | `migrate` | Apply pending [database migrations](../operations/upgrading.md#database-migrations) and exit. |
 | `migrate status` | List migrations and when they ran; exits non-zero if some are pending. |
 | `migrate down [--steps N]` | Revert the last N migrations (only those that can be undone). |
-| `admin create --username U --email E --password-stdin` | Create an administrator (password: 12+ characters, from stdin or `GOHEAD_ADMIN_PASSWORD`). |
+| `admin create --username U --email E --password-stdin` | Create an administrator (password: 12+ characters, from stdin). |
 | `admin set-password --username U --password-stdin` | Replace a user's password, e.g. to recover the admin account. |
 | `worker` | Run agent jobs from the `agents` queue (10 concurrent jobs). |
 | `dispatcher` | Turn content events from the `events` queue into agent jobs. |

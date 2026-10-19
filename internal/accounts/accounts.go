@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
 	"github.com/gohead-cms/gohead/pkg/utils"
@@ -85,6 +86,10 @@ func BootstrapAdmin(username, email, password string) (created bool, err error) 
 		return false, fmt.Errorf("could not count users: %w", err)
 	}
 	if count > 0 {
+		if !hasAdmin() {
+			logger.Log.WithField("username", username).Warn("admin.username is set but users already exist, none of them an admin: " +
+				"the account is not created. Create an admin with `gohead admin create`.")
+		}
 		return false, nil
 	}
 	if password == "" || email == "" {
@@ -99,6 +104,15 @@ func BootstrapAdmin(username, email, password string) (created bool, err error) 
 	}
 	logger.Log.WithField("username", username).Info("Created the first administrator from the configuration")
 	return true, nil
+}
+
+// hasAdmin reports whether some user has the admin role.
+func hasAdmin() bool {
+	var n int64
+	err := database.DB.Model(&models.User{}).
+		Joins("JOIN user_roles ON user_roles.id = users.user_role_id").
+		Where("user_roles.name = ?", "admin").Count(&n).Error
+	return err != nil || n > 0 // on error, don't warn
 }
 
 // SetPassword replaces a user's password.

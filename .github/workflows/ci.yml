@@ -4,6 +4,9 @@ on:
   push:
     branches: [master]
   pull_request:
+    # "labeled": the API contract job reacts to the update-api-contract
+    # and breaking-change labels.
+    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
 
 permissions:
@@ -103,16 +106,11 @@ jobs:
   api-contract:
     name: API contract
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # commits regenerated snapshots when a PR asks for it
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0
-          # The PR branch itself (not the merge commit), so snapshot updates
-          # can be pushed to it.
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          fetch-depth: 0 # tags: compare with the last release
+          persist-credentials: false
       - uses: actions/setup-go@v7
         with:
           go-version: "1.27.x"
@@ -121,34 +119,25 @@ jobs:
       - name: Generate the API snapshots
         run: UPDATE_API_CONTRACT=1 go test -count=1 -run TestAPIContract ./internal/openapi ./internal/graphql
 
-      # Add the label "update-api-contract" to a PR to commit the regenerated
-      # snapshots to its branch (PRs from this repository only).
-      - name: Commit updated snapshots
-        if: >-
-          github.event_name == 'pull_request' &&
-          contains(github.event.pull_request.labels.*.name, 'update-api-contract') &&
-          github.event.pull_request.head.repo.full_name == github.repository
-        run: |
-          git add api/
-          if ! git diff --cached --quiet; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git commit -m "chore(api): update the API contract snapshots"
-            git push
-          fi
+      - name: Keep the generated snapshots
+        uses: actions/upload-artifact@v7
+        with:
+          name: api-snapshots
+          path: api/
+          retention-days: 3
 
       - name: Snapshots match the code
         run: |
           if [ -n "$(git status --porcelain api/)" ]; then
             git diff --stat api/
-            echo "::error title=API contract::The public API changed but api/ was not updated. Run 'make api-contract' and commit api/ (or add the label update-api-contract to the PR)."
+            echo "::error title=API contract::The public API changed but api/ was not updated. Run 'make api-contract' and commit api/, or add the label update-api-contract to the PR."
             exit 1
           fi
 
       # The contract users rely on is the last release. A PR labelled
       # "breaking-change" acknowledges a deliberate break (next major).
       - name: No breaking change since the last release
-        if: ${{ !contains(github.event.pull_request.labels.*.name, 'breaking-change') }}
+        if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'breaking-change')
         shell: bash
         run: |
           last=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
@@ -161,7 +150,40 @@ jobs:
           git show "$last:api/graphql.json" > "$RUNNER_TEMP/graphql.json"
           go install github.com/oasdiff/oasdiff@v1.33.0
           "$(go env GOPATH)/bin/oasdiff" breaking "$RUNNER_TEMP/openapi.json" api/openapi.json --fail-on ERR --format githubactions
-          npx --yes -p graphql@16 -p @graphql-inspector/cli@7.0.0 graphql-inspector diff "$RUNNER_TEMP/graphql.json" api/graphql.json
+          npx --yes -p graphql@16.11.0 -p @graphql-inspector/cli@7.0.0 graphql-inspector diff "$RUNNER_TEMP/graphql.json" api/graphql.json
+
+  # Label a PR "update-api-contract" to commit the snapshots generated above
+  # to its branch. This job holds a write token, so it runs no repository
+  # code: it only copies the artifact and pushes (PRs from this repository).
+  # Commits pushed with the workflow token don't start CI: push again (or
+  # close and reopen the PR) to check the result.
+  api-contract-update:
+    name: Commit API snapshots
+    needs: api-contract
+    if: >-
+      always() && needs.api-contract.result != 'cancelled' &&
+      github.event_name == 'pull_request' &&
+      contains(github.event.pull_request.labels.*.name, 'update-api-contract') &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: actions/download-artifact@v7
+        with:
+          name: api-snapshots
+          path: api/
+      - name: Commit and push
+        run: |
+          git add api/
+          if git diff --cached --quiet; then echo "Snapshots already up to date."; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore(api): update the API contract snapshots"
+          git push
 
   vulncheck:
     name: govulncheck

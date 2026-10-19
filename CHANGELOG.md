@@ -7,12 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ## [Unreleased]
 
 ### Breaking changes
-- **Self-registration is off by default** (`auth.registration: disabled`): `POST /auth/register` returns `403` unless set to `open`, and it never creates an admin, even on an empty database. See the [upgrade guide](docs/content/operations/upgrading.md).
+- **Self-registration is off by default** (`auth.registration: disabled`): `POST /auth/register` returns `403` unless set to `open`, and it never creates an admin, even on an empty database. See the [upgrade guide](https://gohead-cms.github.io/gohead/operations/upgrading/).
 - **The first administrator** is created from `admin.username` / `admin.email` / `admin.password` (`GOHEAD_ADMIN_*`, password 12+ characters) when the API starts on a database without users, or with `gohead admin create`.
 
 ### Added
 - **Versioned database migrations** recorded in `schema_migrations` and serialized by a database lock, so replicas starting together no longer race: `gohead migrate`, `migrate status`, `migrate down`. The API applies them at startup unless `auto_migrate` is false (then it refuses to start on an outdated schema); the Helm chart runs them in an init container.
-- `gohead admin create` and `gohead admin set-password` (passwords from stdin or the environment).
+- `gohead admin create` and `gohead admin set-password` (passwords from standard input only).
 - **API contract**: `api/openapi.json` and `api/graphql.json` snapshot the public API; CI fails when they drift from the code and reports breaking changes against the last release (oasdiff, GraphQL Inspector). See *API stability*.
 - Docs: upgrade guide with version notes, API stability policy, release checklist. Image builds warn when a package cannot be pulled anonymously.
 - Helm: `bootstrapAdmin` values and a `migrate` init container (`migrations.initContainer`).
@@ -32,6 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - MySQL: JSON columns are created as `JSON` (they used PostgreSQL's `JSONB`, which MySQL rejects), and unique text columns (collection, component, singleton, agent and user slug names, token hashes, media keys) have a length. On PostgreSQL these columns become `varchar(191)` (`varchar(64)` and `varchar(255)` for token hashes and media keys) instead of `text`, changed by the automatic migration at startup: it fails if an existing value is longer, so check first, e.g. `SELECT max(length(name)) FROM collections` (and `components`, `singletons`, `agents`, `users.slug`).
 - Use `loc=UTC` in MySQL URLs (the examples did not), so times are stored in UTC like on the other databases.
 - The admin UI lint (ESLint, React hooks rules) is clean and blocks CI.
+- The JWT secret that `docker-compose.yml` falls back to is treated as unset (a random secret is generated and a warning logged), and the quick start generates the secret and the admin password.
 - `/admin/users` requires a user session (not an API token).
 - Usernames cannot contain `:` (reserved for `token:<name>` attribution).
 - Deleting an agent deletes its run history and conversation.

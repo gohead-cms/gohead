@@ -3,6 +3,7 @@ package migrations
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/testutils"
@@ -44,6 +45,20 @@ func TestBaselineAndStatus(t *testing.T) {
 
 	_, err = Down(db, 1)
 	assert.Error(t, err, "the baseline cannot be undone")
+
+	// A newer GoHead version migrated this database: an older binary
+	// refuses to revert underneath it.
+	require.NoError(t, db.Create(&record{ID: "9999_future", AppliedAt: time.Now()}).Error)
+	_, err = Down(db, 1)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "9999_future")
+}
+
+func TestStatusIsReadOnly(t *testing.T) {
+	_, db := testutils.SetupTestServer()
+	defer testutils.CleanupTestDB()
+	assert.True(t, errors.Is(Check(db), ErrPending))
+	assert.False(t, db.Migrator().HasTable(&record{}), "checking does not create tables")
 }
 
 type widget struct {

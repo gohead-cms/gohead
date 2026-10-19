@@ -132,6 +132,9 @@ func Down(db *gorm.DB, steps int) ([]string, error) {
 		if err != nil {
 			return err
 		}
+		if unknown := unknownIDs(done); len(unknown) > 0 {
+			return fmt.Errorf("the database has migrations %v from a newer GoHead version: revert them with that version first", unknown)
+		}
 		list := sorted()
 		for i := len(list) - 1; i >= 0 && len(reverted) < steps; i-- {
 			m := list[i]
@@ -157,12 +160,17 @@ func Down(db *gorm.DB, steps int) ([]string, error) {
 
 // Status lists every migration with when it was applied.
 func Status(db *gorm.DB) ([]State, error) {
-	if err := db.AutoMigrate(&record{}); err != nil {
-		return nil, err
+	done := map[string]record{}
+	// Read-only: a database never migrated has no table, and everything is
+	// pending.
+	if db.Migrator().HasTable(&record{}) {
+		var err error
+		if done, err = appliedIDs(db); err != nil {
+			return nil, err
+		}
 	}
-	done, err := appliedIDs(db)
-	if err != nil {
-		return nil, err
+	if unknown := unknownIDs(done); len(unknown) > 0 {
+		logger.Log.WithField("migrations", unknown).Warn("The database has migrations this GoHead version does not know: it was migrated by a newer version")
 	}
 	var out []State
 	for _, m := range sorted() {
@@ -195,6 +203,22 @@ func Check(db *gorm.DB) error {
 	return nil
 }
 
+// unknownIDs lists applied migrations this binary does not define.
+func unknownIDs(done map[string]record) []string {
+	known := map[string]bool{}
+	for _, m := range All {
+		known[m.ID] = true
+	}
+	var out []string
+	for id := range done {
+		if !known[id] {
+			out = append(out, id)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
 func sorted() []Migration {
 	list := append([]Migration(nil), All...)
 	sort.Slice(list, func(i, j int) bool { return list[i].ID < list[j].ID })
@@ -224,13 +248,19 @@ const (
 // withLock runs fn while holding the migration lock. The lock lives on a
 // dedicated connection (locks are per session), and fn uses the normal pool.
 func withLock(db *gorm.DB, fn func(db *gorm.DB) error) error {
-	if err := db.AutoMigrate(&record{}); err != nil {
-		return fmt.Errorf("could not create schema_migrations: %w", err)
+	// schema_migrations is created under the lock, so runners starting
+	// together on an empty database don't race to create it.
+	run := func() error {
+		if err := db.AutoMigrate(&record{}); err != nil {
+			return fmt.Errorf("could not create schema_migrations: %w", err)
+		}
+		return fn(db)
 	}
 	dialect := db.Dialector.Name()
 	if dialect != "postgres" && dialect != "mysql" {
-		// SQLite: one process owns the file; writes are serialized anyway.
-		return fn(db)
+		// SQLite: no lock. Run migrations from one process (the API, or
+		// `gohead migrate` while the API is stopped).
+		return run()
 	}
 	sqlDB, err := db.DB()
 	if err != nil {
@@ -260,5 +290,5 @@ func withLock(db *gorm.DB, fn func(db *gorm.DB) error) error {
 		}
 		defer func() { _, _ = conn.ExecContext(context.Background(), "SELECT RELEASE_LOCK(?)", lockName) }()
 	}
-	return fn(db)
+	return run()
 }

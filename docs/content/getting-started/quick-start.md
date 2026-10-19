@@ -16,14 +16,23 @@ captured from a real server.
 ## 1. Create the first account
 
 GoHead creates the first **admin** when it starts on an empty database with
-`GOHEAD_ADMIN_USERNAME`, `GOHEAD_ADMIN_EMAIL` and `GOHEAD_ADMIN_PASSWORD` set (Docker
-Compose sets the first two to `admin` / `admin@example.com`; the password needs 12+
-characters). On an instance that is already running, use the command line:
+`GOHEAD_ADMIN_USERNAME`, `GOHEAD_ADMIN_EMAIL` and `GOHEAD_ADMIN_PASSWORD` set (the
+password needs 12+ characters). With Docker Compose, put them in `.env` before the first
+`docker compose up`:
 
 ```bash
-echo 'change-me-please' | gohead admin create --username admin --email admin@example.com --password-stdin
+export ADMIN_PASSWORD=$(openssl rand -hex 12)
+printf 'GOHEAD_JWT_SECRET=%s\nGOHEAD_ADMIN_USERNAME=admin\nGOHEAD_ADMIN_PASSWORD=%s\n' \
+  "$(openssl rand -hex 32)" "$ADMIN_PASSWORD" > .env
+```
+
+On an instance that is already running, use the command line:
+
+```bash
+export ADMIN_PASSWORD=$(openssl rand -hex 12)
+echo "$ADMIN_PASSWORD" | gohead admin create --username admin --email admin@example.com --password-stdin
 # with Docker Compose:
-echo 'change-me-please' | docker compose exec -T api gohead admin create \
+echo "$ADMIN_PASSWORD" | docker compose exec -T api gohead admin create \
   --username admin --email admin@example.com --password-stdin
 ```
 
@@ -34,7 +43,7 @@ Log in and keep the token:
 
 ```bash
 export TOKEN=$(curl -s -X POST $GOHEAD/auth/login -H "$JSON" \
-  -d '{"username":"admin","password":"change-me-please"}' | jq -r .data.token)
+  -d "{\"username\":\"admin\",\"password\":\"$ADMIN_PASSWORD\"}" | jq -r .data.token)
 export AUTH="Authorization: Bearer $TOKEN"
 ```
 
