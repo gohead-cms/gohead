@@ -97,7 +97,8 @@ migrations are explicit, reviewed steps; contributors add them in `pkg/migration
       columns). Start from a new database.
 
 Also new, without action needed: the versioned migrations above (the first start records
-`0001_baseline`), agent run history and limits, scoped agent functions, API tokens,
+`0001_baseline`, then `0002_revisions` for [content history](../guides/content-history.md);
+existing entries get their first revision on their next change), agent run history and limits, scoped agent functions, API tokens,
 outbound webhooks and the OpenAPI document. Use `loc=UTC` in MySQL URLs.
 
 ### 0.4.0
