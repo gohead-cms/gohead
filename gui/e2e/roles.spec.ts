@@ -31,11 +31,18 @@ test("roles: a custom role writes drafts in one collection only", async ({ page,
     await drawer.getByRole("textbox", { name: /^Name/ }).fill(roleName);
     await drawer.getByRole("textbox", { name: /^Description/ }).fill("Writes memos, an editor publishes them");
     const box = (action: string) => drawer.getByRole("checkbox", { name: `${action} ${collection}`, exact: true });
+    // Chakra hides the native input under a styled control, and the matrix
+    // can be long (other tests leave collections behind): click the input
+    // itself instead of a screen position.
+    const tick = async (action: string) => {
+      await box(action).evaluate((el) => (el as HTMLInputElement).click());
+      await expect(box(action)).toBeChecked();
+    };
     await expect(box("Create")).not.toBeChecked();
     // Any action implies read.
-    await box("Create").check({ force: true });
+    await tick("Create");
     await expect(box("Read")).toBeChecked();
-    await box("Update").check({ force: true });
+    await tick("Update");
     await expect(box("Publish")).not.toBeChecked();
     await drawer.getByRole("button", { name: "Create role" }).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);

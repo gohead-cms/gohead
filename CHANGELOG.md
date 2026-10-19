@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-19
+
 ### Breaking changes
 - **Self-registration is off by default** (`auth.registration: disabled`): `POST /auth/register` returns `403` unless set to `open`, and it never creates an admin, even on an empty database. See the [upgrade guide](https://gohead-cms.github.io/gohead/operations/upgrading/).
 - **The first administrator** is created from `admin.username` / `admin.email` / `admin.password` (`GOHEAD_ADMIN_*`, password 12+ characters) when the API starts on a database without users, or with `gohead admin create`.
