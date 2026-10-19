@@ -138,6 +138,200 @@
         },
         "type": "object"
       },
+      "Revision": {
+        "properties": {
+          "action": {
+            "enum": [
+              "create",
+              "update",
+              "publish",
+              "unpublish",
+              "delete",
+              "restore",
+              "baseline"
+            ],
+            "type": "string"
+          },
+          "actorKind": {
+            "enum": [
+              "user",
+              "token",
+              "agent",
+              "system"
+            ],
+            "type": "string"
+          },
+          "actorName": {
+            "type": "string"
+          },
+          "agentRunId": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "entityId": {
+            "type": "integer"
+          },
+          "entityType": {
+            "enum": [
+              "item",
+              "singleton"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "restoredFrom": {
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "published"
+            ],
+            "type": "string"
+          },
+          "typeName": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "entityType",
+          "entityId",
+          "version",
+          "typeName",
+          "action",
+          "actorKind",
+          "actorName",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "RevisionDetail": {
+        "properties": {
+          "action": {
+            "enum": [
+              "create",
+              "update",
+              "publish",
+              "unpublish",
+              "delete",
+              "restore",
+              "baseline"
+            ],
+            "type": "string"
+          },
+          "actorKind": {
+            "enum": [
+              "user",
+              "token",
+              "agent",
+              "system"
+            ],
+            "type": "string"
+          },
+          "actorName": {
+            "type": "string"
+          },
+          "agentRunId": {
+            "type": "integer"
+          },
+          "changes": {
+            "items": {
+              "properties": {
+                "after": {},
+                "before": {},
+                "change": {
+                  "enum": [
+                    "added",
+                    "removed",
+                    "changed"
+                  ],
+                  "type": "string"
+                },
+                "field": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "field",
+                "change"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "comparedTo": {
+            "oneOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "data": {
+            "additionalProperties": true,
+            "description": "The stored data after the change (relations as IDs)",
+            "type": "object"
+          },
+          "entityId": {
+            "type": "integer"
+          },
+          "entityType": {
+            "enum": [
+              "item",
+              "singleton"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "restoredFrom": {
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "published"
+            ],
+            "type": "string"
+          },
+          "typeName": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "entityType",
+          "entityId",
+          "version",
+          "typeName",
+          "action",
+          "actorKind",
+          "actorName",
+          "createdAt",
+          "data",
+          "changes"
+        ],
+        "type": "object"
+      },
       "Singleton_site": {
         "properties": {
           "createdAt": {
@@ -1009,6 +1203,237 @@
         ]
       }
     },
+    "/api/collections/articles/{id}/revisions": {
+      "get": {
+        "operationId": "list_revisions_articles",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/Revision"
+                      },
+                      "type": "array"
+                    },
+                    "meta": {
+                      "properties": {
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Revisions"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "History of changes, newest first (editors and admins)",
+        "tags": [
+          "articles"
+        ]
+      }
+    },
+    "/api/collections/articles/{id}/revisions/{version}": {
+      "get": {
+        "operationId": "get_revision_articles",
+        "parameters": [
+          {
+            "description": "Version to diff against: a number, or current. Default: the previous version.",
+            "in": "query",
+            "name": "compare",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/RevisionDetail"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Revision"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "One version, with its data and the changes from another version",
+        "tags": [
+          "articles"
+        ]
+      }
+    },
+    "/api/collections/articles/{id}/revisions/{version}/restore": {
+      "post": {
+        "operationId": "restore_revision_articles",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/articles"
+                    },
+                    "meta": {
+                      "properties": {
+                        "dropped": {
+                          "description": "Attributes of the old version the type no longer has",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "revision": {
+                          "$ref": "#/components/schemas/Revision"
+                        },
+                        "unchanged": {
+                          "description": "The entry already had this content: no revision was recorded",
+                          "type": "boolean"
+                        },
+                        "undeleted": {
+                          "type": "boolean"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Restored"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Make a version the current content (a new revision; brings back deleted content)",
+        "tags": [
+          "articles"
+        ]
+      }
+    },
     "/api/collections/articles/{id}/unpublish": {
       "post": {
         "operationId": "unpublish_articles",
@@ -1447,6 +1872,237 @@
         ]
       }
     },
+    "/api/collections/authors/{id}/revisions": {
+      "get": {
+        "operationId": "list_revisions_authors",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/Revision"
+                      },
+                      "type": "array"
+                    },
+                    "meta": {
+                      "properties": {
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Revisions"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "History of changes, newest first (editors and admins)",
+        "tags": [
+          "authors"
+        ]
+      }
+    },
+    "/api/collections/authors/{id}/revisions/{version}": {
+      "get": {
+        "operationId": "get_revision_authors",
+        "parameters": [
+          {
+            "description": "Version to diff against: a number, or current. Default: the previous version.",
+            "in": "query",
+            "name": "compare",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/RevisionDetail"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Revision"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "One version, with its data and the changes from another version",
+        "tags": [
+          "authors"
+        ]
+      }
+    },
+    "/api/collections/authors/{id}/revisions/{version}/restore": {
+      "post": {
+        "operationId": "restore_revision_authors",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/authors"
+                    },
+                    "meta": {
+                      "properties": {
+                        "dropped": {
+                          "description": "Attributes of the old version the type no longer has",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "revision": {
+                          "$ref": "#/components/schemas/Revision"
+                        },
+                        "unchanged": {
+                          "description": "The entry already had this content: no revision was recorded",
+                          "type": "boolean"
+                        },
+                        "undeleted": {
+                          "type": "boolean"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Restored"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Make a version the current content (a new revision; brings back deleted content)",
+        "tags": [
+          "authors"
+        ]
+      }
+    },
     "/api/graphql": {
       "post": {
         "operationId": "graphql",
@@ -1802,6 +2458,134 @@
         },
         "tags": [
           "media"
+        ]
+      }
+    },
+    "/api/revisions": {
+      "get": {
+        "operationId": "list_revisions",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "action",
+            "schema": {
+              "enum": [
+                "create",
+                "update",
+                "publish",
+                "unpublish",
+                "delete",
+                "restore",
+                "baseline"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "username, token name or agent name",
+            "in": "query",
+            "name": "actor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "actorKind",
+            "schema": {
+              "enum": [
+                "user",
+                "token",
+                "agent",
+                "system"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agentRun",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "collection",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "singleton",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/Revision"
+                      },
+                      "type": "array"
+                    },
+                    "meta": {
+                      "properties": {
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Revisions"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Changes across all entries, newest first (editors and admins)",
+        "tags": [
+          "history"
         ]
       }
     },
@@ -2193,6 +2977,213 @@
         ]
       }
     },
+    "/api/singleton/site/revisions": {
+      "get": {
+        "operationId": "list_revisions_Singleton_site",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/Revision"
+                      },
+                      "type": "array"
+                    },
+                    "meta": {
+                      "properties": {
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Revisions"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "History of changes, newest first (editors and admins)",
+        "tags": [
+          "singleton:site"
+        ]
+      }
+    },
+    "/api/singleton/site/revisions/{version}": {
+      "get": {
+        "operationId": "get_revision_Singleton_site",
+        "parameters": [
+          {
+            "description": "Version to diff against: a number, or current. Default: the previous version.",
+            "in": "query",
+            "name": "compare",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/RevisionDetail"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Revision"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "One version, with its data and the changes from another version",
+        "tags": [
+          "singleton:site"
+        ]
+      }
+    },
+    "/api/singleton/site/revisions/{version}/restore": {
+      "post": {
+        "operationId": "restore_revision_Singleton_site",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Singleton_site"
+                    },
+                    "meta": {
+                      "properties": {
+                        "dropped": {
+                          "description": "Attributes of the old version the type no longer has",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "revision": {
+                          "$ref": "#/components/schemas/Revision"
+                        },
+                        "unchanged": {
+                          "description": "The entry already had this content: no revision was recorded",
+                          "type": "boolean"
+                        },
+                        "undeleted": {
+                          "type": "boolean"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Restored"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Make a version the current content (a new revision; brings back deleted content)",
+        "tags": [
+          "singleton:site"
+        ]
+      }
+    },
     "/auth/login": {
       "post": {
         "operationId": "login",
@@ -2398,6 +3389,10 @@
     {
       "description": "GraphQL endpoint",
       "name": "graphql"
+    },
+    {
+      "description": "Content revisions across entries",
+      "name": "history"
     },
     {
       "description": "Uploaded files",

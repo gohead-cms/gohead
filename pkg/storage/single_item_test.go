@@ -37,7 +37,7 @@ func TestSingleItemStorage(t *testing.T) {
 		content := map[string]interface{}{
 			"title": "Welcome to Our Site",
 		}
-		item, err := storage.CreateSingleItem(&Singleton, content)
+		item, err := storage.CreateSingleItem(storage.SystemActor, &Singleton, content)
 		assert.NoError(t, err, "should create single item without conflict")
 		assert.NotNil(t, item, "item should not be nil")
 		assert.NotZero(t, item.ID, "new single item should have an ID")
@@ -50,7 +50,7 @@ func TestSingleItemStorage(t *testing.T) {
 		duplicateContent := map[string]interface{}{
 			"title": "Another Attempt",
 		}
-		item, err := storage.CreateSingleItem(&Singleton, duplicateContent)
+		item, err := storage.CreateSingleItem(storage.SystemActor, &Singleton, duplicateContent)
 		assert.Error(t, err, "should fail because an item already exists for 'homepage'")
 		assert.Nil(t, item)
 		assert.Contains(t, err.Error(), "already exists")
@@ -76,7 +76,7 @@ func TestSingleItemStorage(t *testing.T) {
 			"title": "Updated Homepage Title",
 		}
 
-		updatedItem, err := storage.UpdateSingleItem("homepage", newData)
+		updatedItem, err := storage.UpdateSingleItem(storage.SystemActor, "homepage", newData)
 		assert.NoError(t, err)
 		assert.NotNil(t, updatedItem)
 		assert.Equal(t, "Updated Homepage Title", updatedItem.Data["title"])
@@ -91,7 +91,7 @@ func TestSingleItemStorage(t *testing.T) {
 		newData := map[string]interface{}{
 			"title": "Won't matter",
 		}
-		updatedItem, err := storage.UpdateSingleItem("unknown", newData)
+		updatedItem, err := storage.UpdateSingleItem(storage.SystemActor, "unknown", newData)
 		assert.Nil(t, updatedItem)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "single type 'unknown' not found")
@@ -111,7 +111,7 @@ func TestSingleItemStorage(t *testing.T) {
 		newData := map[string]interface{}{
 			"title": "About Us Page",
 		}
-		updatedItem, err := storage.UpdateSingleItem("about-us", newData)
+		updatedItem, err := storage.UpdateSingleItem(storage.SystemActor, "about-us", newData)
 		assert.Nil(t, updatedItem)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "no existing single item for single type 'about-us'")
@@ -119,7 +119,7 @@ func TestSingleItemStorage(t *testing.T) {
 
 	t.Run("DeleteSingleItem - success", func(t *testing.T) {
 		// Delete the item for 'homepage'
-		err := storage.DeleteSingleItem("homepage")
+		err := storage.DeleteSingleItem(storage.SystemActor, "homepage")
 		assert.NoError(t, err, "should delete the single item successfully")
 
 		// After deletion, retrieval should fail
@@ -130,13 +130,13 @@ func TestSingleItemStorage(t *testing.T) {
 	})
 
 	t.Run("DeleteSingleItem - single type not found", func(t *testing.T) {
-		err := storage.DeleteSingleItem("nonexistent")
+		err := storage.DeleteSingleItem(storage.SystemActor, "nonexistent")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "single type 'nonexistent' not found")
 	})
 
 	t.Run("DeleteSingleItem - item already deleted", func(t *testing.T) {
-		err := storage.DeleteSingleItem("homepage")
+		err := storage.DeleteSingleItem(storage.SystemActor, "homepage")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "no single item found for single type 'homepage'")
 	})
@@ -156,7 +156,7 @@ func TestCheckValidationFails(t *testing.T) {
 
 	// Attempt creation with missing "email"
 	itemData := map[string]interface{}{}
-	item, err := storage.CreateSingleItem(&st, itemData)
+	item, err := storage.CreateSingleItem(storage.SystemActor, &st, itemData)
 	assert.Nil(t, item)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "missing required attribute: 'email'")

@@ -232,6 +232,7 @@ func UpdateCollection(id uint, updated *models.Collection) error {
 	}
 
 	// Update the basic attributes of the collection
+	oldName := existing.Name
 	existing.Name = updated.Name
 	existing.Description = updated.Description
 	// An update that does not name the option keeps it as it is.
@@ -258,6 +259,16 @@ func UpdateCollection(id uint, updated *models.Collection) error {
 		logger.Log.WithField("collection_id", id).Error("Rollback failed to update fields")
 		tx.Rollback()
 		return fmt.Errorf("failed to update fields: %w", err)
+	}
+
+	// The items' history follows a renamed collection.
+	if oldName != existing.Name {
+		if err := tx.Model(&models.Revision{}).
+			Where("entity_type = ? AND type_name = ?", models.RevisionEntityItem, oldName).
+			Update("type_name", existing.Name).Error; err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to rename the collection's history: %w", err)
+		}
 	}
 
 	// Without draft and publish every item is visible, so drafts become
@@ -398,6 +409,12 @@ func DeleteCollection(collectionID uint) error {
 		return fmt.Errorf("failed to delete content items for collection '%s': %w", Collection.Name, err)
 	}
 	logger.Log.WithField("collection_id", collectionID).Info("DeleteCollection: delete successfully associated items")
+
+	// The history goes with the items: it cannot be restored without them.
+	if err := tx.Where("entity_type = ? AND type_name = ?", models.RevisionEntityItem, Collection.Name).Delete(&models.Revision{}).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete the history of collection '%s': %w", Collection.Name, err)
+	}
 
 	// Delete the collection itself
 	if err := tx.Delete(&Collection).Error; err != nil {

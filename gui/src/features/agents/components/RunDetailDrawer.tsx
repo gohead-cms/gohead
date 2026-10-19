@@ -18,6 +18,7 @@ import {
   useColorModeValue,
 } from "@chakra-ui/react";
 import { type AgentRunStep } from "../../../shared/types";
+import { RunContentChanges } from "../../history/RunContentChanges";
 import { useAgentRun } from "../hook/useAgentRuns";
 import {
   formatCost,
@@ -180,6 +181,8 @@ export function RunDetailDrawer({ agentName, runId, onClose }: RunDetailDrawerPr
                   <Pre text={run.output} />
                 </Section>
               )}
+              <Divider />
+              {runId !== null && <RunContentChanges key={runId} agentName={agentName} runId={runId} />}
             </VStack>
           )}
         </DrawerBody>

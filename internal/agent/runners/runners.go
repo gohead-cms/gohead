@@ -10,6 +10,7 @@ import (
 
 	"github.com/gohead-cms/gohead/internal/agent/functions"
 	"github.com/gohead-cms/gohead/internal/agent/jobs"
+	"github.com/gohead-cms/gohead/internal/models"
 	agentModels "github.com/gohead-cms/gohead/internal/models/agents"
 	"github.com/gohead-cms/gohead/pkg/llm"
 	"github.com/gohead-cms/gohead/pkg/logger"
@@ -198,6 +199,9 @@ func (r *AgentRunner) inRunLimit(agent *agentModels.Agent, run *agentModels.Agen
 // execution, history management, step recording and in-run limits.
 func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Agent, payload jobs.AgentJobPayload,
 	run *agentModels.AgentRun, rec *llm.UsageRecorder) (runErr error) {
+	// Content the agent's functions change is attributed to this run, so
+	// it shows in the history and the run can be reverted.
+	ctx = storage.WithActor(ctx, storage.Actor{Kind: models.ActorAgent, Name: agent.Name, AgentRunID: run.ID})
 	llmClient, err := r.newClient(llm.Config{
 		Provider:             agent.LLMConfig.Provider,
 		Model:                agent.LLMConfig.Model,

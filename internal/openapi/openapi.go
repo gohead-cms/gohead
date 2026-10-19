@@ -23,7 +23,7 @@ var unsafeName = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
 func schemaName(name string) string { return unsafeName.ReplaceAllString(name, "_") }
 
 // reservedSchemas are the fixed schema names.
-var reservedSchemas = map[string]bool{"Error": true, "Pagination": true, "Media": true}
+var reservedSchemas = map[string]bool{"Error": true, "Pagination": true, "Media": true, "Revision": true, "RevisionDetail": true}
 
 // collectionNames maps each collection to a schema name that cannot clash
 // with the fixed schemas, the Component_/Singleton_ names, or another
@@ -124,6 +124,9 @@ func Build(version string) (obj, error) {
 		schemas[name+"Input"] = inputSchema(st.Attributes)
 		tags = append(tags, obj{"name": "singleton:" + st.Name, "description": firstNonEmpty(st.Description, "The "+st.Name+" singleton")})
 		paths["/api/singleton/"+st.Name] = singletonPath(st.Name, name)
+		for p, v := range singletonHistoryPaths(st.Name, name) {
+			paths[p] = v
+		}
 	}
 
 	for p, v := range staticPaths() {
@@ -133,6 +136,7 @@ func Build(version string) (obj, error) {
 		obj{"name": "media", "description": "Uploaded files"},
 		obj{"name": "auth", "description": "Sessions"},
 		obj{"name": "graphql", "description": "GraphQL endpoint"},
+		obj{"name": "history", "description": "Content revisions across entries"},
 	)
 
 	return obj{
