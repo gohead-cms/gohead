@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/logger"
@@ -47,6 +48,11 @@ func parseLocale(c *gin.Context) (localeContext, bool) {
 	}
 	lc.locale, lc.defaultLocale = locale, def
 	return lc, true
+}
+
+// readLocale is the locale related entries are populated in.
+func (l localeContext) readLocale() storage.ReadLocale {
+	return storage.ReadLocale{Locale: l.locale, Default: l.defaultLocale, Fallback: l.fallback}
 }
 
 // localize returns an entry's data in the request's locale.
@@ -100,20 +106,25 @@ func UpdateLocale(c *gin.Context) {
 		return
 	}
 	code := c.Param("code")
+	if body.IsDefault != nil && !*body.IsDefault {
+		validationError(c, "make another locale the default instead")
+		return
+	}
+	if body.Name != nil && strings.TrimSpace(*body.Name) == "" {
+		validationError(c, "name is required")
+		return
+	}
 	var l *models.Locale
 	var err error
-	if body.Name != nil {
-		if l, err = storage.RenameLocale(code, *body.Name); err != nil {
+	// The default first: it is the change that can be refused.
+	if body.IsDefault != nil {
+		if l, err = storage.SetDefaultLocale(code); err != nil {
 			localeError(c, err)
 			return
 		}
 	}
-	if body.IsDefault != nil {
-		if !*body.IsDefault {
-			validationError(c, "make another locale the default instead")
-			return
-		}
-		if l, err = storage.SetDefaultLocale(code); err != nil {
+	if body.Name != nil {
+		if l, err = storage.RenameLocale(code, *body.Name); err != nil {
 			localeError(c, err)
 			return
 		}

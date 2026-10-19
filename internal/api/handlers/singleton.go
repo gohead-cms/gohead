@@ -69,7 +69,7 @@ func GetSingleItem(c *gin.Context) {
 // by the caller.
 func singleItemResponseFor(st *models.Singleton, item *models.SingleItem, rc readContext) (map[string]any, error) {
 	data := rc.localize(st.Attributes, item.Data, item.Translations)
-	data, err := storage.PopulateRelations(models.Collection{Attributes: st.Attributes}, data, rc.level, rc.publishedOnly)
+	data, err := storage.PopulateRelationsIn(models.Collection{Attributes: st.Attributes}, data, rc.level, rc.publishedOnly, rc.readLocale())
 	if err != nil {
 		return nil, err
 	}

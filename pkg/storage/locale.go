@@ -4,11 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/database"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // DefaultLocaleCode is the default locale used until one is stored (set
@@ -45,6 +48,7 @@ func EnsureDefaultLocale(code string) error {
 		return fmt.Errorf("i18n.default_locale '%s' is not a valid locale code (e.g. en, fr, pt-BR)", code)
 	}
 	DefaultLocaleCode = code
+	defer invalidateLocales()
 	var n int64
 	if err := database.DB.Model(&models.Locale{}).Count(&n).Error; err != nil {
 		return err
@@ -52,7 +56,10 @@ func EnsureDefaultLocale(code string) error {
 	if n > 0 {
 		return nil
 	}
-	return database.DB.Create(&models.Locale{Code: code, Name: code, IsDefault: true}).Error
+	// Replicas starting together may all get here: the unique code makes
+	// the extra inserts no-ops.
+	return database.DB.Clauses(clause.OnConflict{DoNothing: true}).
+		Create(&models.Locale{Code: code, Name: code, IsDefault: true}).Error
 }
 
 // ListLocales returns the locales, the default first.
@@ -67,41 +74,87 @@ func ListLocales() ([]models.Locale, error) {
 	return out, nil
 }
 
+// localeCacheTTL bounds how long another replica's locale change can go
+// unseen. Changes made through this process are seen at once.
+const localeCacheTTL = 5 * time.Second
+
+// localeSnapshot is the configured locales, cached per database handle.
+type localeSnapshot struct {
+	db    *gorm.DB
+	at    time.Time
+	def   string
+	codes map[string]bool
+}
+
+var (
+	localeMu    sync.Mutex
+	localeCache *localeSnapshot
+)
+
+// invalidateLocales drops the cache after a change.
+func invalidateLocales() {
+	localeMu.Lock()
+	localeCache = nil
+	localeMu.Unlock()
+}
+
+// locales returns the default locale and the configured codes.
+func locales() (*localeSnapshot, error) {
+	localeMu.Lock()
+	defer localeMu.Unlock()
+	if c := localeCache; c != nil && c.db == database.DB && time.Since(c.at) < localeCacheTTL {
+		return c, nil
+	}
+	var rows []models.Locale
+	if err := database.DB.Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	snap := &localeSnapshot{db: database.DB, at: time.Now(), def: DefaultLocaleCode, codes: map[string]bool{}}
+	for _, l := range rows {
+		snap.codes[l.Code] = true
+		if l.IsDefault {
+			snap.def = l.Code
+		}
+	}
+	snap.codes[snap.def] = true
+	localeCache = snap
+	return snap, nil
+}
+
 // DefaultLocale returns the default locale's code.
 func DefaultLocale() (string, error) {
-	var l models.Locale
-	err := database.DB.Where("is_default = ?", true).First(&l).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return DefaultLocaleCode, nil
-	}
+	snap, err := locales()
 	if err != nil {
 		return "", err
 	}
-	return l.Code, nil
+	return snap.def, nil
+}
+
+// LocaleExists reports whether a locale is configured.
+func LocaleExists(code string) bool {
+	snap, err := locales()
+	return err == nil && snap.codes[code]
 }
 
 // ResolveLocale checks a requested locale and returns it with the default
 // locale. "" means the default locale.
 func ResolveLocale(requested string) (locale, defaultLocale string, err error) {
-	defaultLocale, err = DefaultLocale()
+	snap, err := locales()
 	if err != nil {
 		return "", "", err
 	}
-	if requested == "" || requested == defaultLocale {
-		return defaultLocale, defaultLocale, nil
+	if requested == "" {
+		return snap.def, snap.def, nil
 	}
-	var n int64
-	if err := database.DB.Model(&models.Locale{}).Where("code = ?", requested).Count(&n).Error; err != nil {
-		return "", "", err
-	}
-	if n == 0 {
+	if !snap.codes[requested] {
 		return "", "", ErrLocaleNotFound
 	}
-	return requested, defaultLocale, nil
+	return requested, snap.def, nil
 }
 
 // CreateLocale adds a locale.
 func CreateLocale(code, name string) (*models.Locale, error) {
+	defer invalidateLocales()
 	if !models.ValidLocaleCode(code) {
 		return nil, &ItemValidationError{Err: fmt.Errorf("'%s' is not a valid locale code (e.g. en, fr, pt-BR)", code)}
 	}
@@ -135,6 +188,7 @@ func CreateLocale(code, name string) (*models.Locale, error) {
 
 // RenameLocale changes a locale's display name.
 func RenameLocale(code, name string) (*models.Locale, error) {
+	defer invalidateLocales()
 	var l models.Locale
 	if err := database.DB.Where("code = ?", code).First(&l).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -152,19 +206,57 @@ func RenameLocale(code, name string) (*models.Locale, error) {
 	return &l, nil
 }
 
-// translationTables are the tables whose rows hold translations.
-var translationTables = []any{&models.Item{}, &models.SingleItem{}}
-
-// countTranslated counts the entries with content in locale.
+// countTranslated counts the live entries with a value in locale for one
+// of their type's localized attributes.
 func countTranslated(tx *gorm.DB, code string) (int64, error) {
-	var total int64
-	for _, model := range translationTables {
-		var n int64
-		q := tx.Model(model).Where(translationExistsSQL(tx.Dialector.Name()), translationPathArgs(tx.Dialector.Name(), code)...)
-		if err := q.Count(&n).Error; err != nil {
-			return 0, err
+	dialect := tx.Dialector.Name()
+	var localized []models.Attribute
+	if err := tx.Where("localized = ?", true).Find(&localized).Error; err != nil {
+		return 0, err
+	}
+	byCollection, bySingleton := map[uint]map[string]bool{}, map[uint]map[string]bool{}
+	for _, a := range localized {
+		switch {
+		case a.CollectionID != nil:
+			if byCollection[*a.CollectionID] == nil {
+				byCollection[*a.CollectionID] = map[string]bool{}
+			}
+			byCollection[*a.CollectionID][a.Name] = true
+		case a.SingletonID != nil:
+			if bySingleton[*a.SingletonID] == nil {
+				bySingleton[*a.SingletonID] = map[string]bool{}
+			}
+			bySingleton[*a.SingletonID][a.Name] = true
 		}
-		total += n
+	}
+	has := func(translations models.JSONMap, names map[string]bool) bool {
+		for k := range models.Translation(translations, code) {
+			if names[k] {
+				return true
+			}
+		}
+		return false
+	}
+	var total int64
+	var items []models.Item
+	if err := tx.Select("id", "collection_id", "translations").
+		Where(translationExistsSQL(dialect), translationPathArgs(dialect, code)...).Find(&items).Error; err != nil {
+		return 0, err
+	}
+	for _, it := range items {
+		if has(it.Translations, byCollection[it.CollectionID]) {
+			total++
+		}
+	}
+	var singles []models.SingleItem
+	if err := tx.Select("id", "single_type_id", "translations").
+		Where(translationExistsSQL(dialect), translationPathArgs(dialect, code)...).Find(&singles).Error; err != nil {
+		return 0, err
+	}
+	for _, it := range singles {
+		if has(it.Translations, bySingleton[it.SingleTypeID]) {
+			total++
+		}
 	}
 	return total, nil
 }
@@ -195,8 +287,15 @@ func translationPathArgs(dialect, code string) []any {
 // entry has a translation in the new default (that content would be
 // hidden), and the old default becomes a locale without translations.
 func SetDefaultLocale(code string) (*models.Locale, error) {
+	defer invalidateLocales()
 	var out models.Locale
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		// Lock every locale row: two concurrent changes must not leave two
+		// defaults.
+		var all []models.Locale
+		if err := lockRow(tx).Find(&all).Error; err != nil {
+			return err
+		}
 		if err := tx.Where("code = ?", code).First(&out).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrLocaleNotFound
@@ -229,6 +328,7 @@ func SetDefaultLocale(code string) (*models.Locale, error) {
 // and the delete is refused (LocaleInUseError) unless purge is set, which
 // deletes that content too.
 func DeleteLocale(code string, purge bool) (int64, error) {
+	defer invalidateLocales()
 	var purged int64
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
 		var l models.Locale

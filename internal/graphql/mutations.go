@@ -269,8 +269,11 @@ func updateCollectionItem(p graphql.ResolveParams, id string, inputData map[stri
 	merged := models.JSONMap{}
 	var item *models.Item
 	if loc.locale != loc.defaultLocale {
+		localized := models.LocalizedNames(collection.Attributes)
 		for k, v := range models.Translation(existing.Translations, loc.locale) {
-			merged[k] = v
+			if localized[k] { // values kept for attributes no longer localized are not resent
+				merged[k] = v
+			}
 		}
 		for k, v := range inputData {
 			merged[k] = v

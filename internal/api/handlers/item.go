@@ -83,7 +83,7 @@ func GetItems(collection models.Collection, rc readContext) gin.HandlerFunc {
 // request's locale, with its relations populated down to rc.level.
 func itemResponse(ct models.Collection, item models.Item, rc readContext) (map[string]any, error) {
 	data := rc.localize(ct.Attributes, item.Data, item.Translations)
-	data, err := storage.PopulateRelations(ct, data, rc.level, rc.publishedOnly)
+	data, err := storage.PopulateRelationsIn(ct, data, rc.level, rc.publishedOnly, rc.readLocale())
 	if err != nil {
 		return nil, err
 	}
@@ -309,6 +309,10 @@ func writeItemError(c *gin.Context, ct models.Collection, err error) {
 	case errors.Is(err, storage.ErrItemNotFound):
 		c.Set("response", "Item not found")
 		c.Set("status", http.StatusNotFound)
+	case errors.Is(err, storage.ErrLocaleNotFound):
+		validationError(c, "unknown locale (see GET /api/locales)")
+	case errors.Is(err, storage.ErrDefaultLocaleWrite):
+		validationError(c, err.Error())
 	case errors.Is(err, storage.ErrDraftAndPublishDisabled):
 		validationError(c, fmt.Sprintf("collection '%s' does not use draft and publish", ct.Name))
 	case errors.As(err, &verr):

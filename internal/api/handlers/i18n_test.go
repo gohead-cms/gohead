@@ -226,3 +226,69 @@ func TestLocalizedSingleton(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, code)
 	assert.Len(t, a.ok("editor", "GET", "/api/singleton/homepage/revisions", nil), 2)
 }
+
+func TestLocalizedRelationsAndRestores(t *testing.T) {
+	a := newContentAPI(t)
+	a.ok("admin", "POST", "/admin/locales", map[string]any{"code": "fr"})
+	a.ok("admin", "POST", "/admin/locales", map[string]any{"code": "de"})
+	a.ok("admin", "POST", "/admin/collections", map[string]any{
+		"name": "articles", "kind": "collection",
+		"attributes": map[string]any{
+			"title": map[string]any{"type": "string", "localized": true},
+			"note":  map[string]any{"type": "string", "localized": true},
+		},
+	})
+	a.ok("admin", "POST", "/admin/collections", map[string]any{
+		"name": "menus", "kind": "collection",
+		"attributes": map[string]any{
+			"label":   map[string]any{"type": "string"},
+			"article": map[string]any{"type": "relation", "relation": "oneToOne", "target": "articles"},
+		},
+	})
+	art := a.ok("editor", "POST", "/api/collections/articles", map[string]any{"data": map[string]any{"title": "Hello"}}).(map[string]any)
+	artPath := fmt.Sprintf("/api/collections/articles/%d", int(art["id"].(float64)))
+	a.ok("editor", "PUT", artPath+"?locale=fr", map[string]any{"data": map[string]any{"title": "Bonjour"}})
+	menu := a.ok("editor", "POST", "/api/collections/menus", map[string]any{"data": map[string]any{"label": "Main", "article": art["id"]}}).(map[string]any)
+	menuPath := fmt.Sprintf("/api/collections/menus/%d", int(menu["id"].(float64)))
+
+	t.Run("related entries are read in the same locale", func(t *testing.T) {
+		got := a.ok("viewer", "GET", menuPath+"?locale=fr", nil).(map[string]any)
+		related := got["article"].(map[string]any)
+		assert.Equal(t, "Bonjour", related["title"])
+		assert.Equal(t, "fr", related["locale"])
+		got = a.ok("viewer", "GET", menuPath, nil).(map[string]any)
+		assert.Equal(t, "Hello", field(got["article"], "title"))
+	})
+
+	t.Run("an unchanged translation records nothing", func(t *testing.T) {
+		before := len(a.ok("editor", "GET", artPath+"/revisions", nil).([]any))
+		a.ok("editor", "PUT", artPath+"?locale=de", map[string]any{"data": map[string]any{}})
+		a.ok("editor", "PUT", artPath+"?locale=fr", map[string]any{"data": map[string]any{"title": "Bonjour"}})
+		assert.Len(t, a.ok("editor", "GET", artPath+"/revisions", nil), before)
+	})
+
+	t.Run("restores skip deleted locales", func(t *testing.T) {
+		a.ok("editor", "PUT", artPath+"?locale=de", map[string]any{"data": map[string]any{"title": "Hallo"}})
+		versions := a.ok("editor", "GET", artPath+"/revisions", nil).([]any)
+		withDe := int(field(versions[0], "version").(float64))
+		a.ok("admin", "DELETE", "/admin/locales/de?purge=true", nil)
+		code, out := a.do("editor", "POST", fmt.Sprintf("%s/revisions/%d/restore", artPath, withDe), nil)
+		require.Equal(t, http.StatusOK, code, "%v", out)
+		assert.Equal(t, []any{"en", "fr"}, field(out["data"], "locales"))
+	})
+
+	t.Run("values of attributes no longer localized do not block locales", func(t *testing.T) {
+		a.ok("admin", "POST", "/admin/locales", map[string]any{"code": "it"})
+		a.ok("editor", "PUT", artPath+"?locale=it", map[string]any{"data": map[string]any{"note": "nota"}})
+		a.ok("admin", "PUT", "/admin/collections/articles", map[string]any{
+			"name": "articles", "kind": "collection",
+			"attributes": map[string]any{
+				"title": map[string]any{"type": "string", "localized": true},
+				"note":  map[string]any{"type": "string"},
+			},
+		})
+		got := a.ok("viewer", "GET", artPath, nil).(map[string]any)
+		assert.Equal(t, []any{"en", "fr"}, got["locales"], "the Italian note is not served any more")
+		a.ok("admin", "DELETE", "/admin/locales/it", nil)
+	})
+}

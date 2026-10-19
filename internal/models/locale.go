@@ -77,6 +77,25 @@ func TranslatedLocales(translations JSONMap) []string {
 	return out
 }
 
+// TranslatedLocalesOf lists the locales with a value for at least one of
+// the localized attributes (values kept for attributes that are no longer
+// localized do not count), sorted.
+func TranslatedLocalesOf(attrs []Attribute, translations JSONMap) []string {
+	localized := LocalizedNames(attrs)
+	var out []string
+	for code, v := range translations {
+		m, _ := v.(map[string]any)
+		for k := range m {
+			if localized[k] {
+				out = append(out, code)
+				break
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
 // LocalizeData returns data as seen in locale: localized attributes take
 // their value in that locale; with fallback, a missing value falls back to
 // the default locale's, otherwise it is left out. The default locale (or
@@ -111,7 +130,7 @@ func LocalizedResponse(out map[string]any, attrs []Attribute, translations JSONM
 		locale = defaultLocale
 	}
 	locales := []string{defaultLocale}
-	for _, code := range TranslatedLocales(translations) {
+	for _, code := range TranslatedLocalesOf(attrs, translations) {
 		if code != defaultLocale {
 			locales = append(locales, code)
 		}

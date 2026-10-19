@@ -402,6 +402,31 @@ func FetchNestedRelations(collection models.Collection, data models.JSONMap, lev
 // drafts of draft-and-publish target collections are left out, as are
 // related items that no longer exist.
 func PopulateRelations(collection models.Collection, data models.JSONMap, level uint, publishedOnly bool) (models.JSONMap, error) {
+	return PopulateRelationsIn(collection, data, level, publishedOnly, ReadLocale{})
+}
+
+// ReadLocale is the locale related entries are read in. The zero value
+// reads the default locale.
+type ReadLocale struct {
+	Locale, Default string
+	Fallback        bool
+}
+
+// resolved fills in the default locale when it is not known yet.
+func (l ReadLocale) resolved() ReadLocale {
+	if l.Default == "" {
+		l.Default, _ = DefaultLocale()
+		l.Fallback = true
+	}
+	if l.Locale == "" {
+		l.Locale = l.Default
+	}
+	return l
+}
+
+// PopulateRelationsIn is PopulateRelations with related entries read in a
+// locale (their localized attributes, and their locale fields).
+func PopulateRelationsIn(collection models.Collection, data models.JSONMap, level uint, publishedOnly bool, loc ReadLocale) (models.JSONMap, error) {
 	if level == 0 {
 		if publishedOnly {
 			return hideDraftIDs(collection, data)
@@ -443,7 +468,7 @@ func PopulateRelations(collection models.Collection, data models.JSONMap, level 
 				result[attr.Name] = nil
 				break
 			}
-			nested, err := fetchItemWithRelations(targetCollection, id, level-1, publishedOnly)
+			nested, err := fetchItemWithRelations(targetCollection, id, level-1, publishedOnly, loc)
 			if err != nil {
 				return nil, fmt.Errorf("failed to fetch nested item for '%s': %w", attr.Name, err)
 			}
@@ -455,7 +480,7 @@ func PopulateRelations(collection models.Collection, data models.JSONMap, level 
 		case "manyToMany":
 			nestedItems := []models.JSONMap{}
 			for _, id := range models.ToUintSlice(raw) {
-				nested, err := fetchItemWithRelations(targetCollection, id, level-1, publishedOnly)
+				nested, err := fetchItemWithRelations(targetCollection, id, level-1, publishedOnly, loc)
 				if err != nil {
 					return nil, fmt.Errorf("failed to fetch nested item for '%s': %w", attr.Name, err)
 				}
@@ -471,7 +496,7 @@ func PopulateRelations(collection models.Collection, data models.JSONMap, level 
 
 // fetchItemWithRelations returns the related item in the flat API shape, or
 // nil when it does not exist (or is a hidden draft).
-func fetchItemWithRelations(collection models.Collection, itemID uint, level uint, publishedOnly bool) (models.JSONMap, error) {
+func fetchItemWithRelations(collection models.Collection, itemID uint, level uint, publishedOnly bool, loc ReadLocale) (models.JSONMap, error) {
 	item, err := GetVisibleItem(collection, itemID, publishedOnly)
 	if errors.Is(err, ErrItemNotFound) {
 		return nil, nil
@@ -479,7 +504,13 @@ func fetchItemWithRelations(collection models.Collection, itemID uint, level uin
 	if err != nil {
 		return nil, err
 	}
-	data, err := PopulateRelations(collection, item.Data, level, publishedOnly)
+	data := item.Data
+	localized := models.HasLocalized(collection.Attributes)
+	if localized {
+		loc = loc.resolved()
+		data = models.LocalizeData(collection.Attributes, item.Data, item.Translations, loc.Locale, loc.Default, loc.Fallback)
+	}
+	data, err = PopulateRelationsIn(collection, data, level, publishedOnly, loc)
 	if err != nil {
 		return nil, err
 	}
@@ -487,7 +518,11 @@ func fetchItemWithRelations(collection models.Collection, itemID uint, level uin
 		// A related item is shown as an object, so its files are too.
 		data = PopulateMedia(context.Background(), collection.Attributes, data)
 	}
-	return models.ItemResponse(collection, *item, data), nil
+	out := models.ItemResponse(collection, *item, data)
+	if localized {
+		out = models.LocalizedResponse(out, collection.Attributes, item.Translations, loc.Locale, loc.Default)
+	}
+	return out, nil
 }
 
 // hideDraftIDs removes, from unpopulated relation values, the IDs of drafts

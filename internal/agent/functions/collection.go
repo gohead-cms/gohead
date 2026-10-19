@@ -132,7 +132,21 @@ func upsertCollectionItem(ctx context.Context, args any) (string, error) {
 			if itemID == 0 {
 				return fmt.Sprintf(`{"status": "error", "message": "create items in the default locale (%s), then write translations with item_id and locale"}`, def), nil
 			}
-			if _, err := storage.SetItemTranslation(storage.ActorFrom(ctx), *collection, uint(itemID), locale, data, nil); err != nil {
+			// Merge over the locale's current values, so translating one
+			// attribute keeps the others.
+			merged := map[string]any{}
+			if existing, err := storage.GetItemByID(collection.ID, uint(itemID)); err == nil {
+				localized := models.LocalizedNames(collection.Attributes)
+				for k, v := range models.Translation(existing.Translations, locale) {
+					if localized[k] {
+						merged[k] = v
+					}
+				}
+			}
+			for k, v := range data {
+				merged[k] = v
+			}
+			if _, err := storage.SetItemTranslation(storage.ActorFrom(ctx), *collection, uint(itemID), locale, merged, nil); err != nil {
 				msg, _ := json.Marshal(err.Error())
 				return fmt.Sprintf(`{"status": "error", "message": %s}`, msg), nil
 			}

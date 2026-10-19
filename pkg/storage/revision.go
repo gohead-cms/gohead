@@ -411,6 +411,10 @@ func RestoreItemRevision(actor Actor, ct models.Collection, itemID, version uint
 		if err != nil {
 			return &ItemValidationError{Err: fmt.Errorf("version %d no longer fits the collection: %w", version, err)}
 		}
+		translations, err := validateItemTranslations(tx, ct, item.ID, translations, nested)
+		if err != nil {
+			return &ItemValidationError{Err: fmt.Errorf("version %d no longer fits the collection: %w", version, err)}
+		}
 		if !item.DeletedAt.Valid && len(nested.Items) == 0 && sameData(item.Data, processed) &&
 			sameData(copyTranslations(item.Translations), copyTranslations(translations)) {
 			res.Unchanged = true
@@ -471,6 +475,13 @@ func RestoreSingletonRevision(actor Actor, st *models.Singleton, version uint) (
 		return nil, nil, &ItemValidationError{Err: fmt.Errorf("version %d no longer fits the singleton: %w", version, err)}
 	}
 	translations := restorableTranslations(st.Attributes, rev.Translations)
+	pseudo := models.Singleton{Name: st.Name, Attributes: localizedOnly(st.Attributes)}
+	for code, v := range translations {
+		values, _ := v.(map[string]any)
+		if err := models.ValidateSingleItemValues(pseudo, values); err != nil {
+			return nil, nil, &ItemValidationError{Err: fmt.Errorf("version %d no longer fits the singleton: locale '%s': %w", version, code, err)}
+		}
+	}
 	res := &RestoreResult{Dropped: dropped}
 	var item models.SingleItem
 	txErr := database.DB.Transaction(func(tx *gorm.DB) error {

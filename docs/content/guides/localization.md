@@ -53,9 +53,9 @@ Add `"localized": true` to an attribute. Any type can be localized except relati
 ```
 
 - **Required** applies to the default locale. A translation can leave a value out, and readers then get the default locale's value.
-- **Unique** applies within each locale: two articles can't share a French slug, but the French and English slugs of one article can be the same.
+- **Unique** applies within each locale: two articles can't share a French slug, but the French and English slugs of one article can be the same. Only stored translations are compared. An article with no French slug falls back to its English one when read in French, and that fallback isn't checked against other articles' French slugs.
 - In a type with localized attributes, `locale` and `locales` are reserved attribute names.
-- Turning `localized` off on an attribute stops serving its translations. The values stay stored, and turning `localized` back on brings them back.
+- Turning `localized` off on an attribute stops serving its translations, and they no longer count as content in that locale. The values stay stored, and turning `localized` back on brings them back.
 
 ## Reading in a locale
 
@@ -84,7 +84,7 @@ curl "$GOHEAD/api/collections/articles/42?locale=fr" -H "$AUTH"
 - **Default:** without `?locale=`, you get the default locale.
 - **Unknown locales** return `400`.
 - **Filters and sorts** use the requested locale: `?locale=fr&filters[slug]=bonjour-le-monde` finds the article by its French slug, and `sort=title` sorts by French title. With fallback, untranslated entries are matched and sorted on their default value.
-- **Relations** are populated in the same locale.
+- **Relations** are populated in the same locale (REST `level`, GraphQL selections).
 
 ## Writing translations
 
@@ -126,7 +126,7 @@ mutation {
 - **History:** every revision keeps the translations. Diffs name translated values `<attribute>@<locale>`, for example `title@fr`, and restoring a version restores its translations too. See [content history](content-history.md).
 - **Webhooks:** webhook payloads add a `translations` object (`{"fr": {"title": "…"}}`) next to `data`. `password` attributes are left out, as in `data`.
 - **Agents:**
-    - `collections.upsert_item` takes a `locale`: with `item_id`, it writes that locale's translation. That makes it easy to build a translation agent, for example one triggered on `item:created` that translates new articles into every locale.
+    - `collections.upsert_item` takes a `locale`: with `item_id`, it writes that locale's translation. The values given are merged over that locale's existing values, and `null` removes one. That makes it easy to build a translation agent, for example one triggered on `item:created` that translates new articles into every locale.
     - `collections.list_locales` lists the locales.
     - `collections.list_items` returns each item's `translations`.
 
@@ -184,3 +184,6 @@ Each translation an agent writes is a revision tied to the agent's run, so it ca
 - **Fields only:** entries are translated attribute by attribute. A locale can't have its own entries, or entries missing from other locales. To publish something in one language only, use a shared attribute, for example a `languages` enum, and filter on it.
 - **No per-locale publishing:** publishing applies to the entry in every locale.
 - **Components:** attributes inside components can't be localized one by one. Localize the component attribute instead.
+- **GraphQL `locale` argument:** only collections with localized attributes take it. A query starting from a collection without localized attributes reads its related entries in the default locale.
+- **Deleting a locale with `purge=true`** removes its translations without recording revisions or sending webhooks. Older revisions keep them, but restoring one doesn't bring back a locale that no longer exists.
+- **Locale changes on other replicas:** an API replica sees locales added, changed or removed elsewhere within 5 seconds.

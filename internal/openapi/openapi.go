@@ -43,7 +43,8 @@ func assignCollectionNames(collections []models.Collection) map[string]string {
 	for _, ct := range collections {
 		n := schemaName(ct.Name)
 		clash := reservedSchemas[n] || strings.HasPrefix(n, "Component_") || strings.HasPrefix(n, "Singleton_") ||
-			strings.HasPrefix(n, "Collection_") || (strings.HasSuffix(n, "Input") && plain[strings.TrimSuffix(n, "Input")])
+			strings.HasPrefix(n, "Collection_") || (strings.HasSuffix(n, "Input") && plain[strings.TrimSuffix(n, "Input")]) ||
+			(strings.HasSuffix(n, "Translation") && plain[strings.TrimSuffix(n, "Translation")])
 		if clash {
 			n = "Collection_" + n
 		}
@@ -108,6 +109,9 @@ func Build(version string) (obj, error) {
 		name := collectionSchema(ct.Name)
 		schemas[name] = itemSchema(ct)
 		schemas[name+"Input"] = inputSchema(ct.Attributes)
+		if models.HasLocalized(ct.Attributes) {
+			schemas[name+"Translation"] = translationSchema(ct.Attributes)
+		}
 		tags = append(tags, obj{"name": ct.Name, "description": firstNonEmpty(ct.Description, "Items of the "+ct.Name+" collection")})
 		for p, v := range collectionPaths(ct, name) {
 			paths[p] = v
@@ -127,6 +131,9 @@ func Build(version string) (obj, error) {
 		}
 		schemas[name] = obj{"type": "object", "properties": props, "required": required}
 		schemas[name+"Input"] = inputSchema(st.Attributes)
+		if models.HasLocalized(st.Attributes) {
+			schemas[name+"Translation"] = translationSchema(st.Attributes)
+		}
 		tags = append(tags, obj{"name": "singleton:" + st.Name, "description": firstNonEmpty(st.Description, "The "+st.Name+" singleton")})
 		paths["/api/singleton/"+st.Name] = singletonPath(st.Name, name, models.HasLocalized(st.Attributes))
 		for p, v := range singletonHistoryPaths(st.Name, name) {
@@ -290,6 +297,24 @@ func itemSchema(ct models.Collection) obj {
 		s["description"] = ct.Description
 	}
 	return s
+}
+
+// translationSchema is the "data" of a write in another locale than the
+// default: localized attributes only, none required, null removes a value.
+func translationSchema(attrs []models.Attribute) obj {
+	var localized []models.Attribute
+	for _, a := range attrs {
+		if a.Localized {
+			a.Required = false
+			localized = append(localized, a)
+		}
+	}
+	props, _ := properties(localized, true)
+	for k, v := range props {
+		props[k] = nullable(v.(obj))
+	}
+	return obj{"type": "object", "properties": props, "additionalProperties": false,
+		"description": "Values in the locale given by ?locale= (localized attributes only; null removes a value, {} the translation)"}
 }
 
 // inputSchema is the "data" of a write request.

@@ -43,7 +43,7 @@ var catalog = map[string]Info{
 			"collection_name": str("Collection name"),
 			"data":            map[string]any{"type": "object", "description": "The item's attributes"},
 			"item_id":         str("ID of the item to replace (omit to create)"),
-			"locale":          str("With item_id: write the item's localized attributes in this locale (a translation) instead of its main content"),
+			"locale":          str("With item_id: write the item's localized attributes in this locale (a translation) instead of its main content; values not given keep their current translation, null removes one"),
 		}, "collection_name", "data")},
 	"collections.list_locales": {Description: "List the content locales (the default first)", Parameters: object(map[string]any{})},
 	"collections.delete_item": {Description: "Delete an item by ID",

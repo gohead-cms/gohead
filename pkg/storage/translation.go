@@ -80,7 +80,15 @@ func withTranslation(translations models.JSONMap, locale string, values map[stri
 	if len(values) > 0 {
 		out[locale] = values
 	}
+	if len(out) == 0 {
+		return nil
+	}
 	return out
+}
+
+// sameTranslations compares translations, ignoring empty locales.
+func sameTranslations(a, b models.JSONMap) bool {
+	return sameData(copyTranslations(a), copyTranslations(b))
 }
 
 // SetItemTranslation replaces an item's values in a locale other than the
@@ -104,6 +112,7 @@ func SetItemTranslation(actor Actor, ct models.Collection, itemID uint, locale s
 
 	var item models.Item
 	var transition events.EventType
+	changed := false
 	nested := &models.NestedCreated{}
 	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
 		if err := lockRow(tx).Where("id = ? AND collection_id = ?", itemID, ct.ID).First(&item).Error; err != nil {
@@ -140,11 +149,12 @@ func SetItemTranslation(actor Actor, ct models.Collection, itemID uint, locale s
 		if err := reloadItem(tx, &item); err != nil {
 			return err
 		}
-		if sameData(before.translations, item.Translations) && transition == "" {
+		if sameTranslations(before.translations, item.Translations) && transition == "" {
 			return nil
 		}
+		changed = true
 		action := models.RevisionUpdate
-		if sameData(before.translations, item.Translations) {
+		if sameTranslations(before.translations, item.Translations) {
 			action = models.RevisionUnpublish
 			if transition == events.EventTypeItemPublished {
 				action = models.RevisionPublish
@@ -160,7 +170,9 @@ func SetItemTranslation(actor Actor, ct models.Collection, itemID uint, locale s
 		return nil, txErr
 	}
 	publishNested(nested)
-	publishEvent(database.DB, events.EventTypeItemUpdated, &item)
+	if changed {
+		publishEvent(database.DB, events.EventTypeItemUpdated, &item)
+	}
 	if transition != "" {
 		publishEvent(database.DB, transition, &item)
 	}
@@ -197,7 +209,7 @@ func SetSingletonTranslation(actor Actor, st *models.Singleton, locale string, d
 		}
 		before := &entryState{data: item.Data, translations: item.Translations}
 		translations := withTranslation(item.Translations, locale, values)
-		if sameData(item.Translations, translations) {
+		if sameTranslations(item.Translations, translations) {
 			return nil
 		}
 		if err := tx.Model(&item).Updates(map[string]any{"translations": translations}).Error; err != nil {
@@ -216,14 +228,15 @@ func SetSingletonTranslation(actor Actor, st *models.Singleton, locale string, d
 	return &item, nil
 }
 
-// restorableTranslations keeps the localized attributes of a revision's
-// translations.
+// restorableTranslations keeps, from a revision's translations, the
+// configured locales (not the default) and the attributes still localized.
 func restorableTranslations(attrs []models.Attribute, translations models.JSONMap) models.JSONMap {
 	localized := models.LocalizedNames(attrs)
+	def, _ := DefaultLocale()
 	out := models.JSONMap{}
 	for code, v := range translations {
 		m, ok := v.(map[string]any)
-		if !ok {
+		if !ok || code == def || !LocaleExists(code) {
 			continue
 		}
 		kept := map[string]any{}
@@ -254,4 +267,33 @@ func FlattenEntry(data, translations models.JSONMap) models.JSONMap {
 		}
 	}
 	return out
+}
+
+// validateItemTranslations validates every locale of translations like a
+// translation write (types, components, media, unique values per locale)
+// and returns the processed values.
+func validateItemTranslations(tx *gorm.DB, ct models.Collection, itemID uint, translations models.JSONMap, nested *models.NestedCreated) (models.JSONMap, error) {
+	if len(translations) == 0 {
+		return nil, nil
+	}
+	pseudo := models.Collection{ID: ct.ID, Name: ct.Name, Attributes: localizedOnly(ct.Attributes)}
+	out := models.JSONMap{}
+	for code, v := range translations {
+		values, _ := v.(map[string]any)
+		processed, err := models.ValidateItemUpdate(pseudo, values, models.WithNestedCollector(tx, nested), itemID)
+		if err != nil {
+			return nil, fmt.Errorf("locale '%s': %w", code, err)
+		}
+		for _, a := range ct.Attributes {
+			if val, ok := processed[a.Name]; ok && a.Localized && a.Unique {
+				if err := validation.CheckLocalizedUniqueness(tx, ct.ID, code, a.Name, val, itemID); err != nil {
+					return nil, err
+				}
+			}
+		}
+		if len(processed) > 0 {
+			out[code] = map[string]any(processed)
+		}
+	}
+	return out, nil
 }

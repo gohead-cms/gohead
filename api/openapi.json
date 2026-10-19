@@ -412,6 +412,23 @@
         },
         "type": "object"
       },
+      "Singleton_navigationTranslation": {
+        "additionalProperties": false,
+        "description": "Values in the locale given by ?locale= (localized attributes only; null removes a value, {} the translation)",
+        "properties": {
+          "label": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
       "Singleton_site": {
         "properties": {
           "createdAt": {
@@ -841,6 +858,33 @@
         "required": [
           "title"
         ],
+        "type": "object"
+      },
+      "pagesTranslation": {
+        "additionalProperties": false,
+        "description": "Values in the locale given by ?locale= (localized attributes only; null removes a value, {} the translation)",
+        "properties": {
+          "slug": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
         "type": "object"
       }
     },
@@ -2249,7 +2293,7 @@
         "operationId": "list_pages",
         "parameters": [
           {
-            "description": "Missing localized values fall back to the default locale (default true); false leaves them out.",
+            "description": "Missing localized values fall back to the default locale (default true); false leaves them out, even required ones.",
             "in": "query",
             "name": "fallback",
             "schema": {
@@ -2505,7 +2549,7 @@
         "operationId": "get_pages",
         "parameters": [
           {
-            "description": "Missing localized values fall back to the default locale (default true); false leaves them out.",
+            "description": "Missing localized values fall back to the default locale (default true); false leaves them out, even required ones.",
             "in": "query",
             "name": "fallback",
             "schema": {
@@ -2612,7 +2656,14 @@
               "schema": {
                 "properties": {
                   "data": {
-                    "$ref": "#/components/schemas/pagesInput"
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/pagesInput"
+                      },
+                      {
+                        "$ref": "#/components/schemas/pagesTranslation"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -3668,7 +3719,7 @@
         "operationId": "get_Singleton_navigation",
         "parameters": [
           {
-            "description": "Missing localized values fall back to the default locale (default true); false leaves them out.",
+            "description": "Missing localized values fall back to the default locale (default true); false leaves them out, even required ones.",
             "in": "query",
             "name": "fallback",
             "schema": {
@@ -3759,7 +3810,14 @@
               "schema": {
                 "properties": {
                   "data": {
-                    "$ref": "#/components/schemas/Singleton_navigationInput"
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/Singleton_navigationInput"
+                      },
+                      {
+                        "$ref": "#/components/schemas/Singleton_navigationTranslation"
+                      }
+                    ]
                   }
                 },
                 "required": [

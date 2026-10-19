@@ -44,7 +44,7 @@ var (
 func localeParams() []any {
 	return []any{
 		obj{"name": "locale", "in": "query", "description": "Locale of localized attributes (GET /api/locales); default: the default locale.", "schema": obj{"type": "string"}},
-		obj{"name": "fallback", "in": "query", "description": "Missing localized values fall back to the default locale (default true); false leaves them out.", "schema": obj{"type": "boolean", "default": true}},
+		obj{"name": "fallback", "in": "query", "description": "Missing localized values fall back to the default locale (default true); false leaves them out, even required ones.", "schema": obj{"type": "boolean", "default": true}},
 	}
 }
 
@@ -70,8 +70,14 @@ func collectionPaths(ct models.Collection, name string) obj {
 	tag := []string{ct.Name}
 	item, input := ref(name), ref(name+"Input")
 	writeBody := obj{"type": "object", "properties": obj{"data": input}, "required": []string{"data"}}
+	putBody := writeBody
+	if models.HasLocalized(ct.Attributes) {
+		// With ?locale= another locale: a translation.
+		putBody = obj{"type": "object", "properties": obj{"data": obj{"anyOf": []any{input, ref(name + "Translation")}}}, "required": []string{"data"}}
+	}
 	if ct.DraftAndPublish {
 		writeBody["properties"].(obj)["status"] = obj{"type": "string", "enum": []string{models.StatusDraft, models.StatusPublished}}
+		putBody["properties"].(obj)["status"] = obj{"type": "string", "enum": []string{models.StatusDraft, models.StatusPublished}}
 	}
 
 	listParams := []any{
@@ -118,7 +124,7 @@ func collectionPaths(ct models.Collection, name string) obj {
 			"put": obj{
 				"tags": tag, "operationId": "update_" + name, "summary": "Replace an item's data",
 				"parameters":  writeParams,
-				"requestBody": obj{"required": true, "content": jsonContent(writeBody)},
+				"requestBody": obj{"required": true, "content": jsonContent(putBody)},
 				"responses":   merge(obj{"200": ok("Updated", dataEnvelope(item, nil))}, errorResponses("400", "401", "403", "404")),
 			},
 			"delete": obj{
@@ -181,9 +187,11 @@ func historyPaths(base string, tag []string, name string, params []any, restored
 func singletonPath(stName, name string, localized bool) obj {
 	tag := []string{"singleton:" + stName}
 	readParams, writeParams := []any{paramLevel}, []any{paramLevel}
+	singletonData := ref(name + "Input")
 	if localized {
 		readParams = append(readParams, localeParams()...)
 		writeParams = append(writeParams, writeLocaleParam)
+		singletonData = obj{"anyOf": []any{ref(name + "Input"), ref(name + "Translation")}}
 	}
 	return obj{
 		"get": obj{
@@ -194,7 +202,7 @@ func singletonPath(stName, name string, localized bool) obj {
 		"put": obj{
 			"tags": tag, "operationId": "put_" + name, "summary": "Create or replace the " + stName + " singleton",
 			"parameters":  writeParams,
-			"requestBody": obj{"required": true, "content": jsonContent(obj{"type": "object", "properties": obj{"data": ref(name + "Input")}, "required": []string{"data"}})},
+			"requestBody": obj{"required": true, "content": jsonContent(obj{"type": "object", "properties": obj{"data": singletonData}, "required": []string{"data"}})},
 			"responses":   merge(obj{"200": ok("Saved", dataEnvelope(ref(name), nil)), "201": ok("Created", dataEnvelope(ref(name), nil))}, errorResponses("400", "401", "403", "404")),
 		},
 	}
