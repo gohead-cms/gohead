@@ -333,8 +333,9 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *medi
 	{
 		authRoutes.POST("/register", handlers.Register)
 		authRoutes.POST("/login", handlers.Login)
-		authRoutes.GET("/me", middleware.AuthMiddleware(), handlers.Me)
 	}
+	// Not rate limited with login: the admin UI calls it on every page load.
+	router.GET("/auth/me", middleware.AuthMiddleware(), handlers.Me)
 
 	// Agent Webhook Trigger (Public, authenticates with a token)
 	router.POST("/agents/webhook/:id", handlers.HandleWebhook)

@@ -12,7 +12,7 @@ export function useWorkspaceData() {
   return useApiQuery<WorkspaceData>("workspace", async () => {
     const [collections, agents] = await Promise.all([
       getJSON<ApiCollection[]>("/admin/collections", "Failed to load collections"),
-      getJSON<AgentNodeData[]>("/admin/agents", "Failed to load agents"),
+      getJSON<AgentNodeData[]>("/admin/agents?pageSize=100", "Failed to load agents"),
     ]);
     return { collections: collections.data ?? [], agents: agents.data ?? [] };
   });

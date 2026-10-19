@@ -73,7 +73,7 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
   const notify = useNotify();
   const { canWrite } = useMe();
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const { content, loading, error, refetch } = useCollectionContent(collectionName);
+  const { content, loading, error, refetch, hasMore, loadMore } = useCollectionContent(collectionName);
   const [editingItem, setEditingItem] = useState<ContentItem | null>(null);
   // Bumped on every open, so the form starts from the entry it opens for.
   const [formKey, setFormKey] = useState(0);
@@ -121,7 +121,7 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
       <Flex justify="space-between" align="center" mb={6} gap={4} wrap="wrap">
         <Box>
           <Heading size="lg">{schema.info?.displayName || schema.collectionName}</Heading>
-          <Text color="gray.500">{loading && content.items.length === 0 ? "Loading entries…" : `${content.items.length} entries found`}</Text>
+          <Text color="gray.500">{loading && content.items.length === 0 ? "Loading entries…" : `${content.total} ${content.total === 1 ? "entry" : "entries"}, newest first`}</Text>
         </Box>
         {canWrite && (
         <HStack>
@@ -152,6 +152,13 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
           onTogglePublish={handleTogglePublish}
           onDelete={handleDelete}
         />
+      )}
+      {!error && hasMore && (
+        <Flex justify="center" mt={4}>
+          <Button size="sm" variant="outline" bg="white" onClick={loadMore} isLoading={loading}>
+            Load more ({content.total - content.items.length} older)
+          </Button>
+        </Flex>
       )}
       <EntryFormModal key={`${collectionName}-${formKey}`} isOpen={isOpen} onClose={onClose} schema={schema} itemToEdit={editingItem} onSubmit={handleSaveItem} />
     </>

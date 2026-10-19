@@ -42,7 +42,7 @@ export interface UsageSummary {
  */
 export function useUsageSummary() {
   const { data, loading, error, refetch } = useApiQuery("activity-usage", async (): Promise<UsageSummary> => {
-    const json = await getJSON<AgentNodeData[]>("/admin/agents", "Failed to load agents");
+    const json = await getJSON<AgentNodeData[]>("/admin/agents?pageSize=100", "Failed to load agents");
     const agents = Array.isArray(json.data) ? json.data : [];
     const shown = agents.slice(0, USAGE_AGENT_LIMIT);
     const results = await Promise.allSettled(

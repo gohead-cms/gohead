@@ -46,20 +46,18 @@ export async function loadSummaries(kind: ModelKind): Promise<TypeSummary[]> {
 
 export interface LoadedType {
   form: TypeForm;
-  /** The API left out settings it stores (collections: description, enum options, min/max, pattern, unique). */
-  incomplete: boolean;
 }
 
 /** Loads one type into form state, or null when it does not exist. */
 export async function loadType(kind: ModelKind, name: string): Promise<LoadedType | null> {
   if (kind === "collections") {
     const res = await getJSON<ApiCollection>(`/admin/collections/${encodeURIComponent(name)}`, "Failed to load the collection");
-    return { form: formFromCollection(res.data), incomplete: res.data.schema.description === undefined };
+    return { form: formFromCollection(res.data) };
   }
   // The list carries the description, which GET /admin/singleton/{name} leaves out.
   const res = await getJSON<ApiNamedType[]>(listPath(kind), `Failed to load ${kind}`);
   const found = (res.data ?? []).find((t) => t.name === name);
-  return found ? { form: formFromNamedType(found), incomplete: false } : null;
+  return found ? { form: formFromNamedType(found) } : null;
 }
 
 /**

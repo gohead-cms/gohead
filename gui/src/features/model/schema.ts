@@ -130,8 +130,8 @@ export function typeLabel(type: string): string {
   return ATTRIBUTE_TYPES.find((t) => t.value === type)?.label ?? type;
 }
 
-const PATTERN_TYPES = ["string", "text", "richtext", "email"];
-const NO_UNIQUE_TYPES = ["relation", "component", "media", "json", "bool"];
+const PATTERN_TYPES = ["string", "text", "richtext", "email", "password"];
+const NO_UNIQUE_TYPES = ["relation", "component"];
 
 export const supportsPattern = (a: AttributeForm) => PATTERN_TYPES.includes(a.type);
 export const supportsUnique = (a: AttributeForm) => !NO_UNIQUE_TYPES.includes(a.type);

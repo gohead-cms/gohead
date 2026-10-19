@@ -31,6 +31,9 @@ func GetAgents(c *gin.Context) {
 	if pageSize < 1 {
 		pageSize = 10
 	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
 
 	var filters map[string]any
 	var rangeValues []int
@@ -123,7 +126,8 @@ func CreateAgent(c *gin.Context) {
 		return
 	}
 
-	logger.Log.WithField("input", input).Info("CreateAgent")
+	// Not the whole input: the LLM config may carry an API key.
+	logger.Log.WithField("name", input["name"]).Info("CreateAgent")
 
 	agent, err := agents.ParseAgentInput(input)
 	if err != nil {

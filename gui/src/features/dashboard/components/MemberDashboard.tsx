@@ -38,16 +38,18 @@ export function MemberDashboard({ me, canWrite }: { me: Me | null; canWrite: boo
         <Text fontSize="sm" color="gray.500">
           {canWrite
             ? "You can create, edit and publish content and upload media. The content model, agents and settings are managed by admins."
-            : "You can browse published content and media. Ask an admin if you need to edit content."}
+            : "You can browse published content. Ask an admin if you need to edit content or manage media."}
         </Text>
       </Box>
       <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
         <Shortcut to="/contrib" icon={FiEdit3} title="Content editor">
           {canWrite ? "Write and update entries." : "Browse entries."}
         </Shortcut>
-        <Shortcut to="/media" icon={FiImage} title="Media library">
-          {canWrite ? "Upload and manage images and files." : "Browse images and files."}
-        </Shortcut>
+        {canWrite && (
+          <Shortcut to="/media" icon={FiImage} title="Media library">
+            Upload and manage images and files.
+          </Shortcut>
+        )}
       </SimpleGrid>
     </Page>
   );

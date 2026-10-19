@@ -23,6 +23,23 @@ func GetSingleItem(c *gin.Context) {
 	if !ok {
 		return
 	}
+	// status=all: related drafts too (editors and admins), so a form can
+	// send the content back without losing links to drafts.
+	publishedOnly := true
+	switch c.Query("status") {
+	case "", models.StatusPublished:
+	case "all":
+		if !hasPermission(c.GetString("role"), "update") {
+			c.Set("response", "Access denied")
+			c.Set("details", "status=all needs the editor or admin role")
+			c.Set("status", http.StatusForbidden)
+			return
+		}
+		publishedOnly = false
+	default:
+		validationError(c, "status must be published or all")
+		return
+	}
 	name := c.Param("name")
 	st, err := storage.GetSingletonByName(name)
 	if err != nil {
@@ -36,7 +53,7 @@ func GetSingleItem(c *gin.Context) {
 		c.Set("status", http.StatusNotFound)
 		return
 	}
-	out, err := singleItemResponse(st, item, level)
+	out, err := singleItemResponseFor(st, item, level, publishedOnly)
 	if err != nil {
 		c.Set("response", "Failed to populate relations")
 		c.Set("status", http.StatusInternalServerError)
@@ -46,14 +63,20 @@ func GetSingleItem(c *gin.Context) {
 	c.Set("status", http.StatusOK)
 }
 
-// singleItemResponse populates relations (published related items only)
-// and builds the flat response.
-func singleItemResponse(st *models.Singleton, item *models.SingleItem, level uint) (map[string]any, error) {
-	data, err := storage.PopulateRelations(models.Collection{Attributes: st.Attributes}, item.Data, level, true)
+// singleItemResponseFor is singleItemResponse with the draft filter chosen
+// by the caller.
+func singleItemResponseFor(st *models.Singleton, item *models.SingleItem, level uint, publishedOnly bool) (map[string]any, error) {
+	data, err := storage.PopulateRelations(models.Collection{Attributes: st.Attributes}, item.Data, level, publishedOnly)
 	if err != nil {
 		return nil, err
 	}
 	return models.SingleItemResponse(*item, data), nil
+}
+
+// singleItemResponse populates relations (published related items only)
+// and builds the flat response.
+func singleItemResponse(st *models.Singleton, item *models.SingleItem, level uint) (map[string]any, error) {
+	return singleItemResponseFor(st, item, level, true)
 }
 
 // GetSingleton retrieves a single type by its name.

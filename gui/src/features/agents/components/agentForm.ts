@@ -221,10 +221,8 @@ export function validateDraft(d: AgentDraft, takenNames: string[]): DraftErrors 
   }
 
   const names = new Map<string, number>();
-  const impls = new Map<string, number>();
   for (const f of d.functions) {
     names.set(f.name.trim(), (names.get(f.name.trim()) ?? 0) + 1);
-    if (f.impl_key) impls.set(f.impl_key, (impls.get(f.impl_key) ?? 0) + 1);
   }
   for (const f of d.functions) {
     const p = `fn.${f.uid}`;
@@ -233,7 +231,6 @@ export function validateDraft(d: AgentDraft, takenNames: string[]): DraftErrors 
     else if (!/^[a-zA-Z0-9_-]{1,64}$/.test(n)) e[`${p}.name`] = "Letters, digits, _ or - (max 64), as LLM providers require.";
     else if ((names.get(n) ?? 0) > 1) e[`${p}.name`] = "Two functions have this name.";
     if (!f.impl_key) e[`${p}.impl_key`] = "Choose an implementation.";
-    else if ((impls.get(f.impl_key) ?? 0) > 1) e[`${p}.impl_key`] = "The server accepts each implementation once per agent.";
     const parsed = parseParameters(f.parameters);
     if (parsed.error) e[`${p}.parameters`] = parsed.error;
   }

@@ -155,11 +155,8 @@ func displayTitle(data models.JSONMap) string {
 			return truncateText(s, 80)
 		}
 	}
-	for _, v := range data {
-		if s, ok := v.(string); ok && s != "" && len(s) <= 120 {
-			return truncateText(s, 80)
-		}
-	}
+	// No fallback to other fields: they may hold anything, passwords
+	// included. The UI shows "#<id>" instead.
 	return ""
 }
 

@@ -47,13 +47,12 @@ export interface TypeEditorFormProps {
   /** Names of other types of this kind. */
   takenNames: string[];
   /** The API did not return every attribute setting (see the warning). */
-  incompleteSchema: boolean;
 }
 
 const FORM_ID = "type-editor-form";
 
 /** Name, settings and attributes of a collection, component or singleton. */
-export function TypeEditorForm({ kind, existingName, initial, collections, components, takenNames, incompleteSchema }: TypeEditorFormProps) {
+export function TypeEditorForm({ kind, existingName, initial, collections, components, takenNames }: TypeEditorFormProps) {
   const navigate = useNavigate();
   const notify = useNotify();
   const [form, setForm] = useState<TypeForm>(initial);
@@ -117,15 +116,6 @@ export function TypeEditorForm({ kind, existingName, initial, collections, compo
           <Alert status="warning" borderRadius="md">
             <AlertIcon />
             <AlertDescription>{errors.general ?? "Fix the highlighted fields before saving."}</AlertDescription>
-          </Alert>
-        )}
-        {incompleteSchema && (
-          <Alert status="info" borderRadius="md">
-            <AlertIcon />
-            <AlertDescription>
-              The API does not return the description, enum options, min/max, pattern or unique settings of collection
-              attributes. Re-enter any you need before saving, or they will be cleared.
-            </AlertDescription>
           </Alert>
         )}
 

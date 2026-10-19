@@ -28,7 +28,7 @@ export const singletonPath = (name: string) => `/api/singleton/${encodeURICompon
  * the form sends them back unchanged. Null when it has no content yet (404).
  */
 export function useSingletonContent(name: string | null) {
-  const path = name ? `${singletonPath(name)}?level=0` : null;
+  const path = name ? `${singletonPath(name)}?level=0&status=all` : null;
   const { data, loading, error, refetch } = useApiQuery(path, async (): Promise<SingletonContent | null> => {
     try {
       const json = await getJSON<SingletonContent>(path!, "Failed to load the content");

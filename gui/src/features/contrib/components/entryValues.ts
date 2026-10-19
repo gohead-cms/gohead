@@ -16,6 +16,22 @@ export function inputType(type: string): string {
   return "text";
 }
 
+/** A relation value as the API stores it: an ID or a list of IDs. */
+function relationIDs(value: unknown): unknown {
+  const id = (v: unknown) => (v !== null && typeof v === "object" && "id" in v ? (v as { id: unknown }).id : v);
+  if (value === null || value === undefined) return undefined;
+  if (Array.isArray(value)) return value.map(id).filter((v) => v !== null && v !== undefined);
+  return id(value);
+}
+
+/** An ISO time as a datetime-local input value (local time, minutes). */
+function toLocalInput(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 /** The blank value a new entry's field starts with. */
 export function blankValue(attr: Attribute): unknown {
   if (isBooleanType(attr.type)) return false;
@@ -36,7 +52,23 @@ export function attributeMap(attributes: Attribute[] | Record<string, Attribute>
  */
 export function initialValues(attributes: Record<string, Attribute>, entry?: Record<string, unknown> | null): Record<string, unknown> {
   if (entry) {
-    return Object.fromEntries(Object.entries(entry).filter(([key]) => !SYSTEM_FIELDS.has(key) || key in attributes));
+    const values: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(entry)) {
+      if (SYSTEM_FIELDS.has(key) && !(key in attributes)) continue;
+      const attr = attributes[key];
+      if (attr?.type === "relation") {
+        // Lists populate relations as objects; the API takes their IDs back.
+        const ids = relationIDs(value);
+        if (ids !== undefined) values[key] = ids;
+        continue;
+      }
+      if (attr?.type === "datetime" && typeof value === "string") {
+        values[key] = toLocalInput(value);
+        continue;
+      }
+      values[key] = value;
+    }
+    return values;
   }
   const values: Record<string, unknown> = {};
   for (const [key, attr] of Object.entries(attributes)) {
@@ -59,7 +91,13 @@ export function toItemData(attributes: Record<string, Attribute>, values: Record
   const data: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(values)) {
     const attr = attributes[key];
-    if (value === "" || value === undefined) continue;
+    // Empty means unset: the entry's data is replaced, so the field goes.
+    if (value === "" || value === undefined || value === null) continue;
+    if (attr?.type === "datetime" && typeof value === "string") {
+      const d = new Date(value);
+      data[key] = Number.isNaN(d.getTime()) ? value : d.toISOString();
+      continue;
+    }
     if (attr && isNumberType(attr.type) && typeof value === "string") {
       const n = Number(value);
       data[key] = Number.isNaN(n) ? value : n;

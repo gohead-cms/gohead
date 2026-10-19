@@ -76,7 +76,6 @@ export function TypeEditorPage() {
         kind={kind}
         existingName={name}
         initial={existing.data?.form ?? emptyForm()}
-        incompleteSchema={!!existing.data?.incomplete}
         collections={collectionNames}
         components={componentNames}
         takenNames={sameKind.filter((n) => n !== name)}

@@ -40,6 +40,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Deleting an agent deletes its run history and conversation.
 
 ### Fixed
+- `GET /api/singleton/{name}?status=all` lets editors and admins see links to draft entries, so saving a singleton from the admin UI no longer drops them.
+- `GET /admin/agents` caps `pageSize` at 100.
+- `/auth/me` is no longer rate limited together with login.
+- `POST /admin/agents` no longer logs the whole request, which could include an LLM API key.
+- The dashboard's recent entries only use a title, name, label or slug as the entry title, never other fields.
 - Editing a collection through the API's own schema dropped `unique`, enum `options`, `min`/`max`, `pattern` and the description (they were not returned, and an update replaces the definition); relation targets returned as `api::x.x` are accepted back.
 - Admins can no longer demote or delete their own account or the last admin.
 - Two agent functions may use the same implementation with different scopes, as documented; renaming an agent to a taken name returns `409` instead of `500`; agent list filters only accept known fields.
