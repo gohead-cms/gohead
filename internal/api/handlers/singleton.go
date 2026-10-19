@@ -72,8 +72,9 @@ func GetSingleton(c *gin.Context) {
 
 	// Prepare response
 	response := map[string]any{
-		"name":       st.Name,
-		"attributes": st.Attributes,
+		"name":        st.Name,
+		"description": st.Description,
+		"attributes":  st.Attributes,
 	}
 
 	logger.Log.WithField("name", name).Info("GetSingleton: single type retrieved successfully")
@@ -111,7 +112,7 @@ func CreateOrUpdateSingleton(c *gin.Context) {
 	// Validate the single type
 	if err := models.ValidateSingletonSchema(Singleton); err != nil {
 		logger.Log.WithError(err).Warn("CreateOrUpdateSingleton: validation failed")
-		c.Set("response", gin.H{"message": "Validation schema for failed", "single_type": input})
+		c.Set("response", "Single type validation failed")
 		c.Set("details", err.Error())
 		c.Set("status", http.StatusBadRequest)
 		return
@@ -120,7 +121,7 @@ func CreateOrUpdateSingleton(c *gin.Context) {
 	// Save or update the Singleton in the database
 	if err := storage.SaveOrUpdateSingleton(&Singleton); err != nil {
 		logger.Log.WithError(err).Error("CreateOrUpdateSingleton: Failed to save single type")
-		c.Set("response", gin.H{"message": "Failed to save single type", "single_type": input})
+		c.Set("response", "Failed to save single type")
 		c.Set("details", err.Error())
 		c.Set("status", http.StatusInternalServerError)
 		return
@@ -139,7 +140,8 @@ func DeleteSingleton(c *gin.Context) {
 	st, err := storage.GetSingletonByName(name)
 	if err != nil {
 		logger.Log.WithError(err).Warn("DeleteSingleton: single type not found")
-		c.Set("response", gin.H{"message": "Single type not found", "details": err})
+		c.Set("response", "Single type not found")
+		c.Set("details", err.Error())
 		c.Set("status", http.StatusNotFound)
 		return
 	}
@@ -147,7 +149,8 @@ func DeleteSingleton(c *gin.Context) {
 	// Call the storage function to delete the single type
 	if err := storage.DeleteSingleton(st.ID); err != nil {
 		logger.Log.WithError(err).Error("DeleteSingleton: Failed to delete single type")
-		c.Set("response", gin.H{"message": "Failed to delete single type", "details": err})
+		c.Set("response", "Failed to delete single type")
+		c.Set("details", err.Error())
 		c.Set("status", http.StatusInternalServerError)
 		return
 	}

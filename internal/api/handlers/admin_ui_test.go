@@ -95,3 +95,46 @@ func TestAdminUIEndpoints(t *testing.T) {
 		assert.Contains(t, one, "schema")
 	}
 }
+
+// A schema read from the API and sent back unchanged keeps every setting
+// (the admin UI edits collections this way: PUT replaces the definition).
+func TestCollectionSchemaRoundTrip(t *testing.T) {
+	a := newContentAPI(t)
+	a.router.GET("/admin/collections/:name", middleware.AuthMiddleware(), middleware.AdminOnly(), GetCollection)
+	a.ok("admin", "POST", "/admin/collections", map[string]any{
+		"name": "authors", "kind": "collection",
+		"attributes": map[string]any{"name": map[string]any{"type": "string"}},
+	})
+	a.ok("admin", "POST", "/admin/collections", map[string]any{
+		"name": "posts", "kind": "collection", "description": "Blog posts", "draft_and_publish": true,
+		"attributes": map[string]any{
+			"title":    map[string]any{"type": "string", "required": true, "unique": true, "pattern": "^[A-Z]"},
+			"views":    map[string]any{"type": "int", "min": 0, "max": 10},
+			"category": map[string]any{"type": "enum", "options": []string{"news", "tips"}},
+			"author":   map[string]any{"type": "relation", "relation": "oneToOne", "target": "authors"},
+		},
+	})
+
+	read := func() map[string]any {
+		return a.ok("admin", "GET", "/admin/collections/posts", nil).(map[string]any)["schema"].(map[string]any)
+	}
+	before := read()
+	a.ok("admin", "PUT", "/admin/collections/posts", map[string]any{
+		"name": "posts", "kind": "collection",
+		"description": before["description"], "options": before["options"], "attributes": before["attributes"],
+	})
+	after := read()
+	assert.Equal(t, before, after, "nothing lost or changed by the round trip")
+
+	attrs := after["attributes"].(map[string]any)
+	title := attrs["title"].(map[string]any)
+	assert.Equal(t, true, title["unique"])
+	assert.Equal(t, "^[A-Z]", title["pattern"])
+	assert.EqualValues(t, 10, attrs["views"].(map[string]any)["max"])
+	assert.Len(t, attrs["category"].(map[string]any)["options"], 2)
+	assert.Equal(t, "Blog posts", after["description"])
+
+	// The relation still points at the collection (stored without the api:: prefix).
+	a.ok("editor", "POST", "/api/collections/authors", map[string]any{"data": map[string]any{"name": "Ada"}})
+	a.ok("editor", "POST", "/api/collections/posts", map[string]any{"data": map[string]any{"title": "Hello", "author": 1}})
+}

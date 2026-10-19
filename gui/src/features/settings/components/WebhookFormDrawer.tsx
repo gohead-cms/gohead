@@ -234,6 +234,9 @@ export function WebhookFormDrawer({
 
               <FormControl isInvalid={submitted && !!headersError}>
                 <FormLabel as="div">Custom headers</FormLabel>
+                <FormErrorMessage mt={0} mb={2}>
+                  {headersError}
+                </FormErrorMessage>
                 {replaceHeaders ? (
                   <HeadersEditor rows={rows} onChange={setRows} />
                 ) : (
@@ -246,7 +249,6 @@ export function WebhookFormDrawer({
                     </Button>
                   </Stack>
                 )}
-                <FormErrorMessage>{headersError}</FormErrorMessage>
                 <FormHelperText>
                   Sent with every delivery, e.g. a token the receiver expects. Values are stored but never shown again
                   {replaceHeaders && !creating ? ": re-enter them all, saving replaces the whole list." : "."}
