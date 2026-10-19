@@ -333,6 +333,7 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *medi
 	{
 		authRoutes.POST("/register", handlers.Register)
 		authRoutes.POST("/login", handlers.Login)
+		authRoutes.GET("/me", middleware.AuthMiddleware(), handlers.Me)
 	}
 
 	// Agent Webhook Trigger (Public, authenticates with a token)
@@ -378,6 +379,10 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *medi
 		creds.DELETE("/tokens/:id", handlers.RevokeAPIToken)
 
 		// Outbound webhooks
+		admin.GET("/overview", handlers.GetOverview)
+		admin.GET("/runs", handlers.ListAllAgentRuns)
+		admin.GET("/agent-functions", handlers.AgentFunctionCatalog)
+
 		admin.POST("/webhooks", handlers.CreateWebhook)
 		admin.GET("/webhooks", handlers.ListWebhooks)
 		admin.GET("/webhooks/:id", handlers.GetWebhook)
@@ -397,6 +402,7 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *medi
 			agents.GET("/:name/runs", handlers.ListAgentRuns)
 			agents.GET("/:name/runs/:run", handlers.GetAgentRun)
 			agents.GET("/:name/usage", handlers.GetAgentUsage)
+			agents.POST("/:name/run", handlers.RunAgentNow)
 		}
 	}
 

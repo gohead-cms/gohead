@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { apiFetchWithAuth } from "../../services/api";
+import { api, ApiError, Envelope } from "../../services/api";
 import { errorMessage } from "../utils/errors";
 
 interface Settled<T> {
@@ -58,11 +58,13 @@ export function useApiQuery<T>(key: string | null, load: () => Promise<T>): ApiQ
 }
 
 /** GETs an API path and returns its JSON envelope. */
-export async function getJSON<T = unknown>(path: string, failure = "Request failed"): Promise<{ data: T; meta?: Record<string, unknown> }> {
-  const res = await apiFetchWithAuth(path);
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.error?.message || `${failure} (${res.status})`);
+export async function getJSON<T = unknown>(path: string, failure = "Request failed"): Promise<Envelope<T>> {
+  try {
+    return await api<T>("GET", path);
+  } catch (err) {
+    if (err instanceof ApiError && err.message.startsWith("Request failed")) {
+      throw new ApiError(err.status, `${failure} (${err.status})`, err.details);
+    }
+    throw err;
   }
-  return res.json();
 }

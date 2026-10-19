@@ -143,6 +143,14 @@ func staticPaths() obj {
 			"requestBody": obj{"required": true, "content": jsonContent(credentials)},
 			"responses":   merge(obj{"200": ok("Token", dataEnvelope(obj{"type": "object", "properties": obj{"token": obj{"type": "string"}}}, nil))}, errorResponses("401", "429")),
 		}},
+		"/auth/me": obj{"get": obj{
+			"tags": []string{"auth"}, "operationId": "me", "summary": "The authenticated user or API token",
+			"responses": merge(obj{"200": ok("Caller", dataEnvelope(obj{"type": "object", "properties": obj{
+				"kind": obj{"type": "string", "enum": []string{"user", "token"}}, "id": obj{"type": "integer"},
+				"username": obj{"type": "string"}, "email": obj{"type": "string"}, "name": obj{"type": "string"},
+				"role": obj{"type": "string"},
+			}}, nil))}, errorResponses("401", "404")),
+		}},
 		"/auth/register": obj{"post": obj{
 			"tags": []string{"auth"}, "operationId": "register", "summary": "Create a viewer account (when auth.registration is open)", "security": noAuth,
 			"requestBody": obj{"required": true, "content": jsonContent(merge(obj{}, obj{"type": "object", "properties": obj{"username": obj{"type": "string"}, "email": obj{"type": "string", "format": "email"}, "password": obj{"type": "string", "format": "password"}}, "required": []string{"username", "email", "password"}}))},

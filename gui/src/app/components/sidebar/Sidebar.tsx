@@ -21,21 +21,20 @@ import {
   FiSettings,
   FiMenu,
   FiGrid,
-  FiCloud,
   FiActivity,
-  FiBarChart,
-  FiTrendingUp,
-  FiChevronDown
+  FiChevronDown,
+  FiImage,
+  FiUsers,
+  FiKey,
+  FiSend,
+  FiLayers,
 } from 'react-icons/fi';
-import { GoWorkflow } from "react-icons/go";
 import { IconType } from 'react-icons';
 import { NavLink, useLocation } from "react-router-dom";
 import { LiaProjectDiagramSolid } from "react-icons/lia";
 import { LuBrain } from "react-icons/lu";
 import { VscRobot } from "react-icons/vsc";
-import { TbMathFunction } from "react-icons/tb";
-import { PiPlug } from "react-icons/pi";
-import { FiImage } from 'react-icons/fi';
+import { useMe } from "../../../features/auth/me";
 
 // --- Menu Structure ---
 interface NavItemProps {
@@ -43,43 +42,46 @@ interface NavItemProps {
   icon: IconType;
   href?: string;
   children?: NavItemProps[];
+  /** Only shown to admins (the pages behind it need the admin role). */
+  adminOnly?: boolean;
 }
 
 const LinkItems: Array<NavItemProps> = [
   { name: 'Dashboard', icon: FiHome, href: '/dashboard' },
   {
-    name: 'Data Management',
+    name: 'Content',
     icon: FiDatabase,
     children: [
-      { name: 'Schema Designer', icon: LiaProjectDiagramSolid, href: '/workspace' },
       { name: 'Content Editor', icon: FiGrid, href: '/contrib' },
       { name: 'Media Library', icon: FiImage, href: '/media' },
     ],
   },
   {
-    name: 'AI Management',
-    icon: LuBrain,
+    name: 'Content Model',
+    icon: FiLayers,
+    adminOnly: true,
     children: [
-        { name: 'Agents', icon: VscRobot, href: '/agents' },
-        { name: 'Workflows', icon: GoWorkflow, href: '/workflows' },
-        { name: 'LLM Primitives', icon: TbMathFunction, href: '/primitives' },
+      { name: 'Types', icon: FiLayers, href: '/model' },
+      { name: 'Schema Designer', icon: LiaProjectDiagramSolid, href: '/workspace' },
     ],
   },
   {
-    name: 'Monitoring',
-    icon: FiActivity,
+    name: 'AI',
+    icon: LuBrain,
+    adminOnly: true,
     children: [
-      { name: 'Analytics', icon: FiBarChart, href: '/analytics' },
-      { name: 'Agent Performance', icon: FiTrendingUp, href: '/performance' },
-      { name: 'Logs', icon: FiActivity, href: '/logs' },
-    ]
+      { name: 'Agents', icon: VscRobot, href: '/agents' },
+      { name: 'Activity', icon: FiActivity, href: '/activity' },
+    ],
   },
-  { 
-    name: 'Settings', 
+  {
+    name: 'Settings',
     icon: FiSettings,
+    adminOnly: true,
     children: [
-        { name: 'LLM Providers', icon: FiCloud, href: '/providers' },
-        { name: 'Integration', icon: PiPlug, href: '/integration' },
+      { name: 'Users', icon: FiUsers, href: '/settings/users' },
+      { name: 'API Tokens', icon: FiKey, href: '/settings/tokens' },
+      { name: 'Webhooks', icon: FiSend, href: '/settings/webhooks' },
     ],
   },
 ];
@@ -127,6 +129,8 @@ interface SidebarContentProps extends BoxProps {
 }
 
 function SidebarContent({ onClose, ...rest }: SidebarContentProps) {
+  const { isAdmin } = useMe();
+  const visibleLinks = LinkItems.filter((l) => isAdmin || !l.adminOnly);
   return (
     <Box
       transition="3s ease"
@@ -147,7 +151,7 @@ function SidebarContent({ onClose, ...rest }: SidebarContentProps) {
         )}
       </Flex>
       <Box overflowY="auto" h="calc(100% - 80px)" pb={10}>
-        {LinkItems.map((link) => (
+        {visibleLinks.map((link) => (
           <NavItem key={link.name} icon={link.icon} href={link.href} childrenItems={link.children} onNavItemClick={onClose}>
             {link.name}
           </NavItem>
@@ -159,7 +163,7 @@ function SidebarContent({ onClose, ...rest }: SidebarContentProps) {
 
 // --- Navigation Item Component ---
 function NavItem({ icon, children, href, childrenItems, onNavItemClick }: { icon: IconType; children: React.ReactNode; href?: string; childrenItems?: NavItemProps[]; onNavItemClick?: () => void; }) {
-  const { isOpen, onToggle } = useDisclosure();
+  const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
   const location = useLocation();
   
   const isParentActive = childrenItems?.some(child => child.href && location.pathname.startsWith(child.href));

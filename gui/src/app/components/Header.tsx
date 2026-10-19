@@ -1,21 +1,19 @@
-import { Box, Flex, Text, Button, Icon } from "@chakra-ui/react";
-import { Menu, MenuButton, MenuList, MenuItem } from "@chakra-ui/react";
-import { Avatar } from "@chakra-ui/react";
-import { useAuthStore } from "../../services/auth";
+import { Badge, Box, Button, Flex, Icon, Menu, MenuButton, MenuDivider, MenuItem, MenuList, Text, Avatar } from "@chakra-ui/react";
 import { useNavigate } from "react-router-dom";
-import { FiLogOut } from "react-icons/fi";
-import React from 'react';
+import { FiBookOpen, FiCode, FiLogOut } from "react-icons/fi";
+import { useAuthStore } from "../../services/auth";
+import { API_BASE_URL } from "../../services/api";
+import { useMe } from "../../features/auth/me";
 
 export function Header() {
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
+  const { me } = useMe();
 
   const handleLogout = () => {
     logout();
-    navigate("/", { replace: true });
+    navigate("/login", { replace: true });
   };
-
-  const user = { name: "SUDO", avatarUrl: "https://api.dicebear.com/7.x/adventurer/svg?seed=GoHead" };
 
   return (
     <Flex
@@ -35,34 +33,34 @@ export function Header() {
       zIndex={100}
     >
       <Flex align="center" gap={3}>
-        <img
-          src="/gohead_logo.svg"
-          alt="GoHead Logo"
-          style={{ height: 32, width: 32 }}
-        />
+        <img src="/gohead_logo.svg" alt="" style={{ height: 32, width: 32 }} />
         <Text fontSize="lg" fontWeight="bold">
-          GoHead!
+          GoHead
         </Text>
       </Flex>
       <Menu>
-        {/* MenuButton is the trigger for the MenuList */}
-        <MenuButton as={Button} variant="ghost" px={2} py={1} borderRadius="full">
-          {/* The Chakra Avatar component handles both the image and fallback text */}
-          <Avatar
-            size="sm"
-            name={user.name}
-            src={user.avatarUrl}
-          />
+        <MenuButton as={Button} variant="ghost" px={2} py={1} borderRadius="full" aria-label="Account menu">
+          <Avatar size="sm" name={me?.username ?? "?"} />
         </MenuButton>
         <MenuList>
           <Box px={4} py={2}>
-            <Text fontWeight="bold">{user.name}</Text>
+            <Text fontWeight="bold">{me?.username ?? "…"}</Text>
+            {me && (
+              <Badge mt={1} colorScheme={me.role === "admin" ? "purple" : "gray"}>
+                {me.role}
+              </Badge>
+            )}
           </Box>
-          <MenuItem onClick={handleLogout}>
-            <Flex align="center">
-              <Icon as={FiLogOut} fontSize="md" mr={2} />
-              Sign out
-            </Flex>
+          <MenuDivider />
+          <MenuItem as="a" href={`${API_BASE_URL}/api/docs`} target="_blank" rel="noreferrer" icon={<Icon as={FiCode} />}>
+            API reference
+          </MenuItem>
+          <MenuItem as="a" href="https://gohead-cms.github.io/gohead/" target="_blank" rel="noreferrer" icon={<Icon as={FiBookOpen} />}>
+            Documentation
+          </MenuItem>
+          <MenuDivider />
+          <MenuItem onClick={handleLogout} icon={<Icon as={FiLogOut} />}>
+            Sign out
           </MenuItem>
         </MenuList>
       </Menu>

@@ -1,0 +1,87 @@
+package handlers
+
+import (
+	"net/http"
+	"testing"
+	"time"
+
+	"github.com/gohead-cms/gohead/internal/accounts"
+	"github.com/gohead-cms/gohead/internal/api/middleware"
+	agents "github.com/gohead-cms/gohead/internal/models/agents"
+	"github.com/gohead-cms/gohead/pkg/storage"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestAdminUIEndpoints(t *testing.T) {
+	a := newContentAPI(t)
+	a.router.GET("/auth/me", middleware.AuthMiddleware(), Me)
+	admin := a.router.Group("/admin", middleware.AuthMiddleware(), middleware.AdminOnly())
+	admin.GET("/overview", GetOverview)
+	admin.GET("/runs", ListAllAgentRuns)
+	admin.GET("/agent-functions", AgentFunctionCatalog)
+	admin.POST("/agents", CreateAgent)
+	admin.POST("/agents/:name/run", RunAgentNow)
+
+	_, err := accounts.CreateAdmin("admin-user", "admin@example.com", "a-long-admin-password")
+	require.NoError(t, err)
+	me := a.ok("admin", "GET", "/auth/me", nil).(map[string]any)
+	assert.Equal(t, "admin-user", me["username"])
+	assert.Equal(t, "admin", me["role"])
+	assert.Equal(t, "user", me["kind"])
+	assert.NotContains(t, me, "password")
+
+	a.ok("admin", "POST", "/admin/collections", map[string]any{
+		"name": "posts", "kind": "collection",
+		"attributes": map[string]any{"title": map[string]any{"type": "string"}},
+	})
+	a.ok("editor", "POST", "/api/collections/posts", map[string]any{"data": map[string]any{"title": "Hello"}})
+	a.ok("admin", "POST", "/admin/agents", map[string]any{
+		"name": "tagger", "system_prompt": "Tag.", "max_turns": 2,
+		"llm_config": map[string]any{"provider": "openai", "model": "m", "api_key": "k"},
+		"memory":     map[string]any{"type": "in-memory", "session_scope": "agent"},
+		"trigger":    map[string]any{"type": "manual"},
+	})
+	agent, err := storage.GetAgentByName("tagger")
+	require.NoError(t, err)
+	for _, status := range []string{agents.RunSucceeded, agents.RunFailed} {
+		require.NoError(t, storage.CreateAgentRun(&agents.AgentRun{AgentID: agent.ID, AgentName: "tagger",
+			Status: status, StartedAt: time.Now().UTC(), InputTokens: 10, OutputTokens: 5}))
+	}
+
+	ov := a.ok("admin", "GET", "/admin/overview", nil).(map[string]any)["overview"].(map[string]any)
+	counts := ov["counts"].(map[string]any)
+	assert.EqualValues(t, 1, counts["collections"])
+	assert.EqualValues(t, 1, counts["items"])
+	assert.EqualValues(t, 1, counts["agents"])
+	runs := ov["runs24h"].(map[string]any)
+	assert.EqualValues(t, 2, runs["total"])
+	assert.EqualValues(t, 1, runs["failed"])
+	assert.EqualValues(t, 30, runs["inputTokens"].(float64)+runs["outputTokens"].(float64))
+	recent := ov["recentItems"].([]any)
+	require.Len(t, recent, 1)
+	assert.Equal(t, "Hello", recent[0].(map[string]any)["title"])
+	assert.Equal(t, "posts", recent[0].(map[string]any)["collection"])
+
+	failed := a.ok("admin", "GET", "/admin/runs?status=failed", nil).([]any)
+	require.Len(t, failed, 1)
+	assert.Equal(t, "tagger", failed[0].(map[string]any)["agentName"])
+	code, _ := a.do("admin", "GET", "/admin/runs?status=nope", nil)
+	assert.Equal(t, http.StatusBadRequest, code)
+
+	catalog := a.ok("admin", "GET", "/admin/agent-functions", nil).([]any)
+	assert.NotEmpty(t, catalog)
+	first := catalog[0].(map[string]any)
+	assert.NotEmpty(t, first["description"])
+	assert.Equal(t, "object", first["parameters"].(map[string]any)["type"])
+
+	// Without Redis there is no queue: the API says so instead of failing.
+	code, _ = a.do("admin", "POST", "/admin/agents/tagger/run", map[string]any{"input": "go"})
+	assert.Equal(t, http.StatusServiceUnavailable, code)
+	code, _ = a.do("admin", "POST", "/admin/agents/nobody/run", nil)
+	assert.Equal(t, http.StatusNotFound, code)
+
+	code, _ = a.do("editor", "GET", "/admin/overview", nil)
+	assert.Equal(t, http.StatusForbidden, code)
+}
