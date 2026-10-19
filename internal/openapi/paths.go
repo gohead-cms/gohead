@@ -299,6 +299,45 @@ func staticPaths() obj {
 			"responses": merge(obj{"200": ok("Revisions", dataEnvelope(obj{"type": "array", "items": ref("Revision")},
 				obj{"type": "object", "properties": obj{"pagination": ref("Pagination")}}))}, errorResponses("400", "401", "403")),
 		}},
+		"/api/proposals": obj{"get": obj{
+			"tags": []string{"proposals"}, "operationId": "list_proposals", "summary": "Changes agents proposed, newest first (only collections the caller may change)",
+			"parameters": []any{
+				obj{"name": "status", "in": "query", "schema": obj{"type": "string", "enum": []string{models.ProposalPending, models.ProposalApproved, models.ProposalRejected, models.ProposalFailed, "all"}, "default": models.ProposalPending}},
+				obj{"name": "collection", "in": "query", "schema": obj{"type": "string"}},
+				obj{"name": "agent", "in": "query", "schema": obj{"type": "string"}},
+				obj{"name": "agentRun", "in": "query", "schema": obj{"type": "integer"}},
+				obj{"name": "page", "in": "query", "schema": obj{"type": "integer", "minimum": 1, "default": 1}},
+				obj{"name": "pageSize", "in": "query", "schema": obj{"type": "integer", "minimum": 1, "maximum": 100, "default": 20}},
+			},
+			"responses": merge(obj{"200": ok("Proposals", dataEnvelope(obj{"type": "array", "items": ref("Proposal")},
+				obj{"type": "object", "properties": obj{"pagination": ref("Pagination")}}))}, errorResponses("400", "401", "403")),
+		}},
+		"/api/proposals/{id}": obj{"get": obj{
+			"tags": []string{"proposals"}, "operationId": "get_proposal", "summary": "A proposal, the item as it is now and the changes",
+			"parameters": []any{paramID},
+			"responses": merge(obj{"200": ok("Proposal", dataEnvelope(obj{"type": "object", "properties": obj{
+				"proposal": ref("Proposal"), "stale": obj{"type": "boolean", "description": "The item changed since the agent proposed this"},
+				"current": obj{"type": "object", "additionalProperties": true}, "currentStatus": obj{"type": "string"},
+				"changes": obj{"type": "array", "items": obj{"type": "object"}},
+			}, "required": []string{"proposal", "stale"}}, nil))}, errorResponses("400", "401", "404")),
+		}},
+		"/api/proposals/{id}/approve": obj{"post": obj{
+			"tags": []string{"proposals"}, "operationId": "approve_proposal", "summary": "Apply a proposal, optionally with edited values",
+			"parameters": []any{paramID},
+			"requestBody": obj{"content": jsonContent(obj{"type": "object", "properties": obj{
+				"data":  obj{"type": "object", "additionalProperties": true, "description": "Values to apply instead of the agent's"},
+				"force": obj{"type": "boolean", "description": "Apply although the item changed since"},
+			}})},
+			"responses": merge(obj{"200": ok("Applied", dataEnvelope(obj{"type": "object", "properties": obj{
+				"proposal": ref("Proposal"), "item": obj{"type": "object", "additionalProperties": true},
+			}}, nil))}, errorResponses("400", "401", "403", "404", "409", "422")),
+		}},
+		"/api/proposals/{id}/reject": obj{"post": obj{
+			"tags": []string{"proposals"}, "operationId": "reject_proposal", "summary": "Discard a proposal",
+			"parameters":  []any{paramID},
+			"requestBody": obj{"content": jsonContent(obj{"type": "object", "properties": obj{"note": obj{"type": "string"}}})},
+			"responses":   merge(obj{"200": ok("Rejected", dataEnvelope(obj{"type": "object", "properties": obj{"proposal": ref("Proposal")}}, nil))}, errorResponses("401", "404", "409")),
+		}},
 		"/api/graphql": obj{"post": obj{
 			"tags": []string{"graphql"}, "operationId": "graphql", "summary": "GraphQL queries and mutations",
 			"requestBody": obj{"required": true, "content": jsonContent(obj{"type": "object", "properties": obj{"query": obj{"type": "string"}, "variables": obj{"type": "object"}, "operationName": obj{"type": "string"}}, "required": []string{"query"}})},
@@ -321,6 +360,7 @@ func baseSchemas() obj {
 		}, "required": []string{"code", "name", "isDefault"}},
 		"Revision":       revisionSchema(false),
 		"RevisionDetail": revisionSchema(true),
+		"Proposal":       proposalSchema(),
 		"Media": obj{"type": "object", "properties": obj{
 			"id": obj{"type": "integer"}, "url": obj{"type": "string"}, "name": obj{"type": "string"}, "mime": obj{"type": "string"},
 			"size": obj{"type": "integer"}, "width": nullable(obj{"type": "integer"}), "height": nullable(obj{"type": "integer"}),
@@ -376,4 +416,19 @@ func revisionSchema(detail bool) obj {
 		required = append(required, "data", "changes")
 	}
 	return obj{"type": "object", "properties": props, "required": required}
+}
+
+// proposalSchema is a change an agent proposed.
+func proposalSchema() obj {
+	return obj{"type": "object", "properties": obj{
+		"id": obj{"type": "integer"}, "agentName": obj{"type": "string"}, "agentRunId": nullable(obj{"type": "integer"}),
+		"action":     obj{"type": "string", "enum": []string{models.ProposalCreate, models.ProposalUpdate, models.ProposalDelete}},
+		"collection": obj{"type": "string"}, "itemId": nullable(obj{"type": "integer"}),
+		"locale": obj{"type": "string", "description": "Set when the change is a translation"},
+		"data":   obj{"type": "object", "additionalProperties": true, "description": "The item's values after the change"},
+		"reason": obj{"type": "string"}, "baseVersion": obj{"type": "integer"},
+		"status":     obj{"type": "string", "enum": []string{models.ProposalPending, models.ProposalApproved, models.ProposalRejected, models.ProposalFailed}},
+		"reviewedBy": obj{"type": "string"}, "reviewNote": obj{"type": "string"}, "error": obj{"type": "string"},
+		"createdAt": obj{"type": "string", "format": "date-time"}, "decidedAt": nullable(obj{"type": "string", "format": "date-time"}),
+	}, "required": []string{"id", "agentName", "action", "collection", "status", "createdAt"}}
 }

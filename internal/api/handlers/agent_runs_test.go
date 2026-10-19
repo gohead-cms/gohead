@@ -17,7 +17,6 @@ import (
 func TestAgentRunEndpoints(t *testing.T) {
 	a := newContentAPI(t)
 	admin := a.router.Group("/admin/agents", middleware.AuthMiddleware(), middleware.AdminOnly())
-	admin.POST("", CreateAgent)
 	admin.GET("/:name/runs", ListAgentRuns)
 	admin.GET("/:name/runs/:run", GetAgentRun)
 	admin.GET("/:name/usage", GetAgentUsage)

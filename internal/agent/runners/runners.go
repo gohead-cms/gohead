@@ -72,14 +72,22 @@ func (r *AgentRunner) Run(ctx context.Context, payload jobs.AgentJobPayload, att
 		Provider:  agent.LLMConfig.Provider,
 		Model:     agent.LLMConfig.Model,
 		StartedAt: r.now().UTC(),
+		DryRun:    payload.DryRun,
 	}
 	run.TriggerType, run.Trigger = describeTrigger(payload)
 	run.Input = truncate(r.createContextualInput(payload), maxStoredText)
 
 	// Record the run first, then check the limits against the runs created
 	// before it: runs of the same agent starting together on several
-	// workers are ordered by ID and cannot all pass the same check.
-	if err := storage.CreateAgentRun(run); err != nil {
+	// workers are ordered by ID and cannot all pass the same check. A run
+	// requested from the API was recorded (queued) already: it goes on
+	// under the same ID, except on retries.
+	if payload.RunID != 0 && attempt == 1 {
+		run.ID = payload.RunID
+		if err := storage.SaveAgentRun(run); err != nil {
+			return fmt.Errorf("could not record run: %w", err)
+		}
+	} else if err := storage.CreateAgentRun(run); err != nil {
 		return fmt.Errorf("could not record run: %w", err)
 	}
 	reason, err := preRunLimit(agent, run.ID, r.now)
@@ -202,6 +210,12 @@ func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Ag
 	// Content the agent's functions change is attributed to this run, so
 	// it shows in the history and the run can be reverted.
 	ctx = storage.WithActor(ctx, storage.Actor{Kind: models.ActorAgent, Name: agent.Name, AgentRunID: run.ID})
+	switch {
+	case payload.DryRun:
+		ctx = functions.WithWriteMode(ctx, functions.WriteDryRun)
+	case agent.RequireApproval:
+		ctx = functions.WithWriteMode(ctx, functions.WritePropose)
+	}
 	llmClient, err := r.newClient(llm.Config{
 		Provider:             agent.LLMConfig.Provider,
 		Model:                agent.LLMConfig.Model,
@@ -249,6 +263,9 @@ func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Ag
 		var limited *errLimited
 		if runErr != nil && !errors.As(runErr, &limited) {
 			return
+		}
+		if payload.DryRun {
+			return // test runs leave the agent's memory as it was
 		}
 		if err := storage.SaveConversationHistory(agent.ID, messages[1:]); err != nil {
 			logger.Log.WithError(err).Warn("Could not save conversation history")

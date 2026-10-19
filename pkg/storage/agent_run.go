@@ -133,12 +133,13 @@ func PruneAgentRuns(agentID uint, keep int) {
 	}
 	last := cutoff[0].ID
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
-		old := "agent_id = ? AND id <= ? AND status <> ?"
-		sub := tx.Model(&agents.AgentRun{}).Select("id").Where(old, agentID, last, agents.RunRunning)
+		old := "agent_id = ? AND id <= ? AND status NOT IN ?"
+		live := []string{agents.RunRunning, agents.RunQueued}
+		sub := tx.Model(&agents.AgentRun{}).Select("id").Where(old, agentID, last, live)
 		if err := tx.Where("run_id IN (?)", sub).Delete(&agents.AgentRunStep{}).Error; err != nil {
 			return err
 		}
-		return tx.Where(old, agentID, last, agents.RunRunning).Delete(&agents.AgentRun{}).Error
+		return tx.Where(old, agentID, last, live).Delete(&agents.AgentRun{}).Error
 	})
 	if err != nil {
 		logger.Log.WithError(err).Warn("Failed to prune agent runs")

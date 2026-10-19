@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/gohead-cms/gohead/internal/models"
 	"strconv"
 	"strings"
 	"time"
@@ -76,6 +77,13 @@ func (d *EventDispatcher) HandleCollectionEvent(ctx context.Context, t *asynq.Ta
 
 	// 2. For each subscribed agent, enqueue a specific agent:run job.
 	for _, agent := range subscribedAgents {
+		// An agent is not triggered by its own changes: an agent that
+		// updates the items whose updates trigger it would loop.
+		if SelfTriggered(payload, agent.Name) {
+			logger.Log.WithField("agent_name", agent.Name).WithField("item_id", payload.ItemID).
+				Info("Skipping an event caused by the agent itself")
+			continue
+		}
 		// Create structured TriggerEvent - this contains all the data the runner needs
 		triggerEvent := &jobs.TriggerEvent{
 			Type: "collection_event",
@@ -115,4 +123,10 @@ func (d *EventDispatcher) HandleCollectionEvent(ctx context.Context, t *asynq.Ta
 	}
 
 	return nil
+}
+
+// SelfTriggered reports whether the event comes from a change the agent
+// made itself.
+func SelfTriggered(payload events.CollectionEventPayload, agentName string) bool {
+	return payload.ActorKind == models.ActorAgent && payload.ActorName == agentName
 }

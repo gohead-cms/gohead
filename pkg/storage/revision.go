@@ -163,9 +163,9 @@ func recordNested(tx *gorm.DB, actor Actor, nested *models.NestedCreated) error 
 }
 
 // publishNested sends item:created for nested items, after the commit.
-func publishNested(nested *models.NestedCreated) {
+func publishNested(actor Actor, nested *models.NestedCreated) {
 	for _, n := range nested.Items {
-		publishEvent(database.DB, events.EventTypeItemCreated, n.Item)
+		publishEvent(database.DB, actor, events.EventTypeItemCreated, n.Item)
 	}
 }
 
@@ -469,16 +469,16 @@ func RestoreItemRevision(actor Actor, ct models.Collection, itemID, version uint
 	if txErr != nil {
 		return nil, nil, txErr
 	}
-	publishNested(nested)
+	publishNested(actor, nested)
 	switch {
 	case res.Unchanged:
 	case res.Undeleted:
-		publishEvent(database.DB, events.EventTypeItemCreated, &item)
+		publishEvent(database.DB, actor, events.EventTypeItemCreated, &item)
 		if item.PublishedAt != nil {
-			publishEvent(database.DB, events.EventTypeItemPublished, &item)
+			publishEvent(database.DB, actor, events.EventTypeItemPublished, &item)
 		}
 	default:
-		publishEvent(database.DB, events.EventTypeItemUpdated, &item)
+		publishEvent(database.DB, actor, events.EventTypeItemUpdated, &item)
 	}
 	return &item, res, nil
 }

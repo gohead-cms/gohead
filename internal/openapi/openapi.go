@@ -23,7 +23,7 @@ var unsafeName = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
 func schemaName(name string) string { return unsafeName.ReplaceAllString(name, "_") }
 
 // reservedSchemas are the fixed schema names.
-var reservedSchemas = map[string]bool{"Error": true, "Pagination": true, "Media": true, "Revision": true, "RevisionDetail": true, "Locale": true}
+var reservedSchemas = map[string]bool{"Error": true, "Pagination": true, "Media": true, "Revision": true, "RevisionDetail": true, "Locale": true, "Proposal": true}
 
 // collectionNames maps each collection to a schema name that cannot clash
 // with the fixed schemas, the Component_/Singleton_ names, or another
@@ -150,6 +150,7 @@ func Build(version string) (obj, error) {
 		obj{"name": "graphql", "description": "GraphQL endpoint"},
 		obj{"name": "history", "description": "Content revisions across entries"},
 		obj{"name": "locales", "description": "Content locales"},
+		obj{"name": "proposals", "description": "Changes agents proposed, waiting for approval"},
 	)
 
 	return obj{

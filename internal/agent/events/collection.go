@@ -38,6 +38,10 @@ type CollectionEventPayload struct {
 	// ItemTranslations holds localized values in other locales than the
 	// default, by locale.
 	ItemTranslations map[string]any `json:"item_translations,omitempty"`
+	// ActorKind and ActorName say who made the change (models.ActorUser,
+	// ActorAgent…): an agent is not triggered by its own changes.
+	ActorKind string `json:"actor_kind,omitempty"`
+	ActorName string `json:"actor_name,omitempty"`
 }
 
 // EnqueueCollectionEvent creates and enqueues a new generic collection event.

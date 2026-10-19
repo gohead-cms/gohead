@@ -165,6 +165,104 @@
         },
         "type": "object"
       },
+      "Proposal": {
+        "properties": {
+          "action": {
+            "enum": [
+              "create",
+              "update",
+              "delete"
+            ],
+            "type": "string"
+          },
+          "agentName": {
+            "type": "string"
+          },
+          "agentRunId": {
+            "oneOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "baseVersion": {
+            "type": "integer"
+          },
+          "collection": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "data": {
+            "additionalProperties": true,
+            "description": "The item's values after the change",
+            "type": "object"
+          },
+          "decidedAt": {
+            "oneOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "itemId": {
+            "oneOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "locale": {
+            "description": "Set when the change is a translation",
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "reviewNote": {
+            "type": "string"
+          },
+          "reviewedBy": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "approved",
+              "rejected",
+              "failed"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "agentName",
+          "action",
+          "collection",
+          "status",
+          "createdAt"
+        ],
+        "type": "object"
+      },
       "Revision": {
         "properties": {
           "action": {
@@ -3337,6 +3435,339 @@
         ]
       }
     },
+    "/api/proposals": {
+      "get": {
+        "operationId": "list_proposals",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "agent",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agentRun",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "collection",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "default": "pending",
+              "enum": [
+                "pending",
+                "approved",
+                "rejected",
+                "failed",
+                "all"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/Proposal"
+                      },
+                      "type": "array"
+                    },
+                    "meta": {
+                      "properties": {
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Proposals"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Changes agents proposed, newest first (only collections the caller may change)",
+        "tags": [
+          "proposals"
+        ]
+      }
+    },
+    "/api/proposals/{id}": {
+      "get": {
+        "operationId": "get_proposal",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "properties": {
+                        "changes": {
+                          "items": {
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "current": {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        "currentStatus": {
+                          "type": "string"
+                        },
+                        "proposal": {
+                          "$ref": "#/components/schemas/Proposal"
+                        },
+                        "stale": {
+                          "description": "The item changed since the agent proposed this",
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "proposal",
+                        "stale"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Proposal"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "A proposal, the item as it is now and the changes",
+        "tags": [
+          "proposals"
+        ]
+      }
+    },
+    "/api/proposals/{id}/approve": {
+      "post": {
+        "operationId": "approve_proposal",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "data": {
+                    "additionalProperties": true,
+                    "description": "Values to apply instead of the agent's",
+                    "type": "object"
+                  },
+                  "force": {
+                    "description": "Apply although the item changed since",
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "properties": {
+                        "item": {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        "proposal": {
+                          "$ref": "#/components/schemas/Proposal"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Applied"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Apply a proposal, optionally with edited values",
+        "tags": [
+          "proposals"
+        ]
+      }
+    },
+    "/api/proposals/{id}/reject": {
+      "post": {
+        "operationId": "reject_proposal",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "properties": {
+                        "proposal": {
+                          "$ref": "#/components/schemas/Proposal"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Rejected"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Discard a proposal",
+        "tags": [
+          "proposals"
+        ]
+      }
+    },
     "/api/revisions": {
       "get": {
         "operationId": "list_revisions",
@@ -4694,6 +5125,10 @@
     {
       "description": "Items of the pages collection",
       "name": "pages"
+    },
+    {
+      "description": "Changes agents proposed, waiting for approval",
+      "name": "proposals"
     },
     {
       "description": "The navigation singleton",

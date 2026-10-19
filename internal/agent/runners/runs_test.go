@@ -192,7 +192,7 @@ func TestFunctionScopes(t *testing.T) {
 	assert.NotEmpty(t, tools[0].Error, "refusals are flagged in the run")
 	assert.Contains(t, tools[1].Result, "not allowed to access collection 'drafts'")
 	assert.Contains(t, tools[2].Result, "is not in collection 'articles'")
-	assert.Contains(t, tools[3].Result, "successfully deleted")
+	assert.Contains(t, tools[3].Result, `"action":"deleted"`)
 
 	_, err = storage.GetItemByID(f.articles.ID, article.ID)
 	assert.NoError(t, err, "the article survived")
