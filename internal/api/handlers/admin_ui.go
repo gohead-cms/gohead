@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -136,7 +137,13 @@ func TestAgent(c *gin.Context) {
 		ItemID uint   `json:"item_id"`
 		Event  string `json:"event"`
 	}
-	_ = c.ShouldBindJSON(&body)
+	if !bindOptional(c, &body) {
+		return
+	}
+	if body.ItemID != 0 && strings.TrimSpace(body.Input) != "" {
+		validationError(c, "give either input or item_id")
+		return
+	}
 	payload := jobs.AgentJobPayload{AgentID: agent.ID, DryRun: true, InitialInput: strings.TrimSpace(body.Input)}
 	if body.ItemID != 0 {
 		collection := agent.Trigger.EventTrigger.Collection
@@ -155,8 +162,13 @@ func TestAgent(c *gin.Context) {
 			return
 		}
 		event := body.Event
-		if event == "" && len(agent.Trigger.EventTrigger.Events) > 0 {
-			event = agent.Trigger.EventTrigger.Events[0]
+		events := agent.Trigger.EventTrigger.Events
+		if event == "" && len(events) > 0 {
+			event = events[0]
+		}
+		if event == "" || !slices.Contains(events, event) {
+			validationError(c, "event must be one of the agent's events: "+strings.Join(events, ", "))
+			return
 		}
 		payload.TriggerEvent = &jobs.TriggerEvent{Type: "collection_event", CollectionEvent: &jobs.CollectionEventData{
 			Collection: collection, Event: event, ItemID: fmt.Sprint(item.ID), ItemData: item.Data,

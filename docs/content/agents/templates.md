@@ -61,7 +61,7 @@ admin UI or the API to review flagged items.
 | Parameter | |
 |-----------|-|
 | `fields` | The [localized](../guides/localization.md) fields to translate |
-| `locales` | Locale codes, comma-separated. Empty: every locale |
+| `locales` | Locale codes, comma-separated, not the default locale (the source). Empty: every other locale |
 | `on_update` | Also translate when an item is updated (overwrites translations people edited) |
 
 ## API

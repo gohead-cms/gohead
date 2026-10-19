@@ -92,6 +92,12 @@ func TestRenderValidatesParams(t *testing.T) {
 		"not localized":        {"translator", map[string]any{"collection": "posts", "fields": []any{"summary"}}, "not localized"},
 		"unknown locale":       {"translator", map[string]any{"collection": "posts", "fields": []any{"title"}, "locales": "de"}, "not configured"},
 		"tags into the source": {"tagger", map[string]any{"collection": "posts", "sources": []any{"summary"}, "target": "summary"}, "own field"},
+		"default locale":       {"translator", map[string]any{"collection": "posts", "fields": []any{"title"}, "locales": "en, fr"}, "default locale"},
+		"string bool":          {"summarizer", map[string]any{"collection": "posts", "source": "body", "target": "summary", "approval": "true"}, "approval must be true or false"},
+		"string number":        {"summarizer", map[string]any{"collection": "posts", "source": "body", "target": "summary", "words": "30"}, "words must be a number"},
+		"string for a list":    {"tagger", map[string]any{"collection": "posts", "sources": "body", "target": "tags"}, "sources must be a list"},
+		"same flag values":     {"moderator", map[string]any{"collection": "posts", "sources": []any{"body"}, "flag": "review", "flagged_value": "ok", "ok_value": "ok"}, "must differ"},
+		"reason is the flag":   {"moderator", map[string]any{"collection": "posts", "sources": []any{"body"}, "flag": "flagged", "reason": "body"}, "own fields"},
 	} {
 		_, err := Render(tc.id, tc.params)
 		assert.ErrorContains(t, err, tc.err, name)

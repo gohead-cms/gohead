@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -29,9 +30,9 @@ func proposalAction(p *models.Proposal) string {
 	}
 }
 
-// reviewableCollections lists the collections whose proposals the role may
-// review (nil: all).
-func reviewableCollections(role string) ([]string, error) {
+// reviewScope maps each proposal action to the collections where the role
+// may make that change (nil: everything).
+func reviewScope(role string) (map[string][]string, error) {
 	if auth.IsBuiltinRole(role) && auth.HasPermission(role, auth.ActionUpdate) {
 		return nil, nil
 	}
@@ -39,16 +40,42 @@ func reviewableCollections(role string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	out := []string{}
+	scope := map[string][]string{}
 	for _, ct := range collections {
-		for _, action := range []string{auth.ActionCreate, auth.ActionUpdate, auth.ActionDelete} {
-			if auth.Can(role, action, ct.Name) {
-				out = append(out, ct.Name)
-				break
+		for action, perm := range map[string]string{
+			models.ProposalCreate: auth.ActionCreate, models.ProposalUpdate: auth.ActionUpdate, models.ProposalDelete: auth.ActionDelete,
+		} {
+			if auth.Can(role, perm, ct.Name) {
+				scope[action] = append(scope[action], ct.Name)
 			}
 		}
 	}
-	return out, nil
+	return scope, nil
+}
+
+// bindOptional decodes an optional JSON body: an empty body is fine, a
+// malformed one is refused.
+func bindOptional(c *gin.Context, body any) bool {
+	if err := c.ShouldBindJSON(body); err != nil && !errors.Is(err, io.EOF) {
+		validationError(c, "invalid JSON body: "+err.Error())
+		return false
+	}
+	return true
+}
+
+// redactProposal hides password values of a proposal's collection.
+func redactProposal(p models.Proposal, hidden map[string]bool) models.Proposal {
+	if len(hidden) > 0 && p.Data != nil {
+		p.Data = redact(p.Data, hidden)
+	}
+	return p
+}
+
+func hiddenFields(ct *models.Collection) map[string]bool {
+	if ct == nil {
+		return nil
+	}
+	return (&historyTarget{collection: ct}).passwordFields()
 }
 
 // ListProposals lists proposals, newest first: status (pending by default;
@@ -81,18 +108,27 @@ func ListProposals(c *gin.Context) {
 	if q.Page, q.PageSize, ok = pageParams(c); !ok {
 		return
 	}
-	scope, err := reviewableCollections(role)
+	scope, err := reviewScope(role)
 	if err != nil {
 		c.Set("response", "Failed to list proposals")
 		c.Set("status", http.StatusInternalServerError)
 		return
 	}
-	q.Collections = scope
+	q.Scope = scope
 	list, total, err := storage.ListProposals(q)
 	if err != nil {
 		c.Set("response", "Failed to list proposals")
 		c.Set("status", http.StatusInternalServerError)
 		return
+	}
+	hidden := map[string]map[string]bool{}
+	for i := range list {
+		name := list[i].Collection
+		if _, ok := hidden[name]; !ok {
+			ct, _ := storage.GetCollectionByName(name)
+			hidden[name] = hiddenFields(ct)
+		}
+		list[i] = redactProposal(list[i], hidden[name])
 	}
 	c.Set("response", list)
 	c.Set("meta", gin.H{"pagination": gin.H{
@@ -125,32 +161,36 @@ func loadProposal(c *gin.Context) (*models.Proposal, *models.Collection, bool) {
 	return p, ct, true
 }
 
-// GetProposal returns a proposal with the item as it is now and the
-// changes the proposal makes to it.
+// GetProposal returns a proposal with the item as it is now, the values
+// approving it would write ("proposed": for a stale update, the item now
+// with the agent's changes) and the changes between the two.
 func GetProposal(c *gin.Context) {
 	p, ct, ok := loadProposal(c)
 	if !ok {
 		return
 	}
-	out := gin.H{"proposal": p, "stale": storage.ProposalIsStale(p)}
-	var current models.JSONMap
-	if ct != nil && p.ItemID != nil && p.Action != models.ProposalCreate {
-		if item, err := storage.GetItemByID(ct.ID, *p.ItemID); err == nil {
-			current = item.Data
-			if p.Locale != "" {
-				current = models.JSONMap(models.Translation(item.Translations, p.Locale))
-			}
-			out["current"] = current
-			out["currentStatus"] = item.Status()
+	hidden := hiddenFields(ct)
+	out := gin.H{"proposal": redactProposal(*p, hidden), "stale": false}
+	if p.Status == models.ProposalPending {
+		st, err := storage.ProposalNow(p)
+		if err != nil {
+			c.Set("response", "Failed to load the proposal")
+			c.Set("status", http.StatusInternalServerError)
+			return
 		}
-	}
-	proposed := p.Data
-	if p.Action == models.ProposalDelete {
-		proposed = nil
-	}
-	if ct != nil {
-		hidden := (&historyTarget{collection: ct}).passwordFields()
-		changes := storage.DiffData(current, proposed)
+		out["stale"] = st.Stale
+		if st.Current != nil {
+			out["current"] = redact(st.Current, hidden)
+		}
+		if st.Proposed != nil {
+			out["proposed"] = redact(st.Proposed, hidden)
+		}
+		if ct != nil && p.ItemID != nil && p.Action != models.ProposalCreate {
+			if item, err := storage.GetItemByID(ct.ID, *p.ItemID); err == nil {
+				out["currentStatus"] = item.Status()
+			}
+		}
+		changes := storage.DiffData(st.Current, st.Proposed)
 		for i := range changes {
 			if hidden[changes[i].Field] {
 				changes[i].Before, changes[i].After = maskValue(changes[i].Before), maskValue(changes[i].After)
@@ -181,11 +221,32 @@ func ApproveProposal(c *gin.Context) {
 		Data  map[string]any `json:"data"`
 		Force bool           `json:"force"`
 	}
-	_ = c.ShouldBindJSON(&body)
+	if !bindOptional(c, &body) {
+		return
+	}
 	data := models.JSONMap(body.Data)
 	effective := p.Data
 	if data != nil {
 		effective = data
+		// Password values are masked in what reviewers see: a masked value
+		// sent back keeps the proposed one.
+		if hidden := hiddenFields(ct); len(hidden) > 0 {
+			st, err := storage.ProposalNow(p)
+			if err != nil {
+				c.Set("response", "Failed to load the proposal")
+				c.Set("status", http.StatusInternalServerError)
+				return
+			}
+			for k := range hidden {
+				if data[k] == maskedValue {
+					if v, ok := st.Proposed[k]; ok {
+						data[k] = v
+					} else {
+						delete(data, k)
+					}
+				}
+			}
+		}
 	}
 	if p.Action != models.ProposalDelete && !allowNested(c, *ct, effective) {
 		return
@@ -193,7 +254,7 @@ func ApproveProposal(c *gin.Context) {
 	if p.Action == models.ProposalUpdate && p.ItemID != nil && !allowLiveEdit(c, *ct, *p.ItemID) {
 		return
 	}
-	proposal, item, err := storage.ApproveProposal(p.ID, actorFrom(c).Name, data, body.Force)
+	proposal, item, err := storage.ApproveProposal(p.ID, actorFrom(c), data, body.Force)
 	if err != nil {
 		var verr *storage.ItemValidationError
 		switch {
@@ -204,7 +265,7 @@ func ApproveProposal(c *gin.Context) {
 			c.Set("response", err.Error())
 			c.Set("details", "review the item as it is now; approve with force to apply the proposal anyway")
 			c.Set("status", http.StatusConflict)
-		case errors.As(err, &verr), errors.Is(err, storage.ErrItemNotFound):
+		case errors.As(err, &verr), errors.Is(err, storage.ErrItemNotFound), errors.Is(err, storage.ErrProposalUnappliable):
 			c.Set("response", "The change could not be applied: "+proposal.Error)
 			c.Set("details", gin.H{"proposal": proposal})
 			c.Set("status", http.StatusUnprocessableEntity)
@@ -232,7 +293,9 @@ func RejectProposal(c *gin.Context) {
 	var body struct {
 		Note string `json:"note"`
 	}
-	_ = c.ShouldBindJSON(&body)
+	if !bindOptional(c, &body) {
+		return
+	}
 	proposal, err := storage.RejectProposal(p.ID, actorFrom(c).Name, body.Note)
 	if err != nil {
 		if errors.Is(err, storage.ErrProposalDecided) {

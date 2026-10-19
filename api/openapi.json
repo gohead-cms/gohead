@@ -199,9 +199,16 @@
             "type": "string"
           },
           "data": {
-            "additionalProperties": true,
-            "description": "The item's values after the change",
-            "type": "object"
+            "oneOf": [
+              {
+                "additionalProperties": true,
+                "description": "The item's values after the change (null for a deletion)",
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "decidedAt": {
             "oneOf": [
@@ -246,6 +253,7 @@
           "status": {
             "enum": [
               "pending",
+              "applying",
               "approved",
               "rejected",
               "failed"
@@ -3570,6 +3578,7 @@
                         },
                         "current": {
                           "additionalProperties": true,
+                          "description": "The item's values now (pending proposals)",
                           "type": "object"
                         },
                         "currentStatus": {
@@ -3577,6 +3586,11 @@
                         },
                         "proposal": {
                           "$ref": "#/components/schemas/Proposal"
+                        },
+                        "proposed": {
+                          "additionalProperties": true,
+                          "description": "What approving writes: for a stale update, the item now with the agent's changes",
+                          "type": "object"
                         },
                         "stale": {
                           "description": "The item changed since the agent proposed this",

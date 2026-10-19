@@ -4,6 +4,7 @@
 package templates
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 	"sort"
@@ -197,8 +198,20 @@ func (t Template) read(params map[string]any) (values, error) {
 		v.raw[k] = val
 	}
 	for _, p := range t.Params {
-		if _, set := v.raw[p.Key]; !set && p.Default != nil {
-			v.raw[p.Key] = p.Default
+		val, set := v.raw[p.Key]
+		if !set || val == nil {
+			if p.Default != nil {
+				v.raw[p.Key] = p.Default
+			}
+			continue
+		}
+		if err := checkType(p, val); err != nil {
+			return v, err
+		}
+	}
+	if n, set := v.raw["name"]; set {
+		if _, ok := n.(string); !ok {
+			return v, fmt.Errorf("name must be a string")
 		}
 	}
 	name := v.str("collection")
@@ -241,6 +254,45 @@ func (t Template) read(params map[string]any) (values, error) {
 	return v, nil
 }
 
+// checkType refuses a parameter value of the wrong JSON type.
+func checkType(p Param, val any) error {
+	ok := true
+	want := "a string"
+	switch p.Type {
+	case "fields":
+		want = "a list of attribute names"
+		list, isList := val.([]any)
+		ok = isList
+		for _, e := range list {
+			if _, isStr := e.(string); !isStr {
+				ok = false
+			}
+		}
+		if _, isStrs := val.([]string); isStrs {
+			ok = true
+		}
+	case "number":
+		want = "a number"
+		switch n := val.(type) {
+		case float64:
+			ok = n == float64(int(n)) && n >= 0
+		case int:
+			ok = n >= 0
+		default:
+			ok = false
+		}
+	case "bool":
+		want = "true or false"
+		_, ok = val.(bool)
+	default:
+		_, ok = val.(string)
+	}
+	if !ok {
+		return fmt.Errorf("%s must be %s", p.Key, want)
+	}
+	return nil
+}
+
 // fn is a function spec using a built-in implementation, scoped to the
 // template's collection.
 func fn(name, description, implKey string, collection string) map[string]any {
@@ -259,6 +311,11 @@ func fn(name, description, implKey string, collection string) map[string]any {
 
 func eventTrigger(collection string, events ...string) map[string]any {
 	return map[string]any{"type": "collection_event", "event_trigger": map[string]any{"collection": collection, "events": events}}
+}
+
+func jsonString(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b)
 }
 
 func quoted(names []string) string {
@@ -332,15 +389,23 @@ Never change any other field.`, ct, quoted(sources), choice, max, target, format
 
 func buildModerator(v values) (map[string]any, error) {
 	ct, sources, flag, reason := v.collection.Name, v.strs("sources"), v.str("flag"), v.str("reason")
+	if slices.Contains(sources, flag) || slices.Contains(sources, reason) || (reason != "" && reason == flag) {
+		return nil, fmt.Errorf("the flag and the reason need their own fields, not the text to check")
+	}
 	a := v.attr(flag)
-	flagged, ok := `"`+v.str("flagged_value")+`"`, `"`+v.str("ok_value")+`"`
+	flagged, ok := jsonString(v.str("flagged_value")), jsonString(v.str("ok_value"))
 	switch a.Type {
 	case "bool", "boolean":
 		flagged, ok = "true", "false"
-	case "enum", "enumeration":
-		for _, val := range []string{v.str("flagged_value"), v.str("ok_value")} {
-			if !slices.Contains(a.Options, val) {
-				return nil, fmt.Errorf("'%s' is not an option of %s (options: %s)", val, flag, strings.Join(a.Options, ", "))
+	default:
+		if v.str("flagged_value") == "" || v.str("flagged_value") == v.str("ok_value") {
+			return nil, fmt.Errorf("the values when flagged and when fine must differ")
+		}
+		if a.Type == "enum" || a.Type == "enumeration" {
+			for _, val := range []string{v.str("flagged_value"), v.str("ok_value")} {
+				if !slices.Contains(a.Options, val) {
+					return nil, fmt.Errorf("'%s' is not an option of %s (options: %s)", val, flag, strings.Join(a.Options, ", "))
+				}
 			}
 		}
 	}
@@ -374,6 +439,9 @@ func buildTranslator(v values) (map[string]any, error) {
 			}
 			if !storage.LocaleExists(c) {
 				return nil, fmt.Errorf("locale '%s' is not configured", c)
+			}
+			if def, _ := storage.DefaultLocale(); c == def {
+				return nil, fmt.Errorf("'%s' is the default locale, which the translator translates from", c)
 			}
 			codes = append(codes, c)
 		}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/database"
+	"github.com/gohead-cms/gohead/pkg/logger"
 
 	"gorm.io/gorm"
 )
@@ -60,6 +61,15 @@ var errRollback = errors.New("rollback")
 // relation would create are not kept). It returns ErrItemNotFound or an
 // *ItemValidationError.
 func CheckItemWrite(ct models.Collection, action string, itemID uint, locale string, data models.JSONMap) error {
+	// Locales are resolved first: their lookup does not use the
+	// transaction (and would wait for it on single-connection databases).
+	var code, def string
+	if locale != "" && action == models.ProposalUpdate {
+		var err error
+		if code, def, err = ResolveLocale(locale); err != nil {
+			return &ItemValidationError{Err: fmt.Errorf("unknown locale '%s'", locale)}
+		}
+	}
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
 		switch action {
 		case models.ProposalCreate:
@@ -78,10 +88,6 @@ func CheckItemWrite(ct models.Collection, action string, itemID uint, locale str
 				break
 			}
 			if locale != "" {
-				code, def, err := ResolveLocale(locale)
-				if err != nil {
-					return &ItemValidationError{Err: fmt.Errorf("unknown locale '%s'", locale)}
-				}
 				if code != def {
 					values, err := checkTranslationKeys(ct.Attributes, data, def)
 					if err != nil {
@@ -110,13 +116,15 @@ func CheckItemWrite(ct models.Collection, action string, itemID uint, locale str
 
 // ProposalQuery filters proposals.
 type ProposalQuery struct {
-	Status      string   // "" or "all": every status
-	Collection  string   // one collection
-	Collections []string // nil: all; otherwise only these (a role's scope)
-	AgentName   string
-	AgentRunID  uint
-	Page        int
-	PageSize    int
+	Status     string // "" or "all": every status
+	Collection string // one collection
+	// Scope, when not nil, limits each action (create, update, delete) to
+	// the collections listed for it: a reviewer's permissions.
+	Scope      map[string][]string
+	AgentName  string
+	AgentRunID uint
+	Page       int
+	PageSize   int
 }
 
 // ListProposals lists proposals, newest first.
@@ -134,12 +142,14 @@ func ListProposals(q ProposalQuery) ([]models.Proposal, int, error) {
 	if q.Collection != "" {
 		db = db.Where("collection = ?", q.Collection)
 	}
-	if q.Collections != nil {
-		cols := q.Collections
-		if len(cols) == 0 {
-			cols = []string{""}
+	if q.Scope != nil {
+		cond := database.DB.Where("1 = 0")
+		for action, cols := range q.Scope {
+			if len(cols) > 0 {
+				cond = cond.Or("action = ? AND collection IN ?", action, cols)
+			}
 		}
-		db = db.Where("collection IN ?", cols)
+		db = db.Where(cond)
 	}
 	if q.AgentName != "" {
 		db = db.Where("agent_name = ?", q.AgentName)
@@ -170,98 +180,248 @@ func GetProposal(id uint) (*models.Proposal, error) {
 	return &p, nil
 }
 
+// proposalBase returns the item's values (or the proposal's locale's)
+// as they were when the agent proposed the change; false when that version
+// is no longer kept.
+func proposalBase(p *models.Proposal) (models.JSONMap, bool) {
+	version := p.BaseVersion
+	if version == 0 {
+		version = 1 // the baseline written before the first change
+	}
+	rev, err := GetRevision(models.RevisionEntityItem, *p.ItemID, version)
+	if err != nil || (p.BaseVersion == 0 && rev.Action != models.RevisionBaseline) {
+		return nil, false
+	}
+	if p.Locale != "" {
+		m, _ := rev.Translations[p.Locale].(map[string]any)
+		return models.JSONMap(m), true
+	}
+	return rev.Data, true
+}
+
+// ProposalState is a proposal against the item as it is now.
+type ProposalState struct {
+	// Stale: the item changed since the agent proposed the change.
+	Stale bool
+	// Current holds the item's values now (or the locale's), nil for a
+	// creation or a deleted item.
+	Current models.JSONMap
+	// Proposed holds the values approving would write: for a stale update,
+	// the item as it is now with the attributes the agent changed.
+	Proposed models.JSONMap
+	// Version is the item's latest version, which the change expects.
+	Version uint
+	item    *models.Item
+}
+
+// ProposalNow compares a pending proposal with its item as it is now.
+func ProposalNow(p *models.Proposal) (*ProposalState, error) {
+	st := &ProposalState{Proposed: p.Data}
+	if p.Action == models.ProposalCreate || p.ItemID == nil {
+		return st, nil
+	}
+	if p.Action == models.ProposalDelete {
+		st.Proposed = nil
+	}
+	var item models.Item
+	if err := database.DB.First(&item, *p.ItemID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			st.Stale = true
+			return st, nil
+		}
+		return nil, err
+	}
+	st.item = &item
+	st.Current = item.Data
+	if p.Locale != "" {
+		m, _ := item.Translations[p.Locale].(map[string]any)
+		st.Current = models.JSONMap(m)
+	}
+	if rev, err := LatestRevision(models.RevisionEntityItem, item.ID); err == nil {
+		st.Version = rev.Version
+	} else if !errors.Is(err, ErrRevisionNotFound) {
+		return nil, err
+	}
+	st.Stale = st.Version != p.BaseVersion
+	if !st.Stale || p.Action != models.ProposalUpdate {
+		return st, nil
+	}
+	// Rebase: keep what changed since, apply what the agent changed.
+	base, ok := proposalBase(p)
+	if !ok {
+		return st, nil
+	}
+	proposed := copyMap(st.Current)
+	for k := range keysOf(base, p.Data) {
+		after, inProposal := p.Data[k]
+		if sameData(models.JSONMap{"v": after}, models.JSONMap{"v": base[k]}) {
+			continue
+		}
+		if inProposal {
+			proposed[k] = after
+		} else {
+			delete(proposed, k)
+		}
+	}
+	st.Proposed = proposed
+	return st, nil
+}
+
+func keysOf(maps ...models.JSONMap) map[string]bool {
+	out := map[string]bool{}
+	for _, m := range maps {
+		for k := range m {
+			out[k] = true
+		}
+	}
+	return out
+}
+
 // ProposalIsStale reports whether the proposal's item changed since it was
 // proposed.
 func ProposalIsStale(p *models.Proposal) bool {
-	if p.ItemID == nil || p.Action == models.ProposalCreate {
-		return false
-	}
-	rev, err := LatestRevision(models.RevisionEntityItem, *p.ItemID)
-	if err != nil {
-		return p.BaseVersion != 0
-	}
-	return rev.Version != p.BaseVersion
+	st, err := ProposalNow(p)
+	return err == nil && st.Stale
 }
 
-// ApproveProposal applies a pending proposal, with data (when not nil)
-// replacing what the agent proposed. The change is made as the agent, in
-// its run, so its history and a run revert include it; the proposal
-// records who approved it. A failed change marks the proposal failed and
-// returns the error.
-func ApproveProposal(id uint, reviewer string, data models.JSONMap, force bool) (*models.Proposal, *models.Item, error) {
-	p, err := claimProposal(id)
+// ApproveProposal applies a pending proposal. Without data, the agent's
+// change is applied as the agent, in its run, so its history and a run
+// revert include it; with data (values a reviewer edited), the reviewer
+// makes the change. A stale proposal is refused unless force is set; then
+// only the attributes the agent changed are applied over the item as it is
+// now. A failed change marks the proposal failed and returns the error.
+func ApproveProposal(id uint, reviewer Actor, data models.JSONMap, force bool) (p *models.Proposal, item *models.Item, err error) {
+	p, err = claimProposal(id)
 	if err != nil {
-		return nil, nil, err
+		return p, nil, err
 	}
-	if !force && ProposalIsStale(p) {
-		releaseProposal(p.ID)
-		p.Status = models.ProposalPending
-		return p, nil, ErrProposalStale
+	done := false
+	defer func() {
+		if !done {
+			releaseProposal(id) // a panic or an unexpected error
+			p.Status = models.ProposalPending
+		}
+	}()
+	fail := func(msg string, cause error) (*models.Proposal, *models.Item, error) {
+		done = true
+		if ferr := finishProposal(p, models.ProposalFailed, reviewer.Name, "", msg); ferr != nil {
+			return p, nil, ferr
+		}
+		return p, nil, cause
 	}
 	ct, err := GetCollectionByName(p.Collection)
 	if err != nil {
-		return p, nil, finishProposal(p, models.ProposalFailed, reviewer, "", "the collection no longer exists")
+		return fail("the collection no longer exists", ErrProposalUnappliable)
 	}
-	if data == nil {
-		data = p.Data
-	} else {
-		p.Data = data
+	st, err := ProposalNow(p)
+	if err != nil {
+		return p, nil, err
 	}
+	if st.Stale && !force {
+		return p, nil, ErrProposalStale
+	}
+	if p.Action != models.ProposalCreate {
+		if st.item == nil {
+			return fail("the item no longer exists", ErrItemNotFound)
+		}
+		if st.item.CollectionID != ct.ID {
+			return fail("the item is no longer in this collection", ErrProposalUnappliable)
+		}
+	}
+	var def string
+	if p.Locale != "" {
+		if def, err = DefaultLocale(); err != nil {
+			return p, nil, err
+		}
+		if p.Locale == def {
+			return fail("the locale is now the default locale", ErrProposalUnappliable)
+		}
+		if !LocaleExists(p.Locale) {
+			return fail(fmt.Sprintf("locale '%s' no longer exists", p.Locale), ErrProposalUnappliable)
+		}
+	}
+
 	actor := Actor{Kind: models.ActorAgent, Name: p.AgentName}
 	if p.AgentRunID != nil {
 		actor.AgentRunID = *p.AgentRunID
 	}
-	var item *models.Item
+	if data == nil {
+		data = st.Proposed
+	} else {
+		actor = reviewer
+	}
+	p.Data = data
+	// Nobody may change the item between this check and the change.
+	actor.expectVersion, actor.expectSet = st.Version, p.Action != models.ProposalCreate
+
 	switch p.Action {
 	case models.ProposalCreate:
 		item, err = SaveItem(actor, *ct, data)
 	case models.ProposalDelete:
-		err = DeleteItem(actor, *p.ItemID)
+		err = DeleteItem(actor, st.item.ID)
 	default:
-		def, _ := DefaultLocale()
-		if p.Locale != "" && p.Locale != def {
+		if p.Locale != "" {
 			item, err = SetItemTranslation(actor, *ct, *p.ItemID, p.Locale, data, nil)
 		} else {
 			item, err = UpdateItemContent(actor, *ct, *p.ItemID, data, nil)
 		}
 	}
+	if errors.Is(err, errChangedSince) {
+		return p, nil, ErrProposalStale
+	}
 	if err != nil {
-		msg := "could not apply the change"
 		var verr *ItemValidationError
 		switch {
 		case errors.As(err, &verr):
-			msg = verr.Error()
+			return fail(verr.Error(), err)
 		case errors.Is(err, ErrItemNotFound):
-			msg = "the item no longer exists"
+			return fail("the item no longer exists", err)
+		case errors.Is(err, ErrLocaleNotFound):
+			return fail(err.Error(), ErrProposalUnappliable)
 		}
-		if ferr := finishProposal(p, models.ProposalFailed, reviewer, "", msg); ferr != nil {
-			return p, nil, ferr
-		}
-		return p, nil, err
+		return fail("could not apply the change", err)
 	}
 	if item != nil && p.ItemID == nil {
 		id := item.ID
 		p.ItemID = &id
 	}
-	return p, item, finishProposal(p, models.ProposalApproved, reviewer, "", "")
+	done = true
+	// The change is made: record it, retrying a failed write.
+	for i := 0; i < 3; i++ {
+		if err = finishProposal(p, models.ProposalApproved, reviewer.Name, "", ""); err == nil {
+			break
+		}
+	}
+	return p, item, err
 }
+
+// ErrProposalUnappliable is returned when a proposal can no longer be
+// applied (its collection, item or locale changed); the proposal is
+// marked failed.
+var ErrProposalUnappliable = errors.New("the proposal can no longer be applied")
 
 // RejectProposal discards a pending proposal.
 func RejectProposal(id uint, reviewer, note string) (*models.Proposal, error) {
 	p, err := claimProposal(id)
 	if err != nil {
-		return nil, err
+		return p, err
 	}
 	return p, finishProposal(p, models.ProposalRejected, reviewer, note, "")
 }
 
-// proposalApplying marks a proposal being decided, so two reviewers
-// cannot apply it twice.
-const proposalApplying = "applying"
+// ProposalApplying marks a proposal being decided, so two reviewers
+// cannot apply it twice. A claim older than claimTimeout (a crashed
+// server) can be taken over.
+const ProposalApplying = "applying"
+
+const claimTimeout = 2 * time.Minute
 
 // claimProposal moves a pending proposal to "applying" atomically.
 func claimProposal(id uint) (*models.Proposal, error) {
-	res := database.DB.Model(&models.Proposal{}).Where("id = ? AND status = ?", id, models.ProposalPending).Update("status", proposalApplying)
+	now := models.APITime(time.Now())
+	res := database.DB.Model(&models.Proposal{}).
+		Where("id = ? AND (status = ? OR (status = ? AND decided_at < ?))", id, models.ProposalPending, ProposalApplying, now.Add(-claimTimeout)).
+		Updates(map[string]any{"status": ProposalApplying, "decided_at": now})
 	if res.Error != nil {
 		return nil, res.Error
 	}
@@ -276,7 +436,10 @@ func claimProposal(id uint) (*models.Proposal, error) {
 }
 
 func releaseProposal(id uint) {
-	database.DB.Model(&models.Proposal{}).Where("id = ? AND status = ?", id, proposalApplying).Update("status", models.ProposalPending)
+	if err := database.DB.Model(&models.Proposal{}).Where("id = ? AND status = ?", id, ProposalApplying).
+		Updates(map[string]any{"status": models.ProposalPending, "decided_at": nil}).Error; err != nil {
+		logger.Log.WithError(err).WithField("proposal", id).Error("Failed to release a proposal")
+	}
 }
 
 func finishProposal(p *models.Proposal, status, reviewer, note, errText string) error {

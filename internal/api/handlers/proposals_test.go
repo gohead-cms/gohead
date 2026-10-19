@@ -32,13 +32,15 @@ func TestProposalReview(t *testing.T) {
 	t.Run("reviewers only see what they may change", func(t *testing.T) {
 		assert.Len(t, a.ok("editor", "GET", "/api/proposals", nil), 3)
 		list := a.ok("writer", "GET", "/api/proposals", nil).([]any)
-		assert.Len(t, list, 2, "the writer can change articles, not pages")
+		assert.Len(t, list, 1, "the writer may update articles, not delete them or change pages")
 		code, _ := a.do("viewer", "GET", "/api/proposals", nil)
 		assert.Equal(t, http.StatusForbidden, code)
 		code, _ = a.do("writer", "GET", fmt.Sprintf("/api/proposals/%d", onPage.ID), nil)
 		assert.Equal(t, http.StatusNotFound, code)
 		code, _ = a.do("writer", "POST", fmt.Sprintf("/api/proposals/%d/approve", deleteArticle.ID), nil)
 		assert.Equal(t, http.StatusNotFound, code, "approving a delete needs delete")
+		code, _ = a.do("editor", "POST", fmt.Sprintf("/api/proposals/%d/approve", onPage.ID), map[string]any{"data": []any{"x"}, "force": true})
+		assert.Equal(t, http.StatusBadRequest, code, "a malformed body is refused, not ignored")
 		code, _ = a.do("editor", "GET", "/api/proposals?status=nope", nil)
 		assert.Equal(t, http.StatusBadRequest, code)
 	})
@@ -50,6 +52,7 @@ func TestProposalReview(t *testing.T) {
 		changes := got["changes"].([]any)
 		require.Len(t, changes, 1)
 		assert.Equal(t, "About us", field(changes[0], "after"))
+		assert.Equal(t, "About us", field(got["proposed"], "title"))
 	})
 
 	t.Run("approve, edit, reject", func(t *testing.T) {

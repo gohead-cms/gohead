@@ -43,23 +43,26 @@ to see the change field by field against the item as it is now, then:
 
 Who can review: anyone whose role may make the change. A role with `update` on `articles`
 reviews updates of articles, `delete` is needed for deletions and `create` for creations,
-and changing a published item needs `publish` as for any edit. Viewers do not see
-proposals. Each reviewer only sees the collections they may change.
+and changing a published item needs `publish` as for any edit. Each reviewer only sees the
+proposals they could apply; viewers see none.
 
 An approved change is made **as the agent, in its run**: the
 [history](../guides/content-history.md) shows the agent and its run, reverting the run undoes
-it, and the proposal records who approved it. Approved changes emit content events
+it, and the proposal records who approved it. A change you edited before approving is
+yours: the history shows you, not the agent. Approved changes emit content events
 (webhooks), but never trigger the agent that proposed them.
 
 ### Stale proposals
 
 When the item changed after the agent proposed something (a person edited it, another
-proposal was approved), the proposal is **stale**: approving it would overwrite that
-change, so GoHead refuses with `409` and the UI shows a warning. Review the item, then
-reject the proposal or apply it anyway.
+proposal was approved), the proposal is **stale** and GoHead refuses to approve it with
+`409`; the UI shows a warning. The proposal then shows what applying it **now** would do:
+the item as it is, with only the attributes the agent changed. Reject it, or apply it
+anyway: changes made since to other attributes are kept.
 
-If the change can no longer be applied (the item was deleted, a value is no longer valid),
-the proposal is marked `failed` with the reason.
+If the change can no longer be applied (the item or its collection was deleted, a locale
+removed, a value is no longer valid), applying it marks the proposal `failed` with the
+reason. Deleting a collection fails its pending proposals.
 
 ## API
 
@@ -67,7 +70,8 @@ the proposal is marked `failed` with the reason.
 # Pending proposals (status=pending|approved|rejected|failed|all, collection, agent, agentRun)
 curl "$GOHEAD/api/proposals?agent=translator-posts" -H "$AUTH"
 
-# One proposal: the change, the item now, the diff, and whether it is stale
+# One proposal: the item now (current), what approving writes (proposed),
+# the diff between the two, and whether it is stale
 curl $GOHEAD/api/proposals/12 -H "$AUTH"
 
 # Approve, optionally with edited values or despite a later change
@@ -86,5 +90,8 @@ curl -X POST $GOHEAD/api/proposals/12/reject -H "$AUTH" -d '{"note": "Too litera
 | `failed` | Approved but could not be applied (`error`) |
 
 Approving returns `409` when the proposal was already decided or is stale (send
-`"force": true` to apply it anyway), `422` when the change could not be applied, and `403`
-when your role may not make it.
+`"force": true` to apply it anyway), `422` when the change could not be applied (the
+proposal is then `failed`), `403` when the change needs a permission you lack (`publish`
+for a published item, `create` for related items it would create) and `404` for proposals
+your role may not apply. Password values are masked; a masked value sent back in `data`
+keeps the proposed one.

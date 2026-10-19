@@ -58,9 +58,17 @@ func (r *AgentRunner) HandleAgentJob(ctx context.Context, t *asynq.Task) error {
 func (r *AgentRunner) Run(ctx context.Context, payload jobs.AgentJobPayload, attempt int) error {
 	logger.Log.WithField("agent_id", payload.AgentID).Info("Starting agent job execution")
 
+	// Runs requested from the API (Run now, test runs) were recorded as
+	// queued: they run once under that ID and are not retried, so the run
+	// the caller follows is the one that happens.
+	manual := payload.RunID != 0
 	agent, err := storage.GetAgentByID(payload.AgentID)
 	if err != nil {
 		logger.Log.WithError(err).WithField("agent_id", payload.AgentID).Error("Failed to retrieve agent for job")
+		if manual {
+			storage.FailQueuedRun(payload.RunID, "the agent could not be loaded: "+err.Error())
+			return nil
+		}
 		return err
 	}
 
@@ -81,19 +89,24 @@ func (r *AgentRunner) Run(ctx context.Context, payload jobs.AgentJobPayload, att
 	// before it: runs of the same agent starting together on several
 	// workers are ordered by ID and cannot all pass the same check. A run
 	// requested from the API was recorded (queued) already: it goes on
-	// under the same ID, except on retries.
-	if payload.RunID != 0 && attempt == 1 {
+	// under the same ID.
+	if manual {
 		run.ID = payload.RunID
 		if err := storage.SaveAgentRun(run); err != nil {
-			return fmt.Errorf("could not record run: %w", err)
+			logger.Log.WithError(err).WithField("run_id", run.ID).Error("Could not start a queued run")
+			storage.FailQueuedRun(payload.RunID, "could not be started: "+err.Error())
+			return nil
 		}
 	} else if err := storage.CreateAgentRun(run); err != nil {
 		return fmt.Errorf("could not record run: %w", err)
 	}
-	reason, err := preRunLimit(agent, run.ID, r.now)
+	reason, err := preRunLimit(agent, run.ID, manual, r.now)
 	if err != nil {
 		r.finish(run, agentModels.RunFailed, "could not check limits: "+err.Error(), nil)
 		r.save(run)
+		if manual {
+			return nil
+		}
 		return fmt.Errorf("could not check agent usage: %w", err)
 	}
 	if reason != "" {
@@ -122,6 +135,9 @@ func (r *AgentRunner) Run(ctx context.Context, payload jobs.AgentJobPayload, att
 
 	if runErr != nil {
 		logger.Log.WithError(runErr).WithField("agent_id", payload.AgentID).Error("Agent conversation loop failed")
+		if manual {
+			return nil
+		}
 		return runErr
 	}
 	logger.Log.WithField("agent_id", payload.AgentID).WithField("run_id", run.ID).WithField("status", run.Status).Info("Agent job completed")
@@ -149,12 +165,14 @@ func (r *AgentRunner) finish(run *agentModels.AgentRun, status, errText string, 
 // preRunLimit returns why run runID of the agent may not start ("" if it
 // may), counting only the runs created before it. A database error fails
 // closed.
-func preRunLimit(agent *agentModels.Agent, runID uint, now func() time.Time) (string, error) {
+// A queued run (wasQueued) was numbered when it was requested: it also
+// counts the runs started since, whatever their ID.
+func preRunLimit(agent *agentModels.Agent, runID uint, wasQueued bool, now func() time.Time) (string, error) {
 	l := agent.Limits
 	if !l.Any() {
 		return "", nil
 	}
-	day, err := storage.AgentUsageBefore(agent.ID, now().UTC().Add(-24*time.Hour), runID)
+	day, err := storage.AgentUsageBefore(agent.ID, now().UTC().Add(-24*time.Hour), runID, wasQueued)
 	if err != nil {
 		return "", err
 	}
@@ -162,7 +180,7 @@ func preRunLimit(agent *agentModels.Agent, runID uint, now func() time.Time) (st
 		return fmt.Sprintf("max_runs_per_day reached (%d runs in the last 24 hours)", day.Runs), nil
 	}
 	if l.MaxRunsPerHour > 0 {
-		hour, err := storage.AgentUsageBefore(agent.ID, now().UTC().Add(-time.Hour), runID)
+		hour, err := storage.AgentUsageBefore(agent.ID, now().UTC().Add(-time.Hour), runID, wasQueued)
 		if err != nil {
 			return "", err
 		}

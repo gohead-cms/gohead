@@ -317,8 +317,10 @@ func staticPaths() obj {
 			"parameters": []any{paramID},
 			"responses": merge(obj{"200": ok("Proposal", dataEnvelope(obj{"type": "object", "properties": obj{
 				"proposal": ref("Proposal"), "stale": obj{"type": "boolean", "description": "The item changed since the agent proposed this"},
-				"current": obj{"type": "object", "additionalProperties": true}, "currentStatus": obj{"type": "string"},
-				"changes": obj{"type": "array", "items": obj{"type": "object"}},
+				"current":       obj{"type": "object", "additionalProperties": true, "description": "The item's values now (pending proposals)"},
+				"proposed":      obj{"type": "object", "additionalProperties": true, "description": "What approving writes: for a stale update, the item now with the agent's changes"},
+				"currentStatus": obj{"type": "string"},
+				"changes":       obj{"type": "array", "items": obj{"type": "object"}},
 			}, "required": []string{"proposal", "stale"}}, nil))}, errorResponses("400", "401", "404")),
 		}},
 		"/api/proposals/{id}/approve": obj{"post": obj{
@@ -425,9 +427,9 @@ func proposalSchema() obj {
 		"action":     obj{"type": "string", "enum": []string{models.ProposalCreate, models.ProposalUpdate, models.ProposalDelete}},
 		"collection": obj{"type": "string"}, "itemId": nullable(obj{"type": "integer"}),
 		"locale": obj{"type": "string", "description": "Set when the change is a translation"},
-		"data":   obj{"type": "object", "additionalProperties": true, "description": "The item's values after the change"},
+		"data":   nullable(obj{"type": "object", "additionalProperties": true, "description": "The item's values after the change (null for a deletion)"}),
 		"reason": obj{"type": "string"}, "baseVersion": obj{"type": "integer"},
-		"status":     obj{"type": "string", "enum": []string{models.ProposalPending, models.ProposalApproved, models.ProposalRejected, models.ProposalFailed}},
+		"status":     obj{"type": "string", "enum": []string{models.ProposalPending, "applying", models.ProposalApproved, models.ProposalRejected, models.ProposalFailed}},
 		"reviewedBy": obj{"type": "string"}, "reviewNote": obj{"type": "string"}, "error": obj{"type": "string"},
 		"createdAt": obj{"type": "string", "format": "date-time"}, "decidedAt": nullable(obj{"type": "string", "format": "date-time"}),
 	}, "required": []string{"id", "agentName", "action", "collection", "status", "createdAt"}}
