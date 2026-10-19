@@ -12,6 +12,8 @@ const (
 	// RunLimited: stopped, or not started, because a rate or cost limit was
 	// reached.
 	RunLimited = "limited"
+	// RunQueued: requested (run now, test run) and waiting for a worker.
+	RunQueued = "queued"
 )
 
 // Step types.
@@ -23,7 +25,9 @@ const (
 // AgentRun records one execution of an agent: what started it, what it
 // did, what it cost and how it ended.
 type AgentRun struct {
-	ID           uint       `json:"id" gorm:"primaryKey"`
+	ID uint `json:"id" gorm:"primaryKey"`
+	// DryRun: a test run; content functions only simulated their writes.
+	DryRun       bool       `json:"dryRun" gorm:"not null;default:false"`
 	AgentID      uint       `json:"agentId" gorm:"index:idx_agent_runs_agent_started,priority:1"`
 	AgentName    string     `json:"agentName"`
 	Status       string     `json:"status" gorm:"type:varchar(20);index"`

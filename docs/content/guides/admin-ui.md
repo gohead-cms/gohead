@@ -51,7 +51,8 @@ An expired or revoked session signs you out.
 | Media library | `/media` | Upload by button or drag and drop, search and filter, edit name, alt text and caption, copy URLs, delete |
 | Types | `/model` | Create, edit and delete collections, components and single types: attributes of every type with their options (required, unique, enum values, ranges, relations, media, components), draft and publish |
 | Schema designer | `/workspace` | The saved content model as a graph: collections, relations and the agents listening to them |
-| Agents | `/agents` | Create and edit agents (model, prompt, trigger, functions from the built-in catalog with collection scopes, limits), run one now, inspect its runs step by step, see the content a run changed and revert it |
+| Agents | `/agents` | Create agents from scratch or from a [template](../agents/templates.md), edit them (model, prompt, trigger, functions from the built-in catalog with collection scopes, limits, [approval](../agents/approvals.md)), run one now or as a [test run](../agents/runs-and-limits.md#test-runs), inspect its runs step by step, see the content a run changed or proposed and revert it |
+| Approvals | `/approvals` | [Changes agents proposed](../agents/approvals.md): review the diff, approve, edit and approve, or reject. The sidebar shows the pending count. For roles that can change content |
 | Activity | `/activity` | **Agent runs**: runs of every agent with status, tokens, cost and duration, and usage against limits. **Content changes**: every change to content, filtered by who made it (people, API tokens, agents) and action |
 | Users | `/settings/users` | Create accounts, change roles, reset passwords. Admins can't demote or delete themselves or the last admin |
 | API tokens | `/settings/tokens` | Create role-scoped tokens (the secret is shown once) and revoke them |

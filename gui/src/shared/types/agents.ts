@@ -30,7 +30,8 @@ export interface AgentLimits {
   max_cost_per_day?: number;
 }
 
-export type RunStatus = 'running' | 'succeeded' | 'failed' | 'limited';
+/** queued: requested (run now, test run) and waiting for a worker. */
+export type RunStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'limited';
 
 export interface AgentRunStep {
   id: number;
@@ -53,6 +54,8 @@ export interface AgentRun {
   agentId?: number;
   agentName?: string;
   status: RunStatus;
+  /** A test run: content functions only reported what they would change. */
+  dryRun?: boolean;
   triggerType: string;
   trigger: string;
   input: string;
@@ -122,6 +125,9 @@ export interface AgentNodeData {
     };
     systemPrompt?: string;
     limits?: AgentLimits;
+    /** Content writes become proposals an editor approves (when the API sends it). */
+    requireApproval?: boolean;
+    require_approval?: boolean;
   };
   [key: string]: unknown;
 }
@@ -132,6 +138,46 @@ export interface AgentNodeData {
 export interface AgentFunction {
   name: string;
   description: string;
+}
+
+/** A parameter of an agent template (GET /admin/agent-templates). */
+export interface AgentTemplateParam {
+  key: string;
+  label: string;
+  type: 'collection' | 'field' | 'fields' | 'text' | 'number' | 'bool';
+  required: boolean;
+  default?: unknown;
+  help?: string;
+  /** field / fields: the attribute types allowed. */
+  types?: string[];
+  /** field / fields: only localized attributes. */
+  localized?: boolean;
+}
+
+/** A ready-made agent. */
+export interface AgentTemplate {
+  id: string;
+  name: string;
+  description: string;
+  params: AgentTemplateParam[];
+}
+
+/** An agent definition: the body of POST /admin/agents (what a template renders). */
+export interface AgentDefinition {
+  name: string;
+  system_prompt: string;
+  max_turns?: number;
+  trigger?: {
+    type: string;
+    cron?: string;
+    webhook_token?: string;
+    event_trigger?: { collection: string; events: string[] };
+  };
+  functions?: (AgentFunction & { collections?: string[]; parameters?: Record<string, unknown> })[];
+  llm_config?: AgentNodeData['schema']['llmConfig'];
+  memory?: { type: string; session_scope: string };
+  require_approval?: boolean;
+  limits?: AgentLimits;
 }
 
 /** 

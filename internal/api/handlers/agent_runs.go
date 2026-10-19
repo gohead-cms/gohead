@@ -31,9 +31,9 @@ func ListAgentRuns(c *gin.Context) {
 	}
 	q := storage.RunQuery{Page: 1, PageSize: 20, Status: c.Query("status")}
 	switch q.Status {
-	case "", agents.RunRunning, agents.RunSucceeded, agents.RunFailed, agents.RunLimited:
+	case "", agents.RunQueued, agents.RunRunning, agents.RunSucceeded, agents.RunFailed, agents.RunLimited:
 	default:
-		validationError(c, "status must be running, succeeded, failed or limited")
+		validationError(c, "status must be queued, running, succeeded, failed or limited")
 		return
 	}
 	if v := c.Query("page"); v != "" {

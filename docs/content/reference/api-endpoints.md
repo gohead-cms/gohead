@@ -35,6 +35,9 @@ Base URL: your API, e.g. `http://localhost:8080`. **Auth** column: `–` public,
 | `GET` | `/api/singleton/{name}/revisions` | token (update) | History of a singleton (also `/{version}` and `/{version}/restore`) |
 | `GET` | `/api/locales` | token | Content [locales](../guides/localization.md), the default first. Reads take `?locale=` and `?fallback=`, and `PUT ?locale=` writes a translation |
 | `GET` | `/api/revisions` | token (update) | Change feed across entries; `collection`, `singleton`, `action`, `actorKind`, `actor`, `agentRun` |
+| `GET` | `/api/proposals` | token (create, update or delete) | [Changes agents proposed](../agents/approvals.md) in collections the caller may change; `status`, `collection`, `agent`, `agentRun` |
+| `GET` | `/api/proposals/{id}` | token | One proposal with the item now, the diff and `stale` |
+| `POST` | `/api/proposals/{id}/approve`, `/reject` | token (the change's permission) | Apply (`data`, `force`) or discard (`note`) a proposal |
 | `POST` | `/api/media` | token (create) | Upload files (`multipart/form-data`, field `files`) |
 | `GET` | `/api/media` | token (create) | List the media library (`page`, `pageSize`, `mime`, `search`) |
 | `GET`, `PUT`, `DELETE` | `/api/media/{id}` | token (create / update / delete) | One file; `PUT` changes `name`, `alt`, `caption` |
@@ -93,6 +96,10 @@ header.
 | `GET`, `PUT`, `DELETE` | `/admin/agents/{name}` | admin |
 | `GET` | `/admin/agents/{name}/runs` | admin |
 | `GET` | `/admin/agents/{name}/runs/{id}` | admin |
+| `POST` | `/admin/agents/{name}/run` | admin (run now; `202` with the queued run's ID) |
+| `POST` | `/admin/agents/{name}/test` | admin ([test run](../agents/runs-and-limits.md#test-runs): `input`, or `item_id` and `event`) |
+| `GET` | `/admin/agent-templates` | admin ([templates](../agents/templates.md)) |
+| `POST` | `/admin/agent-templates/{id}/render` | admin (an agent definition from `params`; not saved) |
 | `POST` | `/admin/agents/{name}/runs/{id}/revert` | admin ([revert a run's content changes](../guides/content-history.md#reverting-an-agent-run); `?force=true`) |
 | `GET` | `/admin/agents/{name}/usage` | admin |
 | `POST` | `/agents/webhook/{id}` | webhook |

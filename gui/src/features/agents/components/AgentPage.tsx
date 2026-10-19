@@ -67,8 +67,8 @@ export default function AgentsPage() {
           <Spinner />
         ) : agentDetails ? (
           <AgentDetails
-            // ?run=… opens that run; a new one starts the details again.
-            key={params.get("run") ?? ""}
+            // Another agent, or ?run=… opening a run, starts the details again.
+            key={`${agentDetails.name}:${params.get("run") ?? ""}`}
             agent={agentDetails}
             initialRun={Number(params.get("run")) || undefined}
             onDelete={isAdmin ? () => remove(agentDetails.name) : undefined}

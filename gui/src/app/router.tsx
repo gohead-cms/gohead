@@ -21,6 +21,7 @@ import { TokensPage } from "../features/settings/TokensPage";
 import { WebhooksPage } from "../features/settings/WebhooksPage";
 import { LocalesPage } from "../features/settings/LocalesPage";
 import { RolesPage } from "../features/settings/RolesPage";
+import { ApprovalsPage } from "../features/approvals/ApprovalsPage";
 
 // The main layout that includes the Sidebar and Header
 function DashboardLayout() {
@@ -46,6 +47,19 @@ function AdminOnly({ children }: { children: ReactNode }) {
   return isAdmin ? <>{children}</> : <Navigate to="/dashboard" replace />;
 }
 
+/** Pages for roles that can change content (reviewing agent proposals): others go to the dashboard. */
+function ReviewersOnly({ children }: { children: ReactNode }) {
+  const { canReview, loading } = useMe();
+  if (loading) {
+    return (
+      <Center py={20}>
+        <Spinner />
+      </Center>
+    );
+  }
+  return canReview ? <>{children}</> : <Navigate to="/dashboard" replace />;
+}
+
 export function AppRouter() {
   return (
     <Routes>
@@ -65,6 +79,7 @@ export function AppRouter() {
         <Route path="/contrib" element={<ContributionsPage />} />
         <Route path="/contrib/edit/:collectionName" element={<ContributionEditorPage />} />
         <Route path="/media" element={<MediaLibraryPage />} />
+        <Route path="/approvals" element={<ReviewersOnly><ApprovalsPage /></ReviewersOnly>} />
 
         {/* Content model */}
         <Route path="/model" element={<AdminOnly><ContentModelPage /></AdminOnly>} />

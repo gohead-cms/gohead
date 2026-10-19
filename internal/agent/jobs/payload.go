@@ -10,7 +10,12 @@ type AgentJobPayload struct {
 	AgentID      uint          `json:"agent_id"`                // Changed from uuid.UUID to uint
 	InitialInput string        `json:"initial_input"`           // The first message to the agent
 	TriggerEvent *TriggerEvent `json:"trigger_event,omitempty"` // Structured event data
-	CreatedAt    time.Time     `json:"created_at,omitempty"`    // When the job was created
+	// DryRun: a test run; content functions only simulate their writes.
+	DryRun bool `json:"dry_run,omitempty"`
+	// RunID: the run recorded (queued) when the job was requested, so the
+	// requester can follow it; 0 lets the worker record it.
+	RunID     uint      `json:"run_id,omitempty"`
+	CreatedAt time.Time `json:"created_at,omitempty"` // When the job was created
 }
 
 // TriggerEvent represents a structured trigger event

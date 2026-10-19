@@ -7,7 +7,7 @@ import { errorMessage } from "../../../shared/utils/errors";
 import { type AgentFunctionInfo } from "../../../shared/types";
 import { type CollectionChoice } from "../hook/useEditorData";
 import { type AgentDraft, buildPayload, validateDraft } from "./agentForm";
-import { BasicsSection, LimitsSection, MemorySection, ModelSection, TriggerSection } from "./AgentFormSections";
+import { ApprovalSection, BasicsSection, LimitsSection, MemorySection, ModelSection, TriggerSection } from "./AgentFormSections";
 import { FunctionsEditor } from "./FunctionsEditor";
 
 interface AgentFormProps {
@@ -69,6 +69,7 @@ export function AgentForm({ initial, originalName, agentId, takenNames, catalog,
           collections={collections}
           errors={errors}
         />
+        <ApprovalSection {...sectionProps} />
         <LimitsSection {...sectionProps} />
         <MemorySection {...sectionProps} />
 

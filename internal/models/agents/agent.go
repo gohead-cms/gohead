@@ -17,15 +17,18 @@ import (
 // Agent represents an autonomous agent configuration.
 type Agent struct {
 	gorm.Model
-	Name         string         `json:"name" gorm:"uniqueIndex;size:191"`
-	SystemPrompt string         `json:"system_prompt" gorm:"type:text;not null"`
-	MaxTurns     int            `json:"max_turns" gorm:"not null;default:4"`
-	LLMConfig    LLMConfig      `json:"llm_config" gorm:"type:jsonb"`
-	Memory       MemoryConfig   `json:"memory" gorm:"type:jsonb"`
-	Trigger      TriggerConfig  `json:"trigger" gorm:"type:jsonb"`
-	Functions    FunctionSpecs  `json:"functions" gorm:"type:jsonb"`
-	Limits       Limits         `json:"limits" gorm:"type:json;serializer:json"`
-	Config       models.JSONMap `json:"-" gorm:"type:jsonb"`
+	Name         string        `json:"name" gorm:"uniqueIndex;size:191"`
+	SystemPrompt string        `json:"system_prompt" gorm:"type:text;not null"`
+	MaxTurns     int           `json:"max_turns" gorm:"not null;default:4"`
+	LLMConfig    LLMConfig     `json:"llm_config" gorm:"type:jsonb"`
+	Memory       MemoryConfig  `json:"memory" gorm:"type:jsonb"`
+	Trigger      TriggerConfig `json:"trigger" gorm:"type:jsonb"`
+	Functions    FunctionSpecs `json:"functions" gorm:"type:jsonb"`
+	Limits       Limits        `json:"limits" gorm:"type:json;serializer:json"`
+	// RequireApproval makes content writes proposals that an editor
+	// approves or rejects, instead of changes.
+	RequireApproval bool           `json:"require_approval" gorm:"not null;default:false"`
+	Config          models.JSONMap `json:"-" gorm:"type:jsonb"`
 }
 
 // LLMConfig specifies the large language model to use.

@@ -407,6 +407,8 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *medi
 		admin.POST("/webhooks/:id/test", handlers.TestWebhook)
 
 		// Agents
+		admin.GET("/agent-templates", handlers.ListAgentTemplates)
+		admin.POST("/agent-templates/:id/render", handlers.RenderAgentTemplate)
 		agents := admin.Group("/agents")
 		{
 			agents.POST("", handlers.CreateAgent)
@@ -418,6 +420,7 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *medi
 			agents.GET("/:name/runs/:run", handlers.GetAgentRun)
 			agents.GET("/:name/usage", handlers.GetAgentUsage)
 			agents.POST("/:name/run", handlers.RunAgentNow)
+			agents.POST("/:name/test", handlers.TestAgent)
 			agents.POST("/:name/runs/:run/revert", handlers.RevertAgentRun)
 		}
 	}
@@ -454,6 +457,10 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *medi
 		content.GET("/singleton/:name/revisions/:version", handlers.GetSingletonRevision)
 		content.POST("/singleton/:name/revisions/:version/restore", handlers.RestoreSingletonRevision)
 		content.GET("/revisions", handlers.ListRevisions)
+		content.GET("/proposals", handlers.ListProposals)
+		content.GET("/proposals/:id", handlers.GetProposal)
+		content.POST("/proposals/:id/approve", handlers.ApproveProposal)
+		content.POST("/proposals/:id/reject", handlers.RejectProposal)
 		content.POST("/media", handlers.UploadMedia)
 		content.GET("/media", handlers.ListMedia)
 		content.GET("/media/:id", handlers.GetMedia)

@@ -23,6 +23,8 @@ export interface MeState {
   canWrite: boolean;
   /** The role can read at least one content type. */
   canReadContent: boolean;
+  /** The role can create, update or delete in at least one content type: it reviews agent proposals. */
+  canReview: boolean;
   /**
    * Whether the role may perform action on resource: a collection name,
    * singletonResource(name) or MEDIA ("media"). Mirrors the server: a type
@@ -39,6 +41,7 @@ export const MeContext = createContext<MeState>({
   isAdmin: false,
   canWrite: false,
   canReadContent: false,
+  canReview: false,
   can: () => false,
 });
 
@@ -63,6 +66,7 @@ export function meState(me: Me | null, loading: boolean, error: string | null, r
     isAdmin: me?.role === "admin",
     canWrite: allowsAny(perms, "create") || allowsAny(perms, "update"),
     canReadContent: allowsAny(perms, "read"),
+    canReview: allowsAny(perms, "create") || allowsAny(perms, "update") || allowsAny(perms, "delete"),
     can: (action, resource) => allows(perms, action, resource),
   };
 }

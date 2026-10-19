@@ -2,9 +2,12 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gohead-cms/gohead/internal/agent/functions"
 	"github.com/gohead-cms/gohead/internal/agent/jobs"
@@ -56,9 +59,9 @@ func GetOverview(c *gin.Context) {
 func ListAllAgentRuns(c *gin.Context) {
 	q := storage.RunQuery{Page: 1, PageSize: 20, Status: c.Query("status")}
 	switch q.Status {
-	case "", agents.RunRunning, agents.RunSucceeded, agents.RunFailed, agents.RunLimited:
+	case "", agents.RunQueued, agents.RunRunning, agents.RunSucceeded, agents.RunFailed, agents.RunLimited:
 	default:
-		validationError(c, "status must be running, succeeded, failed or limited")
+		validationError(c, "status must be queued, running, succeeded, failed or limited")
 		return
 	}
 	if v := c.Query("page"); v != "" {
@@ -114,19 +117,98 @@ func RunAgentNow(c *gin.Context) {
 	if input == "" {
 		input = "This is a manual run started from the admin UI. Do your task."
 	}
+	queueRun(c, agent, jobs.AgentJobPayload{AgentID: agent.ID, InitialInput: input})
+}
+
+// TestAgent queues a test run (dry run): the agent runs for real (model
+// calls, reads), but content functions only validate and report the
+// changes they would make. Body: {"input": "…"} for a manual message, or
+// {"item_id": 42, "event": "item:created"} to simulate the agent's
+// collection event on an existing item.
+func TestAgent(c *gin.Context) {
+	agent, err := storage.GetAgentByName(c.Param("name"))
+	if err != nil {
+		c.Set("response", "Agent not found")
+		c.Set("status", http.StatusNotFound)
+		return
+	}
+	var body struct {
+		Input  string `json:"input"`
+		ItemID uint   `json:"item_id"`
+		Event  string `json:"event"`
+	}
+	if !bindOptional(c, &body) {
+		return
+	}
+	if body.ItemID != 0 && strings.TrimSpace(body.Input) != "" {
+		validationError(c, "give either input or item_id")
+		return
+	}
+	payload := jobs.AgentJobPayload{AgentID: agent.ID, DryRun: true, InitialInput: strings.TrimSpace(body.Input)}
+	if body.ItemID != 0 {
+		collection := agent.Trigger.EventTrigger.Collection
+		if agent.Trigger.Type != "collection_event" || collection == "" {
+			validationError(c, "item_id simulates a collection event: this agent is not triggered by one")
+			return
+		}
+		ct, err := storage.GetCollectionByName(collection)
+		if err != nil {
+			validationError(c, "the agent's collection '"+collection+"' does not exist")
+			return
+		}
+		item, err := storage.GetItemByID(ct.ID, body.ItemID)
+		if err != nil {
+			validationError(c, fmt.Sprintf("item %d not found in %s", body.ItemID, collection))
+			return
+		}
+		event := body.Event
+		events := agent.Trigger.EventTrigger.Events
+		if event == "" && len(events) > 0 {
+			event = events[0]
+		}
+		if event == "" || !slices.Contains(events, event) {
+			validationError(c, "event must be one of the agent's events: "+strings.Join(events, ", "))
+			return
+		}
+		payload.TriggerEvent = &jobs.TriggerEvent{Type: "collection_event", CollectionEvent: &jobs.CollectionEventData{
+			Collection: collection, Event: event, ItemID: fmt.Sprint(item.ID), ItemData: item.Data,
+		}}
+	} else if payload.InitialInput == "" {
+		payload.InitialInput = "This is a test run started from the admin UI. Do your task."
+	}
+	queueRun(c, agent, payload)
+}
+
+// queueRun records a queued run and sends the job to the workers; the
+// response carries the run ID to follow.
+func queueRun(c *gin.Context, agent *agents.Agent, payload jobs.AgentJobPayload) {
 	if asynqClient == nil {
 		c.Set("response", "Agent runs need Redis, which is not configured")
 		c.Set("status", http.StatusServiceUnavailable)
 		return
 	}
-	if err := jobs.EnqueueAgentJob(context.Background(), asynqClient, jobs.AgentJobPayload{
-		AgentID: agent.ID, InitialInput: input,
-	}); err != nil {
-		logger.Log.WithError(err).WithField("agent", agent.Name).Error("Failed to queue a manual run")
-		c.Set("response", "Failed to queue the run")
+	run := &agents.AgentRun{
+		AgentID: agent.ID, AgentName: agent.Name, Status: agents.RunQueued, DryRun: payload.DryRun,
+		Provider: agent.LLMConfig.Provider, Model: agent.LLMConfig.Model, StartedAt: time.Now().UTC(),
+		TriggerType: "manual",
+	}
+	if payload.TriggerEvent != nil {
+		run.TriggerType = payload.TriggerEvent.Type
+	}
+	if err := storage.CreateAgentRun(run); err != nil {
+		c.Set("response", "Failed to record the run")
 		c.Set("status", http.StatusInternalServerError)
 		return
 	}
-	c.Set("response", gin.H{"status": "queued"})
+	payload.RunID = run.ID
+	if err := jobs.EnqueueAgentJob(context.Background(), asynqClient, payload); err != nil {
+		logger.Log.WithError(err).WithField("agent", agent.Name).Error("Failed to queue a run")
+		run.Status, run.Error = agents.RunFailed, "could not be queued"
+		_ = storage.SaveAgentRun(run)
+		c.Set("response", "Could not queue the run: the job queue (Redis) is unreachable")
+		c.Set("status", http.StatusServiceUnavailable)
+		return
+	}
+	c.Set("response", gin.H{"status": "queued", "runId": run.ID, "dryRun": payload.DryRun})
 	c.Set("status", http.StatusAccepted)
 }

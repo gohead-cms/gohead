@@ -278,6 +278,8 @@ func FormatAgentSchema(agent *agents.Agent) map[string]any {
 			"trigger":      trigger,
 			"functions":    agent.Functions,
 			"limits":       agent.Limits,
+			// requireApproval: writes become proposals editors approve.
+			"requireApproval": agent.RequireApproval,
 		},
 	}
 }

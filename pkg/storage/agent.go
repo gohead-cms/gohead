@@ -171,6 +171,7 @@ func UpdateAgent(id uint, updated *models.Agent) error {
 	existing.Functions = updated.Functions
 	existing.Config = updated.Config
 	existing.Limits = updated.Limits
+	existing.RequireApproval = updated.RequireApproval
 
 	if err := database.DB.Save(&existing).Error; err != nil {
 		logger.Log.WithError(err).WithField("agent_id", id).Error("Failed to save updated agent")

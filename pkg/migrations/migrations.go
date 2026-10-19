@@ -53,6 +53,12 @@ var All = []Migration{
 		Up:          i18nUp,
 		Down:        i18nDown,
 	},
+	{
+		ID:          "0004_agent_reviews",
+		Description: "Agent proposals awaiting approval, approval setting, test runs",
+		Up:          agentsV2Up,
+		Down:        agentsV2Down,
+	},
 }
 
 // baseline creates or updates every table from the models, as GoHead did at

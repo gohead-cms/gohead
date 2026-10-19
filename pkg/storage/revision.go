@@ -28,6 +28,7 @@ type Actor struct {
 	// unless the entry's latest version is still this one (checked under
 	// the row lock, in the change's transaction).
 	expectVersion uint
+	expectSet     bool // expectVersion is set (0: the entry has no history yet)
 }
 
 // errChangedSince: the entry changed between a check and the change.
@@ -98,7 +99,7 @@ func recordRevision(tx *gorm.DB, actor Actor, in revisionInput) (*models.Revisio
 		Select("COALESCE(MAX(version), 0)").Scan(&last).Error; err != nil {
 		return nil, fmt.Errorf("failed to read the last revision: %w", err)
 	}
-	if actor.expectVersion != 0 && last != actor.expectVersion {
+	if actor.expectSet && last != actor.expectVersion {
 		return nil, errChangedSince
 	}
 	if actor.Kind == "" {
@@ -150,7 +151,7 @@ func recordRevision(tx *gorm.DB, actor Actor, in revisionInput) (*models.Revisio
 // recordNested records the first revision of the items validation created
 // for relations given as objects (see models.WithNestedCollector).
 func recordNested(tx *gorm.DB, actor Actor, nested *models.NestedCreated) error {
-	actor.expectVersion = 0 // new entries
+	actor.expectVersion, actor.expectSet = 0, false // new entries
 	for _, n := range nested.Items {
 		if _, err := recordRevision(tx, actor, revisionInput{
 			entityType: models.RevisionEntityItem, entityID: n.Item.ID, typeName: n.Collection.Name,
@@ -163,9 +164,9 @@ func recordNested(tx *gorm.DB, actor Actor, nested *models.NestedCreated) error 
 }
 
 // publishNested sends item:created for nested items, after the commit.
-func publishNested(nested *models.NestedCreated) {
+func publishNested(actor Actor, nested *models.NestedCreated) {
 	for _, n := range nested.Items {
-		publishEvent(database.DB, events.EventTypeItemCreated, n.Item)
+		publishEvent(database.DB, actor, events.EventTypeItemCreated, n.Item)
 	}
 }
 
@@ -469,16 +470,16 @@ func RestoreItemRevision(actor Actor, ct models.Collection, itemID, version uint
 	if txErr != nil {
 		return nil, nil, txErr
 	}
-	publishNested(nested)
+	publishNested(actor, nested)
 	switch {
 	case res.Unchanged:
 	case res.Undeleted:
-		publishEvent(database.DB, events.EventTypeItemCreated, &item)
+		publishEvent(database.DB, actor, events.EventTypeItemCreated, &item)
 		if item.PublishedAt != nil {
-			publishEvent(database.DB, events.EventTypeItemPublished, &item)
+			publishEvent(database.DB, actor, events.EventTypeItemPublished, &item)
 		}
 	default:
-		publishEvent(database.DB, events.EventTypeItemUpdated, &item)
+		publishEvent(database.DB, actor, events.EventTypeItemUpdated, &item)
 	}
 	return &item, res, nil
 }
@@ -599,7 +600,7 @@ func RevertAgentRun(actor Actor, runID uint, force bool) ([]RevertOutcome, error
 		// entry between this check and the change itself.
 		guarded := actor
 		if !force {
-			guarded.expectVersion = latest.Version
+			guarded.expectVersion, guarded.expectSet = latest.Version, true
 		}
 		if latest.ID != e.last.ID && !force {
 			o.Result = "skipped"

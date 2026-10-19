@@ -1,4 +1,4 @@
-import { type AgentFunctionInfo, type AgentLimits, type AgentNodeData } from "../../../shared/types";
+import { type AgentDefinition, type AgentFunctionInfo, type AgentLimits, type AgentNodeData } from "../../../shared/types";
 
 /** The value the API returns in place of a stored secret; sending it back keeps the secret. */
 export const SECRET_MASK = "********";
@@ -68,6 +68,8 @@ export interface AgentDraft {
   session_scope: string;
   limits: Record<keyof AgentLimits, string>;
   functions: FunctionDraft[];
+  /** Content writes become proposals an editor approves. */
+  require_approval: boolean;
 }
 
 let uidCounter = 0;
@@ -130,6 +132,37 @@ export function draftFromAgent(agent: AgentNodeData | null): AgentDraft {
       collections: f.collections ?? [],
       parameters: JSON.stringify(f.parameters ?? {}, null, 2),
     })),
+    require_approval: Boolean(s?.requireApproval ?? s?.require_approval),
+  };
+}
+
+/**
+ * The form state for a new agent from a definition (what a template
+ * renders, the body of POST /admin/agents): nothing is stored yet.
+ */
+export function draftFromDefinition(def: AgentDefinition): AgentDraft {
+  const draft = draftFromAgent({
+    label: def.name,
+    name: def.name,
+    schema: {
+      systemPrompt: def.system_prompt,
+      maxTurns: def.max_turns,
+      memory: def.memory,
+      functions: def.functions ?? [],
+      llmConfig: { ...def.llm_config, provider: def.llm_config?.provider ?? "", model: def.llm_config?.model ?? "" },
+      trigger: def.trigger ?? { type: "manual" },
+      limits: def.limits,
+      requireApproval: def.require_approval,
+    },
+  });
+  return {
+    ...draft,
+    // A new agent: a key or token in the definition is typed, not stored.
+    api_key: def.llm_config?.api_key && def.llm_config.api_key !== SECRET_MASK ? def.llm_config.api_key : "",
+    api_key_stored: false,
+    api_secret: "",
+    webhook_token: def.trigger?.webhook_token && def.trigger.webhook_token !== SECRET_MASK ? def.trigger.webhook_token : generateToken(),
+    webhook_token_stored: false,
   };
 }
 
@@ -284,5 +317,6 @@ export function buildPayload(d: AgentDraft): Record<string, unknown> {
       ...(f.collections.length > 0 ? { collections: f.collections } : {}),
     })),
     limits,
+    require_approval: d.require_approval,
   };
 }

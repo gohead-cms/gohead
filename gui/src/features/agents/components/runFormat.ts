@@ -1,11 +1,26 @@
 import { type RunStatus } from "../../../shared/types";
 
 export const statusColor: Record<RunStatus, string> = {
+  queued: "gray",
   running: "blue",
   succeeded: "green",
   failed: "red",
   limited: "orange",
 };
+
+/** The run has not ended yet (queued or running): its details change. */
+export function runInProgress(status: RunStatus | undefined): boolean {
+  return status === "queued" || status === "running";
+}
+
+/** The status filter of run lists. */
+export const RUN_STATUS_OPTIONS: { value: RunStatus; label: string }[] = [
+  { value: "succeeded", label: "Succeeded" },
+  { value: "failed", label: "Failed" },
+  { value: "limited", label: "Limited" },
+  { value: "running", label: "Running" },
+  { value: "queued", label: "Queued" },
+];
 
 export function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;

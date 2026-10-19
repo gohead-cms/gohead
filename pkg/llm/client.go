@@ -293,3 +293,11 @@ func NewAdapter(cfg Config) (Client, error) {
 
 	return &langChainAdapter{client: client, cfg: cfg}, nil
 }
+
+// DefaultProvider returns the instance-wide default provider and model
+// (llm.provider, llm.model), for presets such as agent templates.
+func DefaultProvider() (provider, model string) {
+	defaultsMu.RLock()
+	defer defaultsMu.RUnlock()
+	return defaults.Provider, defaults.Model
+}

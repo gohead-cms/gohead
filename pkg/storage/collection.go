@@ -273,6 +273,12 @@ func UpdateCollection(id uint, updated *models.Collection) error {
 			tx.Rollback()
 			return fmt.Errorf("failed to rename the collection in roles: %w", err)
 		}
+		if tx.Migrator().HasTable(&models.Proposal{}) {
+			if err := tx.Model(&models.Proposal{}).Where("collection = ?", oldName).Update("collection", existing.Name).Error; err != nil {
+				tx.Rollback()
+				return fmt.Errorf("failed to rename the collection in agent proposals: %w", err)
+			}
+		}
 	}
 
 	// Without draft and publish every item is visible, so drafts become
@@ -422,6 +428,14 @@ func DeleteCollection(collectionID uint) error {
 	if err := moveRoleKeys(tx, Collection.Name, ""); err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to remove collection '%s' from roles: %w", Collection.Name, err)
+	}
+	// Pending agent proposals cannot be applied any more.
+	if tx.Migrator().HasTable(&models.Proposal{}) {
+		if err := tx.Model(&models.Proposal{}).Where("collection = ? AND status IN ?", Collection.Name, []string{models.ProposalPending, ProposalApplying}).
+			Updates(map[string]any{"status": models.ProposalFailed, "error": "the collection was deleted", "decided_at": models.APITime(time.Now())}).Error; err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to close the proposals of collection '%s': %w", Collection.Name, err)
+		}
 	}
 
 	// Delete the collection itself

@@ -1,4 +1,4 @@
-import { type AgentFunctionInfo, type Schema } from "../../../shared/types";
+import { type AgentFunctionInfo, type AgentTemplate, type Attribute, type Schema } from "../../../shared/types";
 import { getJSON, useApiQuery } from "../../../shared/hooks/useApiQuery";
 
 /** The built-in functions agents can use (GET /admin/agent-functions). */
@@ -30,4 +30,24 @@ export function useCollectionChoices() {
       .sort((a, b) => a.name.localeCompare(b.name));
   });
   return { collections: data ?? [], loading, error };
+}
+
+/** The ready-made agents (GET /admin/agent-templates). */
+export function useAgentTemplates() {
+  const { data, loading, error } = useApiQuery("/admin/agent-templates", async () => {
+    const json = await getJSON<AgentTemplate[]>("/admin/agent-templates", "Failed to load the templates");
+    return Array.isArray(json.data) ? json.data : [];
+  });
+  return { templates: data ?? [], loading, error };
+}
+
+/** The attributes of a collection (GET /api/schema/collections/{name}), by name. */
+export function useCollectionAttributes(collection: string | null) {
+  const path = collection ? `/api/schema/collections/${encodeURIComponent(collection)}` : null;
+  const { data, loading, error } = useApiQuery(path, async () => {
+    const json = await getJSON<{ schema: Schema }>(path!, "Failed to load the collection's fields");
+    const attrs = json.data?.schema?.attributes ?? {};
+    return Object.entries(attrs).map(([name, a]): Attribute => ({ ...a, name }));
+  });
+  return { attributes: data ?? [], loading, error };
 }

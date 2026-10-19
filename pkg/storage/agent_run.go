@@ -59,9 +59,25 @@ func AgentUsageSince(agentID uint, since time.Time, excludeRun uint) (AgentUsage
 
 // AgentUsageBefore is AgentUsageSince over the runs created before run
 // beforeRun, which orders runs starting at the same time.
-func AgentUsageBefore(agentID uint, since time.Time, beforeRun uint) (AgentUsage, error) {
-	return sumUsage(database.DB.Model(&agents.AgentRun{}).
-		Where("agent_id = ? AND started_at >= ? AND id < ?", agentID, since.UTC(), beforeRun))
+// With wasQueued (a run recorded when it was requested and started later),
+// runs started since that are not queued count too.
+func AgentUsageBefore(agentID uint, since time.Time, beforeRun uint, wasQueued bool) (AgentUsage, error) {
+	q := database.DB.Model(&agents.AgentRun{}).Where("agent_id = ? AND started_at >= ?", agentID, since.UTC())
+	if wasQueued {
+		q = q.Where("id <> ? AND (id < ? OR status <> ?)", beforeRun, beforeRun, agents.RunQueued)
+	} else {
+		q = q.Where("id < ?", beforeRun)
+	}
+	return sumUsage(q)
+}
+
+// FailQueuedRun marks a run that never started as failed.
+func FailQueuedRun(id uint, reason string) {
+	now := time.Now().UTC()
+	if err := database.DB.Model(&agents.AgentRun{}).Where("id = ? AND status = ?", id, agents.RunQueued).
+		Updates(map[string]any{"status": agents.RunFailed, "error": reason, "finished_at": now}).Error; err != nil {
+		logger.Log.WithError(err).WithField("run_id", id).Error("Failed to mark a queued run failed")
+	}
 }
 
 func sumUsage(q *gorm.DB) (AgentUsage, error) {
@@ -133,12 +149,13 @@ func PruneAgentRuns(agentID uint, keep int) {
 	}
 	last := cutoff[0].ID
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
-		old := "agent_id = ? AND id <= ? AND status <> ?"
-		sub := tx.Model(&agents.AgentRun{}).Select("id").Where(old, agentID, last, agents.RunRunning)
+		old := "agent_id = ? AND id <= ? AND status NOT IN ?"
+		live := []string{agents.RunRunning, agents.RunQueued}
+		sub := tx.Model(&agents.AgentRun{}).Select("id").Where(old, agentID, last, live)
 		if err := tx.Where("run_id IN (?)", sub).Delete(&agents.AgentRunStep{}).Error; err != nil {
 			return err
 		}
-		return tx.Where(old, agentID, last, agents.RunRunning).Delete(&agents.AgentRun{}).Error
+		return tx.Where(old, agentID, last, live).Delete(&agents.AgentRun{}).Error
 	})
 	if err != nil {
 		logger.Log.WithError(err).Warn("Failed to prune agent runs")

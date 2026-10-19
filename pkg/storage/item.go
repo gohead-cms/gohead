@@ -100,11 +100,11 @@ func CreateItems(actor Actor, collection models.Collection, inputs []ItemInput) 
 		return nil, txErr
 	}
 
-	publishNested(nested)
+	publishNested(actor, nested)
 	for _, item := range created {
-		publishEvent(database.DB, events.EventTypeItemCreated, item)
+		publishEvent(database.DB, actor, events.EventTypeItemCreated, item)
 		if item.PublishedAt != nil {
-			publishEvent(database.DB, events.EventTypeItemPublished, item)
+			publishEvent(database.DB, actor, events.EventTypeItemPublished, item)
 		}
 	}
 	return created, nil
@@ -172,10 +172,10 @@ func UpdateItemContent(actor Actor, collection models.Collection, itemID uint, d
 	if txErr != nil {
 		return nil, txErr
 	}
-	publishNested(nested)
-	publishEvent(database.DB, events.EventTypeItemUpdated, &item)
+	publishNested(actor, nested)
+	publishEvent(database.DB, actor, events.EventTypeItemUpdated, &item)
 	if transition != "" {
-		publishEvent(database.DB, transition, &item)
+		publishEvent(database.DB, actor, transition, &item)
 	}
 	return &item, nil
 }
@@ -220,7 +220,7 @@ func SetItemPublished(actor Actor, collection models.Collection, itemID uint, pu
 		return nil, err
 	}
 	if transition != "" {
-		publishEvent(database.DB, transition, &item)
+		publishEvent(database.DB, actor, transition, &item)
 	}
 	return &item, nil
 }
@@ -248,7 +248,7 @@ func setPublishedTx(tx *gorm.DB, item *models.Item, publish bool) (events.EventT
 	return event, nil
 }
 
-func publishEvent(db *gorm.DB, eventType events.EventType, item *models.Item) {
+func publishEvent(db *gorm.DB, actor Actor, eventType events.EventType, item *models.Item) {
 	// 1. Safety Check: If the event system (Asynq) isn't configured, do nothing.
 	if asynqClient == nil {
 		return
@@ -271,6 +271,8 @@ func publishEvent(db *gorm.DB, eventType events.EventType, item *models.Item) {
 		ItemID:           item.ID,
 		ItemData:         item.Data,
 		ItemTranslations: copyTranslations(item.Translations),
+		ActorKind:        actor.Kind,
+		ActorName:        actor.Name,
 	}
 
 	// 4. Enqueue Event: Send the event to the dispatcher via the Asynq message queue.
@@ -387,7 +389,7 @@ func DeleteItem(actor Actor, id uint) error {
 	if txErr != nil {
 		return txErr
 	}
-	publishEvent(database.DB, events.EventTypeItemDeleted, &item)
+	publishEvent(database.DB, actor, events.EventTypeItemDeleted, &item)
 	return nil
 }
 

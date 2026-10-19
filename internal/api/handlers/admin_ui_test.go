@@ -26,7 +26,6 @@ func TestAdminUIEndpoints(t *testing.T) {
 	admin.GET("/overview", GetOverview)
 	admin.GET("/runs", ListAllAgentRuns)
 	admin.GET("/agent-functions", AgentFunctionCatalog)
-	admin.POST("/agents", CreateAgent)
 	admin.POST("/agents/:name/run", RunAgentNow)
 
 	_, err := accounts.CreateAdmin("admin-user", "admin@example.com", "a-long-admin-password")

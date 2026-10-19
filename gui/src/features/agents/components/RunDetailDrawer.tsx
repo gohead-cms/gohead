@@ -18,15 +18,16 @@ import {
   useColorModeValue,
 } from "@chakra-ui/react";
 import { type AgentRunStep } from "../../../shared/types";
+import { RunProposals } from "../../approvals/RunProposals";
 import { RunContentChanges } from "../../history/RunContentChanges";
 import { useAgentRun } from "../hook/useAgentRuns";
+import { RunStatusBadge } from "./RunBadges";
 import {
   formatCost,
   formatDuration,
   formatTime,
   formatTokens,
   prettyJSON,
-  statusColor,
 } from "./runFormat";
 
 interface RunDetailDrawerProps {
@@ -106,7 +107,7 @@ function Step({ step }: { step: AgentRunStep }) {
 
 /** Shows one run: what triggered it, every model and function call, and how it ended. */
 export function RunDetailDrawer({ agentName, runId, onClose }: RunDetailDrawerProps) {
-  const { run, loading, error } = useAgentRun(agentName, runId);
+  const { run, loading, error, inProgress } = useAgentRun(agentName, runId);
 
   return (
     <Drawer isOpen={runId !== null} onClose={onClose} size="lg" placement="right">
@@ -119,21 +120,36 @@ export function RunDetailDrawer({ agentName, runId, onClose }: RunDetailDrawerPr
             {agentName}
           </Text>
           {run && (
-            <Badge ml={3} colorScheme={statusColor[run.status]}>
-              {run.status}
-            </Badge>
+            <Box as="span" ml={3}>
+              <RunStatusBadge run={run} />
+            </Box>
           )}
+          {inProgress && <Spinner size="xs" ml={2} color="gray.400" aria-label="Updating" />}
         </DrawerHeader>
         <DrawerBody>
-          {loading && <Spinner mt={4} />}
+          {/* A run that has not ended reloads in place: keep it on screen. */}
+          {loading && !run && <Spinner mt={4} />}
           {error && (
             <Alert status="error" mt={4}>
               <AlertIcon />
               {error}
             </Alert>
           )}
-          {run && !loading && (
+          {run && (
             <VStack align="stretch" spacing={5} py={4}>
+              {run.status === "queued" && (
+                <Alert status="info" borderRadius="md">
+                  <AlertIcon />
+                  Queued: the run starts as soon as a worker picks it up.
+                </Alert>
+              )}
+              {run.dryRun && (
+                <Alert status="info" variant="left-accent" borderRadius="md">
+                  <AlertIcon />
+                  Test run: the agent ran for real, but content functions only reported what they would change (“would_update”…). Nothing
+                  was written.
+                </Alert>
+              )}
               <HStack spacing={6} wrap="wrap" fontSize="sm">
                 <Text>Started {formatTime(run.startedAt)}</Text>
                 <Text>{formatDuration(run.durationMs)}</Text>
@@ -182,7 +198,9 @@ export function RunDetailDrawer({ agentName, runId, onClose }: RunDetailDrawerPr
                 </Section>
               )}
               <Divider />
-              {runId !== null && <RunContentChanges key={runId} agentName={agentName} runId={runId} />}
+              {/* Reloaded once the run ends: it may propose more while it runs. */}
+              {runId !== null && <RunProposals key={`${runId}-${run.status}`} runId={runId} />}
+              {runId !== null && !run.dryRun && <RunContentChanges key={runId} agentName={agentName} runId={runId} />}
             </VStack>
           )}
         </DrawerBody>

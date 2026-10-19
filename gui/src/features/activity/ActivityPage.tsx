@@ -3,7 +3,6 @@ import { Link as RouterLink } from "react-router-dom";
 import {
   Alert,
   AlertIcon,
-  Badge,
   Box,
   Button,
   HStack,
@@ -28,6 +27,7 @@ import { FiActivity, FiRefreshCw } from "react-icons/fi";
 import { type AgentRun, type RunStatus } from "../../shared/types";
 import { EmptyState } from "../../shared/ui/EmptyState";
 import { Page, PageHeader } from "../../shared/ui/PageHeader";
+import { RunStatusBadge } from "../agents/components/RunBadges";
 import { RunDetailDrawer } from "../agents/components/RunDetailDrawer";
 import {
   formatCost,
@@ -35,7 +35,7 @@ import {
   formatShortTime,
   formatTime,
   formatTokens,
-  statusColor,
+  RUN_STATUS_OPTIONS,
   triggerSummary,
 } from "../agents/components/runFormat";
 import { ContentChanges } from "../history/ContentChanges";
@@ -103,10 +103,11 @@ export function ActivityPage() {
                   }}
                 >
                   <option value="">All runs</option>
-                  <option value="succeeded">Succeeded</option>
-                  <option value="failed">Failed</option>
-                  <option value="limited">Limited</option>
-                  <option value="running">Running</option>
+                  {RUN_STATUS_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
                 </Select>
               </HStack>
 
@@ -182,9 +183,7 @@ export function ActivityPage() {
                               {agent}
                             </Td>
                             <Td>
-                              <Badge colorScheme={statusColor[r.status]} title={r.error || undefined}>
-                                {r.status}
-                              </Badge>
+                              <RunStatusBadge run={r} />
                             </Td>
                             <Td maxW="180px" overflow="hidden" textOverflow="ellipsis" title={trigger}>
                               {trigger}
@@ -232,7 +231,14 @@ export function ActivityPage() {
         </TabPanels>
       </Tabs>
 
-      <RunDetailDrawer agentName={open?.agent ?? ""} runId={open?.id ?? null} onClose={() => setOpen(null)} />
+      <RunDetailDrawer
+        agentName={open?.agent ?? ""}
+        runId={open?.id ?? null}
+        onClose={() => {
+          setOpen(null);
+          refetch();
+        }}
+      />
     </Page>
   );
 }

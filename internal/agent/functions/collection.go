@@ -3,7 +3,6 @@ package functions
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strconv"
 
@@ -22,6 +21,7 @@ func init() {
 	StaticFunctionMap["collections.list_items"] = listCollectionItems // Renamed from query_items
 	StaticFunctionMap["collections.delete_item"] = deleteCollectionItem
 	StaticFunctionMap["collections.list_locales"] = listLocales
+	StaticFunctionMap["collections.patch_item"] = patchCollectionItem
 }
 
 // listLocales lists the content locales.
@@ -122,69 +122,117 @@ func upsertCollectionItem(ctx context.Context, args any) (string, error) {
 	}
 
 	itemID, _ := strconv.ParseUint(itemIDStr, 10, 32)
-	locale, _ := argMap["locale"].(string)
+	locale, err := translationLocale(argMap)
+	if err != nil {
+		return errorResult(err), nil
+	}
+	reason, _ := argMap["reason"].(string)
+	if itemID == 0 {
+		if locale != "" {
+			def, _ := storage.DefaultLocale()
+			return errorResult(fmt.Errorf("create items in the default locale (%s), then write translations with item_id and locale", def)), nil
+		}
+		return writeItem(ctx, collection, models.ProposalCreate, 0, "", data, reason), nil
+	}
 	if locale != "" {
-		def, err := storage.DefaultLocale()
-		if err != nil {
-			return `{"status": "error", "message": "failed to read the default locale"}`, nil
+		// Merge over the locale's current values, so translating one
+		// attribute keeps the others.
+		data = mergeOver(currentValues(collection, uint(itemID), locale), data)
+	}
+	return writeItem(ctx, collection, models.ProposalUpdate, uint(itemID), locale, data, reason), nil
+}
+
+// patchCollectionItem changes some attributes of an item, keeping the
+// others (upsert_item with item_id replaces the whole item).
+func patchCollectionItem(ctx context.Context, args any) (string, error) {
+	argMap, err := parseArgs(args)
+	if err != nil {
+		return `{"status": "error", "message": "invalid JSON format in arguments"}`, nil
+	}
+	collectionName, _ := argMap["collection_name"].(string)
+	data, _ := argMap["data"].(map[string]any)
+	var itemID uint64
+	switch v := argMap["item_id"].(type) {
+	case float64:
+		if v > 0 && v == float64(uint32(v)) {
+			itemID = uint64(v)
 		}
-		if locale != def {
-			if itemID == 0 {
-				return fmt.Sprintf(`{"status": "error", "message": "create items in the default locale (%s), then write translations with item_id and locale"}`, def), nil
-			}
-			// Merge over the locale's current values, so translating one
-			// attribute keeps the others.
-			merged := map[string]any{}
-			if existing, err := storage.GetItemByID(collection.ID, uint(itemID)); err == nil {
-				localized := models.LocalizedNames(collection.Attributes)
-				for k, v := range models.Translation(existing.Translations, locale) {
-					if localized[k] {
-						merged[k] = v
-					}
-				}
-			}
-			for k, v := range data {
-				merged[k] = v
-			}
-			if _, err := storage.SetItemTranslation(storage.ActorFrom(ctx), *collection, uint(itemID), locale, merged, nil); err != nil {
-				msg, _ := json.Marshal(err.Error())
-				return fmt.Sprintf(`{"status": "error", "message": %s}`, msg), nil
-			}
-			b, _ := json.Marshal(map[string]any{"status": "success", "item_id": itemID, "action": "translated", "locale": locale})
-			return string(b), nil
+	case string:
+		itemID, _ = strconv.ParseUint(v, 10, 32)
+	}
+	if collectionName == "" || itemID == 0 || data == nil {
+		return `{"status": "error", "message": "missing required parameters: collection_name, item_id and data"}`, nil
+	}
+	if !collectionAllowed(ctx, collectionName) {
+		return scopeError(collectionName), nil
+	}
+	collection, err := storage.GetCollectionByName(collectionName)
+	if err != nil {
+		return errorResult(err), nil
+	}
+	if name, err := nestedScopeViolation(ctx, collection, data, 0); err != nil {
+		return errorResult(err), nil
+	} else if name != "" {
+		return scopeError(name), nil
+	}
+	locale, err := translationLocale(argMap)
+	if err != nil {
+		return errorResult(err), nil
+	}
+	if _, err := storage.GetItemByID(collection.ID, uint(itemID)); err != nil {
+		return fmt.Sprintf(`{"status": "error", "message": "item with ID %d not found in collection '%s'"}`, itemID, collectionName), nil
+	}
+	reason, _ := argMap["reason"].(string)
+	merged := mergeOver(currentValues(collection, uint(itemID), locale), data)
+	return writeItem(ctx, collection, models.ProposalUpdate, uint(itemID), locale, merged, reason), nil
+}
+
+// translationLocale returns the "locale" argument when it names another
+// locale than the default ("" otherwise).
+func translationLocale(argMap map[string]any) (string, error) {
+	locale, _ := argMap["locale"].(string)
+	if locale == "" {
+		return "", nil
+	}
+	code, def, err := storage.ResolveLocale(locale)
+	if err != nil {
+		return "", fmt.Errorf("unknown locale '%s' (see collections.list_locales)", locale)
+	}
+	if code == def {
+		return "", nil
+	}
+	return code, nil
+}
+
+// currentValues returns an item's data, or its values in a locale (only
+// attributes that are localized).
+func currentValues(ct *models.Collection, itemID uint, locale string) map[string]any {
+	existing, err := storage.GetItemByID(ct.ID, itemID)
+	if err != nil {
+		return map[string]any{}
+	}
+	if locale == "" {
+		return existing.Data
+	}
+	out := map[string]any{}
+	localized := models.LocalizedNames(ct.Attributes)
+	for k, v := range models.Translation(existing.Translations, locale) {
+		if localized[k] {
+			out[k] = v
 		}
 	}
+	return out
+}
 
-	// 2. Decide whether to UPDATE or CREATE
-	if itemID > 0 {
-		// UPDATE an existing item, validated like API writes.
-		if _, err := storage.UpdateItemContent(storage.ActorFrom(ctx), *collection, uint(itemID), data, nil); err != nil {
-			if errors.Is(err, storage.ErrItemNotFound) {
-				return fmt.Sprintf(`{"status": "error", "message": "item with ID %d not found in collection '%s' for update"}`, itemID, collectionName), nil
-			}
-			msg, _ := json.Marshal(err.Error())
-			return fmt.Sprintf(`{"status": "error", "message": %s}`, msg), nil
-		}
-
-		result := map[string]any{"status": "success", "item_id": itemID, "action": "updated"}
-		resultBytes, _ := json.Marshal(result)
-		return string(resultBytes), nil
-
-	} else {
-		// CREATE a new item
-		newItem := &models.Item{
-			CollectionID: collection.ID,
-			Data:         data,
-		}
-		newItem, err := storage.SaveItem(storage.ActorFrom(ctx), *collection, newItem.Data)
-		if err != nil {
-			return fmt.Sprintf(`{"status": "error", "message": "%s"}`, err.Error()), nil
-		}
-
-		result := map[string]any{"status": "success", "item_id": newItem.ID, "action": "created"}
-		resultBytes, _ := json.Marshal(result)
-		return string(resultBytes), nil
+func mergeOver(base, changes map[string]any) map[string]any {
+	out := map[string]any{}
+	for k, v := range base {
+		out[k] = v
 	}
+	for k, v := range changes {
+		out[k] = v
+	}
+	return out
 }
 
 // listCollectionItems finds and retrieves items from a collection with pagination.
@@ -270,15 +318,10 @@ func deleteCollectionItem(ctx context.Context, args any) (string, error) {
 		return scopeError(owner), nil
 	}
 
-	err = storage.DeleteItem(storage.ActorFrom(ctx), uint(itemID))
+	ct, err := storage.GetCollectionByName(owner)
 	if err != nil {
-		return fmt.Sprintf(`{"status": "error", "message": "failed to delete item: %s"}`, err.Error()), nil
+		return errorResult(err), nil
 	}
-
-	result := map[string]any{
-		"status":  "success",
-		"message": fmt.Sprintf("Item '%d' was successfully deleted.", itemID),
-	}
-	resultBytes, _ := json.Marshal(result)
-	return string(resultBytes), nil
+	reason, _ := argMap["reason"].(string)
+	return writeItem(ctx, ct, models.ProposalDelete, uint(itemID), "", nil, reason), nil
 }

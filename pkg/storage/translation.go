@@ -169,12 +169,12 @@ func SetItemTranslation(actor Actor, ct models.Collection, itemID uint, locale s
 	if txErr != nil {
 		return nil, txErr
 	}
-	publishNested(nested)
+	publishNested(actor, nested)
 	if changed {
-		publishEvent(database.DB, events.EventTypeItemUpdated, &item)
+		publishEvent(database.DB, actor, events.EventTypeItemUpdated, &item)
 	}
 	if transition != "" {
-		publishEvent(database.DB, transition, &item)
+		publishEvent(database.DB, actor, transition, &item)
 	}
 	return &item, nil
 }
