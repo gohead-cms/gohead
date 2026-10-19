@@ -68,8 +68,15 @@ func TestProposalReview(t *testing.T) {
 		assert.Equal(t, http.StatusForbidden, code)
 
 		// The article changed (published) since: stale until forced.
+		pending := a.ok("editor", "GET", "/api/proposals?collection=articles", nil).([]any)
+		stale := map[float64]any{}
+		for _, p := range pending {
+			stale[field(p, "id").(float64)] = field(p, "stale")
+		}
+		assert.Equal(t, true, stale[float64(onArticle.ID)], "lists flag stale proposals")
 		code, out2 := a.do("editor", "POST", fmt.Sprintf("/api/proposals/%d/approve", onArticle.ID), nil)
 		assert.Equal(t, http.StatusConflict, code, out2)
+		assert.Equal(t, "stale", field(field(out2["error"], "details"), "code"))
 		a.ok("editor", "POST", fmt.Sprintf("/api/proposals/%d/approve", onArticle.ID), map[string]any{"force": true})
 
 		out = a.ok("editor", "POST", fmt.Sprintf("/api/proposals/%d/reject", deleteArticle.ID), map[string]any{"note": "keep it"}).(map[string]any)

@@ -431,6 +431,7 @@ func proposalSchema() obj {
 		"reason": obj{"type": "string"}, "baseVersion": obj{"type": "integer"},
 		"status":     obj{"type": "string", "enum": []string{models.ProposalPending, "applying", models.ProposalApproved, models.ProposalRejected, models.ProposalFailed}},
 		"reviewedBy": obj{"type": "string"}, "reviewNote": obj{"type": "string"}, "error": obj{"type": "string"},
+		"stale":     obj{"type": "boolean", "description": "In lists of pending proposals: the item changed since"},
 		"createdAt": obj{"type": "string", "format": "date-time"}, "decidedAt": nullable(obj{"type": "string", "format": "date-time"}),
 	}, "required": []string{"id", "agentName", "action", "collection", "status", "createdAt"}}
 }

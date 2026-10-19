@@ -129,6 +129,9 @@ func ListProposals(c *gin.Context) {
 			hidden[name] = hiddenFields(ct)
 		}
 		list[i] = redactProposal(list[i], hidden[name])
+		if list[i].Status == models.ProposalPending && list[i].Action != models.ProposalCreate {
+			list[i].Stale = storage.ProposalIsStale(&list[i])
+		}
 	}
 	c.Set("response", list)
 	c.Set("meta", gin.H{"pagination": gin.H{
@@ -260,10 +263,11 @@ func ApproveProposal(c *gin.Context) {
 		switch {
 		case errors.Is(err, storage.ErrProposalDecided):
 			c.Set("response", decidedMessage(proposal))
+			c.Set("details", gin.H{"code": "decided"})
 			c.Set("status", http.StatusConflict)
 		case errors.Is(err, storage.ErrProposalStale):
 			c.Set("response", err.Error())
-			c.Set("details", "review the item as it is now; approve with force to apply the proposal anyway")
+			c.Set("details", gin.H{"code": "stale", "hint": "review the item as it is now; approve with force to apply the proposal anyway"})
 			c.Set("status", http.StatusConflict)
 		case errors.As(err, &verr), errors.Is(err, storage.ErrItemNotFound), errors.Is(err, storage.ErrProposalUnappliable):
 			c.Set("response", "The change could not be applied: "+proposal.Error)

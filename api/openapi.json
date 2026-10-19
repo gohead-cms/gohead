@@ -250,6 +250,10 @@
           "reviewedBy": {
             "type": "string"
           },
+          "stale": {
+            "description": "In lists of pending proposals: the item changed since",
+            "type": "boolean"
+          },
           "status": {
             "enum": [
               "pending",

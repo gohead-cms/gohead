@@ -41,4 +41,6 @@ type Proposal struct {
 	Error       string     `json:"error,omitempty" gorm:"type:text"`
 	CreatedAt   time.Time  `json:"createdAt" gorm:"index"`
 	DecidedAt   *time.Time `json:"decidedAt,omitempty"`
+	// Stale is set in lists of pending proposals: the item changed since.
+	Stale bool `json:"stale,omitempty" gorm:"-"`
 }

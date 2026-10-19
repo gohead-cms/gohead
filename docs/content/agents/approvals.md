@@ -89,8 +89,9 @@ curl -X POST $GOHEAD/api/proposals/12/reject -H "$AUTH" -d '{"note": "Too litera
 | `rejected` | Discarded (`reviewNote`) |
 | `failed` | Approved but could not be applied (`error`) |
 
-Approving returns `409` when the proposal was already decided or is stale (send
-`"force": true` to apply it anyway), `422` when the change could not be applied (the
+Lists mark pending proposals whose item changed with `"stale": true`. Approving returns
+`409` when the proposal was already decided (`details.code: "decided"`) or is stale
+(`details.code: "stale"`; send `"force": true` to apply it anyway), `422` when the change could not be applied (the
 proposal is then `failed`), `403` when the change needs a permission you lack (`publish`
 for a published item, `create` for related items it would create) and `404` for proposals
 your role may not apply. Password values are masked; a masked value sent back in `data`
