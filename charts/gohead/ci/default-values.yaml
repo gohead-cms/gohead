@@ -1,3 +1,7 @@
 # Minimal install: an external database, everything else default.
 database:
   url: postgres://gohead:gohead@postgres:5432/gohead?sslmode=disable
+bootstrapAdmin:
+  username: admin
+  email: admin@example.com
+  password: ci-admin-password-123

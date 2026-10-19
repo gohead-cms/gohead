@@ -54,9 +54,8 @@ Model your content, get REST and GraphQL APIs instantly, and let agents react to
 ## Five lines to a working API
 
 ```bash
+echo "GOHEAD_ADMIN_PASSWORD=change-me-please" > .env   # first admin: "admin"
 docker compose up -d                                   # API, workers, admin UI, Postgres, Redis
-curl -X POST localhost:8080/auth/register -H 'Content-Type: application/json' \
-  -d '{"username":"admin","email":"admin@example.com","password":"change-me-please"}'
 # log in, create a collection, start writing content:
 ```
 

@@ -15,17 +15,20 @@ captured from a real server.
 
 ## 1. Create the first account
 
-The first account registered on an empty instance becomes the **admin**. Every later
-self-registration gets the read-only **viewer** role.
+GoHead creates the first **admin** when it starts on an empty database with
+`GOHEAD_ADMIN_USERNAME`, `GOHEAD_ADMIN_EMAIL` and `GOHEAD_ADMIN_PASSWORD` set (Docker
+Compose sets the first two to `admin` / `admin@example.com`; the password needs 12+
+characters). On an instance that is already running, use the command line:
 
 ```bash
-curl -s -X POST $GOHEAD/auth/register -H "$JSON" \
-  -d '{"username":"admin","email":"admin@example.com","password":"change-me-please"}'
+echo 'change-me-please' | gohead admin create --username admin --email admin@example.com --password-stdin
+# with Docker Compose:
+echo 'change-me-please' | docker compose exec -T api gohead admin create \
+  --username admin --email admin@example.com --password-stdin
 ```
 
-```json
-{ "data": "User registered successfully" }
-```
+Self-registration (`POST /auth/register`) is off by default; see
+[users and roles](../guides/users-and-roles.md#registration-and-the-first-admin).
 
 Log in and keep the token:
 

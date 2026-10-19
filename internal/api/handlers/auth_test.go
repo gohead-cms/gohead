@@ -29,6 +29,8 @@ func init() {
 	logger.InitLogger("debug")
 	logger.Log.SetOutput(&buffer)
 	logger.Log.SetFormatter(&logrus.TextFormatter{})
+	// Handler tests register accounts; production defaults to disabled.
+	Registration = RegistrationOpen
 }
 
 func TestRegister(t *testing.T) {
@@ -55,12 +57,21 @@ func TestRegister(t *testing.T) {
 		return w
 	}
 
-	t.Run("first account bootstraps as admin", func(t *testing.T) {
+	t.Run("disabled registration is refused", func(t *testing.T) {
+		Registration = RegistrationDisabled
+		defer func() { Registration = RegistrationOpen }()
+		w := register("intruder", nil)
+		assert.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
+		_, err := storage.GetUserByUsername("intruder")
+		assert.Error(t, err, "no account was created")
+	})
+
+	t.Run("the first account is not an admin", func(t *testing.T) {
 		w := register("founder", nil)
 		assert.Equal(t, http.StatusCreated, w.Code, w.Body.String())
 		u, err := storage.GetUserByUsername("founder")
 		assert.NoError(t, err)
-		assert.Equal(t, "admin", u.Role.Name)
+		assert.Equal(t, DefaultRegistrationRole, u.Role.Name, "admins come from the configuration or the CLI")
 	})
 
 	t.Run("client cannot choose its role", func(t *testing.T) {

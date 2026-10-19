@@ -21,6 +21,19 @@ lives at the root of the repository.
 | `log_level` | `GOHEAD_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error`. Logs are JSON on stdout. |
 | `jwt_secret` | `GOHEAD_JWT_SECRET` | *(random)* | Signs login tokens (HS256). See below. |
 | `telemetry_enabled` | `GOHEAD_TELEMETRY_ENABLED` | `false` | Export OpenTelemetry traces over OTLP/gRPC. |
+| `auto_migrate` | `GOHEAD_AUTO_MIGRATE` | `true` | Apply [database migrations](../operations/upgrading.md#database-migrations) when the API starts. When `false`, the API refuses to start on an outdated schema. |
+
+### Accounts
+
+| Key | Env | Default |
+|-----|-----|---------|
+| `admin.username` | `GOHEAD_ADMIN_USERNAME` | *(empty)* |
+| `admin.email` | `GOHEAD_ADMIN_EMAIL` | *(empty: `<username>@localhost`)* |
+| `admin.password` | `GOHEAD_ADMIN_PASSWORD` | *(empty)*, 12+ characters |
+| `auth.registration` | `GOHEAD_AUTH_REGISTRATION` | `disabled` (`open`: anyone can create a viewer account) |
+
+The `admin.*` account is created at startup only when the database has no users. See
+[users and roles](../guides/users-and-roles.md#registration-and-the-first-admin).
 
 !!! warning "Set `jwt_secret`"
     If it is empty or left at the sample value `your-secret-key`, GoHead generates a random

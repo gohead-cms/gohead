@@ -140,6 +140,32 @@ type Config struct {
 
 	// Agents
 	Agents AgentsConfig `mapstructure:"agents" yaml:"agents"`
+
+	// AutoMigrate applies pending database migrations when the API starts.
+	// When false, the API refuses to start on an outdated schema: run
+	// `gohead migrate` first (the Helm chart does, in an init container).
+	AutoMigrate bool `mapstructure:"auto_migrate" yaml:"auto_migrate"`
+
+	// Auth controls self-registration.
+	Auth AuthConfig `mapstructure:"auth" yaml:"auth"`
+
+	// Admin is the first administrator, created at startup when the
+	// instance has no users.
+	Admin AdminConfig `mapstructure:"admin" yaml:"admin"`
+}
+
+// AuthConfig controls account creation.
+type AuthConfig struct {
+	// Registration is "disabled" (default: accounts are created by admins)
+	// or "open" (anyone can create a viewer account at /auth/register).
+	Registration string `mapstructure:"registration" yaml:"registration"`
+}
+
+// AdminConfig is the administrator created on an empty instance.
+type AdminConfig struct {
+	Username string `mapstructure:"username" yaml:"username"`
+	Email    string `mapstructure:"email" yaml:"email"`
+	Password string `mapstructure:"password" yaml:"password"`
 }
 
 // AgentsConfig controls agent run history.
@@ -215,6 +241,11 @@ func LoadConfig(configPath string) (Config, error) {
 
 	// Agent run history
 	viper.SetDefault("agents.runs_kept", 200)
+	viper.SetDefault("auto_migrate", true)
+	viper.SetDefault("auth.registration", "disabled")
+	viper.SetDefault("admin.username", "")
+	viper.SetDefault("admin.email", "")
+	viper.SetDefault("admin.password", "")
 
 	// Set the config file path
 	viper.SetConfigFile(configPath)

@@ -3,9 +3,10 @@ import { defineConfig, devices } from "@playwright/test";
 // Smoke tests for the admin UI against a real API.
 //
 // They expect a GoHead API on E2E_API_URL (default http://localhost:8080)
-// with an empty database: the global setup registers the first user (who
-// becomes admin) and creates the content the tests use. The UI is built
-// and served by `vite preview`.
+// with an empty database, started with the administrator of e2e/fixtures.ts
+// (GOHEAD_ADMIN_USERNAME / GOHEAD_ADMIN_PASSWORD): the global setup logs in as
+// that user and creates the content the tests use. The UI is built and
+// served by `vite preview`.
 const apiURL = process.env.E2E_API_URL ?? "http://localhost:8080";
 
 export default defineConfig({

@@ -52,16 +52,14 @@ permissions as a human.
 ```bash
 git clone https://github.com/gohead-cms/gohead.git && cd gohead
 echo "GOHEAD_JWT_SECRET=$(openssl rand -hex 32)" > .env
+echo "GOHEAD_ADMIN_PASSWORD=change-me-please" >> .env   # first admin: "admin"
 docker compose up -d        # API :8080 · admin UI :3000 · Postgres · Redis · MinIO · workers
 ```
 
-Create the first account (it becomes the admin), log in, and model a collection:
+Log in as the admin and model a collection:
 
 ```bash
 export GOHEAD=http://localhost:8080 JSON='Content-Type: application/json'
-
-curl -s -X POST $GOHEAD/auth/register -H "$JSON" \
-  -d '{"username":"admin","email":"admin@example.com","password":"change-me-please"}'
 
 export AUTH="Authorization: Bearer $(curl -s -X POST $GOHEAD/auth/login -H "$JSON" \
   -d '{"username":"admin","password":"change-me-please"}' | jq -r .data.token)"

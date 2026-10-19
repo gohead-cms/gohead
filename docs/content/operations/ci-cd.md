@@ -27,16 +27,39 @@ production. See [deployment](deployment.md#how-releases-flow).
 
 ## Cutting a release
 
-1. Make sure `master` is green and `CHANGELOG.md` has an entry for the version.
-2. Tag and push:
+1. Make sure `master` is green.
+2. In `CHANGELOG.md`, rename `[Unreleased]` to the version and date, and check that every
+   breaking change has an entry in the [upgrade guide](upgrading.md).
+3. Set `version` and `appVersion` in `charts/gohead/Chart.yaml` to the version (the release
+   workflow overrides them in the published chart, but the repository should match).
+4. Tag and push:
 
     ```bash
-    git tag -a v0.2.0 -m "v0.2.0"
-    git push origin v0.2.0
+    git tag -a v0.5.0 -m "v0.5.0"
+    git push origin v0.5.0
     ```
 
-3. `release.yml` publishes the GitHub release; `images.yml` publishes `0.2.0` and `latest`.
-4. Flux promotes production on its next image scan.
+5. `release.yml` publishes the GitHub release and the Helm chart; `images.yml` publishes
+   the images `0.5.0`, `0.5` and `latest`, and warns if they cannot be pulled anonymously.
+6. Install the release from scratch (Compose or Helm) and upgrade a copy of a previous
+   install before announcing it.
+7. Flux promotes production on its next image scan.
+
+### The API contract
+
+`api/openapi.json` and `api/graphql.json` are snapshots of the public API, generated from a
+fixed content model (`internal/contract`). The **API contract** CI job checks that they
+match the code and compares them with the snapshots of the last release:
+
+- a change to the API makes the job fail until the snapshots are regenerated
+  (`make api-contract`, or add the label **update-api-contract** to the PR and CI commits
+  them), so every API change is visible in review;
+- a breaking change since the last release (removed endpoint or field, new required
+  parameter, narrowed type…) fails the job, found by `oasdiff` and `graphql-inspector`.
+  After 1.0, breaking changes wait for the next major version; label the PR
+  **breaking-change** to acknowledge one deliberately.
+
+See [API stability](../reference/api-stability.md).
 
 Release notes are generated from commit messages: use conventional commits
 (`feat:`, `fix:`, `fix(security):`, `docs:`…), see [contributing](../development/contributing.md).

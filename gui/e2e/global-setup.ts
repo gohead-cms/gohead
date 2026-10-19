@@ -1,8 +1,9 @@
 import { request } from "@playwright/test";
 import { admin, apiURL } from "./fixtures";
 
-// Seeds the API: the first registered user becomes admin, then a collection
-// with one entry and an agent for the pages under test.
+// Seeds the API through the admin created at startup (GOHEAD_ADMIN_*, see
+// fixtures.ts): a collection with one entry and an agent for the pages under
+// test.
 export default async function globalSetup() {
   const api = await request.newContext({ baseURL: apiURL });
 
@@ -13,10 +14,6 @@ export default async function globalSetup() {
     await new Promise((r) => setTimeout(r, 1000));
   }
 
-  const reg = await api.post("/auth/register", { data: admin });
-  if (!reg.ok() && reg.status() !== 409) {
-    throw new Error(`register failed: ${reg.status()} ${await reg.text()}`);
-  }
   const loginRes = await api.post("/auth/login", { data: { username: admin.username, password: admin.password } });
   if (!loginRes.ok()) throw new Error(`login failed: ${loginRes.status()} ${await loginRes.text()}`);
   const token = (await loginRes.json()).data.token as string;

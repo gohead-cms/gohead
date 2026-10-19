@@ -5,7 +5,7 @@
 | Area | Behaviour |
 |------|-----------|
 | Authentication | HS256 JWT, 72 h expiry, `exp` required, algorithm pinned |
-| Registration | First account becomes admin; later self-registrations are viewers |
+| Registration | Off by default; when open, self-registered accounts are viewers. The first admin comes from the configuration or `gohead admin create`, never from the public API |
 | Authorization | One role table enforced by REST handlers and GraphQL resolvers |
 | Passwords | bcrypt; never serialized in responses |
 | Brute force | `/auth/*` rate limited per IP; failed logins lock a username out per IP; unknown and known usernames answer with the same message and timing; limits shared across replicas through Redis |

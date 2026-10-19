@@ -22,12 +22,18 @@ Admin UI (it calls the API at {{ include "gohead.apiUrl" . }}):
 {{- end }}
 {{- end }}
 
-Create the first account (it becomes the admin):
+{{- if .Values.bootstrapAdmin.username }}
 
-  curl -X POST <api-url>/auth/register -H 'Content-Type: application/json' \
-    -d '{"username":"admin","email":"admin@example.com","password":"change-me-please"}'
+Administrator: {{ .Values.bootstrapAdmin.username }} (created on first start).
+{{- else }}
 
-Register it right away: until then anyone who can reach the API can claim it.
+Create the first administrator:
+
+  echo "$PASSWORD" | kubectl exec -i -n {{ .Release.Namespace }} deploy/{{ include "gohead.fullname" . }}-api -- \
+    gohead admin create --username admin --email admin@example.com --password-stdin
+
+(or install with bootstrapAdmin.username/password, or GOHEAD_ADMIN_* in existingSecret).
+{{- end }}
 {{- if and .Values.redis.enabled (not .Values.redis.address) (not .Values.redis.persistence.enabled) }}
 
 Note: the bundled Redis keeps no data on disk; queued agent and webhook jobs
