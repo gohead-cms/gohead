@@ -23,6 +23,8 @@ export interface Proposal {
   /** The agent's explanation, when it gave one. */
   reason?: string;
   baseVersion: number;
+  /** Lists only: a pending update or delete whose entry changed since (omitted when not). */
+  stale?: boolean;
   status: ProposalStatus;
   reviewedBy?: string;
   reviewNote?: string;
@@ -144,11 +146,33 @@ export function rejectProposal(id: number, note: string): Promise<Envelope<{ pro
   return api<{ proposal: Proposal }>("POST", `/api/proposals/${id}/reject`, note.trim() ? { note: note.trim() } : {});
 }
 
-/** An approval refused because the entry changed since the proposal (409 that suggests force). */
+/** The code of a 409 from the approve endpoint: "stale" or "decided". */
+function conflictCode(err: ApiError): string | undefined {
+  const d = err.details;
+  if (d && typeof d === "object" && "code" in d && typeof (d as { code: unknown }).code === "string") return (d as { code: string }).code;
+  return undefined;
+}
+
+/** An approval refused because the entry changed since the proposal (409, details.code "stale"). */
 export function isStaleConflict(err: unknown): boolean {
   if (!(err instanceof ApiError) || err.status !== 409) return false;
+  const code = conflictCode(err);
+  if (code !== undefined) return code === "stale";
+  // Older servers: a 409 that suggests force.
   const details = typeof err.details === "string" ? err.details : "";
   return /force/i.test(details) || /changed/i.test(err.message);
+}
+
+/** Whether two JSON values are the same (object key order aside). */
+export function sameJSON(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((v, i) => sameJSON(v, b[i]));
+  const ao = a as Record<string, unknown>;
+  const bo = b as Record<string, unknown>;
+  const keys = Object.keys(ao);
+  return keys.length === Object.keys(bo).length && keys.every((k) => Object.prototype.hasOwnProperty.call(bo, k) && sameJSON(ao[k], bo[k]));
 }
 
 /** Parses the "edit and approve" JSON: an object, or an error message. */

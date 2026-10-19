@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, AlertIcon, Box, Button, Flex, Heading, HStack, Icon, Text, useDisclosure } from "@chakra-ui/react";
 import { FiPlus } from "react-icons/fi";
 import { FaPenNib } from "react-icons/fa6";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { api } from "../../../services/api";
+import { api, ApiError } from "../../../services/api";
+import { getJSON } from "../../../shared/hooks/useApiQuery";
 import { useLocales } from "../../../shared/hooks/useLocales";
 import { useNotify } from "../../../shared/hooks/useNotify";
 import { PageLoader } from "../../../shared/ui/page-loader";
@@ -75,7 +76,8 @@ export function ContributionsPage() {
 
 function CollectionContent({ collectionName, schema }: { collectionName: string; schema: Schema }) {
   const navigate = useNavigate();
-  // ?item=… opens that entry (links from Approvals), once it is loaded.
+  // ?item=… opens that entry (links from Approvals): from the list when it
+  // is there, otherwise fetched on its own.
   const [params] = useSearchParams();
   const linkedItem = params.get("item");
   const notify = useNotify();
@@ -97,6 +99,8 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
 
   // The linked entry is opened once per link (closing it keeps the list).
   const [openedLink, setOpenedLink] = useState<string | null>(null);
+  // A linked entry beyond the loaded list, being fetched.
+  const [fetchLink, setFetchLink] = useState<string | null>(null);
   if (linkedItem && linkedItem !== openedLink) {
     const item = content.items.find((i) => String(i.id) === linkedItem);
     if (item) {
@@ -104,11 +108,39 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
       setEditingItem(item);
       setFormKey((k) => k + 1);
       onOpen();
-    } else if (!loading && !hasMore) {
-      // Not in this collection (deleted, or never created).
+    } else if (!loading) {
+      // Not in the first entries: fetch it (never opened later by "Load more").
       setOpenedLink(linkedItem);
+      setFetchLink(linkedItem);
     }
   }
+  // The link changed meanwhile: the fetched entry is not wanted any more.
+  if (fetchLink !== null && fetchLink !== linkedItem) setFetchLink(null);
+
+  const { failure } = notify;
+  useEffect(() => {
+    if (fetchLink === null) return;
+    let active = true;
+    getJSON<ContentItem>(`${base}/${encodeURIComponent(fetchLink)}`, "Failed to load the entry").then(
+      (json) => {
+        if (!active) return;
+        setFetchLink(null);
+        if (!json.data) return;
+        setEditingItem(json.data);
+        setFormKey((k) => k + 1);
+        onOpen();
+      },
+      (err: unknown) => {
+        if (!active) return;
+        setFetchLink(null);
+        // 404: not in this collection (deleted, or never created).
+        if (!(err instanceof ApiError && err.status === 404)) failure(err, "Could not open the entry");
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [fetchLink, base, onOpen, failure]);
 
   const openForm = (item: ContentItem | null) => {
     setEditingItem(item);

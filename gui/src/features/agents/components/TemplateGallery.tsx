@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import {
   Alert,
   AlertIcon,
@@ -167,6 +167,13 @@ function fieldChoices(param: AgentTemplateParam, attributes: Attribute[]): Attri
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** A number parameter's value: a non-negative integer. */
+function isCount(v: Values[string] | undefined): boolean {
+  if (typeof v !== "string" || !v.trim()) return false;
+  const n = Number(v);
+  return Number.isInteger(n) && n >= 0;
+}
+
 function emptyValue(v: Values[string] | undefined): boolean {
   return v === undefined || v === "" || (Array.isArray(v) && v.length === 0);
 }
@@ -204,11 +211,19 @@ function TemplateParamsModal({
   const collectionParam = template.params.find((p) => p.type === "collection");
   const collection = collectionParam ? String(values[collectionParam.key] ?? "") : "";
   const { attributes, loading: attrsLoading, error: attrsError } = useCollectionAttributes(collection || null);
+  // Closed (Esc, the overlay, the close button) while rendering: drop the response.
+  const open = useRef(true);
+  useEffect(() => {
+    open.current = true;
+    return () => {
+      open.current = false;
+    };
+  }, []);
 
   const errors: Record<string, string> = {};
   for (const p of template.params) {
     if (p.required && emptyValue(values[p.key])) errors[p.key] = p.type === "collection" ? "Choose a collection." : "Required.";
-    if (p.type === "number" && !emptyValue(values[p.key]) && !(Number(values[p.key]) > 0)) errors[p.key] = "A positive number.";
+    if (p.type === "number" && !emptyValue(values[p.key]) && !isCount(values[p.key])) errors[p.key] = "A whole number, 0 or more.";
   }
   if (/[/?#%\\]/.test(name)) errors.name = "The name cannot contain / ? # % or \\ (it is used in URLs).";
   const shown = attempted ? errors : {};
@@ -235,8 +250,10 @@ function TemplateParamsModal({
       const res = await api<AgentDefinition>("POST", `/admin/agent-templates/${encodeURIComponent(template.id)}/render`, {
         params: renderParams(template.params, values, name),
       });
+      if (!open.current) return;
       onRendered(res.data);
     } catch (err) {
+      if (!open.current) return;
       setServerError(errorMessage(err));
       setBusy(false);
     }
@@ -318,7 +335,8 @@ function TemplateParamsModal({
         <Input
           id={id}
           type={p.type === "number" ? "number" : "text"}
-          min={p.type === "number" ? 1 : undefined}
+          min={p.type === "number" ? 0 : undefined}
+          step={p.type === "number" ? 1 : undefined}
           value={String(v ?? "")}
           onChange={(e) => setValue(p.key, e.target.value)}
         />

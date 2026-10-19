@@ -51,6 +51,7 @@ import {
   proposalEntryLabel,
   proposalStatusColor,
   rejectProposal,
+  sameJSON,
 } from "./proposals";
 import { useProposal } from "./useProposals";
 
@@ -159,15 +160,41 @@ function ProposalReview({ detail, reload, onClose }: { detail: ProposalDetail; r
   const [mode, setMode] = useState<Mode>("review");
   // Editing starts from what approving would write (for a stale update, the
   // entry now with the agent's changes), not the agent's raw values.
-  const [edited, setEdited] = useState(() => JSON.stringify(proposed ?? p.data ?? {}, null, 2));
+  const startText = JSON.stringify(proposed ?? p.data ?? {}, null, 2);
+  const [edited, setEdited] = useState(startText);
+  // The text the edit started from: values equal to it are the agent's change.
+  const [editBase, setEditBase] = useState(startText);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState<"approve" | "force" | "reject" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   // The approval was refused because the entry changed since: offer to force it.
-  const [staleRefused, setStaleRefused] = useState<string | null>(null);
+  const [staleRefused, setStaleRefused] = useState(false);
+  // Edits refused as stale: the details being reloaded, to restart the edit from them.
+  const [resetFrom, setResetFrom] = useState<ProposalDetail | null>(null);
+  // The edit box was reset to the entry as it is now: the reviewer has to look again.
+  const [editReset, setEditReset] = useState(false);
+
+  // Reloaded details: an untouched edit box follows them; one refused as
+  // stale restarts from them.
+  const [seen, setSeen] = useState(detail);
+  if (seen !== detail) {
+    setSeen(detail);
+    if (resetFrom !== null || edited === editBase) {
+      setEdited(startText);
+      setEditBase(startText);
+    }
+    if (resetFrom !== null) {
+      setResetFrom(null);
+      setEditReset(true);
+    }
+  }
 
   const pending = p.status === "pending";
   const parsed = mode === "edit" ? parseEditedData(edited) : null;
+  const working = busy !== null || resetFrom !== null;
+  // Values unchanged from where the edit started stay the agent's change,
+  // which the server rebases on the entry as it is now.
+  const edits = mode === "edit" && parsed?.value && !sameJSON(parsed.value, parseEditedData(editBase).value) ? parsed.value : undefined;
 
   const decided = (title: string, description?: string) => {
     notify.success(title, description);
@@ -176,15 +203,27 @@ function ProposalReview({ detail, reload, onClose }: { detail: ProposalDetail; r
   };
 
   const approve = async (force: boolean) => {
-    if (mode === "edit" && parsed?.error) return;
+    if (working || (mode === "edit" && parsed?.error)) return;
+    // Edits made over the entry reloaded after a stale refusal were reviewed
+    // against it: apply them although the entry changed since the proposal.
+    const forced = force || (edits !== undefined && editReset);
     setBusy(force ? "force" : "approve");
     setActionError(null);
     try {
-      await approveProposal(p.id, { ...(mode === "edit" && parsed?.value ? { data: parsed.value } : {}), ...(force ? { force: true } : {}) });
-      decided("Change applied", `${proposalEntryLabel(p)}: the agent's ${proposalActionLabel(p)} was approved${mode === "edit" ? " with your edits" : ""}.`);
+      await approveProposal(p.id, { ...(edits ? { data: edits } : {}), ...(forced ? { force: true } : {}) });
+      decided("Change applied", `${proposalEntryLabel(p)}: the agent's ${proposalActionLabel(p)} was approved${edits ? " with your edits" : ""}.`);
     } catch (err) {
       if (isStaleConflict(err)) {
-        setStaleRefused(errorMessage(err));
+        if (edits) {
+          // Never force edited values over changes made since: start the
+          // edit again from the entry as it is now.
+          setStaleRefused(false);
+          setEditReset(false);
+          setResetFrom(detail);
+        } else {
+          setStaleRefused(true);
+        }
+        reload();
       } else {
         setActionError(errorMessage(err));
         // 422: the proposal is now failed (bad data, or the collection, entry
@@ -200,6 +239,7 @@ function ProposalReview({ detail, reload, onClose }: { detail: ProposalDetail; r
   };
 
   const reject = async () => {
+    if (working) return;
     setBusy("reject");
     setActionError(null);
     try {
@@ -216,7 +256,9 @@ function ProposalReview({ detail, reload, onClose }: { detail: ProposalDetail; r
     }
   };
 
-  const showStale = pending && (stale || staleRefused !== null);
+  const showStale = pending && (stale || staleRefused || editReset);
+  // Forcing applies the agent's change only, never edited values.
+  const canForce = staleRefused && edits === undefined;
 
   return (
     <>
@@ -292,10 +334,16 @@ function ProposalReview({ detail, reload, onClose }: { detail: ProposalDetail; r
                 <AlertDescription fontSize="sm" display="block">
                   The “current” column shows the entry as it is now, and “proposed” what approving writes: only the fields the agent
                   changed are applied over it.
-                  {staleRefused && " Approve anyway to apply them."}
+                  {canForce && " Approve anyway to apply them."}
                 </AlertDescription>
-                {staleRefused && (
-                  <Button mt={2} size="sm" colorScheme="orange" onClick={() => approve(true)} isLoading={busy === "force"}>
+                {editReset && mode === "edit" && (
+                  <Text fontSize="sm" mt={2} fontWeight="medium" data-testid="edit-reset-note">
+                    The entry changed while you were editing: the values to apply were reset to the entry as it is now with the agent's
+                    changes. Review them, edit them again if needed, and approve.
+                  </Text>
+                )}
+                {canForce && (
+                  <Button mt={2} size="sm" colorScheme="orange" onClick={() => approve(true)} isLoading={busy === "force"} isDisabled={working}>
                     Apply anyway
                   </Button>
                 )}
@@ -330,6 +378,7 @@ function ProposalReview({ detail, reload, onClose }: { detail: ProposalDetail; r
                 fontSize="sm"
                 value={edited}
                 onChange={(e) => setEdited(e.target.value)}
+                isDisabled={working}
                 aria-label="Values to apply (JSON)"
                 spellCheck={false}
               />
@@ -346,7 +395,7 @@ function ProposalReview({ detail, reload, onClose }: { detail: ProposalDetail; r
           {pending && mode === "reject" && (
             <FormControl>
               <FormLabel fontSize="sm">Note (optional)</FormLabel>
-              <Textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Why the change is rejected" />
+              <Textarea rows={3} isDisabled={working} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Why the change is rejected" />
             </FormControl>
           )}
 
@@ -363,35 +412,35 @@ function ProposalReview({ detail, reload, onClose }: { detail: ProposalDetail; r
         <DrawerFooter borderTopWidth="1px" gap={2} flexWrap="wrap">
           {mode === "review" && (
             <>
-              <Button variant="outline" colorScheme="red" leftIcon={<FiX />} onClick={() => setMode("reject")} mr="auto">
+              <Button variant="outline" colorScheme="red" leftIcon={<FiX />} onClick={() => setMode("reject")} mr="auto" isDisabled={working}>
                 Reject
               </Button>
               {p.action !== "delete" && (
-                <Button variant="outline" leftIcon={<FiEdit3 />} onClick={() => setMode("edit")}>
+                <Button variant="outline" leftIcon={<FiEdit3 />} onClick={() => setMode("edit")} isDisabled={working}>
                   Edit and approve
                 </Button>
               )}
-              <Button colorScheme="green" leftIcon={<FiCheck />} onClick={() => approve(false)} isLoading={busy === "approve"}>
+              <Button colorScheme="green" leftIcon={<FiCheck />} onClick={() => approve(false)} isLoading={busy === "approve"} isDisabled={working}>
                 Approve
               </Button>
             </>
           )}
           {mode === "edit" && (
             <>
-              <Button variant="ghost" onClick={() => setMode("review")} isDisabled={busy !== null}>
+              <Button variant="ghost" onClick={() => setMode("review")} isDisabled={working}>
                 Cancel
               </Button>
-              <Button colorScheme="green" leftIcon={<FiCheck />} onClick={() => approve(false)} isLoading={busy === "approve"} isDisabled={Boolean(parsed?.error)}>
+              <Button colorScheme="green" leftIcon={<FiCheck />} onClick={() => approve(false)} isLoading={busy === "approve"} isDisabled={working || Boolean(parsed?.error)}>
                 Approve with edits
               </Button>
             </>
           )}
           {mode === "reject" && (
             <>
-              <Button variant="ghost" onClick={() => setMode("review")} isDisabled={busy !== null}>
+              <Button variant="ghost" onClick={() => setMode("review")} isDisabled={working}>
                 Cancel
               </Button>
-              <Button colorScheme="red" leftIcon={<FiX />} onClick={reject} isLoading={busy === "reject"}>
+              <Button colorScheme="red" leftIcon={<FiX />} onClick={reject} isLoading={busy === "reject"} isDisabled={working}>
                 Reject proposal
               </Button>
             </>

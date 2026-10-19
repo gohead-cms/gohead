@@ -194,8 +194,8 @@ test("agents: a test run of a collection-event agent", async ({ page, request })
     expect(Number.isInteger(sent.item_id)).toBeTruthy();
 
     if (!res.ok()) {
-      // Without Redis runs cannot be queued (503 when it is not configured,
-      // 500 when it is unreachable): the modal shows why and stays open.
+      // Without Redis runs cannot be queued (503, whether it is not
+      // configured or unreachable): the modal shows why and stays open.
       const message = (await res.json()).error.message as string;
       expect(message).toMatch(/Redis|queue/i);
       await expect(dialog.getByRole("alert")).toContainText(message);
@@ -214,7 +214,9 @@ test("agents: a test run of a collection-event agent", async ({ page, request })
       expect(res.status()).toBe(202);
       const { runId, dryRun } = (await res.json()).data;
       expect(dryRun).toBe(true);
-      const drawer = page.getByRole("dialog");
+      // The test modal closes as the run drawer opens: wait for it to be gone.
+      await expect(page.getByRole("dialog", { name: `Test ${agent}` })).toHaveCount(0);
+      const drawer = page.getByRole("dialog", { name: new RegExp(`^Run #${runId}(?!\\d)`) });
       await expect(drawer).toContainText(`Run #${runId}`);
       await expect(drawer.getByText("test run", { exact: true })).toBeVisible();
       await expect(drawer.getByText(/Test run: the agent ran for real/)).toBeVisible();

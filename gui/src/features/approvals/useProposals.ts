@@ -26,27 +26,17 @@ function useReloadOnChange(refetch: () => void, onFocus: boolean) {
   }, [refetch, onFocus]);
 }
 
-/**
- * A page of proposals, newest first. Pending ones are checked for
- * staleness (the entry changed since), which only the details tell.
- */
+/** A page of proposals, newest first; pending ones whose entry changed since are flagged stale by the server. */
 export function useProposals(filters: ProposalFilters, page: number) {
   const key = proposalsQuery(filters, page, PAGE_SIZE);
   const { data, loading, error, refetch } = useApiQuery(key, async () => {
     const json = await getJSON<Proposal[]>(key, "Failed to load proposals");
     const proposals = Array.isArray(json.data) ? json.data : [];
-    const pending = proposals.filter((p) => p.status === "pending" && p.action !== "create");
-    const details = await Promise.allSettled(pending.map((p) => getJSON<ProposalDetail>(`/api/proposals/${p.id}`)));
-    const stale = new Set<number>();
-    details.forEach((d, i) => {
-      if (d.status === "fulfilled" && d.value.data?.stale) stale.add(pending[i].id);
-    });
-    return { proposals, stale, pagination: (json.meta?.pagination as ProposalPagination | undefined) ?? null };
+    return { proposals, pagination: (json.meta?.pagination as ProposalPagination | undefined) ?? null };
   });
   useReloadOnChange(refetch, false);
   return {
     proposals: data?.proposals ?? [],
-    stale: data?.stale ?? new Set<number>(),
     pagination: data?.pagination ?? null,
     loading,
     error,

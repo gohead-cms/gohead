@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link as RouterLink, useSearchParams } from "react-router-dom";
 import {
   Alert,
@@ -61,7 +61,13 @@ export function ApprovalsPage() {
   const [open, setOpen] = useState<number | null>(null);
   // The agent filter is applied on Enter or when the field loses focus.
   const [agentInput, setAgentInput] = useState(filters.agent ?? "");
-  const { proposals, stale, pagination, loading, error, refetch } = useProposals(filters, page);
+  // Follow the URL when it changes the agent filter (back/forward, a link).
+  const [syncedAgent, setSyncedAgent] = useState(filters.agent ?? "");
+  if ((filters.agent ?? "") !== syncedAgent) {
+    setSyncedAgent(filters.agent ?? "");
+    setAgentInput(filters.agent ?? "");
+  }
+  const { proposals, pagination, loading, error, refetch } = useProposals(filters, page);
   const { collections } = useCollectionsList();
   const hover = useColorModeValue("gray.50", "gray.700");
   const tabIndex = Math.max(0, STATUS_TABS.findIndex((t) => t.value === filters.status));
@@ -85,6 +91,21 @@ export function ApprovalsPage() {
     update({ collection: undefined, agent: undefined, agentRun: undefined });
   };
   const showStatus = filters.status !== "pending";
+
+  // Past the last page (its last proposal was just decided): go to the last one.
+  const lastPage = pagination ? Math.max(1, pagination.pageCount) : null;
+  useEffect(() => {
+    if (lastPage === null || page <= lastPage) return;
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (lastPage > 1) next.set("page", String(lastPage));
+        else next.delete("page");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [lastPage, page, setParams]);
 
   return (
     <Page>
@@ -191,7 +212,7 @@ export function ApprovalsPage() {
               </Thead>
               <Tbody>
                 {proposals.map((p) => (
-                  <ProposalRow key={p.id} proposal={p} stale={stale.has(p.id)} showStatus={showStatus} hover={hover} onOpen={() => setOpen(p.id)} />
+                  <ProposalRow key={p.id} proposal={p} stale={Boolean(p.stale)} showStatus={showStatus} hover={hover} onOpen={() => setOpen(p.id)} />
                 ))}
               </Tbody>
             </Table>
@@ -232,18 +253,23 @@ function ProposalRow({
   onOpen: () => void;
 }) {
   return (
-    <Tr
-      cursor="pointer"
-      _hover={{ bg: hover }}
-      tabIndex={0}
-      aria-label={`Proposal ${p.id} by ${p.agentName}`}
-      onClick={onOpen}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") onOpen();
-      }}
-    >
+    // The whole row opens the proposal with the mouse; the button in its
+    // first cell does it from the keyboard.
+    <Tr cursor="pointer" _hover={{ bg: hover }} onClick={onOpen}>
       <Td whiteSpace="nowrap" title={formatTime(p.createdAt)}>
-        {formatShortTime(p.createdAt)}
+        <Button
+          variant="link"
+          size="sm"
+          fontWeight="normal"
+          color="inherit"
+          aria-label={`Open proposal ${p.id} by ${p.agentName}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpen();
+          }}
+        >
+          {formatShortTime(p.createdAt)}
+        </Button>
       </Td>
       <Td maxW="160px" overflow="hidden" textOverflow="ellipsis" fontWeight="medium" title={p.agentName}>
         {p.agentName}

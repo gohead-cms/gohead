@@ -63,15 +63,18 @@ export function TestRunButton({ agent, onQueued }: { agent: AgentNodeData; onQue
   const trigger = agent.schema.trigger;
   const collection = trigger.type === "collection_event" ? (trigger.event_trigger?.collection ?? "") : "";
   const events = trigger.event_trigger?.events ?? [];
-  const [mode, setMode] = useState<"event" | "input">(collection ? "event" : "input");
+  const [chosenMode, setMode] = useState<"event" | "input">(collection ? "event" : "input");
+  // The agent may have changed since (no collection trigger, other events).
+  const mode = collection ? chosenMode : "input";
   const [itemId, setItemId] = useState("");
-  const [event, setEvent] = useState(events[0] ?? "");
+  const [chosenEvent, setEvent] = useState(events[0] ?? "");
+  const event = events.includes(chosenEvent) ? chosenEvent : (events[0] ?? "");
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const notify = useNotify();
   const { items, loading: itemsLoading, error: itemsError } = useRecentItems(isOpen && mode === "event" && collection ? collection : null);
-  const chosenItem = itemId || (items[0] ? String(items[0].id) : "");
+  const chosenItem = itemId && items.some((it) => String(it.id) === itemId) ? itemId : items[0] ? String(items[0].id) : "";
 
   const close = () => {
     setError(null);
