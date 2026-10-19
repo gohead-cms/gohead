@@ -1,4 +1,4 @@
-import { expect, Page } from "@playwright/test";
+import { type APIRequestContext, expect, type Page } from "@playwright/test";
 
 export const apiURL = process.env.E2E_API_URL ?? "http://localhost:8080";
 // The API must be started with this administrator:
@@ -25,4 +25,11 @@ export function trackErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on("pageerror", (err) => errors.push(err.message));
   return errors;
+}
+
+/** Signs in the admin through the API: headers for direct API calls. */
+export async function adminHeaders(request: APIRequestContext) {
+  const res = await request.post(`${apiURL}/auth/login`, { data: admin });
+  expect(res.ok(), await res.text()).toBeTruthy();
+  return { Authorization: `Bearer ${(await res.json()).data.token as string}` };
 }

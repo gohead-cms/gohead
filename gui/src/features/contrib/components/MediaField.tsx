@@ -2,6 +2,8 @@ import React, { useRef, useState } from "react";
 import { Box, Button, HStack, IconButton, Image, Input, Text, VStack, useToast } from "@chakra-ui/react";
 import { FiUpload, FiX, FiFile } from "react-icons/fi";
 import { API_BASE_URL, apiFetchWithAuth } from "../../../services/api";
+import { useMe } from "../../auth/me";
+import { MEDIA } from "../../auth/permissions";
 
 // A media value as the API returns it (populated), or a bare ID / URL.
 export interface MediaFile {
@@ -48,6 +50,8 @@ export function MediaField({ id, value, multiple, accept, onChange }: MediaField
   const input = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const toast = useToast();
+  // Uploading needs media create; files already set can still be removed.
+  const canUpload = useMe().can("create", MEDIA);
   const values: MediaValue[] = multiple ? (Array.isArray(value) ? value : []) : value ? [value as MediaValue] : [];
 
   const upload = async (files: FileList | null) => {
@@ -79,7 +83,12 @@ export function MediaField({ id, value, multiple, accept, onChange }: MediaField
       {values.map((v, i) => (
         <Preview key={i} value={v} onRemove={() => removeAt(i)} />
       ))}
-      {(multiple || values.length === 0) && (
+      {!canUpload && values.length === 0 && (
+        <Text fontSize="sm" color="gray.500">
+          No file. Your role cannot upload files.
+        </Text>
+      )}
+      {canUpload && (multiple || values.length === 0) && (
         <Button
           leftIcon={<FiUpload />}
           size="sm"

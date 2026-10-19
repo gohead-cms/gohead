@@ -5,26 +5,29 @@ import type { Schema } from "../../../shared/types";
 import { ConfirmButton } from "../../../shared/ui/ConfirmButton";
 import { EmptyState } from "../../../shared/ui/EmptyState";
 import type { ContentItem } from "../hooks";
+import type { EntryPermissions } from "./entryPermissions";
 import { displayValue, tableColumns } from "./entryValues";
 
 interface ContentTableProps {
   schema: Schema;
   items: ContentItem[];
-  /** False hides the actions that change content (viewers). */
-  canWrite: boolean;
+  /** What the role may do here: the actions it cannot are hidden. */
+  perms: EntryPermissions;
   /** With localized attributes and several locales: a column of the locales each entry has. */
   locales?: Locale[];
   onAdd: () => void;
   onEdit: (item: ContentItem) => void;
-  /** Opens the entry's history (editors and admins). */
+  /** Opens the entry's history (roles that can update the type). */
   onHistory?: (item: ContentItem) => void;
   onTogglePublish: (item: ContentItem) => void;
   onDelete: (item: ContentItem) => Promise<void>;
 }
 
-export function ContentTable({ schema, items, canWrite, locales, onAdd, onEdit, onHistory, onTogglePublish, onDelete }: ContentTableProps) {
+export function ContentTable({ schema, items, perms, locales, onAdd, onEdit, onHistory, onTogglePublish, onDelete }: ContentTableProps) {
   const drafts = !!schema.options?.draftAndPublish;
   const headers = tableColumns(schema);
+  const canPublish = drafts && perms.publish;
+  const actions = canPublish || perms.update || perms.delete || !!onHistory;
 
   if (items.length === 0) {
     return (
@@ -32,14 +35,14 @@ export function ContentTable({ schema, items, canWrite, locales, onAdd, onEdit, 
         icon={FiInbox}
         title="This collection is empty"
         action={
-          canWrite && (
+          perms.create && (
             <Button size="sm" colorScheme="purple" leftIcon={<FiPlus />} onClick={onAdd}>
               Add the first entry
             </Button>
           )
         }
       >
-        {canWrite ? "Get started by creating your first entry." : "Nothing has been published here yet."}
+        {perms.create ? "Get started by creating your first entry." : "Nothing has been published here yet."}
       </EmptyState>
     );
   }
@@ -55,7 +58,7 @@ export function ContentTable({ schema, items, canWrite, locales, onAdd, onEdit, 
               ))}
               {locales && <Th>Locales</Th>}
               {drafts && <Th>Status</Th>}
-              {canWrite && <Th isNumeric>Actions</Th>}
+              {actions && <Th isNumeric>Actions</Th>}
             </Tr>
           </Thead>
           <Tbody>
@@ -77,10 +80,10 @@ export function ContentTable({ schema, items, canWrite, locales, onAdd, onEdit, 
                       <Badge colorScheme={published ? "green" : "gray"}>{item.status}</Badge>
                     </Td>
                   )}
-                  {canWrite && (
+                  {actions && (
                     <Td isNumeric>
                       <HStack spacing={1} justify="flex-end">
-                        {drafts && (
+                        {canPublish && (
                           <Tooltip label={published ? "Unpublish" : "Publish"}>
                             <IconButton
                               aria-label={published ? "Unpublish item" : "Publish item"}
@@ -91,18 +94,26 @@ export function ContentTable({ schema, items, canWrite, locales, onAdd, onEdit, 
                             />
                           </Tooltip>
                         )}
-                        <IconButton aria-label="Edit item" icon={<FiEdit />} size="sm" variant="ghost" onClick={() => onEdit(item)} />
+                        {perms.update && (
+                          <IconButton aria-label="Edit item" icon={<FiEdit />} size="sm" variant="ghost" onClick={() => onEdit(item)} />
+                        )}
                         {onHistory && (
                           <Tooltip label="History">
                             <IconButton aria-label="Item history" icon={<FiClock />} size="sm" variant="ghost" onClick={() => onHistory(item)} />
                           </Tooltip>
                         )}
-                        <ConfirmButton
-                          trigger={<IconButton aria-label="Delete item" icon={<FiTrash2 />} size="sm" variant="ghost" colorScheme="red" />}
-                          title="Delete this entry?"
-                          body={`Entry #${item.id} will be deleted. You can bring it back later from "Recently deleted".`}
-                          onConfirm={() => onDelete(item)}
-                        />
+                        {perms.delete && (
+                          <ConfirmButton
+                            trigger={<IconButton aria-label="Delete item" icon={<FiTrash2 />} size="sm" variant="ghost" colorScheme="red" />}
+                            title="Delete this entry?"
+                            body={
+                              perms.update
+                                ? `Entry #${item.id} will be deleted. You can bring it back later from "Recently deleted".`
+                                : `Entry #${item.id} will be deleted. A role that can edit this collection can bring it back from "Recently deleted".`
+                            }
+                            onConfirm={() => onDelete(item)}
+                          />
+                        )}
                       </HStack>
                     </Td>
                   )}

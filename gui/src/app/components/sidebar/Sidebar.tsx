@@ -29,6 +29,7 @@ import {
   FiSend,
   FiLayers,
   FiGlobe,
+  FiShield,
 } from 'react-icons/fi';
 import { type IconType } from 'react-icons';
 import { NavLink, useLocation } from "react-router-dom";
@@ -36,6 +37,7 @@ import { LiaProjectDiagramSolid } from "react-icons/lia";
 import { LuBrain } from "react-icons/lu";
 import { VscRobot } from "react-icons/vsc";
 import { useMe } from "../../../features/auth/me";
+import { MEDIA } from "../../../features/auth/permissions";
 
 // --- Menu Structure ---
 interface NavItemProps {
@@ -45,6 +47,8 @@ interface NavItemProps {
   children?: NavItemProps[];
   /** Only shown to admins (the pages behind it need the admin role). */
   adminOnly?: boolean;
+  /** Only shown when the signed-in role has this permission. */
+  needs?: "content" | "media";
 }
 
 const LinkItems: Array<NavItemProps> = [
@@ -53,8 +57,8 @@ const LinkItems: Array<NavItemProps> = [
     name: 'Content',
     icon: FiDatabase,
     children: [
-      { name: 'Content Editor', icon: FiGrid, href: '/contrib' },
-      { name: 'Media Library', icon: FiImage, href: '/media' },
+      { name: 'Content Editor', icon: FiGrid, href: '/contrib', needs: 'content' },
+      { name: 'Media Library', icon: FiImage, href: '/media', needs: 'media' },
     ],
   },
   {
@@ -81,6 +85,7 @@ const LinkItems: Array<NavItemProps> = [
     adminOnly: true,
     children: [
       { name: 'Users', icon: FiUsers, href: '/settings/users' },
+      { name: 'Roles', icon: FiShield, href: '/settings/roles' },
       { name: 'API Tokens', icon: FiKey, href: '/settings/tokens' },
       { name: 'Webhooks', icon: FiSend, href: '/settings/webhooks' },
       { name: 'Locales', icon: FiGlobe, href: '/settings/locales' },
@@ -131,8 +136,16 @@ interface SidebarContentProps extends BoxProps {
 }
 
 function SidebarContent({ onClose, ...rest }: SidebarContentProps) {
-  const { isAdmin } = useMe();
-  const visibleLinks = LinkItems.filter((l) => isAdmin || !l.adminOnly);
+  const { me, isAdmin, canReadContent, can } = useMe();
+  // Until the account is known, content pages stay listed (as before roles).
+  const allowed = (l: NavItemProps) =>
+    (isAdmin || !l.adminOnly) &&
+    (l.needs !== "content" || !me || canReadContent) &&
+    (l.needs !== "media" || !me || can("read", MEDIA));
+  // A section is shown when at least one of its pages is.
+  const visibleLinks = LinkItems.filter(allowed)
+    .map((l) => (l.children ? { ...l, children: l.children.filter(allowed) } : l))
+    .filter((l) => !l.children || l.children.length > 0);
   return (
     <Box
       transition="3s ease"

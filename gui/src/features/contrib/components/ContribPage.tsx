@@ -8,13 +8,13 @@ import { useLocales } from "../../../shared/hooks/useLocales";
 import { useNotify } from "../../../shared/hooks/useNotify";
 import { PageLoader } from "../../../shared/ui/page-loader";
 import type { Schema } from "../../../shared/types";
-import { useMe } from "../../auth/me";
 import { HistoryDrawer } from "../../history/HistoryDrawer";
 import { RecentlyDeletedButton } from "../../history/RecentlyDeleted";
 import { type ContentItem, useCollectionContent, useCollectionsList, useSingletonsList } from "../hooks";
 import { ContentSelector } from "./ContentSelector";
 import { ContentTable } from "./ContentTable";
 import { EntryFormModal } from "./EntryFormModal";
+import { useEntryPermissions } from "./entryPermissions";
 import { hasLocalizedAttributes } from "./entryValues";
 import { LocaleSwitcher } from "./LocaleSwitcher";
 import { SingletonEditor } from "./SingletonEditor";
@@ -76,7 +76,7 @@ export function ContributionsPage() {
 function CollectionContent({ collectionName, schema }: { collectionName: string; schema: Schema }) {
   const navigate = useNavigate();
   const notify = useNotify();
-  const { canWrite } = useMe();
+  const perms = useEntryPermissions(collectionName);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const localized = hasLocalizedAttributes(schema.attributes);
   const { locales, defaultLocale } = useLocales(localized);
@@ -143,14 +143,15 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
           <Heading size="lg">{schema.info?.displayName || schema.collectionName}</Heading>
           <Text color="gray.500">{loading && content.items.length === 0 ? "Loading entries…" : `${content.total} ${content.total === 1 ? "entry" : "entries"}, newest first`}</Text>
         </Box>
-        {(canWrite || translatable) && (
+        {(perms.create || perms.update || translatable) && (
         <HStack>
           {translatable && defaultLocale && (
             <LocaleSwitcher label="View in locale" locales={locales} value={viewLocale ?? defaultLocale.code} onChange={setListLocale} />
           )}
-          {canWrite && (
+          {/* Bringing an entry back writes it: it needs update. */}
+          {perms.update && <RecentlyDeletedButton collection={collectionName} onRestored={refetch} />}
+          {perms.create && (
           <>
-          <RecentlyDeletedButton collection={collectionName} onRestored={refetch} />
           <Button bg="white" variant="outline" size="sm" leftIcon={<Icon as={FiPlus} />} onClick={() => openForm(null)}>
             Quick Add
           </Button>
@@ -174,11 +175,12 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
         <ContentTable
           schema={schema}
           items={content.items}
-          canWrite={canWrite}
+          perms={perms}
           locales={translatable ? locales : undefined}
           onAdd={() => openForm(null)}
           onEdit={openForm}
-          onHistory={setHistoryItem}
+          // History needs update on the type (restoring writes the entry).
+          onHistory={perms.update ? setHistoryItem : undefined}
           onTogglePublish={handleTogglePublish}
           onDelete={handleDelete}
         />
@@ -197,7 +199,8 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
         schema={schema}
         itemToEdit={editingItem}
         onSubmit={handleSaveItem}
-        onShowHistory={canWrite ? setHistoryItem : undefined}
+        perms={perms}
+        onShowHistory={perms.update ? setHistoryItem : undefined}
         collection={collectionName}
         locales={translatable ? locales : undefined}
         // An entry opened from a list read in a locale is edited in it.

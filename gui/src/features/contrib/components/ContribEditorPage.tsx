@@ -29,6 +29,7 @@ import { useNotify } from "../../../shared/hooks/useNotify";
 import { PageLoader } from "../../../shared/ui/page-loader";
 import type { Attribute, Schema } from "../../../shared/types";
 import { useCollectionSchema } from "../../collections/hook/useCollectionSchema";
+import { useMe } from "../../auth/me";
 import { EntryFields } from "./EntryFields";
 import { hasLocalizedAttributes, initialValues, missingRequired, toEntryPayload } from "./entryValues";
 import { LocaleSwitcher } from "./LocaleSwitcher";
@@ -53,6 +54,17 @@ function layoutFields(schema: Schema) {
 export function ContributionEditorPage() {
   const { collectionName } = useParams<{ collectionName: string }>();
   const { schema, loading, error } = useCollectionSchema(collectionName);
+  const { can, loading: meLoading } = useMe();
+  if (!meLoading && collectionName && !can("create", collectionName)) {
+    return (
+      <Box p={8}>
+        <Alert status="warning" borderRadius="md">
+          <AlertIcon />
+          Your role cannot create entries in “{collectionName}”.
+        </Alert>
+      </Box>
+    );
+  }
   if (error) {
     return (
       <Box p={8}>
@@ -70,6 +82,9 @@ export function ContributionEditorPage() {
 
 function ContributionEditor({ collectionName, schema }: { collectionName: string; schema: Schema }) {
   const navigate = useNavigate();
+  const { can } = useMe();
+  // Without publish, the new entry stays a draft for someone else to publish.
+  const draftOnly = !!schema.options?.draftAndPublish && !can("publish", collectionName);
   const notify = useNotify();
   const { mainField, titleField, sidebarFields } = useMemo(() => layoutFields(schema), [schema]);
   const [formData, setFormData] = useState<Record<string, unknown>>(() => initialValues(schema.attributes));
@@ -122,7 +137,7 @@ function ContributionEditor({ collectionName, schema }: { collectionName: string
             Cancel
           </Button>
           <Button colorScheme="purple" leftIcon={<Icon as={FiSave} />} onClick={handleSubmit} isLoading={isSubmitting}>
-            Save Entry
+            {draftOnly ? "Save draft" : "Save Entry"}
           </Button>
         </HStack>
       </Flex>

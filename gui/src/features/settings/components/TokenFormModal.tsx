@@ -24,7 +24,7 @@ import {
 import { api } from "../../../services/api";
 import { errorMessage } from "../../../shared/utils/errors";
 import { RoleSelect } from "./RoleSelect";
-import type { CreatedApiToken, RoleName } from "./types";
+import type { CreatedApiToken } from "./types";
 
 const MAX_DAYS = 3650;
 const EXPIRY_PRESETS = [
@@ -47,7 +47,7 @@ export function TokenFormModal({
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [role, setRole] = useState<RoleName>("viewer");
+  const [role, setRole] = useState("viewer");
   const [expiry, setExpiry] = useState("90");
   const [customDays, setCustomDays] = useState("");
   const [submitted, setSubmitted] = useState(false);

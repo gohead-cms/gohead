@@ -115,12 +115,16 @@ function Facts({ item }: { item: MediaItem }) {
 /** One media file: preview, URL, facts, editable details and delete. */
 export function MediaDetailsDrawer({
   id,
-  canWrite,
+  canUpdate,
+  canDelete,
   onClose,
   onChanged,
 }: {
   id: number | null;
-  canWrite: boolean;
+  /** Media update: the details can be edited. */
+  canUpdate: boolean;
+  /** Media delete: the file can be deleted. */
+  canDelete: boolean;
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -176,7 +180,7 @@ export function MediaDetailsDrawer({
               <MediaDetailsForm
                 key={`${item.id}-${item.updatedAt}`}
                 item={item}
-                canWrite={canWrite}
+                canWrite={canUpdate}
                 onSaved={() => {
                   query.refetch();
                   onChanged();
@@ -191,7 +195,7 @@ export function MediaDetailsDrawer({
             </Box>
           )}
         </DrawerBody>
-        {item && canWrite && (
+        {item && canDelete && (
           <DrawerFooter borderTopWidth="1px" justifyContent="space-between">
             <ConfirmButton
               title="Delete this file?"

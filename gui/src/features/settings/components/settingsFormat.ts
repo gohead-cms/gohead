@@ -7,6 +7,9 @@ export const roleColor: Record<string, string> = {
   viewer: "gray",
 };
 
+/** Custom roles share one color. */
+export const CUSTOM_ROLE_COLOR = "teal";
+
 export const tokenStatusColor: Record<string, string> = {
   active: "green",
   expired: "orange",

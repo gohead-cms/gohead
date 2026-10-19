@@ -1,13 +1,3 @@
-/** Roles a user or an API token can have. */
-export const ROLES = ["admin", "editor", "viewer"] as const;
-export type RoleName = (typeof ROLES)[number];
-
-export const ROLE_HELP: Record<RoleName, string> = {
-  admin: "Everything, including users, tokens and webhooks",
-  editor: "Create, edit and publish content",
-  viewer: "Read-only access",
-};
-
 /** A user as returned by GET /admin/users (a GORM model: ID is upper-case). */
 export interface AdminUser {
   ID: number;

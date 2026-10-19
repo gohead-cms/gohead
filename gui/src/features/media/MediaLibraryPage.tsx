@@ -23,6 +23,7 @@ import { useNotify } from "../../shared/hooks/useNotify";
 import { EmptyState } from "../../shared/ui/EmptyState";
 import { Page, PageHeader } from "../../shared/ui/PageHeader";
 import { useMe } from "../auth/me";
+import { MEDIA } from "../auth/permissions";
 import { MediaDetailsDrawer } from "./components/MediaDetailsDrawer";
 import { MediaGrid } from "./components/MediaGrid";
 import { UploadQueue } from "./components/UploadQueue";
@@ -54,7 +55,9 @@ function Pager({ p, onPage }: { p: MediaPagination; onPage: (page: number) => vo
 
 /** The media library: browse, search, upload and edit files. */
 export function MediaLibraryPage() {
-  const { canWrite, loading: meLoading } = useMe();
+  const { can, loading: meLoading } = useMe();
+  const canRead = can("read", MEDIA);
+  const canUpload = can("create", MEDIA);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [mime, setMime] = useState("");
@@ -75,7 +78,7 @@ export function MediaLibraryPage() {
   }, [searchInput]);
 
   const path = listPath(page, mime, search);
-  const list = useApiQuery(canWrite ? path : null, () => getJSON<MediaItem[]>(path, "Could not load the media library"));
+  const list = useApiQuery(canRead ? path : null, () => getJSON<MediaItem[]>(path, "Could not load the media library"));
   const items = list.data?.data ?? [];
   const pagination = list.data?.meta?.pagination as MediaPagination | undefined;
   const filtered = search.trim() !== "" || mime !== "";
@@ -94,7 +97,7 @@ export function MediaLibraryPage() {
     void uploads.upload(files);
   };
 
-  const dropHandlers = canWrite
+  const dropHandlers = canUpload
     ? {
         onDragEnter: (e: DragEvent) => {
           if (!hasFiles(e)) return;
@@ -138,12 +141,12 @@ export function MediaLibraryPage() {
     );
   }
 
-  if (!canWrite) {
+  if (!canRead) {
     return (
       <Page>
         <PageHeader title="Media library" description="Images, video, audio and documents used by your content." />
-        <EmptyState icon={FiLock} title="The media library is for editors">
-          Browsing and uploading files needs the editor or admin role. Ask an administrator for access; files used by content stay
+        <EmptyState icon={FiLock} title="Your role has no access to the media library">
+          Browsing and uploading files needs a role with media permissions. Ask an administrator for access; files used by content stay
           visible in that content.
         </EmptyState>
       </Page>
@@ -195,8 +198,10 @@ export function MediaLibraryPage() {
     );
   } else if (items.length === 0) {
     body = (
-      <EmptyState icon={FiUploadCloud} title="No files yet" action={uploadButton}>
-        Upload images, video, audio or documents, or drop files anywhere on this page. They can then be used in media fields.
+      <EmptyState icon={FiUploadCloud} title="No files yet" action={canUpload ? uploadButton : undefined}>
+        {canUpload
+          ? "Upload images, video, audio or documents, or drop files anywhere on this page. They can then be used in media fields."
+          : "Files uploaded by others will be listed here."}
       </EmptyState>
     );
   } else {
@@ -215,8 +220,12 @@ export function MediaLibraryPage() {
       <Page>
         <PageHeader
           title="Media library"
-          description="Images, video, audio and documents used by your content. Drop files anywhere to upload them."
-          actions={uploadButton}
+          description={
+            canUpload
+              ? "Images, video, audio and documents used by your content. Drop files anywhere to upload them."
+              : "Images, video, audio and documents used by your content."
+          }
+          actions={canUpload ? uploadButton : undefined}
         />
         <VisuallyHidden>
           <input ref={fileInput} type="file" multiple aria-label="Choose files to upload" onChange={onPicked} tabIndex={-1} />
@@ -280,7 +289,11 @@ export function MediaLibraryPage() {
         </Center>
       )}
 
-      <MediaDetailsDrawer id={selected} canWrite={canWrite} onClose={() => setSelected(null)} onChanged={list.refetch} />
+      <MediaDetailsDrawer
+        id={selected}
+        canUpdate={can("update", MEDIA)}
+        canDelete={can("delete", MEDIA)}
+        onClose={() => setSelected(null)} onChanged={list.refetch} />
     </Box>
   );
 }
