@@ -4529,6 +4529,41 @@
                         "name": {
                           "type": "string"
                         },
+                        "permissions": {
+                          "description": "What the role may do",
+                          "properties": {
+                            "content": {
+                              "additionalProperties": {
+                                "items": {
+                                  "enum": [
+                                    "read",
+                                    "create",
+                                    "update",
+                                    "delete",
+                                    "publish"
+                                  ],
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "description": "Actions by collection name, singleton:<name> or * (other types)",
+                              "type": "object"
+                            },
+                            "media": {
+                              "items": {
+                                "enum": [
+                                  "read",
+                                  "create",
+                                  "update",
+                                  "delete"
+                                ],
+                                "type": "string"
+                              },
+                              "type": "array"
+                            }
+                          },
+                          "type": "object"
+                        },
                         "role": {
                           "type": "string"
                         },

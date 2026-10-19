@@ -234,6 +234,11 @@ func staticPaths() obj {
 				"kind": obj{"type": "string", "enum": []string{"user", "token"}}, "id": obj{"type": "integer"},
 				"username": obj{"type": "string"}, "email": obj{"type": "string"}, "name": obj{"type": "string"},
 				"role": obj{"type": "string"},
+				"permissions": obj{"type": "object", "description": "What the role may do", "properties": obj{
+					"content": obj{"type": "object", "description": "Actions by collection name, singleton:<name> or * (other types)",
+						"additionalProperties": obj{"type": "array", "items": obj{"type": "string", "enum": []string{"read", "create", "update", "delete", "publish"}}}},
+					"media": obj{"type": "array", "items": obj{"type": "string", "enum": []string{"read", "create", "update", "delete"}}},
+				}},
 			}}, nil))}, errorResponses("401", "404")),
 		}},
 		"/auth/register": obj{"post": obj{

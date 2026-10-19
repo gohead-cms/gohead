@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/gin-gonic/gin"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -29,6 +30,8 @@ func TestSingletonHandlers(t *testing.T) {
 	// Setup the test database and router
 	router, db := testutils.SetupTestServer()
 	router.Use(middleware.ResponseWrapper())
+	// These are admin routes (AdminOnly in production).
+	router.Use(func(c *gin.Context) { c.Set("role", "admin"); c.Next() })
 	defer testutils.CleanupTestDB()
 
 	// Apply migrations for Singleton and its attributes

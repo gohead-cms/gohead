@@ -91,8 +91,7 @@ func TestAdminUIEndpoints(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, code)
 
 	// Every signed-in user can read the content model; only admins change it.
-	a.router.GET("/api/schema/collections", middleware.AuthMiddleware(), GetCollections)
-	a.router.GET("/api/schema/collections/:name", middleware.AuthMiddleware(), GetCollection)
+	// /api/schema/collections[/:name] are registered by newContentAPI.
 	for _, role := range []string{"editor", "viewer"} {
 		list := a.ok(role, "GET", "/api/schema/collections", nil).([]any)
 		assert.Len(t, list, 1, role)
@@ -147,8 +146,7 @@ func TestCollectionSchemaRoundTrip(t *testing.T) {
 func TestAdminsCannotLockThemselvesOut(t *testing.T) {
 	a := newContentAPI(t)
 	users := a.router.Group("/admin/users", middleware.AuthMiddleware(), middleware.AdminOnly())
-	users.POST("", CreateUser)
-	users.PUT("/:id", UpdateUser)
+	users.PUT("/:id", UpdateUser) // POST /admin/users is registered by newContentAPI
 	users.DELETE("/:id", DeleteUser)
 
 	me, err := accounts.CreateAdmin("admin-user", "admin@example.com", "a-long-admin-password")

@@ -1,13 +1,7 @@
-import { type APIRequestContext, expect, test } from "@playwright/test";
-import { admin, apiURL, login, trackErrors } from "./fixtures";
+import { expect, test } from "@playwright/test";
+import { adminHeaders, apiURL, login, trackErrors } from "./fixtures";
 
 const LOCALE = "fr";
-
-async function adminHeaders(request: APIRequestContext) {
-  const res = await request.post(`${apiURL}/auth/login`, { data: admin });
-  expect(res.ok(), await res.text()).toBeTruthy();
-  return { Authorization: `Bearer ${(await res.json()).data.token as string}` };
-}
 
 // Field-level localization end to end: an admin adds a locale on the
 // Locales page, then translates the localized title of an entry in the

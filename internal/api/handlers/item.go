@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
 
@@ -83,7 +84,7 @@ func GetItems(collection models.Collection, rc readContext) gin.HandlerFunc {
 // request's locale, with its relations populated down to rc.level.
 func itemResponse(ct models.Collection, item models.Item, rc readContext) (map[string]any, error) {
 	data := rc.localize(ct.Attributes, item.Data, item.Translations)
-	data, err := storage.PopulateRelationsIn(ct, data, rc.level, rc.publishedOnly, rc.readLocale())
+	data, err := storage.PopulateRelationsIn(ct, data, rc.level, rc.publishedOnly, rc.readOptions())
 	if err != nil {
 		return nil, err
 	}
@@ -237,6 +238,15 @@ func UpdateItem(collection models.Collection) gin.HandlerFunc {
 			validationError(c, err.Error())
 			return
 		}
+		if publish != nil && !allow(c, auth.ActionPublish, collection.Name) {
+			return
+		}
+		if !allowNested(c, collection, input.Data) {
+			return
+		}
+		if !allowLiveEdit(c, collection, uint(itemID)) {
+			return
+		}
 
 		var item *models.Item
 		if rc.translated() {
@@ -266,15 +276,13 @@ func UpdateItem(collection models.Collection) gin.HandlerFunc {
 // and /unpublish. Requires the update permission.
 func PublishItem(publish bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !hasPermission(c.GetString("role"), "update") {
-			c.Set("response", "Access denied")
-			c.Set("status", http.StatusForbidden)
-			return
-		}
 		ct, err := storage.GetCollectionByName(c.Param("collection"))
 		if err != nil {
 			c.Set("response", "Collection not found")
 			c.Set("status", http.StatusNotFound)
+			return
+		}
+		if !allow(c, auth.ActionPublish, ct.Name) {
 			return
 		}
 		itemID, err := strconv.Atoi(c.Param("id"))

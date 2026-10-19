@@ -55,7 +55,8 @@ export interface RestoreMeta {
 
 /** The entry a history is about: a collection item or a singleton. */
 export type HistoryTarget =
-  | { kind: "item"; collection: string; id: number | string; label?: string }
+  /** drafts: the collection is draft-and-publish (restores of published content then need publish). */
+  | { kind: "item"; collection: string; id: number | string; label?: string; drafts?: boolean }
   | { kind: "singleton"; name: string; label?: string };
 
 /** The API path of an entry's history. */
@@ -164,4 +165,31 @@ export function dataTitle(data: Record<string, unknown> | null | undefined): str
 /** The agents page with one of an agent's runs open. */
 export function agentRunLink(agentName: string, runId: number): string {
   return `/agents?${new URLSearchParams({ name: agentName, run: String(runId) })}`;
+}
+
+/** Published content a role cannot publish: why it cannot be changed. */
+export const PUBLISHED_LOCKED =
+  "Published: changing it needs the publish permission — unpublishing is also a publish action.";
+
+/**
+ * Why the role cannot restore revision r of an item (null: it can), as the
+ * server decides: bringing back a deleted item needs create, and touching
+ * published content (the item is published, or comes back published) needs
+ * publish in a draft-and-publish collection.
+ */
+export function restoreBlockReason(
+  r: Pick<Revision, "status">,
+  latest: Pick<Revision, "action" | "status"> | undefined,
+  rights: { create: boolean; publish: boolean },
+  drafts: boolean,
+): string | null {
+  if (latest?.action === "delete") {
+    if (!rights.create) return "Bringing a deleted entry back needs the create permission.";
+    if (drafts && r.status === "published" && !rights.publish) {
+      return "It was published: bringing it back needs the publish permission.";
+    }
+    return null;
+  }
+  if (drafts && latest?.status === "published" && !rights.publish) return PUBLISHED_LOCKED;
+  return null;
 }

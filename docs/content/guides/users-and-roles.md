@@ -2,14 +2,66 @@
 
 ## Roles
 
-| Role | Content: read | Content: create / update / delete | Schema, users, agents (`/admin/*`) |
-|------|:---:|:---:|:---:|
-| `admin`  | ✓ | ✓ | ✓ |
-| `editor` | ✓ | ✓ |   |
-| `viewer` | ✓ |   |   |
+Three roles are built in and created at startup:
 
-The three roles are created automatically at startup. The same table is enforced by the REST
-API and by GraphQL resolvers.
+| Role | Content | Publish | Media library | Admin area (`/admin/*`: content model, agents, users, tokens, settings) |
+|------|---------|:---:|---------------|:---:|
+| `admin`  | read, create, update, delete | ✓ | ✓ | ✓ |
+| `editor` | read, create, update, delete | ✓ | ✓ |   |
+| `viewer` | read (published content) |   |   |   |
+
+You can add **custom roles** with permissions per content type: for example, a writer who drafts articles but can't publish, a reviewer who publishes but doesn't edit, or a team that only sees its own collections. The REST API and GraphQL enforce the same rules.
+
+### Custom roles
+
+A role's permissions list actions by **content type**:
+
+```json
+{
+  "name": "writer",
+  "description": "Drafts articles and news; publishing is left to editors",
+  "permissions": {
+    "content": {
+      "articles": ["create", "update"],
+      "news": ["create", "update", "delete"],
+      "singleton:homepage": ["read"],
+      "*": ["read"]
+    },
+    "media": ["read", "create"]
+  }
+}
+```
+
+| Key | Means | Actions |
+|-----|-------|---------|
+| a collection name | items of that collection | `read`, `create`, `update`, `delete`, `publish` |
+| `singleton:<name>` | a singleton's content | `read`, `update` |
+| `*` | every type not listed | as above |
+| `media` | the media library | `read` (browse), `create` (upload), `update`, `delete` |
+
+- **Unlisted types:** a type that isn't listed uses `*`. If `*` isn't listed either, the role can't reach that type: it gets `403`, and the type doesn't appear in `/api/schema/*`.
+- **Read is implied:** any other action includes `read`, and the server adds it.
+- **Drafts** are visible to roles that can `update` or `publish` the type, both directly and through `status=all`. Other roles see published content only.
+- **Publishing:** `publish` covers `POST …/publish` and `…/unpublish`, and `"status"` in a create or update body. In [draft-and-publish](content-modeling.md#draft-and-publish) collections it is also needed to change an item that is **published**, because that changes live content. Without `publish`, a role writes and edits drafts only, which suits a writer whose work is reviewed before going live. It can still delete published items if it has `delete`.
+- **No review step without draft and publish:** in collections without draft and publish, every item is live, so `create` and `update` publish directly.
+- **History:** reading history and restoring versions need `update` on the type. Restoring also needs `create` when it brings back a deleted item, and `publish` when the item is published or would come back published. The [change feed](content-history.md#change-feed) lists only the types the role can update.
+- **Related entries** of a type the role can't read are left out of populated relations: they're returned as `null`, or dropped from lists, including bare IDs at `level=0`. Drafts of a related type are only shown to roles that can see drafts of that type.
+- **Linking by ID:** relation and media values are IDs. A role that can write a type can link any existing item or file by ID, so a missing ID is reported in the validation error. The linked content stays hidden when the role can't read it, except media, which is shown with the content that uses it. Keep content that must stay private out of reach of roles that can write the types linking to it.
+- **Reserved for admins:** the admin area stays admin-only, for every custom role. That covers the content model, agents (and reverting their runs), users, tokens, webhooks, locales and roles.
+
+Manage roles as an admin, from a user session, or in the admin UI under **Settings → Roles**:
+
+| Method | Path | Body |
+|--------|------|------|
+| `GET` | `/admin/roles` | |
+| `GET` | `/admin/roles/{name}` | |
+| `POST` | `/admin/roles` | `name` (2–32 lowercase letters, digits, `-`, `_`), `description`, `permissions` |
+| `PUT` | `/admin/roles/{name}` | `description`, `permissions` (replaced; the name can't change) |
+| `DELETE` | `/admin/roles/{name}` | `409` while users or active API tokens still use the role |
+
+Built-in roles can't be changed or deleted. Assign a custom role like any other: `role_name` for [users](#managing-users-admin), `role` for [API tokens](integrations.md#api-tokens). That makes it easy to give a front-end a token limited to the collections it displays. A permission change, or giving a user another role, applies to existing sessions and tokens within a few seconds, with no new login needed.
+
+`GET /auth/me` returns the caller's `permissions` in this format. The built-in roles are expanded into it, so a client can show or hide actions.
 
 ## Registration and the first admin
 

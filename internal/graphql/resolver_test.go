@@ -1,9 +1,11 @@
 package graphql
 
 import (
+	"context"
 	"testing"
 
 	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/testutils"
 
 	"github.com/graphql-go/graphql"
@@ -34,7 +36,7 @@ func TestResolveRelation(t *testing.T) {
 	manyToMany := models.Attribute{Name: "authors", Type: "relation", Target: "authors", Relation: "manyToMany"}
 
 	t.Run("one-to-one", func(t *testing.T) {
-		p := graphql.ResolveParams{Source: map[string]any{"author": float64(john.ID)}}
+		p := graphql.ResolveParams{Context: auth.WithRole(context.Background(), "viewer"), Source: map[string]any{"author": float64(john.ID)}}
 		result, err := ResolveRelation(p, 2, oneToOne)
 		require.NoError(t, err)
 		related, ok := result.(map[string]any)
@@ -44,7 +46,7 @@ func TestResolveRelation(t *testing.T) {
 	})
 
 	t.Run("many-to-many skips missing ids", func(t *testing.T) {
-		p := graphql.ResolveParams{Source: map[string]any{"authors": []any{float64(john.ID), float64(jane.ID), float64(9999)}}}
+		p := graphql.ResolveParams{Context: auth.WithRole(context.Background(), "viewer"), Source: map[string]any{"authors": []any{float64(john.ID), float64(jane.ID), float64(9999)}}}
 		result, err := ResolveRelation(p, 2, manyToMany)
 		require.NoError(t, err)
 		related, ok := result.([]map[string]any)
@@ -55,21 +57,21 @@ func TestResolveRelation(t *testing.T) {
 	})
 
 	t.Run("missing related item resolves to null", func(t *testing.T) {
-		p := graphql.ResolveParams{Source: map[string]any{"author": float64(9999)}}
+		p := graphql.ResolveParams{Context: auth.WithRole(context.Background(), "viewer"), Source: map[string]any{"author": float64(9999)}}
 		result, err := ResolveRelation(p, 2, oneToOne)
 		assert.NoError(t, err)
 		assert.Nil(t, result)
 	})
 
 	t.Run("unset relation resolves to null", func(t *testing.T) {
-		p := graphql.ResolveParams{Source: map[string]any{}}
+		p := graphql.ResolveParams{Context: auth.WithRole(context.Background(), "viewer"), Source: map[string]any{}}
 		result, err := ResolveRelation(p, 2, oneToOne)
 		assert.NoError(t, err)
 		assert.Nil(t, result)
 	})
 
 	t.Run("non-map source is an error", func(t *testing.T) {
-		p := graphql.ResolveParams{Source: models.Item{}}
+		p := graphql.ResolveParams{Context: auth.WithRole(context.Background(), "viewer"), Source: models.Item{}}
 		_, err := ResolveRelation(p, 2, oneToOne)
 		assert.Error(t, err)
 	})

@@ -383,6 +383,11 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *medi
 		creds.GET("/tokens", handlers.ListAPITokens)
 		creds.GET("/tokens/:id", handlers.GetAPIToken)
 		creds.DELETE("/tokens/:id", handlers.RevokeAPIToken)
+		creds.GET("/roles", handlers.ListRoles)
+		creds.GET("/roles/:name", handlers.GetRole)
+		creds.POST("/roles", handlers.CreateRole)
+		creds.PUT("/roles/:name", handlers.UpdateRole)
+		creds.DELETE("/roles/:name", handlers.DeleteRole)
 
 		// Outbound webhooks
 		admin.POST("/locales", handlers.CreateLocale)

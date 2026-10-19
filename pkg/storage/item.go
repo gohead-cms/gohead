@@ -410,6 +410,23 @@ func PopulateRelations(collection models.Collection, data models.JSONMap, level 
 type ReadLocale struct {
 	Locale, Default string
 	Fallback        bool
+	// CanRead, when set, hides related entries of collections it refuses
+	// (types the reader's role cannot read).
+	CanRead func(collection string) bool
+	// CanSeeDrafts, when set, hides related drafts of collections it
+	// refuses, even when the request includes drafts.
+	CanSeeDrafts func(collection string) bool
+}
+
+// publishedOnlyFor is whether related entries of target are limited to
+// published ones.
+func (l ReadLocale) publishedOnlyFor(target string, publishedOnly bool) bool {
+	return publishedOnly || (l.CanSeeDrafts != nil && !l.CanSeeDrafts(target))
+}
+
+// hiddenTarget reports whether related entries of target are hidden.
+func (l ReadLocale) hiddenTarget(target string) bool {
+	return l.CanRead != nil && !l.CanRead(target)
 }
 
 // resolved fills in the default locale when it is not known yet.
@@ -428,10 +445,31 @@ func (l ReadLocale) resolved() ReadLocale {
 // locale (their localized attributes, and their locale fields).
 func PopulateRelationsIn(collection models.Collection, data models.JSONMap, level uint, publishedOnly bool, loc ReadLocale) (models.JSONMap, error) {
 	if level == 0 {
-		if publishedOnly {
-			return hideDraftIDs(collection, data)
+		// IDs only: drop those of types the reader cannot read, and of
+		// drafts the reader cannot see.
+		result := make(models.JSONMap, len(data))
+		maps.Copy(result, data)
+		var draftHidden []models.Attribute
+		for _, attr := range collection.Attributes {
+			if attr.Type != "relation" {
+				continue
+			}
+			if _, set := result[attr.Name]; set && loc.hiddenTarget(attr.Target) {
+				if attr.Relation == "manyToMany" {
+					result[attr.Name] = []any{}
+				} else {
+					result[attr.Name] = nil
+				}
+				continue
+			}
+			if loc.publishedOnlyFor(attr.Target, publishedOnly) {
+				draftHidden = append(draftHidden, attr)
+			}
 		}
-		return data, nil
+		if len(draftHidden) > 0 {
+			return hideDraftIDs(models.Collection{Attributes: draftHidden}, result)
+		}
+		return result, nil
 	}
 	// We'll mutate a copy
 	result := make(models.JSONMap, len(data))
@@ -443,6 +481,10 @@ func PopulateRelationsIn(collection models.Collection, data models.JSONMap, leve
 		}
 
 		raw, exists := data[attr.Name]
+		if loc.hiddenTarget(attr.Target) {
+			exists = false
+		}
+		targetPublishedOnly := loc.publishedOnlyFor(attr.Target, publishedOnly)
 		if !exists || raw == nil {
 			// Always output as empty array/object if missing
 			switch attr.Relation {
@@ -468,7 +510,7 @@ func PopulateRelationsIn(collection models.Collection, data models.JSONMap, leve
 				result[attr.Name] = nil
 				break
 			}
-			nested, err := fetchItemWithRelations(targetCollection, id, level-1, publishedOnly, loc)
+			nested, err := fetchItemWithRelations(targetCollection, id, level-1, targetPublishedOnly, loc)
 			if err != nil {
 				return nil, fmt.Errorf("failed to fetch nested item for '%s': %w", attr.Name, err)
 			}
@@ -480,7 +522,7 @@ func PopulateRelationsIn(collection models.Collection, data models.JSONMap, leve
 		case "manyToMany":
 			nestedItems := []models.JSONMap{}
 			for _, id := range models.ToUintSlice(raw) {
-				nested, err := fetchItemWithRelations(targetCollection, id, level-1, publishedOnly, loc)
+				nested, err := fetchItemWithRelations(targetCollection, id, level-1, targetPublishedOnly, loc)
 				if err != nil {
 					return nil, fmt.Errorf("failed to fetch nested item for '%s': %w", attr.Name, err)
 				}

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
 
@@ -168,6 +169,10 @@ func DeleteSingleton(SingletonID uint) error {
 	if err := tx.Where("entity_type = ? AND entity_id = ?", models.RevisionEntitySingleton, st.ID).Delete(&models.Revision{}).Error; err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to delete the history of single type '%s': %w", st.Name, err)
+	}
+	if err := moveRoleKeys(tx, auth.SingletonResource(st.Name), ""); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to remove single type '%s' from roles: %w", st.Name, err)
 	}
 
 	// Delete the single type

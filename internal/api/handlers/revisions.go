@@ -8,6 +8,7 @@ import (
 
 	"github.com/gohead-cms/gohead/internal/models"
 	agentModels "github.com/gohead-cms/gohead/internal/models/agents"
+	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
 
@@ -46,12 +47,40 @@ func revisionJSON(r models.Revision, withData bool) gin.H {
 	return out
 }
 
+// revisionScope is the types whose history role may see: those it can
+// edit (nil: all of them).
+func revisionScope(role string) (*storage.RevisionScope, error) {
+	if auth.PermissionsOf(role).Allows(auth.ActionUpdate, auth.AnyType) && auth.IsBuiltinRole(role) {
+		return nil, nil
+	}
+	collections, _, err := storage.GetAllCollections(nil, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	singletons, err := storage.GetAllSingletons()
+	if err != nil {
+		return nil, err
+	}
+	scope := &storage.RevisionScope{}
+	for _, ct := range collections {
+		if auth.Can(role, auth.ActionUpdate, ct.Name) {
+			scope.Collections = append(scope.Collections, ct.Name)
+		}
+	}
+	for _, st := range singletons {
+		if auth.Can(role, auth.ActionUpdate, auth.SingletonResource(st.Name)) {
+			scope.Singletons = append(scope.Singletons, st.ID)
+		}
+	}
+	return scope, nil
+}
+
 func canEditContent(c *gin.Context) bool {
 	if hasPermission(c.GetString("role"), "update") {
 		return true
 	}
 	c.Set("response", "Access denied")
-	c.Set("details", "content history needs the editor or admin role")
+	c.Set("details", "content history needs a role that can edit content")
 	c.Set("status", http.StatusForbidden)
 	return false
 }
@@ -123,6 +152,9 @@ func itemTarget(c *gin.Context) (*historyTarget, bool) {
 	if !ok {
 		return nil, false
 	}
+	if !allow(c, auth.ActionUpdate, ct.Name) {
+		return nil, false
+	}
 	return &historyTarget{entityType: models.RevisionEntityItem, entityID: id, typeName: ct.Name, collection: ct}, true
 }
 
@@ -131,6 +163,9 @@ func singletonTarget(c *gin.Context) (*historyTarget, bool) {
 	if err != nil {
 		c.Set("response", "Singleton not found")
 		c.Set("status", http.StatusNotFound)
+		return nil, false
+	}
+	if !allow(c, auth.ActionUpdate, auth.SingletonResource(st.Name)) {
 		return nil, false
 	}
 	return &historyTarget{entityType: models.RevisionEntitySingleton, entityID: st.ID, typeName: st.Name, singleton: st}, true
@@ -333,6 +368,17 @@ func restoreHistoryRevision(resolve func(*gin.Context) (*historyTarget, bool)) g
 		var res *storage.RestoreResult
 		var err error
 		if t.collection != nil {
+			// Bringing an item back is a create, and touching published
+			// content (or bringing back a published version) needs publish.
+			undelete, published, oerr := storage.RestoreOutcome(*t.collection, t.entityID, version)
+			if oerr == nil {
+				if undelete && !allow(c, auth.ActionCreate, t.collection.Name) {
+					return
+				}
+				if published && !allow(c, auth.ActionPublish, t.collection.Name) {
+					return
+				}
+			}
 			var item *models.Item
 			item, res, err = storage.RestoreItemRevision(actor, *t.collection, t.entityID, version)
 			if err == nil {
@@ -417,6 +463,13 @@ func ListRevisions(c *gin.Context) {
 		}
 		q.EntityType, q.EntityID = models.RevisionEntitySingleton, st.ID
 	}
+	scope, err := revisionScope(c.GetString("role"))
+	if err != nil {
+		c.Set("response", "Failed to load the history")
+		c.Set("status", http.StatusInternalServerError)
+		return
+	}
+	q.Scope = scope
 	if v := c.Query("agentRun"); v != "" {
 		n, err := strconv.ParseUint(v, 10, 32)
 		if err != nil || n == 0 {

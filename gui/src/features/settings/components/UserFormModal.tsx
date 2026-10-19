@@ -22,11 +22,7 @@ import { api } from "../../../services/api";
 import { errorMessage } from "../../../shared/utils/errors";
 import { RoleSelect } from "./RoleSelect";
 import { MIN_PASSWORD_LENGTH, isEmail, userRoleName } from "./settingsFormat";
-import { type AdminUser, ROLES, type RoleName } from "./types";
-
-function asRole(name: string): RoleName {
-  return (ROLES as readonly string[]).includes(name) ? (name as RoleName) : "viewer";
-}
+import type { AdminUser } from "./types";
 
 /**
  * Creates a user (user = null) or edits one's email, role and password.
@@ -46,11 +42,11 @@ export function UserFormModal({
   onSaved: (message: string) => void;
 }) {
   const creating = user === null;
-  const initialRole = user ? asRole(userRoleName(user)) : "editor";
+  const initialRole = user ? userRoleName(user) || "viewer" : "editor";
   const [username, setUsername] = useState(user?.username ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<RoleName>(initialRole);
+  const [role, setRole] = useState(initialRole);
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);

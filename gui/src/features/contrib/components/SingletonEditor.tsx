@@ -8,6 +8,7 @@ import { PageLoader } from "../../../shared/ui/page-loader";
 import type { Attribute } from "../../../shared/types";
 import { formatTime } from "../../agents/components/runFormat";
 import { useMe } from "../../auth/me";
+import { singletonResource } from "../../auth/permissions";
 import { HistoryDrawer } from "../../history/HistoryDrawer";
 import { type SingletonContent, type SingletonDef, singletonPath, useSingletonContent } from "../hooks/useSingletons";
 import { EntryFields } from "./EntryFields";
@@ -19,7 +20,8 @@ import { useLocaleGuard } from "./useLocaleGuard";
 /** Loads a singleton's content and shows its form. */
 export function SingletonEditor({ singleton }: { singleton: SingletonDef }) {
   const { content, loading, error, refetch } = useSingletonContent(singleton.name);
-  const { canWrite } = useMe();
+  const { can } = useMe();
+  const canUpdate = can("update", singletonResource(singleton.name));
   const [historyOpen, setHistoryOpen] = useState(false);
   const attributes = useMemo(() => attributeMap(singleton.attributes ?? undefined), [singleton.attributes]);
   // While saved content reloads, the form stays on screen.
@@ -61,7 +63,8 @@ export function SingletonEditor({ singleton }: { singleton: SingletonDef }) {
             />
           )}
           {/* Also without content: deleted content can be restored from history. */}
-          {canWrite && (
+          {/* History and restores need update on the single type. */}
+          {canUpdate && (
             <Button bg="white" variant="outline" size="sm" leftIcon={<Icon as={FiClock} />} onClick={() => setHistoryOpen(true)}>
               History
             </Button>
@@ -84,7 +87,7 @@ export function SingletonEditor({ singleton }: { singleton: SingletonDef }) {
             attributes={attributes}
             locale={active}
             defaultLocale={defaultLocale}
-            canWrite={canWrite}
+            canWrite={canUpdate}
             idPrefix={`single-${singleton.name}-`}
             onEdit={guard.markDirty}
             onSaved={reload}
@@ -98,6 +101,7 @@ export function SingletonEditor({ singleton }: { singleton: SingletonDef }) {
           name={singleton.name}
           attributes={attributes}
           content={content ?? null}
+          canUpdate={canUpdate}
           onEdit={guard.markDirty}
           onSaved={reload}
         />
@@ -117,13 +121,14 @@ interface SingletonFormProps {
   name: string;
   attributes: Record<string, Attribute>;
   content: SingletonContent | null;
+  /** False shows the content read-only. */
+  canUpdate: boolean;
   onSaved: () => void;
   /** Called whenever a field is edited. */
   onEdit: () => void;
 }
 
-function SingletonForm({ name, attributes, content, onSaved, onEdit }: SingletonFormProps) {
-  const { canWrite } = useMe();
+function SingletonForm({ name, attributes, content, canUpdate, onSaved, onEdit }: SingletonFormProps) {
   const notify = useNotify();
   const [values, setValues] = useState<Record<string, unknown>>(() => initialValues(attributes, content));
   const [saving, setSaving] = useState(false);
@@ -159,7 +164,7 @@ function SingletonForm({ name, attributes, content, onSaved, onEdit }: Singleton
       {!content && (
         <Alert status="info" borderRadius="md" mb={6}>
           <AlertIcon />
-          {canWrite ? "No content yet: fill in the fields and save to create it." : "No content yet."}
+          {canUpdate ? "No content yet: fill in the fields and save to create it." : "No content yet."}
         </Alert>
       )}
       {missing.length > 0 && (
@@ -168,12 +173,12 @@ function SingletonForm({ name, attributes, content, onSaved, onEdit }: Singleton
           Required: {missing.join(", ")}
         </Alert>
       )}
-      <Box as="fieldset" disabled={!canWrite || saving} minW={0}>
+      <Box as="fieldset" disabled={!canUpdate || saving} minW={0}>
         <EntryFields attributes={attributes} values={values} onChange={onChange} idPrefix={`single-${name}-`} />
       </Box>
       <Flex justify="flex-end" mt={6} gap={3} align="center">
-        {!canWrite && <Text fontSize="sm" color="gray.500">Your role can read content but not change it.</Text>}
-        {canWrite && (
+        {!canUpdate && <Text fontSize="sm" color="gray.500">Your role can read this single type but not change it.</Text>}
+        {canUpdate && (
           <Button colorScheme="purple" leftIcon={<Icon as={FiSave} />} onClick={save} isLoading={saving}>
             Save
           </Button>

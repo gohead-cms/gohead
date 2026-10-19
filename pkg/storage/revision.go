@@ -225,6 +225,15 @@ type RevisionQuery struct {
 	AgentRunID uint
 	Page       int
 	PageSize   int
+	// Scope, when set, limits the list to these types (for roles that can
+	// edit only some of them).
+	Scope *RevisionScope
+}
+
+// RevisionScope lists the types whose history a role may see.
+type RevisionScope struct {
+	Collections []string // collection names
+	Singletons  []uint   // singleton IDs
 }
 
 // ListRevisions lists revisions, newest first, without their data.
@@ -256,6 +265,17 @@ func ListRevisions(q RevisionQuery) ([]models.Revision, int, error) {
 	}
 	if q.AgentRunID != 0 {
 		db = db.Where("agent_run_id = ?", q.AgentRunID)
+	}
+	if s := q.Scope; s != nil {
+		cols, singles := s.Collections, s.Singletons
+		if len(cols) == 0 {
+			cols = []string{""} // matches nothing; keeps the SQL valid
+		}
+		if len(singles) == 0 {
+			singles = []uint{0}
+		}
+		db = db.Where("(entity_type = ? AND type_name IN ?) OR (entity_type = ? AND entity_id IN ?)",
+			models.RevisionEntityItem, cols, models.RevisionEntitySingleton, singles)
 	}
 	var total int64
 	if err := db.Session(&gorm.Session{}).Count(&total).Error; err != nil {
@@ -652,4 +672,24 @@ func revertRestore(actor Actor, entityType string, id uint, typeName string, ver
 	}
 	_, _, err = RestoreItemRevision(actor, *ct, id, version)
 	return err
+}
+
+// RestoreOutcome tells whether restoring a version of an item would bring
+// it back from deletion, and whether it would be published afterwards.
+func RestoreOutcome(ct models.Collection, itemID, version uint) (undelete, published bool, err error) {
+	rev, err := GetRevision(models.RevisionEntityItem, itemID, version)
+	if err != nil {
+		return false, false, err
+	}
+	var item models.Item
+	if err := database.DB.Unscoped().Where("id = ? AND collection_id = ?", itemID, ct.ID).First(&item).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, false, ErrItemNotFound
+		}
+		return false, false, err
+	}
+	if item.DeletedAt.Valid {
+		return true, ct.DraftAndPublish && rev.Status == models.StatusPublished, nil
+	}
+	return false, ct.DraftAndPublish && item.PublishedAt != nil, nil
 }

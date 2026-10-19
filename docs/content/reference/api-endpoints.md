@@ -61,6 +61,15 @@ Base URL: your API, e.g. `http://localhost:8080`. **Auth** column: `–` public,
 (`["name","DESC"]`) and `range` (`[0,9]`), react-admin style, and returns a `Content-Range`
 header.
 
+## Roles
+
+| Method | Path | Auth | Body |
+|--------|------|------|------|
+| `GET` | `/admin/roles`, `/admin/roles/{name}` | admin | |
+| `POST` | `/admin/roles` | admin | `name`, `description`, `permissions` ([custom roles](../guides/users-and-roles.md#custom-roles)) |
+| `PUT` | `/admin/roles/{name}` | admin | `description`, `permissions` |
+| `DELETE` | `/admin/roles/{name}` | admin | refused while the role is in use |
+
 ## Locales
 
 | Method | Path | Auth | Body |

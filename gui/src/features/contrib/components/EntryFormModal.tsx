@@ -19,8 +19,8 @@ import { getJSON, useApiQuery } from "../../../shared/hooks/useApiQuery";
 import { type Locale, localeLabel } from "../../../shared/hooks/useLocales";
 import type { Schema } from "../../../shared/types";
 import { PageLoader } from "../../../shared/ui/page-loader";
-import { useMe } from "../../auth/me";
 import type { ContentItem } from "../hooks/useCollectionContent";
+import type { EntryPermissions } from "./entryPermissions";
 import { EntryFields } from "./EntryFields";
 import { entryLocales, hasLocalizedAttributes, initialValues, toEntryPayload } from "./entryValues";
 import { LocaleSwitcher } from "./LocaleSwitcher";
@@ -33,7 +33,9 @@ interface EntryFormDrawerProps {
   schema: Schema;
   onSubmit: (payload: { data: Partial<ContentItem> }, id?: string | number) => Promise<void>;
   itemToEdit?: ContentItem | null; // Optional prop for the item being edited
-  /** Opens the history of the entry being edited (editors and admins). */
+  /** What the role may do with the collection's entries. */
+  perms: EntryPermissions;
+  /** Opens the history of the entry being edited (roles that can update the type). */
   onShowHistory?: (item: ContentItem) => void;
   /** The collection, for the entry's API path. */
   collection: string;
@@ -57,6 +59,7 @@ export function EntryFormModal({
   onClose,
   schema,
   itemToEdit,
+  perms,
   onSubmit,
   onShowHistory,
   collection,
@@ -64,7 +67,6 @@ export function EntryFormModal({
   initialLocale,
   onTranslationSaved,
 }: EntryFormDrawerProps) {
-  const { canWrite } = useMe();
   const [picked, setPicked] = useState<string | null>(initialLocale ?? null);
   // Switching locale replaces the form: unsaved edits are confirmed first.
   const guard = useLocaleGuard(setPicked);
@@ -114,7 +116,7 @@ export function EntryFormModal({
             attributes={schema.attributes}
             locale={active}
             defaultLocale={defaultLocale}
-            canWrite={canWrite}
+            canWrite={perms.update}
             idPrefix="entry-"
             extraActions={cancelButton}
             onEdit={guard.markDirty}
@@ -144,6 +146,8 @@ export function EntryFormModal({
             reload={!!itemToEdit && !!defaultLocale && typeof itemToEdit.locale === "string" && itemToEdit.locale !== defaultLocale.code}
             onSubmit={onSubmit}
             onClose={onClose}
+            // Without publish, a new entry (or a draft) stays a draft.
+            draftOnly={!!schema.options?.draftAndPublish && !perms.publish && (!itemToEdit || itemToEdit.status !== "published")}
             start={historyButton}
             cancel={cancelButton}
             onEdit={guard.markDirty}
@@ -162,6 +166,8 @@ interface DefaultLocaleEntryProps {
   reload: boolean;
   onSubmit: EntryFormDrawerProps["onSubmit"];
   onClose: () => void;
+  /** The entry is saved as a draft the role cannot publish. */
+  draftOnly: boolean;
   start: ReactNode;
   cancel: ReactNode;
   /** Called whenever a field is edited. */
@@ -196,7 +202,7 @@ function DefaultLocaleEntry(props: DefaultLocaleEntryProps) {
   return <DefaultLocaleForm {...props} entry={data} />;
 }
 
-function DefaultLocaleForm({ schema, item, entry, onSubmit, onClose, start, cancel, onEdit }: DefaultLocaleEntryProps & { entry: ContentItem | null }) {
+function DefaultLocaleForm({ schema, item, entry, onSubmit, onClose, draftOnly, start, cancel, onEdit }: DefaultLocaleEntryProps & { entry: ContentItem | null }) {
   const [formData, setFormData] = useState<Record<string, unknown>>(() => initialValues(schema.attributes, entry));
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -225,9 +231,14 @@ function DefaultLocaleForm({ schema, item, entry, onSubmit, onClose, start, canc
       <DrawerFooter borderTopWidth="1px" gap={3} flexWrap="wrap">
         {start}
         <Spacer />
+        {draftOnly && (
+          <Text fontSize="sm" color="gray.500">
+            Your role cannot publish: an editor publishes it.
+          </Text>
+        )}
         {cancel}
         <Button colorScheme="purple" onClick={handleSubmit} isLoading={isSubmitting}>
-          Save Changes
+          {draftOnly ? "Save draft" : "Save Changes"}
         </Button>
       </DrawerFooter>
     </>
