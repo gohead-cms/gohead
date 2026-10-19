@@ -233,7 +233,7 @@ func UpdateItem(collection models.Collection) gin.HandlerFunc {
 			return
 		}
 
-		item, err := storage.UpdateItemContent(collection, uint(itemID), input.Data, publish)
+		item, err := storage.UpdateItemContent(actorFrom(c), collection, uint(itemID), input.Data, publish)
 		if err != nil {
 			writeItemError(c, collection, err)
 			return
@@ -275,7 +275,7 @@ func PublishItem(publish bool) gin.HandlerFunc {
 		if !ok {
 			return
 		}
-		item, err := storage.SetItemPublished(*ct, uint(itemID), publish)
+		item, err := storage.SetItemPublished(actorFrom(c), *ct, uint(itemID), publish)
 		if err != nil {
 			writeItemError(c, *ct, err)
 			return
@@ -324,7 +324,7 @@ func DeleteItem(ct models.Collection) gin.HandlerFunc {
 			return
 		}
 
-		if err := storage.DeleteItem(uint(id)); err != nil {
+		if err := storage.DeleteItem(actorFrom(c), uint(id)); err != nil {
 			c.Set("response", "Failed to delete item")
 			c.Set("details", err.Error())
 			c.Set("status", http.StatusInternalServerError)

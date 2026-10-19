@@ -221,7 +221,7 @@ func createCollectionItem(p graphql.ResolveParams, inputData map[string]any, col
 	if err != nil {
 		return nil, err
 	}
-	items, err := storage.CreateItems(collection, []storage.ItemInput{{
+	items, err := storage.CreateItems(storage.ActorFrom(p.Context), collection, []storage.ItemInput{{
 		Data:    models.JSONMap(inputData),
 		Publish: publish != nil && *publish,
 	}})
@@ -263,7 +263,7 @@ func updateCollectionItem(p graphql.ResolveParams, id string, inputData map[stri
 		merged[k] = v
 	}
 
-	item, err := storage.UpdateItemContent(collection, existing.ID, merged, publish)
+	item, err := storage.UpdateItemContent(storage.ActorFrom(p.Context), collection, existing.ID, merged, publish)
 	if err != nil {
 		var verr *storage.ItemValidationError
 		if errors.As(err, &verr) {
@@ -285,7 +285,7 @@ func setPublished(p graphql.ResolveParams, collection models.Collection, publish
 	if err != nil {
 		return nil, fmt.Errorf("invalid id '%s'", id)
 	}
-	item, err := storage.SetItemPublished(collection, uint(itemID), publish)
+	item, err := storage.SetItemPublished(storage.ActorFrom(p.Context), collection, uint(itemID), publish)
 	if err != nil {
 		if errors.Is(err, storage.ErrItemNotFound) {
 			return nil, fmt.Errorf("item with id %s not found in collection %s", id, collection.Name)
@@ -310,7 +310,7 @@ func deleteCollectionItem(p graphql.ResolveParams, collection models.Collection)
 	if _, err := storage.GetItemByID(collection.ID, uint(itemID)); err != nil {
 		return false, fmt.Errorf("item not found in collection %s", collection.Name)
 	}
-	if err := storage.DeleteItem(uint(itemID)); err != nil {
+	if err := storage.DeleteItem(storage.ActorFrom(p.Context), uint(itemID)); err != nil {
 		return false, fmt.Errorf("failed to delete item")
 	}
 	return true, nil

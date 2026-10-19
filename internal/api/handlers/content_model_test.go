@@ -46,6 +46,13 @@ func newContentAPI(t *testing.T) *contentAPI {
 	api.POST("/collections/:collection/:id/unpublish", PublishItem(false))
 	api.GET("/singleton/:name", GetSingleItem)
 	api.PUT("/singleton/:name", CreateOrUpdateSingletonItem)
+	api.GET("/collections/:collection/:id/revisions", ListItemRevisions)
+	api.GET("/collections/:collection/:id/revisions/:version", GetItemRevision)
+	api.POST("/collections/:collection/:id/revisions/:version/restore", RestoreItemRevision)
+	api.GET("/singleton/:name/revisions", ListSingletonRevisions)
+	api.GET("/singleton/:name/revisions/:version", GetSingletonRevision)
+	api.POST("/singleton/:name/revisions/:version/restore", RestoreSingletonRevision)
+	api.GET("/revisions", ListRevisions)
 	return &contentAPI{t: t, router: router}
 }
 

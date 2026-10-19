@@ -33,12 +33,12 @@ func TestSaveItem(t *testing.T) {
 	}
 
 	// Save the content item
-	final, err := SaveItem(*collection, itemData)
+	final, err := SaveItem(SystemActor, *collection, itemData)
 	require.NoError(t, err)
 	assert.NotZero(t, final.ID)
 
 	// Unknown attributes are rejected as validation errors.
-	_, err = SaveItem(*collection, models.JSONMap{"nope": 1})
+	_, err = SaveItem(SystemActor, *collection, models.JSONMap{"nope": 1})
 	var verr *ItemValidationError
 	assert.ErrorAs(t, err, &verr)
 	// Verify the content item exists in the database
@@ -98,45 +98,6 @@ func TestGetItems(t *testing.T) {
 	assert.Equal(t, "Article 2", results[1].Data["title"])
 }
 
-func TestUpdateItem(t *testing.T) {
-	// Initialize in-memory test database
-	_, db := testutils.SetupTestServer()
-	defer testutils.CleanupTestDB()
-
-	// Apply migrations
-	assert.NoError(t, db.AutoMigrate(&models.Item{}, &models.Collection{}))
-
-	// Create a collection
-	collection := &models.Collection{Name: "articles"}
-	assert.NoError(t, db.Create(collection).Error)
-
-	// Create and save a content item
-	item := &models.Item{
-		CollectionID: collection.ID,
-		Data:         models.JSONMap{"title": "Old Title", "content": "Old Content"},
-	}
-	assert.NoError(t, db.Create(item).Error)
-
-	// Update the content item
-	// UpdateItem stores already-validated data; validation and nested
-	// relation creation happen in the handler layer.
-	updatedData := models.JSONMap{
-		"title":   "New Title",
-		"content": "New Content",
-	}
-	err := UpdateItem(item.ID, updatedData)
-	assert.NoError(t, err)
-
-	// Verify the content item is updated
-	var updatedItem models.Item
-	assert.NoError(t, db.First(&updatedItem, item.ID).Error)
-	assert.Equal(t, "New Title", updatedItem.Data["title"])
-	assert.Equal(t, "New Content", updatedItem.Data["content"])
-
-	// Updating a missing item fails.
-	assert.Error(t, UpdateItem(9999, updatedData))
-}
-
 func TestDeleteItem(t *testing.T) {
 	// Initialize in-memory test database
 	_, db := testutils.SetupTestServer()
@@ -157,7 +118,7 @@ func TestDeleteItem(t *testing.T) {
 	assert.NoError(t, db.Create(item).Error)
 
 	// Delete the content item
-	err := DeleteItem(item.ID)
+	err := DeleteItem(SystemActor, item.ID)
 	assert.NoError(t, err)
 
 	// Verify the content item is deleted

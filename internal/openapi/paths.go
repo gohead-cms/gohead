@@ -104,6 +104,9 @@ func collectionPaths(ct models.Collection, name string) obj {
 			},
 		},
 	}
+	for p, v := range historyPaths("/api/collections/"+ct.Name+"/{id}", tag, name, []any{paramID}, item) {
+		paths[p] = v
+	}
 	if ct.DraftAndPublish {
 		for _, action := range []string{"publish", "unpublish"} {
 			paths["/api/collections/"+ct.Name+"/{id}/"+action] = obj{"post": obj{
@@ -114,6 +117,40 @@ func collectionPaths(ct models.Collection, name string) obj {
 		}
 	}
 	return paths
+}
+
+// historyPaths describes the revision routes under an entry's path.
+// params are the entry's path parameters; restored is the content schema.
+func historyPaths(base string, tag []string, name string, params []any, restored obj) obj {
+	version := obj{"name": "version", "in": "path", "required": true, "schema": obj{"type": "integer", "minimum": 1}}
+	withVersion := append(append([]any{}, params...), version)
+	compare := obj{"name": "compare", "in": "query", "description": "Version to diff against: a number, or current. Default: the previous version.", "schema": obj{"type": "string"}}
+	pageParams := []any{
+		obj{"name": "page", "in": "query", "schema": obj{"type": "integer", "minimum": 1, "default": 1}},
+		obj{"name": "pageSize", "in": "query", "schema": obj{"type": "integer", "minimum": 1, "maximum": 100, "default": 20}},
+	}
+	return obj{
+		base + "/revisions": obj{"get": obj{
+			"tags": tag, "operationId": "list_revisions_" + name, "summary": "History of changes, newest first (editors and admins)",
+			"parameters": append(append([]any{}, params...), pageParams...),
+			"responses": merge(obj{"200": ok("Revisions", dataEnvelope(obj{"type": "array", "items": ref("Revision")},
+				obj{"type": "object", "properties": obj{"pagination": ref("Pagination")}}))}, errorResponses("400", "401", "403", "404")),
+		}},
+		base + "/revisions/{version}": obj{"get": obj{
+			"tags": tag, "operationId": "get_revision_" + name, "summary": "One version, with its data and the changes from another version",
+			"parameters": append(withVersion, compare),
+			"responses":  merge(obj{"200": ok("Revision", dataEnvelope(ref("RevisionDetail"), nil))}, errorResponses("400", "401", "403", "404")),
+		}},
+		base + "/revisions/{version}/restore": obj{"post": obj{
+			"tags": tag, "operationId": "restore_revision_" + name, "summary": "Make a version the current content (a new revision; brings back deleted content)",
+			"parameters": withVersion,
+			"responses": merge(obj{"200": ok("Restored", dataEnvelope(restored, obj{"type": "object", "properties": obj{
+				"revision":  ref("Revision"),
+				"dropped":   obj{"type": "array", "items": obj{"type": "string"}, "description": "Attributes of the old version the type no longer has"},
+				"undeleted": obj{"type": "boolean"},
+			}}))}, errorResponses("400", "401", "403", "404")),
+		}},
+	}
 }
 
 func singletonPath(stName, name string) obj {
@@ -131,6 +168,10 @@ func singletonPath(stName, name string) obj {
 			"responses":   merge(obj{"200": ok("Saved", dataEnvelope(ref(name), nil)), "201": ok("Created", dataEnvelope(ref(name), nil))}, errorResponses("400", "401", "403", "404")),
 		},
 	}
+}
+
+func singletonHistoryPaths(stName, name string) obj {
+	return historyPaths("/api/singleton/"+stName, []string{"singleton:" + stName}, name, nil, ref(name))
 }
 
 func staticPaths() obj {
@@ -196,6 +237,21 @@ func staticPaths() obj {
 			"delete": obj{"tags": []string{"media"}, "operationId": "delete_media", "parameters": []any{paramID},
 				"responses": merge(obj{"200": obj{"description": "Deleted"}}, errorResponses("401", "403", "404", "503"))},
 		},
+		"/api/revisions": obj{"get": obj{
+			"tags": []string{"history"}, "operationId": "list_revisions", "summary": "Changes across all entries, newest first (editors and admins)",
+			"parameters": []any{
+				obj{"name": "collection", "in": "query", "schema": obj{"type": "string"}},
+				obj{"name": "singleton", "in": "query", "schema": obj{"type": "string"}},
+				obj{"name": "action", "in": "query", "schema": obj{"type": "string", "enum": revisionActions}},
+				obj{"name": "actorKind", "in": "query", "schema": obj{"type": "string", "enum": actorKinds}},
+				obj{"name": "actor", "in": "query", "description": "username, token name or agent name", "schema": obj{"type": "string"}},
+				obj{"name": "agentRun", "in": "query", "schema": obj{"type": "integer"}},
+				obj{"name": "page", "in": "query", "schema": obj{"type": "integer", "minimum": 1, "default": 1}},
+				obj{"name": "pageSize", "in": "query", "schema": obj{"type": "integer", "minimum": 1, "maximum": 100, "default": 20}},
+			},
+			"responses": merge(obj{"200": ok("Revisions", dataEnvelope(obj{"type": "array", "items": ref("Revision")},
+				obj{"type": "object", "properties": obj{"pagination": ref("Pagination")}}))}, errorResponses("400", "401", "403")),
+		}},
 		"/api/graphql": obj{"post": obj{
 			"tags": []string{"graphql"}, "operationId": "graphql", "summary": "GraphQL queries and mutations",
 			"requestBody": obj{"required": true, "content": jsonContent(obj{"type": "object", "properties": obj{"query": obj{"type": "string"}, "variables": obj{"type": "object"}, "operationName": obj{"type": "string"}}, "required": []string{"query"}})},
@@ -212,6 +268,8 @@ func baseSchemas() obj {
 		"Pagination": obj{"type": "object", "properties": obj{
 			"page": obj{"type": "integer"}, "pageSize": obj{"type": "integer"}, "total": obj{"type": "integer"}, "pageCount": obj{"type": "integer"},
 		}},
+		"Revision":       revisionSchema(false),
+		"RevisionDetail": revisionSchema(true),
 		"Media": obj{"type": "object", "properties": obj{
 			"id": obj{"type": "integer"}, "url": obj{"type": "string"}, "name": obj{"type": "string"}, "mime": obj{"type": "string"},
 			"size": obj{"type": "integer"}, "width": nullable(obj{"type": "integer"}), "height": nullable(obj{"type": "integer"}),
@@ -236,4 +294,34 @@ func schemaPath(summary, operationID string, list bool) obj {
 		op["parameters"] = []any{obj{"name": "name", "in": "path", "required": true, "schema": obj{"type": "string"}}}
 	}
 	return obj{"get": op}
+}
+
+var (
+	revisionActions = []string{models.RevisionCreate, models.RevisionUpdate, models.RevisionPublish, models.RevisionUnpublish, models.RevisionDelete, models.RevisionRestore}
+	actorKinds      = []string{models.ActorUser, models.ActorToken, models.ActorAgent, models.ActorSystem}
+)
+
+// revisionSchema is a revision; detail adds its data and the diff.
+func revisionSchema(detail bool) obj {
+	props := obj{
+		"id": obj{"type": "integer"}, "entityType": obj{"type": "string", "enum": []string{models.RevisionEntityItem, models.RevisionEntitySingleton}},
+		"entityId": obj{"type": "integer"}, "version": obj{"type": "integer"}, "typeName": obj{"type": "string"},
+		"action":    obj{"type": "string", "enum": revisionActions},
+		"status":    obj{"type": "string", "enum": []string{models.StatusDraft, models.StatusPublished}},
+		"actorKind": obj{"type": "string", "enum": actorKinds}, "actorName": obj{"type": "string"},
+		"agentRunId": obj{"type": "integer"}, "restoredFrom": obj{"type": "integer"},
+		"createdAt": obj{"type": "string", "format": "date-time"},
+	}
+	required := []string{"id", "entityType", "entityId", "version", "typeName", "action", "actorKind", "actorName", "createdAt"}
+	if detail {
+		props["data"] = obj{"type": "object", "additionalProperties": true, "description": "The stored data after the change (relations as IDs)"}
+		props["comparedTo"] = nullable(obj{"type": "integer"})
+		props["changes"] = obj{"type": "array", "items": obj{"type": "object", "properties": obj{
+			"field":  obj{"type": "string"},
+			"change": obj{"type": "string", "enum": []string{"added", "removed", "changed"}},
+			"before": obj{}, "after": obj{},
+		}, "required": []string{"field", "change"}}}
+		required = append(required, "data", "changes")
+	}
+	return obj{"type": "object", "properties": props, "required": required}
 }

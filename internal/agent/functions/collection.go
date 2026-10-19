@@ -111,7 +111,7 @@ func upsertCollectionItem(ctx context.Context, args any) (string, error) {
 	// 2. Decide whether to UPDATE or CREATE
 	if itemID > 0 {
 		// UPDATE an existing item, validated like API writes.
-		if _, err := storage.UpdateItemContent(*collection, uint(itemID), data, nil); err != nil {
+		if _, err := storage.UpdateItemContent(storage.ActorFrom(ctx), *collection, uint(itemID), data, nil); err != nil {
 			if errors.Is(err, storage.ErrItemNotFound) {
 				return fmt.Sprintf(`{"status": "error", "message": "item with ID %d not found in collection '%s' for update"}`, itemID, collectionName), nil
 			}
@@ -129,7 +129,7 @@ func upsertCollectionItem(ctx context.Context, args any) (string, error) {
 			CollectionID: collection.ID,
 			Data:         data,
 		}
-		newItem, err := storage.SaveItem(*collection, newItem.Data)
+		newItem, err := storage.SaveItem(storage.ActorFrom(ctx), *collection, newItem.Data)
 		if err != nil {
 			return fmt.Sprintf(`{"status": "error", "message": "%s"}`, err.Error()), nil
 		}
@@ -223,7 +223,7 @@ func deleteCollectionItem(ctx context.Context, args any) (string, error) {
 		return scopeError(owner), nil
 	}
 
-	err = storage.DeleteItem(uint(itemID))
+	err = storage.DeleteItem(storage.ActorFrom(ctx), uint(itemID))
 	if err != nil {
 		return fmt.Sprintf(`{"status": "error", "message": "failed to delete item: %s"}`, err.Error()), nil
 	}

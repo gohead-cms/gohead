@@ -165,6 +165,11 @@ func DeleteSingleton(SingletonID uint) error {
 	}
 	logger.Log.WithField("single_type_id", SingletonID).Info("DeleteSingleton: deleted associated attributes")
 
+	if err := tx.Where("entity_type = ? AND entity_id = ?", models.RevisionEntitySingleton, st.ID).Delete(&models.Revision{}).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete the history of single type '%s': %w", st.Name, err)
+	}
+
 	// Delete the single type
 	if err := tx.Delete(&st).Error; err != nil {
 		tx.Rollback()

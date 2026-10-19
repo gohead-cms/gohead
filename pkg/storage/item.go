@@ -26,8 +26,8 @@ func (e *ItemValidationError) Unwrap() error { return e.Err }
 
 // SaveItem validates and creates a single item, then publishes an
 // 'item:created' event once the transaction has committed.
-func SaveItem(collection models.Collection, itemData models.JSONMap) (*models.Item, error) {
-	items, err := SaveItems(collection, []models.JSONMap{itemData})
+func SaveItem(actor Actor, collection models.Collection, itemData models.JSONMap) (*models.Item, error) {
+	items, err := SaveItems(actor, collection, []models.JSONMap{itemData})
 	if err != nil {
 		return nil, err
 	}
@@ -36,12 +36,12 @@ func SaveItem(collection models.Collection, itemData models.JSONMap) (*models.It
 
 // SaveItems validates and creates several items atomically, as drafts in
 // draft-and-publish collections. See CreateItems.
-func SaveItems(collection models.Collection, batch []models.JSONMap) ([]*models.Item, error) {
+func SaveItems(actor Actor, collection models.Collection, batch []models.JSONMap) ([]*models.Item, error) {
 	inputs := make([]ItemInput, len(batch))
 	for i, data := range batch {
 		inputs[i] = ItemInput{Data: data}
 	}
-	return CreateItems(collection, inputs)
+	return CreateItems(actor, collection, inputs)
 }
 
 // ItemInput is one item to create.
@@ -62,8 +62,9 @@ var ErrDraftAndPublishDisabled = errors.New("this collection does not use draft 
 // CreateItems validates and creates several items atomically: either all are
 // stored or none. Nested relations created during validation are part of the
 // same transaction, and the stored data is the processed (validated) data.
-// Events are published only after a successful commit.
-func CreateItems(collection models.Collection, inputs []ItemInput) ([]*models.Item, error) {
+// Each item gets its first revision. Events are published only after a
+// successful commit.
+func CreateItems(actor Actor, collection models.Collection, inputs []ItemInput) ([]*models.Item, error) {
 	created := make([]*models.Item, 0, len(inputs))
 	now := models.APITime(time.Now())
 
@@ -81,6 +82,12 @@ func CreateItems(collection models.Collection, inputs []ItemInput) ([]*models.It
 				item.PublishedAt = &now
 			}
 			if err := tx.Create(item).Error; err != nil {
+				return err
+			}
+			if _, err := recordRevision(tx, actor, revisionInput{
+				entityType: models.RevisionEntityItem, entityID: item.ID, typeName: collection.Name,
+				action: models.RevisionCreate, status: itemStatus(collection, item), data: item.Data,
+			}); err != nil {
 				return err
 			}
 			created = append(created, item)
@@ -105,19 +112,21 @@ func CreateItems(collection models.Collection, inputs []ItemInput) ([]*models.It
 // (nil leaves it unchanged). It returns ErrItemNotFound when the item is not
 // in the collection, an *ItemValidationError for invalid data, and publishes
 // item:updated (plus item:published / item:unpublished on a state change).
-func UpdateItemContent(collection models.Collection, itemID uint, data models.JSONMap, publish *bool) (*models.Item, error) {
+// A change is recorded as a revision; a save that changes nothing is not.
+func UpdateItemContent(actor Actor, collection models.Collection, itemID uint, data models.JSONMap, publish *bool) (*models.Item, error) {
 	if publish != nil && !collection.DraftAndPublish {
 		return nil, ErrDraftAndPublishDisabled
 	}
 	var item models.Item
 	var transition events.EventType
 	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("id = ? AND collection_id = ?", itemID, collection.ID).First(&item).Error; err != nil {
+		if err := lockRow(tx).Where("id = ? AND collection_id = ?", itemID, collection.ID).First(&item).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrItemNotFound
 			}
 			return err
 		}
+		previous := item.Data
 		processed, err := models.ValidateItemUpdate(collection, data, tx, item.ID)
 		if err != nil {
 			return &ItemValidationError{Err: err}
@@ -132,7 +141,25 @@ func UpdateItemContent(collection models.Collection, itemID uint, data models.JS
 				return err
 			}
 		}
-		return reloadItem(tx, &item)
+		if err := reloadItem(tx, &item); err != nil {
+			return err
+		}
+		action := models.RevisionUpdate
+		if sameData(previous, item.Data) {
+			switch transition {
+			case "":
+				return nil // nothing changed
+			case events.EventTypeItemPublished:
+				action = models.RevisionPublish
+			default:
+				action = models.RevisionUnpublish
+			}
+		}
+		_, err = recordRevision(tx, actor, revisionInput{
+			entityType: models.RevisionEntityItem, entityID: item.ID, typeName: collection.Name,
+			action: action, status: itemStatus(collection, &item), data: item.Data,
+		})
+		return err
 	})
 	if txErr != nil {
 		return nil, txErr
@@ -146,14 +173,14 @@ func UpdateItemContent(collection models.Collection, itemID uint, data models.JS
 
 // SetItemPublished publishes or unpublishes an item of a draft-and-publish
 // collection. Publishing an already published item keeps its publishedAt.
-func SetItemPublished(collection models.Collection, itemID uint, publish bool) (*models.Item, error) {
+func SetItemPublished(actor Actor, collection models.Collection, itemID uint, publish bool) (*models.Item, error) {
 	if !collection.DraftAndPublish {
 		return nil, ErrDraftAndPublishDisabled
 	}
 	var item models.Item
 	var transition events.EventType
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("id = ? AND collection_id = ?", itemID, collection.ID).First(&item).Error; err != nil {
+		if err := lockRow(tx).Where("id = ? AND collection_id = ?", itemID, collection.ID).First(&item).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrItemNotFound
 			}
@@ -163,7 +190,21 @@ func SetItemPublished(collection models.Collection, itemID uint, publish bool) (
 		if transition, err = setPublishedTx(tx, &item, publish); err != nil {
 			return err
 		}
-		return reloadItem(tx, &item)
+		if err := reloadItem(tx, &item); err != nil {
+			return err
+		}
+		if transition == "" {
+			return nil
+		}
+		action := models.RevisionUnpublish
+		if publish {
+			action = models.RevisionPublish
+		}
+		_, err = recordRevision(tx, actor, revisionInput{
+			entityType: models.RevisionEntityItem, entityID: item.ID, typeName: collection.Name,
+			action: action, status: itemStatus(collection, &item), data: item.Data,
+		})
+		return err
 	})
 	if err != nil {
 		return nil, err
@@ -307,70 +348,34 @@ func GetItems(collectionID uint, page, pageSize int) ([]models.Item, int, error)
 	return items, int(totalItems), nil
 }
 
-func UpdateItem(itemID uint, data models.JSONMap) error {
+// DeleteItem deletes an item and records a "delete" revision holding the
+// data it had, so the item can be restored. It returns ErrItemNotFound for
+// an unknown item and publishes item:deleted after the commit.
+func DeleteItem(actor Actor, id uint) error {
 	var item models.Item
-	if err := database.DB.Where("id = ?", itemID).First(&item).Error; err != nil {
-		logger.Log.WithField("item_id", itemID).WithError(err).Error("Failed to find item")
-		return fmt.Errorf("collection item not found")
-	}
-
-	item.Data = data
-	if err := database.DB.Save(&item).Error; err != nil {
-		logger.Log.WithField("item_id", itemID).WithError(err).Error("Failed to update item data")
-		return fmt.Errorf("failed to update item data: %w", err)
-	}
-
-	// Publish the 'updated' event.
-	if asynqClient != nil {
-		var collection models.Collection
-		if err := database.DB.First(&collection, item.CollectionID).Error; err != nil {
-			logger.Log.WithError(err).WithField("collection_id", item.CollectionID).Error("Failed to find collection for event publishing after item update")
-			return nil
-		}
-
-		payload := events.CollectionEventPayload{
-			EventType:      events.EventTypeItemUpdated,
-			CollectionName: collection.Name,
-			ItemID:         item.ID,
-			ItemData:       item.Data,
-		}
-		if err := events.EnqueueCollectionEvent(context.Background(), asynqClient, payload); err != nil {
-			logger.Log.WithError(err).Error("Failed to enqueue item:updated event")
-		}
-	}
-
-	logger.Log.WithField("item_id", itemID).Info("Item updated successfully")
-	return nil
-}
-
-func DeleteItem(id uint) error {
-	// --- NEW: Publish Event ---
-	// Before deleting, we must fetch the item to get its data for the event payload.
-	var item models.Item
-	// Fetch the item before deleting it so we can include its data in the event.
-	err := database.DB.First(&item, id).Error
-	if err == nil && asynqClient != nil {
-		// If the item was found, try to find its collection to get the name.
-		var collection models.Collection
-		if err := database.DB.First(&collection, item.CollectionID).Error; err == nil {
-			// If both are found, publish the event.
-			payload := events.CollectionEventPayload{
-				EventType:      events.EventTypeItemDeleted,
-				CollectionName: collection.Name,
-				ItemID:         item.ID,
-				ItemData:       item.Data,
+	var collection models.Collection
+	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := lockRow(tx).First(&item, id).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrItemNotFound
 			}
-			if err := events.EnqueueCollectionEvent(context.Background(), asynqClient, payload); err != nil {
-				logger.Log.WithError(err).Error("Failed to enqueue item:deleted event")
-			}
+			return err
 		}
+		if err := tx.First(&collection, item.CollectionID).Error; err != nil {
+			return fmt.Errorf("failed to find the item's collection: %w", err)
+		}
+		if _, err := recordRevision(tx, actor, revisionInput{
+			entityType: models.RevisionEntityItem, entityID: item.ID, typeName: collection.Name,
+			action: models.RevisionDelete, status: itemStatus(collection, &item), data: item.Data,
+		}); err != nil {
+			return err
+		}
+		return tx.Delete(&item).Error
+	})
+	if txErr != nil {
+		return txErr
 	}
-	// --- END ---
-
-	if err := database.DB.Where("id = ?", id).Delete(&models.Item{}).Error; err != nil {
-		return err
-	}
-
+	publishEvent(database.DB, events.EventTypeItemDeleted, &item)
 	return nil
 }
 

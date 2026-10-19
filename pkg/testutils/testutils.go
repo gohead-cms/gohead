@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
@@ -63,6 +64,25 @@ type UserRole struct {
 	Permissions JSONMap `json:"permissions" gorm:"type:jsonb;not null"` // Permissions associated with the role
 }
 
+// revision mirrors models.Revision (this package cannot import models).
+type revision struct {
+	ID           uint    `gorm:"primaryKey"`
+	EntityType   string  `gorm:"size:16;not null;uniqueIndex:idx_revisions_entity_version,priority:1"`
+	EntityID     uint    `gorm:"not null;uniqueIndex:idx_revisions_entity_version,priority:2"`
+	Version      uint    `gorm:"not null;uniqueIndex:idx_revisions_entity_version,priority:3"`
+	TypeName     string  `gorm:"size:191;index:idx_revisions_type_name"`
+	Action       string  `gorm:"size:16;not null"`
+	Status       string  `gorm:"size:16"`
+	Data         JSONMap `gorm:"type:json"`
+	ActorKind    string  `gorm:"size:16;not null"`
+	ActorName    string  `gorm:"size:191"`
+	AgentRunID   *uint   `gorm:"index:idx_revisions_agent_run_id"`
+	RestoredFrom *uint
+	CreatedAt    time.Time `gorm:"index:idx_revisions_created_at"`
+}
+
+func (revision) TableName() string { return "revisions" }
+
 // setupTestServer initializes a Gin router and database for testing.
 func SetupTestServer() (*gin.Engine, *gorm.DB) {
 	// Initialize the logger
@@ -88,7 +108,9 @@ func SetupTestServer() (*gin.Engine, *gorm.DB) {
 	}
 	database.DB = db
 
-	err = db.AutoMigrate(&UserRole{})
+	// Content writes record revisions, so every test database has the
+	// table, including tests that migrate only the models they use.
+	err = db.AutoMigrate(&UserRole{}, &revision{})
 	if err != nil {
 		logger.Log.Error("Failed to migrate : ", err.Error())
 		panic("Failed to migrate :  " + err.Error())

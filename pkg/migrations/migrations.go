@@ -41,6 +41,12 @@ var All = []Migration{
 		Description: "Tables of GoHead 0.5 (creates them, or brings databases from earlier versions up to date)",
 		Up:          baseline,
 	},
+	{
+		ID:          "0002_revisions",
+		Description: "Content revisions (history of every entry change)",
+		Up:          func(tx *gorm.DB) error { return tx.AutoMigrate(&revision0002{}) },
+		Down:        func(tx *gorm.DB) error { return tx.Migrator().DropTable(&revision0002{}) },
+	},
 }
 
 // baseline creates or updates every table from the models, as GoHead did at
