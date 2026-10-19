@@ -1,659 +1,89 @@
-import React, { useEffect, useState, useCallback, useRef, useMemo, useContext, createContext } from "react";
-import {
-  ReactFlow,
-  applyNodeChanges,
-  applyEdgeChanges,
-  addEdge,
-  NodeChange,
-  EdgeChange,
-  Connection,
-  Panel,
-  MarkerType,
-  Background,
-  Controls,
-  BackgroundVariant,
-  NodeProps
-} from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
-import {
-  Box,
-  Spinner,
-  Button,
-  Flex,
-  IconButton,
-  Text,
-  VStack,
-  HStack,
-  Badge,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
-  FormControl,
-  FormLabel,
-  Input,
-  FormHelperText,
-  FormErrorMessage,
-  Menu,
-  MenuList,
-  MenuItem,
-  useToast,
-} from "@chakra-ui/react";
-import {
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalFooter,
-  ModalBody,
-  ModalCloseButton,
-} from '@chakra-ui/react';
-import { FaPlus, FaEdit, FaTrash, FaEye, FaArrowsAltV, FaArrowsAltH } from "react-icons/fa";
-import { CiViewTable } from "react-icons/ci";
-import {
-  AgentNode,
-  TriggerEdge,
-} from '../agents'
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Alert, AlertDescription, AlertIcon, Box, Button, Center, Spinner } from "@chakra-ui/react";
+import { FiPlus, FiShare2 } from "react-icons/fi";
+import { EmptyState } from "../../shared/ui/EmptyState";
+import { DeleteNodeDialog } from "./components/DeleteNodeDialog";
+import { WorkspaceGraph } from "./components/WorkspaceGraph";
+import { buildGraph, graphSignature, layoutGraph } from "./graph";
+import type { LayoutDirection, NodeRef } from "./graph";
+import { useWorkspaceData } from "./hooks";
 
-import { 
-  CollectionEdge, 
-  CollectionNode, 
-  AttributeEditorSidebar, 
-  RelationModal,
-} from '../collections';
-// Types
-import type { AttributeItem, AppNode, CollectionNode as CollectionNodeType } from "../../shared/types/workspace";
-import type { CollectionEdgeType, AgentNodeType } from "../../shared/types";
-import { 
-  useWorkspaceData,
-  useWorkspaceModals
-} from './hooks'
-
-const edgeTypes = { 
-  collection: CollectionEdge, 
-  triggerEdge: TriggerEdge 
-};
-
-type AgentNodeHandlers = {
-  onEdit: (id: string) => void;
-  onDelete: (id: string) => void;
-  onViewLogs: (id: string) => void;
-};
-
-// Agent node actions come from the canvas through a context, so nodeTypes
-// stays a stable module-level object (React Flow re-mounts every node when
-// nodeTypes changes).
-const HandlersContext = createContext<AgentNodeHandlers | null>(null);
-
-const AgentNodeWithCtx = (props: NodeProps<AgentNodeType>) => {
-const handlers = useContext(HandlersContext);
-  return (
-    <AgentNode
-      data={props.data}
-      selected={props.selected}
-      onEdit={() => handlers?.onEdit(props.id)}
-      onDelete={() => handlers?.onDelete(props.id)}
-      onViewLogs={() => handlers?.onViewLogs(props.id)}
-    />
-  );
-};
-
-const nodeTypes = {
-  collectionNode: CollectionNode,
-  agentNode: AgentNodeWithCtx,
-} as const;
-
+/** Schema Designer: a read-only map of the saved collections, relations and agents. */
 export default function WorkspaceCanvas() {
-  const reactFlowWrapperRef = useRef<HTMLDivElement>(null);
-  const toast = useToast();
-  const [layoutDirection, setLayoutDirection] = useState("LR");
-  // Custom hooks
-  const { nodes, edges, loading, setNodes, setEdges, fetchDataAndLayout } = useWorkspaceData();
-  const {
-    modal,
-    viewerModal,
-    collectionEditorModal,
-    agentEditorModal,
-    createModal,
-    relationModal,
-    selectedNode,
-    setSelectedNode,
-    viewingNode,
-    setViewingNode,
-    editingCollection,
-    setEditingCollection,
-    setEditingAgent,
-    contextMenu,
-    setContextMenu,
-    newCollectionData,
-    setNewCollectionData,
-    validationErrors,
-    setValidationErrors,
-    newConnection,
-    setNewConnection,
-    resetNewCollectionData,
-  } = useWorkspaceModals();
-  const { onOpen: openRelationModal, onClose: closeRelationModal } = relationModal;
-  const { onOpen: openCollectionEditor } = collectionEditorModal;
-  const { onOpen: openAgentEditor } = agentEditorModal;
+  const navigate = useNavigate();
+  const { data, error, refetch } = useWorkspaceData();
+  const [direction, setDirection] = useState<LayoutDirection>("LR");
+  const [deleting, setDeleting] = useState<NodeRef | null>(null);
 
-  useEffect(() => {
-    fetchDataAndLayout(layoutDirection);
-  }, [layoutDirection, fetchDataAndLayout]);
+  const graph = useMemo(() => {
+    if (!data) return null;
+    const { nodes, edges } = buildGraph(data.collections, data.agents);
+    return { nodes: layoutGraph(nodes, edges, direction), edges, signature: graphSignature(nodes, edges) };
+  }, [data, direction]);
 
-  const onNodesChange = useCallback(
-    (changes: NodeChange[]) => 
-      setNodes((nds) => applyNodeChanges(changes, nds) as AppNode[]),
-    [setNodes]
-  );
+  const newCollection = () => navigate("/model/collections/new");
+  const edit = (ref: NodeRef) =>
+    navigate(ref.kind === "collection" ? `/model/collections/${encodeURIComponent(ref.name)}` : `/agents/${encodeURIComponent(ref.name)}/edit`);
 
-  const onEdgesChange = useCallback((changes: EdgeChange[]) => {
-    changes.forEach(change => {
-      if (change.type === 'remove' && change.id) {
-        const edgeToDelete = edges.find(edge => edge.id === change.id);
-        if (edgeToDelete?.type === 'collection' && edgeToDelete.data) {
-          const edgeData = edgeToDelete.data;
-          setNodes(currentNodes =>
-            currentNodes.map(node => {
-              if (node.id === edgeToDelete.source && node.type === 'collectionNode') {
-                const updatedAttributes = node.data.attributes.filter(attr => attr.name !== edgeData.label);
-                return { ...node, data: { ...node.data, attributes: updatedAttributes } };
-              }
-              return node;
-            })
-          );
-        }
-      }
-    });
-    setEdges((eds) => applyEdgeChanges(changes, eds));
-  }, [edges, setNodes, setEdges]);
-
-  const onConnect = useCallback(
-    (params: Connection) => {
-      if (params.source === params.target) return;
-      setNewConnection(params);
-      openRelationModal();
-    },
-    [openRelationModal, setNewConnection]
-  );
-
-  const onNodeClick = useCallback(
-    (event: React.MouseEvent, node: AppNode) => {
-      setSelectedNode(node);
-    },
-    [setSelectedNode]
-  );
-  
-  const onNodeContextMenu = useCallback(
-    (event: React.MouseEvent, node: AppNode) => {
-      event.preventDefault();
-      if (reactFlowWrapperRef.current) {
-        const rect = reactFlowWrapperRef.current.getBoundingClientRect();
-        setContextMenu({
-          x: event.clientX - rect.left,
-          y: event.clientY - rect.top,
-          node,
-        });
-        setSelectedNode(node);
-      }
-    },
-    [setContextMenu, setSelectedNode]
-  );
-
-  const onPaneClick = useCallback(() => {
-    setContextMenu(null);
-    setSelectedNode(null);
-  }, [setContextMenu, setSelectedNode]);
-
-  const handleDisplayNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const displayName = e.target.value;
-    const singularId = displayName.toLowerCase().replace(/\s/g, "-");
-    const pluralId = singularId ? `${singularId}s` : "";
-
-    setNewCollectionData({
-      displayName,
-      singularId,
-      pluralId
-    });
-
-    if (displayName.trim() === "") {
-      setValidationErrors({ displayName: "Display name is required." });
-    } else {
-      setValidationErrors({ displayName: "" });
-    }
-  };
-
-  const handleAddCollection = () => {
-    resetNewCollectionData();
-    createModal.onOpen();
-  };
-
-  const handleContinueClick = () => {
-    if (newCollectionData.displayName.trim() === "") {
-      setValidationErrors({ displayName: "Display name is required." });
-      return;
-    }
-
-    const newNode: CollectionNodeType = {
-      id: newCollectionData.singularId,
-      type: "collectionNode",
-      position: { x: 50, y: 50 },
-      data: {
-        label: newCollectionData.displayName,
-        attributes: [],
-      },
-    };
-    
-    const nodeExists = nodes.some(n => n.id === newNode.id);
-    if (nodeExists) {
-      setValidationErrors({ displayName: "A collection with this ID already exists." });
-      return;
-    }
-
-    setNodes((currentNodes) => [...currentNodes, newNode]);
-    setEditingCollection(newNode);
-    collectionEditorModal.onOpen();
-    createModal.onClose();
-    resetNewCollectionData();
-  };
-
-  const handleUpdateNodeAttributes = useCallback(
-    (nodeId: string, newAttributes: AttributeItem[]) => {
-      setNodes((currentNodes) =>
-        currentNodes.map((node) => {
-          if (node.id === nodeId && node.type === 'collectionNode') {
-            return {
-              ...node,
-              data: {
-                ...node.data,
-                attributes: newAttributes,
-              },
-            };
+  let content;
+  if (error) {
+    content = (
+      <Box p={8}>
+        <Alert status="error" borderRadius="md">
+          <AlertIcon />
+          <AlertDescription flex="1">{error}</AlertDescription>
+          <Button size="sm" onClick={refetch}>
+            Retry
+          </Button>
+        </Alert>
+      </Box>
+    );
+  } else if (!graph) {
+    content = (
+      <Center h="full">
+        <Spinner />
+      </Center>
+    );
+  } else if (graph.nodes.length === 0) {
+    content = (
+      <Box p={8}>
+        <EmptyState
+          icon={FiShare2}
+          title="Nothing to show yet"
+          action={
+            <Button colorScheme="teal" size="sm" leftIcon={<FiPlus />} onClick={newCollection}>
+              New collection
+            </Button>
           }
-          return node;
-        })
-      );
-    },
-    [setNodes]
-  );
-  
-  const handleSaveRelation = useCallback((sourceId: string, targetId: string, relation: { type: string; label: string; }) => {
-      if (!newConnection || !newConnection.source || !newConnection.target) return;
-
-      const newEdge: CollectionEdgeType = {
-        id: `${newConnection.source}-${newConnection.target}-${relation.label}`,
-        source: newConnection.source,
-        target: newConnection.target,
-        animated: true,
-        style: { stroke: "#52b4ca" },
-        type: "collection",
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-        },
-        data: {
-          label: relation.label,
-          relationType: relation.type,
-          attributes: [],
-        }
-      };
-
-      setNodes(currentNodes =>
-        currentNodes.map(node => {
-          if (node.id === newConnection.source && node.type === 'collectionNode') {
-            const newAttribute: AttributeItem = { 
-              name: relation.label, 
-              type: `Relation: ${relation.type}` 
-            };
-            
-            return {
-              ...node,
-              data: {
-                ...node.data,
-                attributes: [...node.data.attributes, newAttribute]
-              }
-            };
-          }
-          return node;
-        })
-      );
-      setEdges((eds) => addEdge(newEdge, eds));
-
-      toast({
-        title: "Relation created.",
-        description: `A ${relation.type} relation named "${relation.label}" was created.`,
-        status: "success",
-        duration: 5000,
-        isClosable: true,
-      });
-
-      closeRelationModal();
-      setNewConnection(null);
-    },
-    [newConnection, closeRelationModal, setNewConnection, toast, setNodes, setEdges]
-  );
-  
-  const handleViewDetails = (nodeToView: AppNode | null) => {
-    if (nodeToView) {
-      setViewingNode(nodeToView);
-      viewerModal.onOpen();
-    }
-    setContextMenu(null);
-  };
-
-  const handleEdit = (nodeToEdit: AppNode | null) => {
-    if (nodeToEdit) {
-      if(nodeToEdit.type === 'collectionNode') {
-        setEditingCollection(nodeToEdit as CollectionNodeType);
-        collectionEditorModal.onOpen();
-      } else if (nodeToEdit.type === 'agentNode') {
-        setEditingAgent(nodeToEdit);
-        agentEditorModal.onOpen();
-      }
-    }
-    setContextMenu(null);
-  };
-
-  
-
-  const handleDelete = (nodeToDelete: AppNode | null) => {
-    if (nodeToDelete) {
-      setNodes(nds => nds.filter(n => n.id !== nodeToDelete.id));
-      setEdges(eds => eds.filter(e => e.source !== nodeToDelete.id && e.target !== nodeToDelete.id));
-      toast({
-        title: `${nodeToDelete.type === 'agentNode' ? 'Agent' : 'Collection'} deleted.`,
-        status: "success", duration: 5000, isClosable: true,
-      });
-    }
-    setContextMenu(null);
-  };
-
-  const handleDeleteAction = useCallback((node: AppNode | null) => {
-    if (node) {
-       setNodes(nds => nds.filter(n => n.id !== node.id));
-       setEdges(eds => eds.filter(e => e.source !== node.id && e.target !== node.id));
-       toast({ title: `${node.type === 'agentNode' ? 'Agent' : 'Collection'} deleted.`, status: "info", duration: 5000, isClosable: true });
-     }
-     setContextMenu(null);
-   }, [setNodes, setEdges, toast, setContextMenu]);
-  
-  // --- Action Handlers (wrapped in useCallback for performance) ---
-  const handleViewLogsAction = useCallback((node: AppNode | null) => {
-     if(node) {
-         toast({
-             title: `View Logs for "${node.id}"`,
-             description: "This feature is not yet implemented.",
-             status: "info",
-             duration: 3000,
-             isClosable: true,
-         });
-     }
-   }, [toast]);
-
-  const handleEditAction = useCallback((node: AppNode | null) => {
-      if (node?.type === 'collectionNode') {
-        setEditingCollection(node);
-        openCollectionEditor();
-      } else if (node?.type === 'agentNode') {
-        setEditingAgent(node);
-        openAgentEditor();
-     }
-     setContextMenu(null);
-   }, [openCollectionEditor, openAgentEditor, setEditingCollection, setEditingAgent, setContextMenu]);
-
-  const agentHandlers = useMemo<AgentNodeHandlers>(() => {
-    const byId = (id: string) => nodes.find(n => n.id === id) ?? null;
-    return {
-      onEdit: (id) => handleEditAction(byId(id)),
-      onDelete: (id) => handleDeleteAction(byId(id)),
-      onViewLogs: (id) => handleViewLogsAction(byId(id)),
-    };
-  }, [nodes, handleEditAction, handleDeleteAction, handleViewLogsAction]);
-
-  if (loading) return <Spinner />;
-  
-  const viewingNodeAttributes = viewingNode?.type === 'collectionNode' 
-    ? viewingNode.data.attributes 
-    : undefined;
-
-  const sourceNode = newConnection?.source
-    ? nodes.find(n => n.id === newConnection.source && n.type === 'collectionNode') as CollectionNodeType | undefined
-    : undefined;
-
-  const targetNode = newConnection?.target
-    ? nodes.find(n => n.id === newConnection.target && n.type === 'collectionNode') as CollectionNodeType | undefined
-    : undefined;
-
-  const allNodeLabels = nodes.map(node => (node.data as { label: string; attributes: AttributeItem[] }).label);
+        >
+          The Schema Designer maps your collections, their relations and the agents they trigger. Create a collection to
+          get started.
+        </EmptyState>
+      </Box>
+    );
+  } else {
+    content = (
+      <WorkspaceGraph
+        // A new layout or a model change starts from fresh positions.
+        key={`${direction}:${graph.signature}`}
+        initialNodes={graph.nodes}
+        edges={graph.edges}
+        direction={direction}
+        onDirection={setDirection}
+        onNew={newCollection}
+        onRefresh={refetch}
+        onEdit={edit}
+        onDelete={setDeleting}
+        onViewLogs={() => navigate("/activity")}
+      />
+    );
+  }
 
   return (
-    <HandlersContext.Provider value={agentHandlers}>
-    <Box w="100%" h="calc(100vh - 64px)" bg="#fafdff" ref={reactFlowWrapperRef}>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        onNodeClick={onNodeClick}
-        onNodeContextMenu={onNodeContextMenu}
-        onPaneClick={onPaneClick}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        fitView
-        fitViewOptions={{
-          padding: 1.0,
-        }}
-      >
-        <Panel position="top-right">
-          <Flex gap={2} p={2} bg="white" borderRadius="md" boxShadow="md" alignItems="center">
-
-            <IconButton
-              size="sm"
-              aria-label="Edit Collection"
-              onClick={() => handleEdit(selectedNode)}
-            ><CiViewTable />
-            </IconButton>
-            <IconButton
-              size="sm"
-              aria-label="Create Collection"
-              onClick={() => handleAddCollection}
-            ><FaPlus />
-            </IconButton>
-            <Box h="24px" w="1px" bg="gray.300" mx={2} />
-            <IconButton
-              size="sm"
-              aria-label="View Details"
-              onClick={() => handleViewDetails(selectedNode)}
-              disabled={!selectedNode}
-            >
-              <FaEye />
-            </IconButton>
-            <IconButton
-              size="sm"
-              aria-label="Edit Collection"
-              onClick={() => handleEdit(selectedNode)}
-              disabled={!selectedNode}
-            >
-              <FaEdit />
-            </IconButton>
-            <IconButton
-              size="sm"
-              aria-label="Delete"
-              onClick={() => handleDelete(selectedNode)}
-              disabled={!selectedNode}
-              colorScheme="red"
-            >
-              <FaTrash />
-            </IconButton>
-            
-            <Box h="24px" w="1px" bg="gray.300" mx={2} />
-
-            <IconButton
-              size="sm"
-              aria-label="Top-to-Bottom Layout"
-              onClick={() => setLayoutDirection("TB")}
-              colorScheme={layoutDirection === "TB" ? "teal" : "gray"}
-            >
-              <FaArrowsAltV />
-            </IconButton>
-            <IconButton
-              size="sm"
-              aria-label="Left-to-Right Layout"
-              onClick={() => setLayoutDirection("LR")}
-              colorScheme={layoutDirection === "LR" ? "teal" : "gray"}
-            >
-              <FaArrowsAltH />
-            </IconButton>
-          </Flex>
-        </Panel>
-        
-        <Controls />
-        <Background variant={"dots" as BackgroundVariant} gap={12} size={1} />
-      </ReactFlow>
-
-      {contextMenu && (
-        <Box
-          position="absolute"
-          top={`${contextMenu.y}px`}
-          left={`${contextMenu.x}px`}
-          zIndex={100}
-        >
-          <Menu isOpen>
-            <MenuList>
-              <MenuItem icon={<FaEye />} onClick={() => handleViewDetails(contextMenu.node)}>
-                View Details
-              </MenuItem>
-              <MenuItem icon={<FaEdit />} onClick={() => handleEdit(contextMenu.node)}>
-                Edit
-              </MenuItem>
-              <MenuItem icon={<FaTrash />} onClick={() => handleDelete(contextMenu.node)}>
-                Delete
-              </MenuItem>
-            </MenuList>
-          </Menu>
-        </Box>
-      )}
-
-      <Modal isOpen={modal.isOpen} onClose={modal.onClose}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>
-            Details: {
-              viewingNode?.type === 'collectionNode' 
-                ? viewingNode.data.label 
-                : viewingNode?.data.name
-            }
-          </ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <Text mb={4} fontWeight="bold">
-              Attributes:
-            </Text>
-            {Array.isArray(viewingNodeAttributes) && viewingNodeAttributes.length > 0 ? (
-            <VStack align="start" spacing={2}>
-              {viewingNodeAttributes.map((attr, index) => (
-                <HStack key={index} w="100%" justifyContent="space-between">
-                  <Text fontWeight="bold">{attr.name}</Text>
-                  <Badge colorScheme="blue">{attr.type}</Badge>
-                </HStack>
-              ))}
-            </VStack>
-            ) : (
-            <Text>This collection has no attributes.</Text>
-            )}
-          </ModalBody>
-          <ModalFooter>
-            <Button colorScheme="blue" onClick={modal.onClose}>
-              Close
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-
-      <Modal isOpen={createModal.isOpen} onClose={createModal.onClose}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Create a single type</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <Tabs variant="enclosed">
-              <TabList>
-                <Tab>BASE SETTINGS</Tab>
-                <Tab>ADVANCED SETTINGS</Tab>
-              </TabList>
-              <TabPanels>
-                <TabPanel>
-                  <VStack spacing={4} align="stretch">
-                    <FormControl id="displayName" isInvalid={!!validationErrors.displayName}>
-                      <FormLabel>Display name</FormLabel>
-                      <Input
-                        value={newCollectionData.displayName}
-                        onChange={handleDisplayNameChange}
-                      />
-                      <FormErrorMessage>{validationErrors.displayName}</FormErrorMessage>
-                    </FormControl>
-                    <FormControl id="singularId">
-                      <FormLabel>API ID (Singular)</FormLabel>
-                      <Input
-                        value={newCollectionData.singularId}
-                        isReadOnly
-                        bg="gray.100"
-                      />
-                      <FormHelperText>
-                        The API ID is used to generate the API routes and databases tables/collections.
-                      </FormHelperText>
-                    </FormControl>
-                    <FormControl id="pluralId">
-                      <FormLabel>API ID (Plural)</FormLabel>
-                      <Input
-                        value={newCollectionData.pluralId}
-                        isReadOnly
-                        bg="gray.100"
-                      />
-                      <FormHelperText>
-                        Pluralized API ID
-                      </FormHelperText>
-                    </FormControl>
-                  </VStack>
-                </TabPanel>
-                <TabPanel>
-                  <Text>Advanced settings are not yet implemented.</Text>
-                </TabPanel>
-              </TabPanels>
-            </Tabs>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={createModal.onClose}>
-              Cancel
-            </Button>
-            <Button colorScheme="teal" onClick={handleContinueClick} isDisabled={!!validationErrors.displayName || !newCollectionData.displayName.trim()}>
-              Continue
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-      
-       <AttributeEditorSidebar
-        key={editingCollection?.id ?? "none"}
-        isOpen={collectionEditorModal.isOpen}
-        onClose={collectionEditorModal.onClose}
-        node={editingCollection}
-        onSave={handleUpdateNodeAttributes}
-      />
-      
-      <RelationModal
-        isOpen={relationModal.isOpen}
-        onClose={() => {
-          relationModal.onClose();
-          setNewConnection(null);
-        }}
-        sourceNodeLabel={sourceNode?.data.label || null}
-        targetNodeLabel={targetNode?.data.label || null}
-        onSave={handleSaveRelation}
-        allNodeLabels={allNodeLabels}
-      />
+    <Box w="100%" h="calc(100vh - 64px)" bg="#fafdff" position="relative">
+      {content}
+      <DeleteNodeDialog target={deleting} onClose={() => setDeleting(null)} onDeleted={refetch} />
     </Box>
-    </HandlersContext.Provider>
   );
 }

@@ -1,4 +1,5 @@
-import { getBezierPath, EdgeLabelRenderer, BaseEdge, EdgeProps, Edge, MarkerType } from "@xyflow/react";
+import { getBezierPath, EdgeLabelRenderer, BaseEdge } from "@xyflow/react";
+import type { EdgeProps, Edge } from "@xyflow/react";
 
 // The data interface remains the same
 export interface CollectionEdgeData {
@@ -19,6 +20,7 @@ export function CollectionEdge({
   targetY,
   sourcePosition,
   targetPosition,
+  markerEnd,
   data,
 }: EdgeProps<CustomCollectionEdge>) {
   const [edgePath, labelX, labelY] = getBezierPath({
@@ -44,14 +46,14 @@ export function CollectionEdge({
     }
   };
   
-  const relationLabel = getRelationLabel(data?.relationType);
+  const relationLabel = data?.label ? `${data.label}: ${getRelationLabel(data.relationType)}` : getRelationLabel(data?.relationType);
 
   return (
     <>
       <BaseEdge
         id={id}
         path={edgePath}
-        markerEnd={MarkerType.ArrowClosed}
+        markerEnd={markerEnd}
       />
       <EdgeLabelRenderer>
         <div

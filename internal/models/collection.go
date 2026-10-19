@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gohead-cms/gohead/internal/types"
@@ -173,13 +174,25 @@ func mapToAttribute(attrMap map[string]any, attribute *Attribute) error {
 		}
 
 		if target, ok := attrMap["target"].(string); ok {
-			attribute.Target = target
+			attribute.Target = normalizeTarget(target)
 		} else {
 			return fmt.Errorf("missing or invalid field 'target' for type 'relation'")
 		}
 	}
 
 	return nil
+}
+
+// normalizeTarget accepts a relation target as a collection name or in the
+// "api::name.name" form the schema endpoints return.
+func normalizeTarget(target string) string {
+	if rest, ok := strings.CutPrefix(target, "api::"); ok {
+		if dot := strings.IndexByte(rest, '.'); dot > 0 {
+			return rest[:dot]
+		}
+		return rest
+	}
+	return target
 }
 
 // -------------------- Schema validator --------------------

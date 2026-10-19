@@ -1,130 +1,101 @@
-import React from "react";
-import {
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  TableContainer,
-  IconButton,
-  HStack,
-  Box,
-  Badge,
-  Tooltip,
-} from "@chakra-ui/react";
-import { FiEdit, FiTrash2, FiEye, FiEyeOff } from "react-icons/fi";
-import { Schema } from "../../../shared/types";
-import { ContentItem } from "../hooks";
-import { EmptyState } from "./EmptyState";
+import { Table, Thead, Tbody, Tr, Th, Td, TableContainer, IconButton, HStack, Box, Badge, Button, Tooltip } from "@chakra-ui/react";
+import { FiEdit, FiTrash2, FiEye, FiEyeOff, FiInbox, FiPlus } from "react-icons/fi";
+import type { Schema } from "../../../shared/types";
+import { ConfirmButton } from "../../../shared/ui/ConfirmButton";
+import { EmptyState } from "../../../shared/ui/EmptyState";
+import type { ContentItem } from "../hooks";
+import { displayValue, tableColumns } from "./entryValues";
 
 interface ContentTableProps {
   schema: Schema;
   items: ContentItem[];
+  /** False hides the actions that change content (viewers). */
+  canWrite: boolean;
+  onAdd: () => void;
   onEdit: (item: ContentItem) => void;
-  onTogglePublish?: (item: ContentItem) => void;
+  onTogglePublish: (item: ContentItem) => void;
+  onDelete: (item: ContentItem) => Promise<void>;
 }
 
-// Function to get a displayable value from an item
-const getDisplayValue = (value: unknown): string => {
-    if (typeof value === 'object' && value !== null) {
-        return JSON.stringify(value).substring(0, 30) + '...';
-    }
-    if (typeof value === 'string' && value.length > 50) {
-        return value.substring(0, 50) + '...';
-    }
-    if (value === null || value === undefined) {
-        return '–';
-    }
-    return String(value);
-}
-
-export function ContentTable({ schema, items, onEdit, onTogglePublish }: ContentTableProps) {
+export function ContentTable({ schema, items, canWrite, onAdd, onEdit, onTogglePublish, onDelete }: ContentTableProps) {
   const drafts = !!schema.options?.draftAndPublish;
-  // Determine table headers from the schema, prioritizing common fields
-  const getHeaders = () => {
-    const attributes = Object.keys(schema.attributes);
-    // Let's add 'id' manually to our preferred list if it's not in the schema attributes
-    const preferredHeaders = ['id', 'title', 'name', 'slug', 'status'];
-    let headers = attributes.filter(attr => preferredHeaders.includes(attr.toLowerCase()));
-    if (headers.length < 4) {
-        headers = [...headers, ...attributes.filter(attr => !headers.includes(attr))];
-    }
-    // Ensure 'id' is always the first column if present
-    const finalHeaders = ['id', ...headers.filter(h => h !== 'id')];
-    return finalHeaders.slice(0, 5); // Show a max of 5 columns for clarity
-  };
+  const headers = tableColumns(schema);
 
-  const headers = getHeaders();
-
-  if (!items || items.length === 0) {
-    return <EmptyState />;
+  if (items.length === 0) {
+    return (
+      <EmptyState
+        icon={FiInbox}
+        title="This collection is empty"
+        action={
+          canWrite && (
+            <Button size="sm" colorScheme="purple" leftIcon={<FiPlus />} onClick={onAdd}>
+              Add the first entry
+            </Button>
+          )
+        }
+      >
+        {canWrite ? "Get started by creating your first entry." : "Nothing has been published here yet."}
+      </EmptyState>
+    );
   }
 
   return (
     <Box borderWidth="1px" borderRadius="lg" overflow="hidden" bg="white">
       <TableContainer>
-        <Table variant="simple">
+        <Table variant="simple" size="sm">
           <Thead bg="gray.50">
             <Tr>
               {headers.map((header) => (
-                <Th key={header} textTransform="capitalize">{header.replace(/_/g, ' ')}</Th>
+                <Th key={header}>{header.replace(/_/g, " ")}</Th>
               ))}
               {drafts && <Th>Status</Th>}
-              <Th isNumeric>Actions</Th>
+              {canWrite && <Th isNumeric>Actions</Th>}
             </Tr>
           </Thead>
           <Tbody>
-            {items.map((item) => (
-              <Tr key={item.id}>
-                {headers.map((header) => (
-                  <Td key={`${item.id}-${header}`}>
-                    {/* Items are flat: attributes sit next to id. */}
-                    {getDisplayValue(item[header])}
-                  </Td>
-                ))}
-                {drafts && (
-                  <Td>
-                    <Badge colorScheme={item.status === 'published' ? 'green' : 'gray'}>
-                      {item.status}
-                    </Badge>
-                  </Td>
-                )}
-                <Td isNumeric>
-                  <HStack spacing={1} justify="flex-end">
-                    {drafts && onTogglePublish && (
-                      <Tooltip label={item.status === 'published' ? 'Unpublish' : 'Publish'}>
-                        <IconButton
-                          aria-label={item.status === 'published' ? 'Unpublish item' : 'Publish item'}
-                          icon={item.status === 'published' ? <FiEyeOff /> : <FiEye />}
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => onTogglePublish(item)}
+            {items.map((item) => {
+              const published = item.status === "published";
+              return (
+                <Tr key={item.id}>
+                  {headers.map((header) => (
+                    // Items are flat: attributes sit next to id.
+                    <Td key={header}>{displayValue(item[header])}</Td>
+                  ))}
+                  {drafts && (
+                    <Td>
+                      <Badge colorScheme={published ? "green" : "gray"}>{item.status}</Badge>
+                    </Td>
+                  )}
+                  {canWrite && (
+                    <Td isNumeric>
+                      <HStack spacing={1} justify="flex-end">
+                        {drafts && (
+                          <Tooltip label={published ? "Unpublish" : "Publish"}>
+                            <IconButton
+                              aria-label={published ? "Unpublish item" : "Publish item"}
+                              icon={published ? <FiEyeOff /> : <FiEye />}
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => onTogglePublish(item)}
+                            />
+                          </Tooltip>
+                        )}
+                        <IconButton aria-label="Edit item" icon={<FiEdit />} size="sm" variant="ghost" onClick={() => onEdit(item)} />
+                        <ConfirmButton
+                          trigger={<IconButton aria-label="Delete item" icon={<FiTrash2 />} size="sm" variant="ghost" colorScheme="red" />}
+                          title="Delete this entry?"
+                          body={`Entry #${item.id} will be deleted. This cannot be undone.`}
+                          onConfirm={() => onDelete(item)}
                         />
-                      </Tooltip>
-                    )}
-                    <IconButton
-                      aria-label="Edit item"
-                      icon={<FiEdit />}
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => onEdit(item)} 
-                    />
-                    <IconButton
-                      aria-label="Delete item"
-                      icon={<FiTrash2 />}
-                      size="sm"
-                      variant="ghost"
-                      colorScheme="red"
-                    />
-                  </HStack>
-                </Td>
-              </Tr>
-            ))}
+                      </HStack>
+                    </Td>
+                  )}
+                </Tr>
+              );
+            })}
           </Tbody>
         </Table>
       </TableContainer>
     </Box>
   );
 }
-

@@ -276,6 +276,27 @@ func TestDraftAndPublish(t *testing.T) {
 		assert.Nil(t, list[0].(map[string]any)["featured"], "default lists show published content only")
 	})
 
+	t.Run("singleton status=all keeps links to drafts for editors", func(t *testing.T) {
+		draftID := draft["id"]
+		a.ok("admin", "POST", "/admin/singleton", map[string]any{
+			"name": "home",
+			"attributes": map[string]any{
+				"featured": map[string]any{"type": "relation", "relation": "oneToOne", "target": "articles"},
+			},
+		})
+		a.ok("editor", "PUT", "/api/singleton/home", map[string]any{"data": map[string]any{"featured": draftID}})
+
+		got := a.ok("editor", "GET", "/api/singleton/home?level=0", nil).(map[string]any)
+		assert.Nil(t, got["featured"], "published only by default")
+		got = a.ok("editor", "GET", "/api/singleton/home?level=0&status=all", nil).(map[string]any)
+		assert.Equal(t, draftID, got["featured"])
+
+		code, _ := a.do("viewer", "GET", "/api/singleton/home?status=all", nil)
+		assert.Equal(t, http.StatusForbidden, code)
+		code, _ = a.do("editor", "GET", "/api/singleton/home?status=bogus", nil)
+		assert.Equal(t, http.StatusBadRequest, code)
+	})
+
 	t.Run("status is rejected without draft and publish", func(t *testing.T) {
 		code, out := a.do("editor", "POST", "/api/collections/pages", map[string]any{
 			"data": map[string]any{"title": "x"}, "status": "published",

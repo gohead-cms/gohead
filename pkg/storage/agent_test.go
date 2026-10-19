@@ -170,3 +170,12 @@ func TestAgentStorage(t *testing.T) {
 		assert.Contains(t, err.Error(), "not found", "Expected 'not found' error message")
 	})
 }
+
+func TestGetAllAgentsRejectsUnknownFilters(t *testing.T) {
+	testutils.SetupTestServer()
+	defer testutils.CleanupTestDB()
+	_, _, err := storage.GetAllAgents(map[string]any{"name = name OR 1=1 --": "x"}, nil)
+	if err == nil {
+		t.Fatal("an unknown filter field must be refused, not put into SQL")
+	}
+}

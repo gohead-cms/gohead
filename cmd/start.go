@@ -334,6 +334,8 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *medi
 		authRoutes.POST("/register", handlers.Register)
 		authRoutes.POST("/login", handlers.Login)
 	}
+	// Not rate limited with login: the admin UI calls it on every page load.
+	router.GET("/auth/me", middleware.AuthMiddleware(), handlers.Me)
 
 	// Agent Webhook Trigger (Public, authenticates with a token)
 	router.POST("/agents/webhook/:id", handlers.HandleWebhook)
@@ -378,6 +380,10 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *medi
 		creds.DELETE("/tokens/:id", handlers.RevokeAPIToken)
 
 		// Outbound webhooks
+		admin.GET("/overview", handlers.GetOverview)
+		admin.GET("/runs", handlers.ListAllAgentRuns)
+		admin.GET("/agent-functions", handlers.AgentFunctionCatalog)
+
 		admin.POST("/webhooks", handlers.CreateWebhook)
 		admin.GET("/webhooks", handlers.ListWebhooks)
 		admin.GET("/webhooks/:id", handlers.GetWebhook)
@@ -397,6 +403,7 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *medi
 			agents.GET("/:name/runs", handlers.ListAgentRuns)
 			agents.GET("/:name/runs/:run", handlers.GetAgentRun)
 			agents.GET("/:name/usage", handlers.GetAgentUsage)
+			agents.POST("/:name/run", handlers.RunAgentNow)
 		}
 	}
 
@@ -405,6 +412,15 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *medi
 	content.Use(middleware.AuthMiddleware())
 	{
 		content.POST("/graphql", handlers.GraphQLHandler)
+
+		// The content model, read-only, for every signed-in user (editors
+		// need it to edit content; changing it stays under /admin).
+		content.GET("/schema/collections", handlers.GetCollections)
+		content.GET("/schema/collections/:name", handlers.GetCollection)
+		content.GET("/schema/singletons", handlers.GetSingletons)
+		content.GET("/schema/singletons/:name", handlers.GetSingleton)
+		content.GET("/schema/components", handlers.GetComponents)
+		content.GET("/schema/components/:name", handlers.GetComponent)
 		if openAPI.Enabled && !openAPI.Public {
 			content.GET("/openapi.json", handlers.OpenAPISpec)
 		}

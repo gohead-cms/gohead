@@ -143,7 +143,7 @@ func TestValidateAgentSchema(t *testing.T) {
 			name:     "Invalid Trigger Type",
 			agent:    Agent{Name: "test", SystemPrompt: "...", MaxTurns: 1, LLMConfig: LLMConfig{Provider: "p"}, Memory: MemoryConfig{Type: "in-memory", SessionScope: "user"}, Trigger: TriggerConfig{Type: "invalid"}},
 			hasError: true,
-			errMsg:   "invalid trigger type: must be 'manual', 'cron', or 'webhook'",
+			errMsg:   "invalid trigger type: must be 'manual', 'cron', 'webhook' or 'collection_event'",
 		},
 		{
 			name:     "Cron Trigger with Empty Cron Expression",

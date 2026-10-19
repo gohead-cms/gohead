@@ -1,4 +1,4 @@
-import { AgentRun, AgentUsage, RunStatus } from "../../../shared/types";
+import { type AgentRun, type AgentUsage, type RunStatus } from "../../../shared/types";
 import { getJSON, useApiQuery } from "../../../shared/hooks/useApiQuery";
 
 export interface RunPagination {

@@ -112,3 +112,12 @@ func DeleteUser(id uint) error {
 	}
 	return nil
 }
+
+// CountUsersWithRole counts the users that have the role.
+func CountUsersWithRole(roleName string) (int64, error) {
+	var n int64
+	err := database.DB.Model(&models.User{}).
+		Joins("JOIN user_roles ON user_roles.id = users.user_role_id").
+		Where("user_roles.name = ?", roleName).Count(&n).Error
+	return n, err
+}

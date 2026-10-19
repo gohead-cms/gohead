@@ -1,5 +1,5 @@
 import { request } from "@playwright/test";
-import { admin, apiURL } from "./fixtures";
+import { admin, apiURL, editor } from "./fixtures";
 
 // Seeds the API through the admin created at startup (GOHEAD_ADMIN_*, see
 // fixtures.ts): a collection with one entry and an agent for the pages under
@@ -24,6 +24,7 @@ export default async function globalSetup() {
     if (!res.ok() && res.status() !== 409) throw new Error(`POST ${path}: ${res.status()} ${await res.text()}`);
   };
 
+  await ensure("/admin/users", { username: editor.username, email: "e2e-editor@example.com", password: editor.password, role_name: "editor" });
   await ensure("/admin/collections", {
     name: "articles",
     kind: "collection",

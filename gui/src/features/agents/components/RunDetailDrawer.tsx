@@ -17,7 +17,7 @@ import {
   VStack,
   useColorModeValue,
 } from "@chakra-ui/react";
-import { AgentRunStep } from "../../../shared/types";
+import { type AgentRunStep } from "../../../shared/types";
 import { useAgentRun } from "../hook/useAgentRuns";
 import {
   formatCost,
@@ -114,6 +114,9 @@ export function RunDetailDrawer({ agentName, runId, onClose }: RunDetailDrawerPr
         <DrawerCloseButton />
         <DrawerHeader borderBottomWidth="1px">
           Run #{runId}
+          <Text as="span" fontWeight="normal" color="gray.500" fontSize="md" ml={2}>
+            {agentName}
+          </Text>
           {run && (
             <Badge ml={3} colorScheme={statusColor[run.status]}>
               {run.status}
