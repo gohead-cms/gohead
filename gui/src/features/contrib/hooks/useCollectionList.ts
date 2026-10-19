@@ -1,4 +1,4 @@
-import { Schema } from "../../../shared/types";
+import type { Schema } from "../../../shared/types";
 import { getJSON, useApiQuery } from "../../../shared/hooks/useApiQuery";
 
 interface CollectionResponse {

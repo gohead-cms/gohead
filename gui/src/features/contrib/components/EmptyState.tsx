@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, VStack, Icon, Heading, Text, useColorModeValue } from '@chakra-ui/react';
-import { IconType } from 'react-icons';
+import type { IconType } from "react-icons";
 import { FiInbox } from 'react-icons/fi';
 
 interface EmptyStateProps {

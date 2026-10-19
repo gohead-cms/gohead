@@ -9,6 +9,17 @@ export interface AgentFunction {
   impl_key?: string;
   /** collections.* functions: the collections they may use (empty: all). */
   collections?: string[];
+  /** JSON schema of the arguments, sent to the model. */
+  parameters?: Record<string, unknown>;
+}
+
+/** A built-in function from GET /admin/agent-functions. */
+export interface AgentFunctionInfo {
+  impl_key: string;
+  description: string;
+  parameters: Record<string, unknown>;
+  /** The function accepts a "collections" scope (collections.*). */
+  scoped: boolean;
 }
 
 export interface AgentLimits {
@@ -39,6 +50,8 @@ export interface AgentRunStep {
 
 export interface AgentRun {
   id: number;
+  agentId?: number;
+  agentName?: string;
   status: RunStatus;
   triggerType: string;
   trigger: string;
@@ -80,17 +93,28 @@ export interface AgentUsage {
  */
 export interface AgentNodeData {
   label: string;
+  /** Numeric ID (used by the webhook trigger URL). */
+  id?: number;
   name: string;
   schema: {
+    maxTurns?: number;
+    memory?: { type: string; session_scope: string };
     functions: AgentFunction[];
     llmConfig: {
       provider: string;
       model: string;
+      /** "********" when a key is stored, "" otherwise. */
+      api_key?: string;
+      api_secret?: string;
+      base_url?: string;
       input_cost_per_million?: number;
       output_cost_per_million?: number;
     };
     trigger: {
       type: string;
+      cron?: string;
+      /** "********" when a token is stored. */
+      webhook_token?: string;
       event_trigger?: {
         collection: string;
         events: string[];

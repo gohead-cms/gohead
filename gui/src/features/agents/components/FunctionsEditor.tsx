@@ -1,0 +1,225 @@
+import {
+  Alert,
+  AlertIcon,
+  Box,
+  Button,
+  Checkbox,
+  CheckboxGroup,
+  FormControl,
+  FormErrorMessage,
+  FormHelperText,
+  FormLabel,
+  HStack,
+  IconButton,
+  Input,
+  Select,
+  SimpleGrid,
+  Text,
+  Textarea,
+  VStack,
+  Wrap,
+  WrapItem,
+} from "@chakra-ui/react";
+import { FiPlus, FiTrash2 } from "react-icons/fi";
+import { AgentFunctionInfo } from "../../../shared/types";
+import { CollectionChoice } from "../hook/useEditorData";
+import { DraftErrors, FunctionDraft, applyCatalog, emptyFunction, functionWarning } from "./agentForm";
+import { EditorSection, Field } from "./EditorParts";
+
+interface FunctionsEditorProps {
+  functions: FunctionDraft[];
+  onChange: (functions: FunctionDraft[]) => void;
+  catalog: AgentFunctionInfo[];
+  catalogError: string | null;
+  collections: CollectionChoice[];
+  errors: DraftErrors;
+}
+
+/** Catalog entries grouped by the prefix of their impl_key ("collections", "llm"…). */
+function groupCatalog(catalog: AgentFunctionInfo[]): [string, AgentFunctionInfo[]][] {
+  const groups = new Map<string, AgentFunctionInfo[]>();
+  for (const info of catalog) {
+    const prefix = info.impl_key.split(".")[0];
+    groups.set(prefix, [...(groups.get(prefix) ?? []), info]);
+  }
+  return [...groups.entries()];
+}
+
+function FunctionCard({
+  fn,
+  index,
+  catalog,
+  collections,
+  errors,
+  onChange,
+  onRemove,
+}: {
+  fn: FunctionDraft;
+  index: number;
+  catalog: AgentFunctionInfo[];
+  collections: CollectionChoice[];
+  errors: DraftErrors;
+  onChange: (fn: FunctionDraft) => void;
+  onRemove: () => void;
+}) {
+  const info = catalog.find((c) => c.impl_key === fn.impl_key);
+  const scoped = info?.scoped ?? fn.impl_key.startsWith("collections.");
+  const known = !fn.impl_key || Boolean(info);
+  const warning = functionWarning(fn);
+  const err = (field: string) => errors[`fn.${fn.uid}.${field}`];
+  const label = fn.name || `function ${index + 1}`;
+  // Scoped collections that no longer exist stay listed so they can be unchecked.
+  const scopeChoices = [...new Set([...collections.map((c) => c.name), ...fn.collections])];
+
+  return (
+    <Box borderWidth="1px" borderRadius="md" p={4} bg="gray.50">
+      <HStack justify="space-between" mb={3}>
+        <Text fontWeight="semibold" fontSize="sm">
+          {fn.name || "New function"}
+          {fn.impl_key && (
+            <Text as="span" color="gray.500" fontWeight="normal" ml={2}>
+              → {fn.impl_key}
+            </Text>
+          )}
+        </Text>
+        <IconButton aria-label={`Remove ${label}`} size="sm" variant="ghost" colorScheme="red" icon={<FiTrash2 />} onClick={onRemove} />
+      </HStack>
+      <VStack spacing={4} align="stretch">
+        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+          <Field label="Implementation" error={err("impl_key")} help={info?.description} isRequired>
+            <Select
+              bg="white"
+              placeholder="Choose a built-in function"
+              value={fn.impl_key}
+              onChange={(e) => onChange(applyCatalog(fn, catalog.find((c) => c.impl_key === e.target.value), info))}
+            >
+              {!known && <option value={fn.impl_key}>{fn.impl_key} (unknown)</option>}
+              {groupCatalog(catalog).map(([group, items]) => (
+                <optgroup key={group} label={group}>
+                  {items.map((c) => (
+                    <option key={c.impl_key} value={c.impl_key}>
+                      {c.impl_key}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Function name (seen by the model)" error={err("name")} isRequired>
+            <Input bg="white" value={fn.name} onChange={(e) => onChange({ ...fn, name: e.target.value })} placeholder="save_summary" />
+          </Field>
+        </SimpleGrid>
+        <Field label="Description (for the model)" help="Tell the model when to call it.">
+          <Input bg="white" value={fn.description} onChange={(e) => onChange({ ...fn, description: e.target.value })} />
+        </Field>
+        {scoped && (
+          <FormControl as="fieldset">
+            <FormLabel as="legend" fontSize="sm" mb={1}>
+              Allowed collections
+            </FormLabel>
+            {scopeChoices.length > 0 ? (
+              <CheckboxGroup value={fn.collections} onChange={(v) => onChange({ ...fn, collections: v.map(String) })}>
+                <Wrap spacingX={5} spacingY={1}>
+                  {scopeChoices.map((name) => (
+                    <WrapItem key={name}>
+                      <Checkbox value={name} bg="white">
+                        {name}
+                      </Checkbox>
+                    </WrapItem>
+                  ))}
+                </Wrap>
+              </CheckboxGroup>
+            ) : (
+              <Text fontSize="sm" color="gray.500">
+                No collections yet.
+              </Text>
+            )}
+            <FormHelperText>None checked: the function may use every collection.</FormHelperText>
+          </FormControl>
+        )}
+        {warning && (
+          <Alert status="warning" borderRadius="md" fontSize="sm">
+            <AlertIcon />
+            {warning}
+          </Alert>
+        )}
+        <FormControl isInvalid={Boolean(err("parameters"))} isRequired>
+          <HStack justify="space-between" mb={1}>
+            <FormLabel fontSize="sm" mb={0}>
+              Parameters (JSON schema)
+            </FormLabel>
+            {info && (
+              <Button
+                size="xs"
+                variant="link"
+                onClick={() => onChange({ ...fn, parameters: JSON.stringify(info.parameters ?? {}, null, 2) })}
+              >
+                Reset to default
+              </Button>
+            )}
+          </HStack>
+          <Textarea
+            bg="white"
+            fontFamily="mono"
+            fontSize="xs"
+            rows={8}
+            spellCheck={false}
+            value={fn.parameters}
+            onChange={(e) => onChange({ ...fn, parameters: e.target.value })}
+          />
+          {err("parameters") ? (
+            <FormErrorMessage>{err("parameters")}</FormErrorMessage>
+          ) : (
+            <FormHelperText>Property names must match the arguments the implementation reads.</FormHelperText>
+          )}
+        </FormControl>
+      </VStack>
+    </Box>
+  );
+}
+
+/** The agent's functions: each maps a name the model sees to a built-in implementation. */
+export function FunctionsEditor({ functions, onChange, catalog, catalogError, collections, errors }: FunctionsEditorProps) {
+  const add = () => onChange([...functions, emptyFunction()]);
+  return (
+    <EditorSection
+      title={`Functions (${functions.length})`}
+      description="Tools the model may call. Pick a built-in implementation; its description and parameters are filled in for you."
+      actions={
+        <Button size="sm" leftIcon={<FiPlus />} onClick={add} flexShrink={0}>
+          Add function
+        </Button>
+      }
+    >
+      {catalogError && (
+        <Alert status="error" mb={4} borderRadius="md">
+          <AlertIcon />
+          {catalogError}
+        </Alert>
+      )}
+      {functions.length === 0 ? (
+        <Text fontSize="sm" color="gray.500">
+          No functions: the agent can only answer with text.{" "}
+          <Button variant="link" size="sm" onClick={add}>
+            Add one
+          </Button>
+        </Text>
+      ) : (
+        <VStack spacing={4} align="stretch">
+          {functions.map((fn, i) => (
+            <FunctionCard
+              key={fn.uid}
+              fn={fn}
+              index={i}
+              catalog={catalog}
+              collections={collections}
+              errors={errors}
+              onChange={(next) => onChange(functions.map((f) => (f.uid === fn.uid ? next : f)))}
+              onRemove={() => onChange(functions.filter((f) => f.uid !== fn.uid))}
+            />
+          ))}
+        </VStack>
+      )}
+    </EditorSection>
+  );
+}

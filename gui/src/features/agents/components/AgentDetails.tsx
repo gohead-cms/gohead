@@ -1,5 +1,11 @@
+import { useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import {
   Box,
+  Button,
+  Code,
+  Flex,
+  HStack,
   Heading,
   Text,
   Badge,
@@ -13,11 +19,18 @@ import {
   TabPanel,
   Wrap,
 } from "@chakra-ui/react";
+import { FiEdit2, FiTrash2 } from "react-icons/fi";
+import { API_BASE_URL } from "../../../services/api";
 import { AgentLimits, AgentNodeData } from "../../../shared/types";
+import { ConfirmButton } from "../../../shared/ui/ConfirmButton";
+import { CopyButton } from "./EditorParts";
+import { RunNowButton } from "./RunNowButton";
 import { RunsPanel } from "./RunsPanel";
 
 interface AgentDetailsProps {
   agent: AgentNodeData;
+  /** Deletes the agent; omitted for read-only viewers. */
+  onDelete?: () => Promise<void>;
 }
 
 function Label({ children }: { children: React.ReactNode }) {
@@ -36,16 +49,52 @@ const limitLabels: [keyof AgentLimits, string][] = [
   ["max_cost_per_day", "USD / day"],
 ];
 
-export function AgentDetails({ agent }: AgentDetailsProps) {
+export function AgentDetails({ agent, onDelete }: AgentDetailsProps) {
   const { name, schema } = agent;
-  const { llmConfig, trigger, functions, limits } = schema;
+  const [tab, setTab] = useState(0);
+  // Bumped after "Run now" so the Runs tab reloads.
+  const [runsVersion, setRunsVersion] = useState(0);
+  const { llmConfig, trigger, limits } = schema;
+  const functions = schema.functions ?? [];
+  const events = trigger.event_trigger?.events ?? [];
+  const webhookUrl = trigger.type === "webhook" && agent.id ? `${API_BASE_URL}/agents/webhook/${agent.id}` : null;
   const setLimits = limitLabels.filter(([k]) => (limits?.[k] ?? 0) > 0);
   const priced = (llmConfig.input_cost_per_million ?? 0) > 0 || (llmConfig.output_cost_per_million ?? 0) > 0;
 
   return (
     <VStack spacing={4} align="stretch">
-      <Heading size="lg">{name}</Heading>
-      <Tabs isLazy colorScheme="teal">
+      <Flex justify="space-between" align="center" gap={3} wrap="wrap">
+        <Heading size="lg" wordBreak="break-word">
+          {name}
+        </Heading>
+        {onDelete && (
+          <HStack spacing={2}>
+            <RunNowButton
+              agentName={name}
+              onQueued={() => {
+                setTab(1);
+                setRunsVersion((v) => v + 1);
+                // The worker usually starts the run a moment later.
+                window.setTimeout(() => setRunsVersion((v) => v + 1), 4000);
+              }}
+            />
+            <Button as={RouterLink} to={`/agents/${encodeURIComponent(name)}/edit`} size="sm" leftIcon={<FiEdit2 />}>
+              Edit
+            </Button>
+            <ConfirmButton
+              trigger={
+                <Button size="sm" variant="outline" colorScheme="red" leftIcon={<FiTrash2 />}>
+                  Delete
+                </Button>
+              }
+              title={`Delete ${name}?`}
+              body="The agent stops running, and its run history and conversation are deleted. This cannot be undone."
+              onConfirm={onDelete}
+            />
+          </HStack>
+        )}
+      </Flex>
+      <Tabs isLazy colorScheme="teal" index={tab} onChange={setTab}>
         <TabList>
           <Tab>Overview</Tab>
           <Tab>Runs</Tab>
@@ -53,13 +102,26 @@ export function AgentDetails({ agent }: AgentDetailsProps) {
         <TabPanels>
           <TabPanel px={0}>
             <VStack spacing={6} align="stretch">
+              {schema.systemPrompt && (
+                <Box>
+                  <Label>System prompt</Label>
+                  <Text fontSize="sm" whiteSpace="pre-wrap" bg="white" borderWidth="1px" borderRadius="md" p={3} maxH="200px" overflowY="auto">
+                    {schema.systemPrompt}
+                  </Text>
+                  {schema.maxTurns ? (
+                    <Text fontSize="sm" color="gray.500" mt={1}>
+                      Up to {schema.maxTurns} turns per run
+                    </Text>
+                  ) : null}
+                </Box>
+              )}
               <Box>
                 <Label>LLM Config</Label>
                 <Text>
                   Provider: <Badge colorScheme="teal">{llmConfig.provider}</Badge>
                 </Text>
                 <Text>
-                  Model: <Badge colorScheme="cyan">{llmConfig.model}</Badge>
+                  Model: <Badge colorScheme="cyan">{llmConfig.model || "default"}</Badge>
                 </Text>
                 {priced && (
                   <Text fontSize="sm" color="gray.500" mt={1}>
@@ -73,10 +135,23 @@ export function AgentDetails({ agent }: AgentDetailsProps) {
                 <Text>
                   Type: <Badge colorScheme="purple">{trigger.type}</Badge>
                 </Text>
-                {trigger.event_trigger && (
+                {trigger.type === "collection_event" && trigger.event_trigger && (
                   <Text>
-                    On: '{trigger.event_trigger.collection}' [{trigger.event_trigger.events.join(", ")}]
+                    On: '{trigger.event_trigger.collection}' [{events.join(", ")}]
                   </Text>
+                )}
+                {trigger.type === "cron" && trigger.cron && (
+                  <Text>
+                    Schedule: <Code>{trigger.cron}</Code> (UTC)
+                  </Text>
+                )}
+                {webhookUrl && (
+                  <HStack mt={1} spacing={2} flexWrap="wrap">
+                    <Code fontSize="sm" wordBreak="break-all">
+                      POST {webhookUrl}
+                    </Code>
+                    <CopyButton value={webhookUrl} label="Copy URL" />
+                  </HStack>
                 )}
               </Box>
               <Box>
@@ -97,6 +172,11 @@ export function AgentDetails({ agent }: AgentDetailsProps) {
               </Box>
               <Box>
                 <Label>Functions ({functions.length})</Label>
+                {functions.length === 0 && (
+                  <Text fontSize="sm" color="gray.500">
+                    No functions: this agent can only answer with text.
+                  </Text>
+                )}
                 <List spacing={2} mt={2}>
                   {functions.map((func) => (
                     <ListItem key={func.name} fontSize="sm">
@@ -120,7 +200,7 @@ export function AgentDetails({ agent }: AgentDetailsProps) {
             </VStack>
           </TabPanel>
           <TabPanel px={0}>
-            <RunsPanel agentName={name} />
+            <RunsPanel key={runsVersion} agentName={name} />
           </TabPanel>
         </TabPanels>
       </Tabs>

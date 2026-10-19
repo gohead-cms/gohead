@@ -1,56 +1,40 @@
-import React from "react";
-import {
-  Box,
-  Flex,
-  Icon,
-  Stat,
-  StatLabel,
-  StatNumber,
-  StatHelpText,
-  StatArrow,
-} from "@chakra-ui/react";
+import type { IconType } from "react-icons";
+import { Link as RouterLink } from "react-router-dom";
+import { Box, Flex, Icon, LinkBox, LinkOverlay, Text } from "@chakra-ui/react";
 
 interface StatCardProps {
-  title: string;
+  label: string;
   value: string | number;
-  icon: React.ElementType;
-  change?: number;
-  colorScheme?: string;
+  detail?: string;
+  icon: IconType;
+  to: string;
+  color?: string;
 }
 
-export function StatCard({ title, value, icon, change, colorScheme = "blue" }: StatCardProps) {
+/** A count with a short detail line; the whole card links to its page. */
+export function StatCard({ label, value, detail, icon, to, color = "purple" }: StatCardProps) {
   return (
-    <Box
-      p={6}
-      bg="white"
-      borderWidth="1px"
-      borderColor="gray.200"
-      borderRadius="xl"
-      shadow="sm"
-    >
-      <Flex justify="space-between" align="center">
-        <Stat>
-          <StatLabel fontSize="sm" color="gray.600">
-            {title}
-          </StatLabel>
-          <StatNumber fontSize="2xl" fontWeight="bold">
-            {value}
-          </StatNumber>
-          {change !== undefined && (
-            <StatHelpText>
-              <StatArrow type={change >= 0 ? "increase" : "decrease"} />
-              {Math.abs(change)}%
-            </StatHelpText>
+    <LinkBox bg="white" borderWidth="1px" borderRadius="lg" p={5} _hover={{ borderColor: `${color}.300` }} transition="border-color 0.15s" minW={0}>
+      <Flex justify="space-between" align="start" gap={3}>
+        <Box minW={0}>
+          <LinkOverlay as={RouterLink} to={to}>
+            <Text fontSize="sm" color="gray.500">
+              {label}
+            </Text>
+          </LinkOverlay>
+          <Text fontSize="2xl" fontWeight="bold" lineHeight="short">
+            {typeof value === "number" ? value.toLocaleString() : value}
+          </Text>
+          {detail && (
+            <Text fontSize="xs" color="gray.500" noOfLines={1}>
+              {detail}
+            </Text>
           )}
-        </Stat>
-        <Box
-          p={3}
-          bg={`${colorScheme}.50`}
-          borderRadius="lg"
-        >
-          <Icon as={icon} boxSize={6} color={`${colorScheme}.500`} />
         </Box>
+        <Flex p={2} bg={`${color}.50`} borderRadius="md" flexShrink={0}>
+          <Icon as={icon} boxSize={5} color={`${color}.500`} />
+        </Flex>
       </Flex>
-    </Box>
+    </LinkBox>
   );
 }

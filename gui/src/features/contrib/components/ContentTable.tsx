@@ -14,8 +14,8 @@ import {
   Tooltip,
 } from "@chakra-ui/react";
 import { FiEdit, FiTrash2, FiEye, FiEyeOff } from "react-icons/fi";
-import { Schema } from "../../../shared/types";
-import { ContentItem } from "../hooks";
+import type { Schema } from "../../../shared/types";
+import type { ContentItem } from "../hooks";
 import { EmptyState } from "./EmptyState";
 
 interface ContentTableProps {

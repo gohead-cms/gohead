@@ -1,0 +1,119 @@
+import { useMemo, useState } from "react";
+import { Alert, AlertIcon, Badge, Box, Button, Flex, Heading, HStack, Icon, Text } from "@chakra-ui/react";
+import { FiSave } from "react-icons/fi";
+import { api } from "../../../services/api";
+import { useNotify } from "../../../shared/hooks/useNotify";
+import { PageLoader } from "../../../shared/ui/page-loader";
+import type { Attribute } from "../../../shared/types";
+import { formatTime } from "../../agents/components/runFormat";
+import { useMe } from "../../auth/me";
+import { SingletonContent, SingletonDef, singletonPath, useSingletonContent } from "../hooks/useSingletons";
+import { EntryFields } from "./EntryFields";
+import { attributeMap, initialValues, missingRequired, toEntryPayload } from "./entryValues";
+
+/** Loads a singleton's content and shows its form. */
+export function SingletonEditor({ singleton }: { singleton: SingletonDef }) {
+  const { content, loading, error, refetch } = useSingletonContent(singleton.name);
+  const attributes = useMemo(() => attributeMap(singleton.attributes ?? undefined), [singleton.attributes]);
+  // While saved content reloads, the form stays on screen.
+  const ready = !loading || !!content;
+
+  return (
+    <Box>
+      <Flex justify="space-between" align="center" mb={6} gap={4} wrap="wrap">
+        <Box>
+          <HStack>
+            <Heading size="lg">{singleton.name}</Heading>
+            <Badge colorScheme="purple">Single type</Badge>
+          </HStack>
+          <Text color="gray.500">
+            {singleton.description ||
+              (content?.updatedAt ? `Last updated ${formatTime(content.updatedAt)}` : "One entry, edited in place.")}
+          </Text>
+        </Box>
+      </Flex>
+      {!ready && <PageLoader text="Fetching content..." />}
+      {error && (
+        <Alert status="error" borderRadius="md">
+          <AlertIcon />
+          {error}
+        </Alert>
+      )}
+      {ready && !error && (
+        <SingletonForm
+          // A new version of the content starts the form again.
+          key={`${singleton.name}-${content?.updatedAt ?? "new"}`}
+          name={singleton.name}
+          attributes={attributes}
+          content={content ?? null}
+          onSaved={refetch}
+        />
+      )}
+    </Box>
+  );
+}
+
+interface SingletonFormProps {
+  name: string;
+  attributes: Record<string, Attribute>;
+  content: SingletonContent | null;
+  onSaved: () => void;
+}
+
+function SingletonForm({ name, attributes, content, onSaved }: SingletonFormProps) {
+  const { canWrite } = useMe();
+  const notify = useNotify();
+  const [values, setValues] = useState<Record<string, unknown>>(() => initialValues(attributes, content));
+  const [saving, setSaving] = useState(false);
+  const [missing, setMissing] = useState<string[]>([]);
+
+  if (Object.keys(attributes).length === 0) {
+    return <Text color="gray.500">This single type has no attributes yet. Add some in the content model.</Text>;
+  }
+
+  const onChange = (key: string, value: unknown) => setValues((prev) => ({ ...prev, [key]: value }));
+
+  const save = async () => {
+    const empty = missingRequired(attributes, values);
+    setMissing(empty);
+    if (empty.length > 0) return;
+    setSaving(true);
+    try {
+      await api("PUT", singletonPath(name), { data: toEntryPayload(attributes, values) });
+      notify.success(content ? "Changes saved" : "Content created");
+      onSaved();
+    } catch (err) {
+      notify.failure(err, "Could not save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Box bg="white" borderWidth="1px" borderRadius="lg" p={6}>
+      {!content && (
+        <Alert status="info" borderRadius="md" mb={6}>
+          <AlertIcon />
+          {canWrite ? "No content yet: fill in the fields and save to create it." : "No content yet."}
+        </Alert>
+      )}
+      {missing.length > 0 && (
+        <Alert status="warning" borderRadius="md" mb={6}>
+          <AlertIcon />
+          Required: {missing.join(", ")}
+        </Alert>
+      )}
+      <Box as="fieldset" disabled={!canWrite || saving} minW={0}>
+        <EntryFields attributes={attributes} values={values} onChange={onChange} idPrefix={`single-${name}-`} />
+      </Box>
+      <Flex justify="flex-end" mt={6} gap={3} align="center">
+        {!canWrite && <Text fontSize="sm" color="gray.500">Your role can read content but not change it.</Text>}
+        {canWrite && (
+          <Button colorScheme="purple" leftIcon={<Icon as={FiSave} />} onClick={save} isLoading={saving}>
+            Save
+          </Button>
+        )}
+      </Flex>
+    </Box>
+  );
+}
