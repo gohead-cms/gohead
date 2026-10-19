@@ -32,9 +32,10 @@ the LLM can correct itself.
 | `collections.list` | – | Names of all collections |
 | `collections.get_schema` | `collection_name` | Attributes and types of a collection |
 | `collections.list_items` | `collection_name`, `page`, `pageSize` | A page of items |
-| `collections.upsert_item` | `collection_name`, `data` (object), optional `item_id` (string), optional `locale` | Creates an item, or replaces item `item_id`; with `item_id` and a `locale` other than the default, writes that [translation](../guides/localization.md#writing-translations) |
+| `collections.upsert_item` | `collection_name`, `data` (object), optional `item_id` (string), optional `locale`, optional `reason` | Creates an item, or replaces item `item_id`; with `item_id` and a `locale` other than the default, writes that [translation](../guides/localization.md#writing-translations) |
+| `collections.patch_item` | `collection_name`, `item_id`, `data` (object), optional `locale`, optional `reason` | Changes the given attributes of an item (or of its translation), keeping the others |
 | `collections.list_locales` | – | The content locales, the default first |
-| `collections.delete_item` | `item_id` (string), optional `collection_name` | Deletes an item by ID |
+| `collections.delete_item` | `item_id` (string), optional `collection_name`, optional `reason` | Deletes an item by ID |
 | `system.log` | `message`, optional `data` | Writes to the worker log |
 
 In [draft-and-publish](../guides/content-modeling.md#draft-and-publish) collections, items
@@ -44,6 +45,11 @@ includes drafts.
 Creates through `collections.upsert_item` are validated like API writes (required fields,
 types, unique values), and so are updates with `item_id`, which replace the item's data.
 Agent writes do not emit content events.
+
+For an agent that [requires approval](approvals.md), writes become proposals instead and
+return `{"status": "pending_approval", "proposal_id": …}`; `reason` is shown to the
+reviewer. In a [test run](runs-and-limits.md#test-runs) they are validated but not applied
+and return `{"status": "success", "dry_run": true, "action": "would_update", …}`.
 
 ## Limiting functions to collections
 

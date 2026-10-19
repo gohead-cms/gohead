@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+- **Agent approvals**: an agent with `require_approval` proposes its content changes instead of making them. Editors review proposals in **Approvals** (field diff, approve, edit and approve, reject) or with `/api/proposals`; whoever may make a change may approve it. Approved changes are applied as the agent in its run (history, run revert), and stale proposals are flagged before they overwrite a later edit. Migration `0004_agent_reviews`.
+- **Test runs**: `POST /admin/agents/{name}/test` and a **Test run** button run an agent with a message or a simulated collection event on an existing item; content writes are validated and reported (`would_update`…) but not applied. Runs started from the UI are recorded as `queued` right away and the response carries the run ID.
+- **Agent templates**: summarizer, tagger, moderator and translator, rendered from a few parameters checked against the content model (`/admin/agent-templates`), in the admin UI under **New agent**.
+- `collections.patch_item` agent function (changes some attributes, keeps the others) and a `reason` argument on content writes.
+
+### Changed
+- An agent is no longer triggered by content events caused by its own changes.
+
 ## [0.5.0] - 2026-10-19
 
 ### Breaking changes

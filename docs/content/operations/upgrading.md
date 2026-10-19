@@ -68,6 +68,11 @@ migrations are explicit, reviewed steps; contributors add them in `pkg/migration
 
 ## Version notes
 
+### Unreleased
+
+Migration `0004_agent_reviews` adds the `proposals` table and two columns (`agents.require_approval`,
+`agent_runs.dry_run`). Existing agents keep writing directly. Nothing to do.
+
 ### 0.5.0
 
 !!! warning "Breaking changes"

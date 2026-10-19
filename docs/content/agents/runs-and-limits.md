@@ -15,7 +15,8 @@ A run records:
 
 | Field | Description |
 |-------|-------------|
-| `status` | `running`, `succeeded`, `failed` or `limited` |
+| `status` | `queued` (started from the admin UI, waiting for a worker), `running`, `succeeded`, `failed` or `limited` |
+| `dryRun` | `true` for a [test run](#test-runs) |
 | `triggerType`, `trigger` | `collection_event`, `webhook`, `schedule` or `manual`, and the trigger payload (JSON) |
 | `input` | The first message sent to the model |
 | `output` | The model's final answer |
@@ -45,7 +46,7 @@ with the agent's name and the run ID. An admin can [revert everything a run chan
 ### API
 
 ```bash
-# Newest runs; filter with status=succeeded|failed|limited|running
+# Newest runs; filter with status=queued|running|succeeded|failed|limited
 curl "$GOHEAD/admin/agents/summarizer/runs?status=failed&page=1&pageSize=20" -H "$AUTH"
 
 # One run with its steps
@@ -65,6 +66,33 @@ curl $GOHEAD/admin/agents/summarizer/usage -H "$AUTH"
   }
 }
 ```
+
+## Test runs
+
+A test run shows what an agent would do without changing anything. On the agent's page,
+choose **Test run**, then type a message, or pick an item for an agent triggered by
+collection events (the run gets the event as if the item had just been created or
+updated). The run opens and fills in as it goes.
+
+In a test run, the model is called and functions run as usual, but content writes are
+**validated and not applied**: `collections.upsert_item`, `collections.patch_item` and
+`collections.delete_item` return what they would have done (`"dry_run": true`,
+`"action": "would_create"`, `would_update` (with `locale` for a translation) or `would_delete`) or the
+validation error a real run would hit. No proposal is created, the agent's conversation
+memory is not saved, and nothing appears in the content history. Test runs count towards
+the agent's [limits](#limits) and cost tokens like any run.
+
+```bash
+# Free-form input
+curl -X POST $GOHEAD/admin/agents/summarizer/test -H "$AUTH" -d '{"input": "Summarize item 3"}'
+
+# Simulate a collection event on an existing item (event: one of the agent's events)
+curl -X POST $GOHEAD/admin/agents/summarizer/test -H "$AUTH" -d '{"item_id": 3, "event": "item:updated"}'
+```
+
+Both this and **Run now** (`POST /admin/agents/{name}/run`) answer `202` with
+`{"status": "queued", "runId": 57, "dryRun": true}`: follow the run at
+`/admin/agents/{name}/runs/57`. They need Redis and a worker (`503` without Redis).
 
 ## Limits
 
