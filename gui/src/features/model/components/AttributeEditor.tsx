@@ -12,7 +12,8 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { FiArrowDown, FiArrowUp, FiTrash2 } from "react-icons/fi";
-import { AttributeField, AttributeForm, supportsUnique, TYPE_HINTS, typeLabel } from "../schema";
+import type { AttributeField, AttributeForm } from "../schema";
+import { supportsUnique, TYPE_HINTS, typeLabel } from "../schema";
 import { AttributeOptions } from "./AttributeOptions";
 
 interface Props {

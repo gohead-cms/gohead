@@ -1,11 +1,8 @@
 import { ApiError } from "../../services/api";
 import { getJSON } from "../../shared/hooks/useApiQuery";
 import { errorMessage } from "../../shared/utils/errors";
+import type { ApiCollection, ApiNamedType, ModelKind, TypeForm } from "./schema";
 import {
-  ApiCollection,
-  ApiNamedType,
-  ModelKind,
-  TypeForm,
   formFromCollection,
   formFromNamedType,
   listPath,

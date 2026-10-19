@@ -8,12 +8,12 @@ import { useNotify } from "../../../shared/hooks/useNotify";
 import { PageLoader } from "../../../shared/ui/page-loader";
 import type { Schema } from "../../../shared/types";
 import { useMe } from "../../auth/me";
-import { ContentItem, useCollectionContent, useCollectionsList, useSingletonsList } from "../hooks";
+import { type ContentItem, useCollectionContent, useCollectionsList, useSingletonsList } from "../hooks";
 import { ContentSelector } from "./ContentSelector";
 import { ContentTable } from "./ContentTable";
 import { EntryFormModal } from "./EntryFormModal";
 import { SingletonEditor } from "./SingletonEditor";
-import { Selection, selectionFromParams, selectionParams } from "./selection";
+import { type Selection, selectionFromParams, selectionParams } from "./selection";
 
 export function ContributionsPage() {
   const { isAdmin } = useMe();

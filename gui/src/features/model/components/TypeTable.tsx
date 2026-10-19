@@ -26,8 +26,10 @@ import { useApiQuery } from "../../../shared/hooks/useApiQuery";
 import { useNotify } from "../../../shared/hooks/useNotify";
 import { ConfirmButton } from "../../../shared/ui/ConfirmButton";
 import { EmptyState } from "../../../shared/ui/EmptyState";
-import { loadSummaries, serverMessage, TypeSummary } from "../api";
-import { deletePath, KIND_DESCRIPTIONS, KIND_LABELS, ModelKind } from "../schema";
+import { loadSummaries, serverMessage } from "../api";
+import type { TypeSummary } from "../api";
+import { deletePath, KIND_DESCRIPTIONS, KIND_LABELS } from "../schema";
+import type { ModelKind } from "../schema";
 
 /** The types of one kind, with create, edit and delete actions. */
 export function TypeTable({ kind }: { kind: ModelKind }) {

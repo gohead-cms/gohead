@@ -9,9 +9,8 @@ import {
   SimpleGrid,
   Textarea,
 } from "@chakra-ui/react";
+import type { AttributeField, AttributeForm } from "../schema";
 import {
-  AttributeField,
-  AttributeForm,
   minMaxLabels,
   RELATION_TYPES,
   supportsMinMax,

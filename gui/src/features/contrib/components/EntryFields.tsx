@@ -1,7 +1,7 @@
 import React from "react";
 import { FormControl, FormHelperText, FormLabel, Input, Select, Switch, Textarea, VStack } from "@chakra-ui/react";
 import type { Attribute } from "../../../shared/types";
-import { MediaField, MediaValue } from "./MediaField";
+import { MediaField, type MediaValue } from "./MediaField";
 import { inputType, isBooleanType } from "./entryValues";
 
 type ChangeHandler = (key: string, value: unknown) => void;

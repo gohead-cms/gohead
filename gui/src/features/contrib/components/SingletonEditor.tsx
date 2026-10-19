@@ -7,7 +7,7 @@ import { PageLoader } from "../../../shared/ui/page-loader";
 import type { Attribute } from "../../../shared/types";
 import { formatTime } from "../../agents/components/runFormat";
 import { useMe } from "../../auth/me";
-import { SingletonContent, SingletonDef, singletonPath, useSingletonContent } from "../hooks/useSingletons";
+import { type SingletonContent, type SingletonDef, singletonPath, useSingletonContent } from "../hooks/useSingletons";
 import { EntryFields } from "./EntryFields";
 import { attributeMap, initialValues, missingRequired, toEntryPayload } from "./entryValues";
 

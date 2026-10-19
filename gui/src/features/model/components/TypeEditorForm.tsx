@@ -1,4 +1,5 @@
-import { FormEvent, useState } from "react";
+import { useState } from "react";
+import type { FormEvent } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import {
   Alert,
@@ -23,16 +24,14 @@ import { api } from "../../../services/api";
 import { useNotify } from "../../../shared/hooks/useNotify";
 import { PageHeader } from "../../../shared/ui/PageHeader";
 import { serverMessage } from "../api";
+import type { AttributeForm, ModelKind, TypeForm } from "../schema";
 import {
-  AttributeForm,
   emptyAttribute,
   formToPayload,
   hasErrors,
   KIND_LABELS,
-  ModelKind,
   moveItem,
   saveRequest,
-  TypeForm,
   typesForKind,
   validateForm,
 } from "../schema";
