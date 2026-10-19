@@ -22,7 +22,7 @@ import (
 )
 
 // Seed creates a content model that uses every attribute type, a
-// component, a singleton and relations.
+// component, singletons, relations and localized attributes.
 func Seed() error {
 	min, max := 1, 5
 	if err := storage.CreateComponent(&models.Component{
@@ -60,6 +60,19 @@ func Seed() error {
 	}}
 	if err := storage.SaveCollection(&articles); err != nil {
 		return fmt.Errorf("articles: %w", err)
+	}
+	pages := models.Collection{Name: "pages", Kind: "collection", Attributes: []models.Attribute{
+		{Name: "title", Type: "string", Required: true, Localized: true},
+		{Name: "slug", Type: "string", Unique: true, Localized: true},
+		{Name: "order", Type: "int"},
+	}}
+	if err := storage.SaveCollection(&pages); err != nil {
+		return fmt.Errorf("pages: %w", err)
+	}
+	if err := storage.SaveOrUpdateSingleton(&models.Singleton{Name: "navigation", Attributes: []models.Attribute{
+		{Name: "label", Type: "string", Localized: true},
+	}}); err != nil {
+		return fmt.Errorf("navigation: %w", err)
 	}
 	if err := storage.SaveOrUpdateSingleton(&models.Singleton{Name: "site", Attributes: []models.Attribute{
 		{Name: "title", Type: "string", Required: true},

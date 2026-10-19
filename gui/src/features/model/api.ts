@@ -13,6 +13,8 @@ export interface TypeSummary {
   name: string;
   description: string;
   attributeCount: number;
+  /** Attributes with a value per locale. */
+  localizedCount: number;
   /** Collections only. */
   draftAndPublish?: boolean;
 }
@@ -22,6 +24,7 @@ export function summarizeCollections(list: ApiCollection[]): TypeSummary[] {
     name: c.schema.collectionName,
     description: c.schema.description ?? "",
     attributeCount: Object.keys(c.schema.attributes ?? {}).length,
+    localizedCount: Object.values(c.schema.attributes ?? {}).filter((a) => a.localized).length,
     draftAndPublish: !!c.schema.options?.draftAndPublish,
   }));
 }
@@ -31,6 +34,7 @@ export function summarizeNamed(list: ApiNamedType[]): TypeSummary[] {
     name: t.name,
     description: t.description ?? "",
     attributeCount: t.attributes?.length ?? 0,
+    localizedCount: (t.attributes ?? []).filter((a) => a.localized).length,
   }));
 }
 

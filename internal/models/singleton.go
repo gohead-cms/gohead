@@ -76,6 +76,9 @@ func ValidateSingletonSchema(singleton Singleton) error {
 		if attr.Name == "id" || attr.Name == "createdAt" || attr.Name == "updatedAt" {
 			return fmt.Errorf("attribute name '%s' is reserved", attr.Name)
 		}
+		if err := validateLocalized(singleton.Attributes, attr); err != nil {
+			return err
+		}
 		if attr.Type == "component" {
 			if err := validateComponentReference(attr.Name, attr.ComponentRef); err != nil {
 				return err

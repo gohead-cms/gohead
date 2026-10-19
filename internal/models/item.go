@@ -21,6 +21,9 @@ type Item struct {
 	// PublishedAt is set when the item is published. It is only meaningful
 	// for collections with DraftAndPublish; nil means draft.
 	PublishedAt *time.Time `json:"publishedAt" gorm:"index"`
+	// Translations holds the values of localized attributes in the other
+	// locales: {"fr": {"title": "…"}}. Data holds the default locale.
+	Translations JSONMap `json:"translations,omitempty" gorm:"type:json"`
 }
 
 // Item statuses in draft-and-publish collections.

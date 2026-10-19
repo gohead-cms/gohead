@@ -78,7 +78,9 @@ type Delivery struct {
 	Collection string         `json:"collection"`
 	ItemID     uint           `json:"item_id"`
 	Item       map[string]any `json:"item"`
-	OccurredAt time.Time      `json:"occurred_at"`
+	// Translations: the item's localized values in other locales.
+	Translations map[string]any `json:"translations,omitempty"`
+	OccurredAt   time.Time      `json:"occurred_at"`
 }
 
 // Fanout enqueues one delivery per webhook subscribed to the event. The
@@ -111,15 +113,35 @@ func Fanout(ctx context.Context, client *asynq.Client, ev events.CollectionEvent
 	if ev.ItemID != 0 {
 		item["id"] = ev.ItemID
 	}
+	var translations map[string]any
+	for code, v := range ev.ItemTranslations {
+		m, ok := v.(map[string]any)
+		if !ok {
+			continue
+		}
+		kept := map[string]any{}
+		for k, val := range m {
+			if !secret[k] {
+				kept[k] = val
+			}
+		}
+		if len(kept) > 0 {
+			if translations == nil {
+				translations = map[string]any{}
+			}
+			translations[code] = kept
+		}
+	}
 	for _, w := range hooks {
 		d := Delivery{
-			WebhookID:  w.ID,
-			DeliveryID: fmt.Sprintf("%s-%d", eventID, w.ID),
-			Event:      string(ev.EventType),
-			Collection: ev.CollectionName,
-			ItemID:     ev.ItemID,
-			Item:       item,
-			OccurredAt: time.Now().UTC(),
+			WebhookID:    w.ID,
+			DeliveryID:   fmt.Sprintf("%s-%d", eventID, w.ID),
+			Event:        string(ev.EventType),
+			Collection:   ev.CollectionName,
+			ItemID:       ev.ItemID,
+			Item:         item,
+			Translations: translations,
+			OccurredAt:   time.Now().UTC(),
 		}
 		body, err := json.Marshal(d)
 		if err != nil {
@@ -251,13 +273,17 @@ func Body(w models.Webhook, d Delivery) ([]byte, error) {
 	if w.Format == models.WebhookFormatSlack {
 		return json.Marshal(map[string]string{"text": slackText(d)})
 	}
-	return json.Marshal(map[string]any{
+	body := map[string]any{
 		"id":         d.DeliveryID,
 		"event":      d.Event,
 		"collection": d.Collection,
 		"occurredAt": d.OccurredAt.UTC().Format(time.RFC3339),
 		"data":       d.Item,
-	})
+	}
+	if len(d.Translations) > 0 {
+		body["translations"] = d.Translations
+	}
+	return json.Marshal(body)
 }
 
 var slackVerbs = map[string]string{

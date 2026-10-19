@@ -38,6 +38,8 @@ export interface ApiAttribute {
   repeatable?: boolean;
   multiple?: boolean;
   allowed_types?: string[] | null;
+  /** A value per locale (collections and singletons; not relations). */
+  localized?: boolean;
 }
 
 /** GET /admin/collections(/{name}) item. */
@@ -79,6 +81,8 @@ export interface AttributeForm {
   multiple: boolean;
   /** Comma-separated MIME patterns. */
   allowedTypes: string;
+  /** A value per locale. */
+  localized: boolean;
 }
 
 export interface TypeForm {
@@ -135,6 +139,17 @@ const NO_UNIQUE_TYPES = ["relation", "component"];
 
 export const supportsPattern = (a: AttributeForm) => PATTERN_TYPES.includes(a.type);
 export const supportsUnique = (a: AttributeForm) => !NO_UNIQUE_TYPES.includes(a.type);
+/** Relations are shared by every locale: they cannot be localized. */
+export const supportsLocalized = (a: Pick<AttributeForm, "type">) => a.type !== "relation";
+/** Components take the locale of the entry that holds them: their attributes have no locale setting. */
+export const kindSupportsLocalized = (kind: ModelKind) => kind !== "components";
+/** Names a type with localized attributes cannot use (its responses carry them). */
+export const LOCALE_RESERVED_NAMES = ["locale", "locales"];
+
+/** Whether the form has an attribute that would be saved as localized. */
+export function hasLocalized(kind: ModelKind, form: Pick<TypeForm, "attributes">): boolean {
+  return kindSupportsLocalized(kind) && form.attributes.some((a) => a.localized && supportsLocalized(a));
+}
 /** min/max: integer value bounds, or list length for multiple media and repeatable components. */
 export const supportsMinMax = (a: AttributeForm) =>
   a.type === "int" || (a.type === "media" && a.multiple) || (a.type === "component" && a.repeatable);
@@ -168,6 +183,7 @@ export function emptyAttribute(): AttributeForm {
     repeatable: false,
     multiple: false,
     allowedTypes: "",
+    localized: false,
   };
 }
 
@@ -202,6 +218,7 @@ export function attributeFromApi(name: string, a: ApiAttribute): AttributeForm {
     repeatable: !!a.repeatable,
     multiple: !!a.multiple,
     allowedTypes: (a.allowed_types ?? []).join(", "),
+    localized: !!a.localized,
   };
 }
 
@@ -223,9 +240,10 @@ export function formFromNamedType(t: ApiNamedType): TypeForm {
   };
 }
 
-function attributeToApi(a: AttributeForm): ApiAttribute {
+function attributeToApi(kind: ModelKind, a: AttributeForm): ApiAttribute {
   const out: ApiAttribute = { type: a.type, required: a.required };
   if (a.unique && supportsUnique(a)) out.unique = true;
+  if (a.localized && supportsLocalized(a) && kindSupportsLocalized(kind)) out.localized = true;
   if (supportsPattern(a) && a.pattern.trim()) out.pattern = a.pattern.trim();
   if (supportsMinMax(a)) {
     if (a.min.trim() !== "") out.min = Number(a.min);
@@ -288,7 +306,7 @@ export function splitList(text: string): string[] {
 /** The request body for POST/PUT of a type. */
 export function formToPayload(kind: ModelKind, form: TypeForm): Record<string, unknown> {
   const attributes: Record<string, ApiAttribute> = {};
-  for (const a of form.attributes) attributes[a.name.trim()] = attributeToApi(a);
+  for (const a of form.attributes) attributes[a.name.trim()] = attributeToApi(kind, a);
   const body: Record<string, unknown> = {
     name: form.name.trim(),
     description: form.description.trim(),
@@ -363,6 +381,7 @@ export function validateForm(form: TypeForm, ctx: ValidationContext): FormErrors
   if (form.attributes.length === 0) errors.general = "Add at least one attribute.";
 
   const reserved = reservedNames(ctx.kind, form.draftAndPublish);
+  const localeReserved = hasLocalized(ctx.kind, form) ? LOCALE_RESERVED_NAMES : [];
   const seen = new Set<string>();
   for (const a of form.attributes) {
     const e: Partial<Record<AttributeField, string>> = {};
@@ -370,6 +389,7 @@ export function validateForm(form: TypeForm, ctx: ValidationContext): FormErrors
     if (!attrName) e.name = "Name is required.";
     else if (!ATTRIBUTE_NAME.test(attrName)) e.name = "Use letters, digits and '_', not starting with a digit.";
     else if (reserved.includes(attrName)) e.name = `"${attrName}" is a reserved name.`;
+    else if (localeReserved.includes(attrName)) e.name = `"${attrName}" is reserved in types with localized attributes.`;
     else if (seen.has(attrName)) e.name = "Duplicate attribute name.";
     seen.add(attrName);
 

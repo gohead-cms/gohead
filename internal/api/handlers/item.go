@@ -37,6 +37,9 @@ func GetItems(collection models.Collection, rc readContext) gin.HandlerFunc {
 			return
 		}
 		q.Status = rc.listStatus
+		if rc.translated() {
+			q.Locale, q.Fallback = rc.locale, rc.fallback
+		}
 
 		items, total, err := storage.QueryItems(collection, q)
 		if err != nil {
@@ -53,7 +56,7 @@ func GetItems(collection models.Collection, rc readContext) gin.HandlerFunc {
 
 		results := make([]map[string]any, 0, len(items))
 		for _, item := range items {
-			out, err := itemResponse(collection, item, rc.level, rc.publishedOnly)
+			out, err := itemResponse(collection, item, rc)
 			if err != nil {
 				logger.Log.WithError(err).Error("Failed to populate relations")
 				c.Set("response", "Failed to populate relations")
@@ -76,14 +79,16 @@ func GetItems(collection models.Collection, rc readContext) gin.HandlerFunc {
 	}
 }
 
-// itemResponse builds the flat API representation of an item, with its
-// relations populated down to level.
-func itemResponse(ct models.Collection, item models.Item, level uint, publishedOnly bool) (map[string]any, error) {
-	data, err := storage.PopulateRelations(ct, item.Data, level, publishedOnly)
+// itemResponse builds the flat API representation of an item in the
+// request's locale, with its relations populated down to rc.level.
+func itemResponse(ct models.Collection, item models.Item, rc readContext) (map[string]any, error) {
+	data := rc.localize(ct.Attributes, item.Data, item.Translations)
+	data, err := storage.PopulateRelationsIn(ct, data, rc.level, rc.publishedOnly, rc.readLocale())
 	if err != nil {
 		return nil, err
 	}
-	return models.ItemResponse(ct, item, data), nil
+	out := models.ItemResponse(ct, item, data)
+	return models.LocalizedResponse(out, ct.Attributes, item.Translations, rc.locale, rc.defaultLocale), nil
 }
 
 func validationError(c *gin.Context, msg string) {
@@ -172,7 +177,7 @@ func GetItemByID(ct models.Collection, id uint, rc readContext) gin.HandlerFunc 
 			return
 		}
 
-		out, err := itemResponse(ct, *item, rc.level, rc.publishedOnly)
+		out, err := itemResponse(ct, *item, rc)
 		if err != nil {
 			c.Set("response", "Failed to fetch item relations")
 			c.Set("status", http.StatusInternalServerError)
@@ -217,7 +222,7 @@ func UpdateItem(collection models.Collection) gin.HandlerFunc {
 			validationError(c, "Invalid ID format")
 			return
 		}
-		level, ok := parseLevel(c)
+		rc, ok := writeContext(c)
 		if !ok {
 			return
 		}
@@ -233,13 +238,19 @@ func UpdateItem(collection models.Collection) gin.HandlerFunc {
 			return
 		}
 
-		item, err := storage.UpdateItemContent(actorFrom(c), collection, uint(itemID), input.Data, publish)
+		var item *models.Item
+		if rc.translated() {
+			// Another locale: replaces that locale's localized values.
+			item, err = storage.SetItemTranslation(actorFrom(c), collection, uint(itemID), rc.locale, input.Data, publish)
+		} else {
+			item, err = storage.UpdateItemContent(actorFrom(c), collection, uint(itemID), input.Data, publish)
+		}
 		if err != nil {
 			writeItemError(c, collection, err)
 			return
 		}
 
-		out, err := itemResponse(collection, *item, level, false)
+		out, err := itemResponse(collection, *item, rc)
 		if err != nil {
 			c.Set("response", "Failed to populate relations for response")
 			c.Set("status", http.StatusInternalServerError)
@@ -271,7 +282,7 @@ func PublishItem(publish bool) gin.HandlerFunc {
 			validationError(c, "Invalid ID format")
 			return
 		}
-		level, ok := parseLevel(c)
+		rc, ok := writeContext(c)
 		if !ok {
 			return
 		}
@@ -280,7 +291,7 @@ func PublishItem(publish bool) gin.HandlerFunc {
 			writeItemError(c, *ct, err)
 			return
 		}
-		out, err := itemResponse(*ct, *item, level, false)
+		out, err := itemResponse(*ct, *item, rc)
 		if err != nil {
 			c.Set("response", "Failed to populate relations for response")
 			c.Set("status", http.StatusInternalServerError)
@@ -298,6 +309,10 @@ func writeItemError(c *gin.Context, ct models.Collection, err error) {
 	case errors.Is(err, storage.ErrItemNotFound):
 		c.Set("response", "Item not found")
 		c.Set("status", http.StatusNotFound)
+	case errors.Is(err, storage.ErrLocaleNotFound):
+		validationError(c, "unknown locale (see GET /api/locales)")
+	case errors.Is(err, storage.ErrDefaultLocaleWrite):
+		validationError(c, err.Error())
 	case errors.Is(err, storage.ErrDraftAndPublishDisabled):
 		validationError(c, fmt.Sprintf("collection '%s' does not use draft and publish", ct.Name))
 	case errors.As(err, &verr):

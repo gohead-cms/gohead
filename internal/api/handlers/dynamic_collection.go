@@ -97,8 +97,12 @@ func handleCreate(c *gin.Context, userRole string, ct *models.Collection) {
 	body := bytes.TrimSpace(raw)
 	isBatch := len(body) > 0 && body[0] == '['
 
-	level, ok := parseLevel(c)
+	rc, ok := writeContext(c)
 	if !ok {
+		return
+	}
+	if rc.translated() {
+		validationError(c, "create entries in the default locale ("+rc.defaultLocale+"), then add translations with PUT ?locale="+rc.locale)
 		return
 	}
 
@@ -168,7 +172,7 @@ func handleCreate(c *gin.Context, userRole string, ct *models.Collection) {
 
 	out := make([]map[string]any, 0, len(created))
 	for _, item := range created {
-		resp, err := itemResponse(*ct, *item, level, false)
+		resp, err := itemResponse(*ct, *item, rc)
 		if err != nil {
 			c.Set("response", "Failed to populate relations for response")
 			c.Set("status", http.StatusInternalServerError)
@@ -191,6 +195,21 @@ type readContext struct {
 	level         uint
 	publishedOnly bool   // hide drafts (also in populated relations)
 	listStatus    string // status filter for lists
+	localeContext
+}
+
+// writeContext is the read context of a write's response: drafts included,
+// in the request's locale.
+func writeContext(c *gin.Context) (readContext, bool) {
+	level, ok := parseLevel(c)
+	if !ok {
+		return readContext{}, false
+	}
+	lc, ok := parseLocale(c)
+	if !ok {
+		return readContext{}, false
+	}
+	return readContext{level: level, localeContext: lc}, true
 }
 
 // parseLevel reads the "level" query parameter (relation population depth,
@@ -220,6 +239,9 @@ func parseReadContext(c *gin.Context, userRole string, ct *models.Collection, si
 		return readContext{}, false
 	}
 	rc := readContext{level: level}
+	if rc.localeContext, ok = parseLocale(c); !ok {
+		return rc, false
+	}
 	canSeeDrafts := hasPermission(userRole, "update")
 	status := c.Query("status")
 

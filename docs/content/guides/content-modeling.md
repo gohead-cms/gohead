@@ -56,7 +56,8 @@ relation pointing to it.
 | `relation` | ID(s) of items in `target` | `relation`, `target` (required) |
 | `component` | an object, or a list with `repeatable` | `component` (required), `repeatable`, `min`/`max` (list length) |
 
-Every attribute also accepts `required` (default `false`) and `unique`.
+Every attribute also accepts `required` (default `false`) and `unique`, and every type except
+`relation` accepts `localized` (a value per language: see [localization](localization.md)).
 
 ## Relations
 

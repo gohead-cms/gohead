@@ -72,6 +72,7 @@ type revisionInput struct {
 	action       string
 	status       string
 	data         models.JSONMap
+	translations models.JSONMap
 	restoredFrom *uint
 	// before is the entry's state before the change. When the entry has no
 	// revision yet (it predates history), it is recorded first as a
@@ -81,8 +82,9 @@ type revisionInput struct {
 
 // entryState is an entry's content and status at one point.
 type entryState struct {
-	data   models.JSONMap
-	status string
+	data         models.JSONMap
+	translations models.JSONMap
+	status       string
 }
 
 // recordRevision stores the next revision of an entry inside tx and prunes
@@ -106,7 +108,8 @@ func recordRevision(tx *gorm.DB, actor Actor, in revisionInput) (*models.Revisio
 		base := &models.Revision{
 			EntityType: in.entityType, EntityID: in.entityID, Version: 1, TypeName: in.typeName,
 			Action: models.RevisionBaseline, Status: in.before.status, Data: copyMap(in.before.data),
-			ActorKind: SystemActor.Kind, ActorName: SystemActor.Name, CreatedAt: models.APITime(time.Now()),
+			Translations: copyTranslations(in.before.translations),
+			ActorKind:    SystemActor.Kind, ActorName: SystemActor.Name, CreatedAt: models.APITime(time.Now()),
 		}
 		if err := tx.Create(base).Error; err != nil {
 			return nil, fmt.Errorf("failed to record the baseline revision: %w", err)
@@ -121,6 +124,7 @@ func recordRevision(tx *gorm.DB, actor Actor, in revisionInput) (*models.Revisio
 		Action:       in.action,
 		Status:       in.status,
 		Data:         copyMap(in.data),
+		Translations: copyTranslations(in.translations),
 		ActorKind:    actor.Kind,
 		ActorName:    actor.Name,
 		RestoredFrom: in.restoredFrom,
@@ -172,6 +176,20 @@ func lockRow(tx *gorm.DB) *gorm.DB {
 		return tx
 	}
 	return tx.Clauses(clause.Locking{Strength: "UPDATE"})
+}
+
+// copyTranslations copies translations, nil when there are none.
+func copyTranslations(t models.JSONMap) models.JSONMap {
+	if len(models.TranslatedLocales(t)) == 0 {
+		return nil
+	}
+	out := models.JSONMap{}
+	for code, v := range t {
+		if m, ok := v.(map[string]any); ok && len(m) > 0 {
+			out[code] = copyMap(m)
+		}
+	}
+	return out
 }
 
 func copyMap(m models.JSONMap) models.JSONMap {
@@ -378,6 +396,7 @@ func RestoreItemRevision(actor Actor, ct models.Collection, itemID, version uint
 		return nil, nil, ErrRevisionNotFound
 	}
 	data, dropped := restorableData(ct.Attributes, rev.Data)
+	translations := restorableTranslations(ct.Attributes, rev.Translations)
 	res := &RestoreResult{Dropped: dropped}
 	nested := &models.NestedCreated{}
 	var item models.Item
@@ -392,7 +411,12 @@ func RestoreItemRevision(actor Actor, ct models.Collection, itemID, version uint
 		if err != nil {
 			return &ItemValidationError{Err: fmt.Errorf("version %d no longer fits the collection: %w", version, err)}
 		}
-		if !item.DeletedAt.Valid && len(nested.Items) == 0 && sameData(item.Data, processed) {
+		translations, err := validateItemTranslations(tx, ct, item.ID, translations, nested)
+		if err != nil {
+			return &ItemValidationError{Err: fmt.Errorf("version %d no longer fits the collection: %w", version, err)}
+		}
+		if !item.DeletedAt.Valid && len(nested.Items) == 0 && sameData(item.Data, processed) &&
+			sameData(copyTranslations(item.Translations), copyTranslations(translations)) {
 			res.Unchanged = true
 			res.Revision, err = latestRevisionTx(tx, models.RevisionEntityItem, item.ID)
 			return err
@@ -400,7 +424,7 @@ func RestoreItemRevision(actor Actor, ct models.Collection, itemID, version uint
 		if err := recordNested(tx, actor, nested); err != nil {
 			return err
 		}
-		updates := map[string]any{"data": processed}
+		updates := map[string]any{"data": processed, "translations": translations}
 		if item.DeletedAt.Valid {
 			res.Undeleted = true
 			updates["deleted_at"] = nil
@@ -418,7 +442,7 @@ func RestoreItemRevision(actor Actor, ct models.Collection, itemID, version uint
 		from := version
 		res.Revision, err = recordRevision(tx, actor, revisionInput{
 			entityType: models.RevisionEntityItem, entityID: item.ID, typeName: ct.Name,
-			action: models.RevisionRestore, status: itemStatus(ct, &item), data: item.Data, restoredFrom: &from,
+			action: models.RevisionRestore, status: itemStatus(ct, &item), data: item.Data, translations: item.Translations, restoredFrom: &from,
 		})
 		return err
 	})
@@ -450,6 +474,14 @@ func RestoreSingletonRevision(actor Actor, st *models.Singleton, version uint) (
 	if err := models.ValidateSingleItemValues(*st, data); err != nil {
 		return nil, nil, &ItemValidationError{Err: fmt.Errorf("version %d no longer fits the singleton: %w", version, err)}
 	}
+	translations := restorableTranslations(st.Attributes, rev.Translations)
+	pseudo := models.Singleton{Name: st.Name, Attributes: localizedOnly(st.Attributes)}
+	for code, v := range translations {
+		values, _ := v.(map[string]any)
+		if err := models.ValidateSingleItemValues(pseudo, values); err != nil {
+			return nil, nil, &ItemValidationError{Err: fmt.Errorf("version %d no longer fits the singleton: locale '%s': %w", version, code, err)}
+		}
+	}
 	res := &RestoreResult{Dropped: dropped}
 	var item models.SingleItem
 	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
@@ -457,27 +489,27 @@ func RestoreSingletonRevision(actor Actor, st *models.Singleton, version uint) (
 		switch {
 		case errors.Is(err, gorm.ErrRecordNotFound):
 			res.Undeleted = true
-			item = models.SingleItem{SingleTypeID: st.ID, Data: data}
+			item = models.SingleItem{SingleTypeID: st.ID, Data: data, Translations: translations}
 			if err := tx.Create(&item).Error; err != nil {
 				return err
 			}
 		case err != nil:
 			return err
 		default:
-			if sameData(item.Data, data) {
+			if sameData(item.Data, data) && sameData(copyTranslations(item.Translations), copyTranslations(translations)) {
 				res.Unchanged = true
 				res.Revision, err = latestRevisionTx(tx, models.RevisionEntitySingleton, st.ID)
 				return err
 			}
-			if err := tx.Model(&item).Updates(map[string]any{"data": data}).Error; err != nil {
+			if err := tx.Model(&item).Updates(map[string]any{"data": data, "translations": translations}).Error; err != nil {
 				return err
 			}
-			item.Data = data
+			item.Data, item.Translations = data, translations
 		}
 		from := version
 		res.Revision, err = recordRevision(tx, actor, revisionInput{
 			entityType: models.RevisionEntitySingleton, entityID: st.ID, typeName: st.Name,
-			action: models.RevisionRestore, data: data, restoredFrom: &from,
+			action: models.RevisionRestore, data: data, translations: translations, restoredFrom: &from,
 		})
 		return err
 	})

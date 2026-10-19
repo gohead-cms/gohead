@@ -85,3 +85,45 @@ func jsonText(value any) string {
 	}
 	return string(b)
 }
+
+// CheckLocalizedUniqueness is CheckFieldUniqueness for a value in another
+// locale than the default: no other live item of the collection may have
+// the same value for fieldName in that locale.
+func CheckLocalizedUniqueness(tx *gorm.DB, collectionID uint, locale, fieldName string, value any, excludeID uint) error {
+	if tx == nil {
+		tx = database.DB
+	}
+	var expr string
+	var args []any
+	path := `$."` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(locale) + `"` + JSONPath(fieldName)[1:]
+	switch tx.Dialector.Name() {
+	case "mysql":
+		expr, args = "JSON_EXTRACT(translations, ?) = CAST(? AS JSON)", []any{path, jsonText(value)}
+	case "postgres":
+		expr, args = "(CAST(translations AS JSONB) -> CAST(? AS TEXT) -> CAST(? AS TEXT)) = CAST(? AS JSONB)", []any{locale, fieldName, jsonText(value)}
+	default:
+		v := value
+		if b, ok := value.(bool); ok {
+			v = 0
+			if b {
+				v = 1
+			}
+		}
+		expr, args = "json_extract(translations, ?) = ?", []any{path, v}
+	}
+	q := tx.Table("items").
+		Where("collection_id = ? AND deleted_at IS NULL AND translations IS NOT NULL", collectionID).
+		Where(expr, args...)
+	if excludeID != 0 {
+		q = q.Where("id <> ?", excludeID)
+	}
+	var count int64
+	if err := q.Count(&count).Error; err != nil {
+		logger.Log.WithError(err).Error("Failed to check localized field uniqueness")
+		return fmt.Errorf("could not validate uniqueness for field '%s'", fieldName)
+	}
+	if count > 0 {
+		return fmt.Errorf("value for field '%s' must be unique in locale '%s'", fieldName, locale)
+	}
+	return nil
+}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gohead-cms/gohead/internal/models"
 	agentModels "github.com/gohead-cms/gohead/internal/models/agents"
@@ -176,6 +177,16 @@ func maskValue(v any) any {
 	return maskedValue
 }
 
+func redactTranslations(translations models.JSONMap, hidden map[string]bool) models.JSONMap {
+	out := models.JSONMap{}
+	for code, v := range translations {
+		if m, ok := v.(map[string]any); ok && len(m) > 0 {
+			out[code] = redact(m, hidden)
+		}
+	}
+	return out
+}
+
 func redact(data models.JSONMap, hidden map[string]bool) models.JSONMap {
 	out := make(models.JSONMap, len(data))
 	for k, v := range data {
@@ -268,17 +279,22 @@ func getHistoryRevision(resolve func(*gin.Context) (*historyTarget, bool)) gin.H
 		hidden := t.passwordFields()
 		out := revisionJSON(*rev, false)
 		out["data"] = redact(rev.Data, hidden)
+		if tr := redactTranslations(rev.Translations, hidden); len(tr) > 0 {
+			out["translations"] = tr
+		}
 		var baseData models.JSONMap
 		if base != nil {
 			out["comparedTo"] = base.Version
-			baseData = base.Data
+			baseData = storage.FlattenEntry(base.Data, base.Translations)
 		} else {
 			out["comparedTo"] = nil
 		}
-		// Changes read from the compared version to this one.
-		changes := storage.DiffData(baseData, rev.Data)
+		// Changes read from the compared version to this one. Values in
+		// other locales are named "<attribute>@<locale>".
+		changes := storage.DiffData(baseData, storage.FlattenEntry(rev.Data, rev.Translations))
 		for i := range changes {
-			if hidden[changes[i].Field] {
+			name, _, _ := strings.Cut(changes[i].Field, "@")
+			if hidden[name] {
 				changes[i].Before, changes[i].After = maskValue(changes[i].Before), maskValue(changes[i].After)
 			}
 		}
@@ -320,13 +336,15 @@ func restoreHistoryRevision(resolve func(*gin.Context) (*historyTarget, bool)) g
 			var item *models.Item
 			item, res, err = storage.RestoreItemRevision(actor, *t.collection, t.entityID, version)
 			if err == nil {
-				current = models.ItemResponse(*t.collection, *item, nil)
+				def, _ := storage.DefaultLocale()
+				current = models.LocalizedResponse(models.ItemResponse(*t.collection, *item, nil), t.collection.Attributes, item.Translations, "", def)
 			}
 		} else {
 			var item *models.SingleItem
 			item, res, err = storage.RestoreSingletonRevision(actor, t.singleton, version)
 			if err == nil {
-				current = models.SingleItemResponse(*item, nil)
+				def, _ := storage.DefaultLocale()
+				current = models.LocalizedResponse(models.SingleItemResponse(*item, nil), t.singleton.Attributes, item.Translations, "", def)
 			}
 		}
 		if err != nil {

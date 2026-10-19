@@ -1,5 +1,6 @@
 import { Table, Thead, Tbody, Tr, Th, Td, TableContainer, IconButton, HStack, Box, Badge, Button, Tooltip } from "@chakra-ui/react";
 import { FiClock, FiEdit, FiTrash2, FiEye, FiEyeOff, FiInbox, FiPlus } from "react-icons/fi";
+import type { Locale } from "../../../shared/hooks/useLocales";
 import type { Schema } from "../../../shared/types";
 import { ConfirmButton } from "../../../shared/ui/ConfirmButton";
 import { EmptyState } from "../../../shared/ui/EmptyState";
@@ -11,6 +12,8 @@ interface ContentTableProps {
   items: ContentItem[];
   /** False hides the actions that change content (viewers). */
   canWrite: boolean;
+  /** With localized attributes and several locales: a column of the locales each entry has. */
+  locales?: Locale[];
   onAdd: () => void;
   onEdit: (item: ContentItem) => void;
   /** Opens the entry's history (editors and admins). */
@@ -19,7 +22,7 @@ interface ContentTableProps {
   onDelete: (item: ContentItem) => Promise<void>;
 }
 
-export function ContentTable({ schema, items, canWrite, onAdd, onEdit, onHistory, onTogglePublish, onDelete }: ContentTableProps) {
+export function ContentTable({ schema, items, canWrite, locales, onAdd, onEdit, onHistory, onTogglePublish, onDelete }: ContentTableProps) {
   const drafts = !!schema.options?.draftAndPublish;
   const headers = tableColumns(schema);
 
@@ -50,6 +53,7 @@ export function ContentTable({ schema, items, canWrite, onAdd, onEdit, onHistory
               {headers.map((header) => (
                 <Th key={header}>{header.replace(/_/g, " ")}</Th>
               ))}
+              {locales && <Th>Locales</Th>}
               {drafts && <Th>Status</Th>}
               {canWrite && <Th isNumeric>Actions</Th>}
             </Tr>
@@ -63,6 +67,11 @@ export function ContentTable({ schema, items, canWrite, onAdd, onEdit, onHistory
                     // Items are flat: attributes sit next to id.
                     <Td key={header}>{displayValue(item[header])}</Td>
                   ))}
+                  {locales && (
+                    <Td>
+                      <EntryLocales codes={item.locales} locales={locales} />
+                    </Td>
+                  )}
                   {drafts && (
                     <Td>
                       <Badge colorScheme={published ? "green" : "gray"}>{item.status}</Badge>
@@ -104,5 +113,30 @@ export function ContentTable({ schema, items, canWrite, onAdd, onEdit, onHistory
         </Table>
       </TableContainer>
     </Box>
+  );
+}
+
+/** The locales an entry has content in: the default, then its translations. */
+function EntryLocales({ codes, locales }: { codes: string[] | undefined; locales: Locale[] }) {
+  const has = new Set(codes ?? []);
+  return (
+    <HStack spacing={1} flexWrap="nowrap">
+      {locales.map((l) => {
+        const present = l.isDefault || has.has(l.code);
+        return (
+          <Tooltip key={l.code} label={l.isDefault ? `${l.code}: default locale` : present ? `${l.code}: translated` : `${l.code}: not translated (falls back)`}>
+            <Badge
+              fontSize="2xs"
+              colorScheme={l.isDefault ? "purple" : present ? "green" : "gray"}
+              variant={present ? "subtle" : "outline"}
+              opacity={present ? 1 : 0.6}
+              textTransform="none"
+            >
+              {l.code}
+            </Badge>
+          </Tooltip>
+        );
+      })}
+    </HStack>
   );
 }

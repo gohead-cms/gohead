@@ -4,6 +4,7 @@ import { FiPlus } from "react-icons/fi";
 import { FaPenNib } from "react-icons/fa6";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../../services/api";
+import { useLocales } from "../../../shared/hooks/useLocales";
 import { useNotify } from "../../../shared/hooks/useNotify";
 import { PageLoader } from "../../../shared/ui/page-loader";
 import type { Schema } from "../../../shared/types";
@@ -14,6 +15,8 @@ import { type ContentItem, useCollectionContent, useCollectionsList, useSingleto
 import { ContentSelector } from "./ContentSelector";
 import { ContentTable } from "./ContentTable";
 import { EntryFormModal } from "./EntryFormModal";
+import { hasLocalizedAttributes } from "./entryValues";
+import { LocaleSwitcher } from "./LocaleSwitcher";
 import { SingletonEditor } from "./SingletonEditor";
 import { type Selection, selectionFromParams, selectionParams } from "./selection";
 
@@ -75,7 +78,13 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
   const notify = useNotify();
   const { canWrite } = useMe();
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const { content, loading, error, refetch, hasMore, loadMore } = useCollectionContent(collectionName);
+  const localized = hasLocalizedAttributes(schema.attributes);
+  const { locales, defaultLocale } = useLocales(localized);
+  const translatable = localized && locales.length > 1 && !!defaultLocale;
+  // The locale the list is read in; null is the default locale.
+  const [listLocale, setListLocale] = useState<string | null>(null);
+  const viewLocale = translatable && listLocale && listLocale !== defaultLocale?.code && locales.some((l) => l.code === listLocale) ? listLocale : null;
+  const { content, loading, error, refetch, hasMore, loadMore } = useCollectionContent(collectionName, viewLocale);
   const [editingItem, setEditingItem] = useState<ContentItem | null>(null);
   // Bumped on every open, so the form starts from the entry it opens for.
   const [formKey, setFormKey] = useState(0);
@@ -134,8 +143,13 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
           <Heading size="lg">{schema.info?.displayName || schema.collectionName}</Heading>
           <Text color="gray.500">{loading && content.items.length === 0 ? "Loading entries…" : `${content.total} ${content.total === 1 ? "entry" : "entries"}, newest first`}</Text>
         </Box>
-        {canWrite && (
+        {(canWrite || translatable) && (
         <HStack>
+          {translatable && defaultLocale && (
+            <LocaleSwitcher label="View in locale" locales={locales} value={viewLocale ?? defaultLocale.code} onChange={setListLocale} />
+          )}
+          {canWrite && (
+          <>
           <RecentlyDeletedButton collection={collectionName} onRestored={refetch} />
           <Button bg="white" variant="outline" size="sm" leftIcon={<Icon as={FiPlus} />} onClick={() => openForm(null)}>
             Quick Add
@@ -143,6 +157,8 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
           <Button colorScheme="purple" size="sm" leftIcon={<Icon as={FaPenNib} />} onClick={() => navigate(`/contrib/edit/${encodeURIComponent(collectionName)}`)}>
             Contrib
           </Button>
+          </>
+          )}
         </HStack>
         )}
       </Flex>
@@ -159,6 +175,7 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
           schema={schema}
           items={content.items}
           canWrite={canWrite}
+          locales={translatable ? locales : undefined}
           onAdd={() => openForm(null)}
           onEdit={openForm}
           onHistory={setHistoryItem}
@@ -181,6 +198,11 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
         itemToEdit={editingItem}
         onSubmit={handleSaveItem}
         onShowHistory={canWrite ? setHistoryItem : undefined}
+        collection={collectionName}
+        locales={translatable ? locales : undefined}
+        // An entry opened from a list read in a locale is edited in it.
+        initialLocale={editingItem ? viewLocale : null}
+        onTranslationSaved={refetch}
       />
       <HistoryDrawer
         target={historyItem ? { kind: "item", collection: collectionName, id: historyItem.id, label: entryLabel(schema, historyItem) } : null}

@@ -97,6 +97,7 @@ nav:
       - GraphQL: guides/graphql.md
       - Media: guides/media.md
       - Content history: guides/content-history.md
+      - Localization: guides/localization.md
       - Integrations: guides/integrations.md
       - Users & roles: guides/users-and-roles.md
       - Admin UI: guides/admin-ui.md

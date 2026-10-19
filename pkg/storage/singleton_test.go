@@ -28,7 +28,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	database.DB = db
 
 	// Automigrate the necessary models
-	err = db.AutoMigrate(&models.Singleton{}, &models.Attribute{}, &models.SingleItem{}, &models.Revision{})
+	err = db.AutoMigrate(&models.Singleton{}, &models.Attribute{}, &models.SingleItem{}, &models.Revision{}, &models.Locale{})
 	require.NoError(t, err, "Failed to migrate database")
 
 	return db

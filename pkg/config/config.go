@@ -144,6 +144,9 @@ type Config struct {
 	// Content controls content history.
 	Content ContentConfig `mapstructure:"content" yaml:"content"`
 
+	// I18n sets the default content locale.
+	I18n I18nConfig `mapstructure:"i18n" yaml:"i18n"`
+
 	// AutoMigrate applies pending database migrations when the API starts.
 	// When false, the API refuses to start on an outdated schema: run
 	// `gohead migrate` first (the Helm chart does, in an init container).
@@ -181,6 +184,14 @@ type AgentsConfig struct {
 type ContentConfig struct {
 	// RevisionsKept is how many revisions are kept per entry (0: all).
 	RevisionsKept int `mapstructure:"revisions_kept" yaml:"revisions_kept"`
+}
+
+// I18nConfig sets up content locales.
+type I18nConfig struct {
+	// DefaultLocale is the locale of existing and new content when the
+	// database has no locale yet (first start, or upgrade). Later changes
+	// go through the locales API.
+	DefaultLocale string `mapstructure:"default_locale" yaml:"default_locale"`
 }
 
 // LoadConfig loads the configuration from file and environment variables.
@@ -251,6 +262,7 @@ func LoadConfig(configPath string) (Config, error) {
 	// Agent run history
 	viper.SetDefault("agents.runs_kept", 200)
 	viper.SetDefault("content.revisions_kept", 100)
+	viper.SetDefault("i18n.default_locale", "en")
 	viper.SetDefault("auto_migrate", true)
 	viper.SetDefault("auth.registration", "disabled")
 	viper.SetDefault("admin.username", "")

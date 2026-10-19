@@ -225,6 +225,10 @@ func ConvertCollectionToGraphQLType(collection models.Collection) (*graphql.Obje
 				fields["publishedAt"] = &graphql.Field{Type: graphql.String}
 				fields["status"] = &graphql.Field{Type: graphql.String}
 			}
+			if models.HasLocalized(collection.Attributes) {
+				fields["locale"] = &graphql.Field{Type: graphql.String, Description: "Locale of the localized values"}
+				fields["locales"] = &graphql.Field{Type: graphql.NewList(graphql.String), Description: "Locales with content: the default, then translations"}
+			}
 
 			// 2. Loop through attributes and build all fields.
 			for _, attr := range collection.Attributes {

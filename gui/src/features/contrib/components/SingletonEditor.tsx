@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Alert, AlertIcon, Badge, Box, Button, Flex, Heading, HStack, Icon, Text } from "@chakra-ui/react";
 import { FiClock, FiSave } from "react-icons/fi";
 import { api } from "../../../services/api";
+import { localeLabel, useLocales } from "../../../shared/hooks/useLocales";
 import { useNotify } from "../../../shared/hooks/useNotify";
 import { PageLoader } from "../../../shared/ui/page-loader";
 import type { Attribute } from "../../../shared/types";
@@ -10,7 +11,10 @@ import { useMe } from "../../auth/me";
 import { HistoryDrawer } from "../../history/HistoryDrawer";
 import { type SingletonContent, type SingletonDef, singletonPath, useSingletonContent } from "../hooks/useSingletons";
 import { EntryFields } from "./EntryFields";
-import { attributeMap, initialValues, missingRequired, toEntryPayload } from "./entryValues";
+import { attributeMap, entryLocales, hasLocalizedAttributes, initialValues, missingRequired, toEntryPayload } from "./entryValues";
+import { LocaleSwitcher } from "./LocaleSwitcher";
+import { TranslationForm } from "./TranslationForm";
+import { useLocaleGuard } from "./useLocaleGuard";
 
 /** Loads a singleton's content and shows its form. */
 export function SingletonEditor({ singleton }: { singleton: SingletonDef }) {
@@ -20,6 +24,18 @@ export function SingletonEditor({ singleton }: { singleton: SingletonDef }) {
   const attributes = useMemo(() => attributeMap(singleton.attributes ?? undefined), [singleton.attributes]);
   // While saved content reloads, the form stays on screen.
   const ready = !loading || !!content;
+  const localized = hasLocalizedAttributes(attributes);
+  const { locales, defaultLocale } = useLocales(localized);
+  const [picked, setPicked] = useState<string | null>(null);
+  // Switching locale replaces the form: unsaved edits are confirmed first.
+  const guard = useLocaleGuard(setPicked);
+  const reload = () => {
+    guard.markClean();
+    refetch();
+  };
+  const translatable = localized && locales.length > 1 && !!defaultLocale;
+  // Translations need content in the default locale first.
+  const active = translatable && content && picked ? (locales.find((l) => l.code === picked && !l.isDefault) ?? null) : null;
 
   return (
     <Box>
@@ -34,12 +50,23 @@ export function SingletonEditor({ singleton }: { singleton: SingletonDef }) {
               (content?.updatedAt ? `Last updated ${formatTime(content.updatedAt)}` : "One entry, edited in place.")}
           </Text>
         </Box>
-        {/* Also without content: deleted content can be restored from history. */}
-        {canWrite && (
-          <Button bg="white" variant="outline" size="sm" leftIcon={<Icon as={FiClock} />} onClick={() => setHistoryOpen(true)}>
-            History
-          </Button>
-        )}
+        <HStack>
+          {translatable && defaultLocale && (
+            <LocaleSwitcher
+              locales={locales}
+              value={active?.code ?? defaultLocale.code}
+              onChange={guard.request}
+              translated={content ? entryLocales(content) : undefined}
+              disabledReason={content ? undefined : `Save the content in ${localeLabel(defaultLocale)} first, then translate it.`}
+            />
+          )}
+          {/* Also without content: deleted content can be restored from history. */}
+          {canWrite && (
+            <Button bg="white" variant="outline" size="sm" leftIcon={<Icon as={FiClock} />} onClick={() => setHistoryOpen(true)}>
+              History
+            </Button>
+          )}
+        </HStack>
       </Flex>
       {!ready && <PageLoader text="Fetching content..." />}
       {error && (
@@ -48,22 +75,40 @@ export function SingletonEditor({ singleton }: { singleton: SingletonDef }) {
           {error}
         </Alert>
       )}
-      {ready && !error && (
+      {ready && !error && active && defaultLocale && (
+        <Box bg="white" borderWidth="1px" borderRadius="lg" p={6}>
+          <TranslationForm
+            key={active.code}
+            path={singletonPath(singleton.name)}
+            readQuery="status=all"
+            attributes={attributes}
+            locale={active}
+            defaultLocale={defaultLocale}
+            canWrite={canWrite}
+            idPrefix={`single-${singleton.name}-`}
+            onEdit={guard.markDirty}
+            onSaved={reload}
+          />
+        </Box>
+      )}
+      {ready && !error && !active && (
         <SingletonForm
           // A new version of the content starts the form again.
           key={`${singleton.name}-${content?.updatedAt ?? "new"}`}
           name={singleton.name}
           attributes={attributes}
           content={content ?? null}
-          onSaved={refetch}
+          onEdit={guard.markDirty}
+          onSaved={reload}
         />
       )}
       <HistoryDrawer
         target={historyOpen ? { kind: "singleton", name: singleton.name } : null}
         onClose={() => setHistoryOpen(false)}
         // The form restarts from the reloaded content (its key is the update time).
-        onRestored={refetch}
+        onRestored={reload}
       />
+      {guard.dialog}
     </Box>
   );
 }
@@ -73,9 +118,11 @@ interface SingletonFormProps {
   attributes: Record<string, Attribute>;
   content: SingletonContent | null;
   onSaved: () => void;
+  /** Called whenever a field is edited. */
+  onEdit: () => void;
 }
 
-function SingletonForm({ name, attributes, content, onSaved }: SingletonFormProps) {
+function SingletonForm({ name, attributes, content, onSaved, onEdit }: SingletonFormProps) {
   const { canWrite } = useMe();
   const notify = useNotify();
   const [values, setValues] = useState<Record<string, unknown>>(() => initialValues(attributes, content));
@@ -86,7 +133,10 @@ function SingletonForm({ name, attributes, content, onSaved }: SingletonFormProp
     return <Text color="gray.500">This single type has no attributes yet. Add some in the content model.</Text>;
   }
 
-  const onChange = (key: string, value: unknown) => setValues((prev) => ({ ...prev, [key]: value }));
+  const onChange = (key: string, value: unknown) => {
+    onEdit();
+    setValues((prev) => ({ ...prev, [key]: value }));
+  };
 
   const save = async () => {
     const empty = missingRequired(attributes, values);

@@ -19,6 +19,7 @@ import { ActivityPage } from "../features/activity/ActivityPage";
 import { UsersPage } from "../features/settings/UsersPage";
 import { TokensPage } from "../features/settings/TokensPage";
 import { WebhooksPage } from "../features/settings/WebhooksPage";
+import { LocalesPage } from "../features/settings/LocalesPage";
 
 // The main layout that includes the Sidebar and Header
 function DashboardLayout() {
@@ -81,6 +82,7 @@ export function AppRouter() {
         <Route path="/settings/users" element={<AdminOnly><UsersPage /></AdminOnly>} />
         <Route path="/settings/tokens" element={<AdminOnly><TokensPage /></AdminOnly>} />
         <Route path="/settings/webhooks" element={<AdminOnly><WebhooksPage /></AdminOnly>} />
+        <Route path="/settings/locales" element={<AdminOnly><LocalesPage /></AdminOnly>} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" />} />

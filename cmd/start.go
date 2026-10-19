@@ -144,6 +144,10 @@ func InitializeServer(cfgPath string) (*gin.Engine, *config.Config, func(), erro
 		cleanup()
 		return nil, nil, func() {}, err
 	}
+	if err := storage.EnsureDefaultLocale(cfg.I18n.DefaultLocale); err != nil {
+		cleanup()
+		return nil, nil, func() {}, err
+	}
 
 	// --- Media storage ---
 	localMedia, err := initMediaStore(cfg)
@@ -381,6 +385,10 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *medi
 		creds.DELETE("/tokens/:id", handlers.RevokeAPIToken)
 
 		// Outbound webhooks
+		admin.POST("/locales", handlers.CreateLocale)
+		admin.PUT("/locales/:code", handlers.UpdateLocale)
+		admin.DELETE("/locales/:code", handlers.DeleteLocale)
+
 		admin.GET("/overview", handlers.GetOverview)
 		admin.GET("/runs", handlers.ListAllAgentRuns)
 		admin.GET("/agent-functions", handlers.AgentFunctionCatalog)
@@ -423,6 +431,7 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *medi
 		content.GET("/schema/singletons/:name", handlers.GetSingleton)
 		content.GET("/schema/components", handlers.GetComponents)
 		content.GET("/schema/components/:name", handlers.GetComponent)
+		content.GET("/locales", handlers.ListLocales)
 		if openAPI.Enabled && !openAPI.Public {
 			content.GET("/openapi.json", handlers.OpenAPISpec)
 		}

@@ -132,7 +132,8 @@ With `"format": "slack"` the body is `{"text": "GoHead: \"Launch day\" (#12) pub
 which Slack incoming webhooks (and Discord's `/slack` endpoints, Mattermost…) accept.
 
 `X-Gohead-Delivery` is the same on every retry of one event: use it to ignore duplicates.
-`data` is the item as stored, except `password` attributes, which are never sent.
+`data` is the item as stored, except `password` attributes, which are never sent. Items with
+[translations](localization.md) also have `"translations": {"fr": {…}}`, filtered the same way.
 
 ### Verify the signature
 

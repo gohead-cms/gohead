@@ -49,6 +49,11 @@ type ItemQuery struct {
 	// Status filters draft-and-publish collections: "" (all items),
 	// models.StatusPublished or models.StatusDraft. Ignored otherwise.
 	Status string
+	// Locale makes filters and sorts on localized attributes use that
+	// locale's values ("" or the default locale: the main data). With
+	// Fallback, a missing value falls back to the default locale's.
+	Locale   string
+	Fallback bool
 }
 
 // withStatus restricts q to published or draft items of a draft-and-publish
@@ -103,6 +108,23 @@ type resolvedField struct {
 	column string // set for built-in columns
 	path   string // JSON path for attributes, e.g. "$.title" / "title"
 	kind   string // "text", "number", "bool", "int", "datetime"
+	// locale: the translation to read (localized attributes in another
+	// locale than the default); fallback reads the main data when missing.
+	locale   string
+	fallback bool
+}
+
+// localeOf applies the query's locale to a resolved attribute.
+func (q ItemQuery) localeOf(ct models.Collection, f resolvedField) resolvedField {
+	if q.Locale == "" || f.column != "" {
+		return f
+	}
+	for _, a := range ct.Attributes {
+		if a.Name == f.path && a.Localized {
+			f.locale, f.fallback = q.Locale, q.Fallback
+		}
+	}
+	return f
 }
 
 func resolveField(ct models.Collection, name string) (resolvedField, error) {
@@ -128,32 +150,56 @@ func resolveField(ct models.Collection, name string) (resolvedField, error) {
 // jsonValueExpr returns a dialect-specific SQL expression extracting an
 // attribute from the JSON "data" column. The attribute name is always bound
 // as a parameter, never interpolated.
-func jsonValueExpr(dialect string, f resolvedField) (string, any) {
+func jsonValueExpr(dialect string, f resolvedField) (string, []any) {
+	raw, args := rawJSONValue(dialect, f)
 	switch dialect {
 	case "postgres":
-		switch f.kind {
-		case "number":
-			return "CAST(data->>CAST(? AS TEXT) AS NUMERIC)", f.path
-		default:
-			return "(data->>CAST(? AS TEXT))", f.path
+		if f.kind == "number" {
+			return "CAST(" + raw + " AS NUMERIC)", args
 		}
+		return "(" + raw + ")", args
 	case "mysql":
-		switch f.kind {
-		case "number":
-			return "CAST(JSON_UNQUOTE(JSON_EXTRACT(data, ?)) AS DECIMAL(65,10))", validation.JSONPath(f.path)
-		default:
-			return "JSON_UNQUOTE(JSON_EXTRACT(data, ?))", validation.JSONPath(f.path)
+		if f.kind == "number" {
+			return "CAST(JSON_UNQUOTE(" + raw + ") AS DECIMAL(65,10))", args
 		}
+		return "JSON_UNQUOTE(" + raw + ")", args
 	default: // sqlite
 		switch f.kind {
 		case "number":
-			return "CAST(json_extract(data, ?) AS REAL)", validation.JSONPath(f.path)
+			return "CAST(" + raw + " AS REAL)", args
 		case "bool":
 			// SQLite stores JSON booleans as 1/0.
-			return "json_extract(data, ?)", validation.JSONPath(f.path)
+			return raw, args
 		default:
-			return "CAST(json_extract(data, ?) AS TEXT)", validation.JSONPath(f.path)
+			return "CAST(" + raw + " AS TEXT)", args
 		}
+	}
+}
+
+// rawJSONValue extracts an attribute: from the main data, or from a
+// locale's translation (falling back to the main data when f.fallback).
+// On PostgreSQL the value is text (->>), elsewhere a JSON/SQL value.
+func rawJSONValue(dialect string, f resolvedField) (string, []any) {
+	var main, tr string
+	var mainArgs, trArgs []any
+	switch dialect {
+	case "postgres":
+		main, mainArgs = "data->>CAST(? AS TEXT)", []any{f.path}
+		tr, trArgs = "(CAST(translations AS JSONB) -> CAST(? AS TEXT) ->> CAST(? AS TEXT))", []any{f.locale, f.path}
+	case "mysql":
+		main, mainArgs = "JSON_EXTRACT(data, ?)", []any{validation.JSONPath(f.path)}
+		tr, trArgs = "JSON_EXTRACT(translations, ?)", []any{jsonPath(f.locale, f.path)}
+	default:
+		main, mainArgs = "json_extract(data, ?)", []any{validation.JSONPath(f.path)}
+		tr, trArgs = "json_extract(translations, ?)", []any{jsonPath(f.locale, f.path)}
+	}
+	switch {
+	case f.locale == "":
+		return main, mainArgs
+	case f.fallback:
+		return "COALESCE(" + tr + ", " + main + ")", append(trArgs, mainArgs...)
+	default:
+		return tr, trArgs
 	}
 }
 
@@ -184,19 +230,19 @@ func bindValue(dialect string, f resolvedField, raw string) (any, error) {
 	}
 }
 
-func applyFilter(db *gorm.DB, dialect string, ct models.Collection, flt ItemFilter) (*gorm.DB, error) {
+func applyFilter(db *gorm.DB, dialect string, ct models.Collection, q ItemQuery, flt ItemFilter) (*gorm.DB, error) {
 	f, err := resolveField(ct, flt.Field)
 	if err != nil {
 		return nil, err
 	}
+	f = q.localeOf(ct, f)
 
 	var lhs string
 	var vars []any
 	if f.column != "" {
 		lhs = f.column // whitelisted by builtinColumns
 	} else {
-		expr, pathArg := jsonValueExpr(dialect, f)
-		lhs, vars = expr, []any{pathArg}
+		lhs, vars = jsonValueExpr(dialect, f)
 	}
 
 	if flt.Op == OpContains {
@@ -239,7 +285,8 @@ func escapeLike(s string) string {
 // several JSON-attribute sorts can be combined (gorm replaces, rather than
 // merges, expression-based OrderBy clauses). Built-in column names come from
 // a whitelist; attribute paths are bound as parameters.
-func orderByExpr(dialect string, ct models.Collection, sorts []ItemSort) (clause.Expr, error) {
+func orderByExpr(dialect string, ct models.Collection, q ItemQuery) (clause.Expr, error) {
+	sorts := q.Sort
 	if len(sorts) == 0 {
 		return clause.Expr{SQL: "id ASC", WithoutParentheses: true}, nil
 	}
@@ -250,6 +297,7 @@ func orderByExpr(dialect string, ct models.Collection, sorts []ItemSort) (clause
 		if err != nil {
 			return clause.Expr{}, err
 		}
+		f = q.localeOf(ct, f)
 		dir := "ASC"
 		if s.Desc {
 			dir = "DESC"
@@ -261,9 +309,9 @@ func orderByExpr(dialect string, ct models.Collection, sorts []ItemSort) (clause
 			sql += f.column + " " + dir
 			continue
 		}
-		expr, pathArg := jsonValueExpr(dialect, f)
+		expr, args := jsonValueExpr(dialect, f)
 		sql += expr + " " + dir
-		vars = append(vars, pathArg)
+		vars = append(vars, args...)
 	}
 	sql += ", id ASC" // deterministic pagination
 	return clause.Expr{SQL: sql, Vars: vars, WithoutParentheses: true}, nil
@@ -284,7 +332,7 @@ func QueryItems(ct models.Collection, q ItemQuery) ([]models.Item, int, error) {
 	base := withStatus(database.DB.Model(&models.Item{}).Where("collection_id = ?", ct.ID), ct, q.Status)
 	var err error
 	for _, flt := range q.Filters {
-		if base, err = applyFilter(base, dialect, ct, flt); err != nil {
+		if base, err = applyFilter(base, dialect, ct, q, flt); err != nil {
 			return nil, 0, err
 		}
 	}
@@ -294,7 +342,7 @@ func QueryItems(ct models.Collection, q ItemQuery) ([]models.Item, int, error) {
 		return nil, 0, fmt.Errorf("failed to count items: %w", err)
 	}
 
-	order, err := orderByExpr(dialect, ct, q.Sort)
+	order, err := orderByExpr(dialect, ct, q)
 	if err != nil {
 		return nil, 0, err
 	}

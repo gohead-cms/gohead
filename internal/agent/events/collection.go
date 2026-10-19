@@ -35,6 +35,9 @@ type CollectionEventPayload struct {
 	CollectionName string         `json:"collection_name"`
 	ItemID         uint           `json:"item_id"`
 	ItemData       map[string]any `json:"item_data"` // The full data of the item
+	// ItemTranslations holds localized values in other locales than the
+	// default, by locale.
+	ItemTranslations map[string]any `json:"item_translations,omitempty"`
 }
 
 // EnqueueCollectionEvent creates and enqueues a new generic collection event.

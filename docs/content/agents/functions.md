@@ -32,7 +32,8 @@ the LLM can correct itself.
 | `collections.list` | – | Names of all collections |
 | `collections.get_schema` | `collection_name` | Attributes and types of a collection |
 | `collections.list_items` | `collection_name`, `page`, `pageSize` | A page of items |
-| `collections.upsert_item` | `collection_name`, `data` (object), optional `item_id` (string) | Creates an item, or replaces item `item_id` |
+| `collections.upsert_item` | `collection_name`, `data` (object), optional `item_id` (string), optional `locale` | Creates an item, or replaces item `item_id`; with `item_id` and a `locale` other than the default, writes that [translation](../guides/localization.md#writing-translations) |
+| `collections.list_locales` | – | The content locales, the default first |
 | `collections.delete_item` | `item_id` (string), optional `collection_name` | Deletes an item by ID |
 | `system.log` | `message`, optional `data` | Writes to the worker log |
 

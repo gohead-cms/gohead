@@ -9,6 +9,7 @@ import {
   Center,
   Flex,
   HStack,
+  Icon,
   IconButton,
   Link,
   Spinner,
@@ -18,9 +19,10 @@ import {
   Text,
   Th,
   Thead,
+  Tooltip,
   Tr,
 } from "@chakra-ui/react";
-import { FiEdit2, FiLayers, FiPlus, FiTrash2 } from "react-icons/fi";
+import { FiEdit2, FiGlobe, FiLayers, FiPlus, FiTrash2 } from "react-icons/fi";
 import { api } from "../../../services/api";
 import { useApiQuery } from "../../../shared/hooks/useApiQuery";
 import { useNotify } from "../../../shared/hooks/useNotify";
@@ -105,9 +107,19 @@ function TypeRow({ kind, type, onDelete }: { kind: ModelKind; type: TypeSummary;
   return (
     <Tr>
       <Td fontWeight="medium">
-        <Link as={RouterLink} to={editPath} color="teal.600">
-          {type.name}
-        </Link>
+        <HStack spacing={2}>
+          <Link as={RouterLink} to={editPath} color="teal.600">
+            {type.name}
+          </Link>
+          {type.localizedCount > 0 && (
+            <Tooltip hasArrow label={`${type.localizedCount} localized ${type.localizedCount === 1 ? "attribute" : "attributes"}: a value per locale`}>
+              <Badge colorScheme="purple" variant="subtle" display="inline-flex" alignItems="center" gap={1} aria-label="Localized">
+                <Icon as={FiGlobe} />
+                {type.localizedCount}
+              </Badge>
+            </Tooltip>
+          )}
+        </HStack>
       </Td>
       <Td color="gray.600" maxW="sm">
         <Text noOfLines={1}>{type.description || "—"}</Text>

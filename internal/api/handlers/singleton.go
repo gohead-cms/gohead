@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gohead-cms/gohead/internal/models"
@@ -19,7 +20,7 @@ func GetSingleItem(c *gin.Context) {
 		c.Set("status", http.StatusForbidden)
 		return
 	}
-	level, ok := parseLevel(c)
+	rc, ok := writeContext(c) // level and locale
 	if !ok {
 		return
 	}
@@ -53,7 +54,8 @@ func GetSingleItem(c *gin.Context) {
 		c.Set("status", http.StatusNotFound)
 		return
 	}
-	out, err := singleItemResponseFor(st, item, level, publishedOnly)
+	rc.publishedOnly = publishedOnly
+	out, err := singleItemResponseFor(st, item, rc)
 	if err != nil {
 		c.Set("response", "Failed to populate relations")
 		c.Set("status", http.StatusInternalServerError)
@@ -65,18 +67,14 @@ func GetSingleItem(c *gin.Context) {
 
 // singleItemResponseFor is singleItemResponse with the draft filter chosen
 // by the caller.
-func singleItemResponseFor(st *models.Singleton, item *models.SingleItem, level uint, publishedOnly bool) (map[string]any, error) {
-	data, err := storage.PopulateRelations(models.Collection{Attributes: st.Attributes}, item.Data, level, publishedOnly)
+func singleItemResponseFor(st *models.Singleton, item *models.SingleItem, rc readContext) (map[string]any, error) {
+	data := rc.localize(st.Attributes, item.Data, item.Translations)
+	data, err := storage.PopulateRelationsIn(models.Collection{Attributes: st.Attributes}, data, rc.level, rc.publishedOnly, rc.readLocale())
 	if err != nil {
 		return nil, err
 	}
-	return models.SingleItemResponse(*item, data), nil
-}
-
-// singleItemResponse populates relations (published related items only)
-// and builds the flat response.
-func singleItemResponse(st *models.Singleton, item *models.SingleItem, level uint) (map[string]any, error) {
-	return singleItemResponseFor(st, item, level, true)
+	out := models.SingleItemResponse(*item, data)
+	return models.LocalizedResponse(out, st.Attributes, item.Translations, rc.locale, rc.defaultLocale), nil
 }
 
 // GetSingleton retrieves a single type by its name.
@@ -194,10 +192,11 @@ func CreateOrUpdateSingletonItem(c *gin.Context) {
 		c.Set("status", http.StatusForbidden)
 		return
 	}
-	level, ok := parseLevel(c)
+	rc, ok := writeContext(c)
 	if !ok {
 		return
 	}
+	rc.publishedOnly = true
 	name := c.Param("name")
 	st, err := storage.GetSingletonByName(name)
 	if err != nil {
@@ -212,6 +211,10 @@ func CreateOrUpdateSingletonItem(c *gin.Context) {
 	if err := c.ShouldBindJSON(&input); err != nil || input.Data == nil {
 		c.Set("response", "Invalid request body. Expecting an object with a 'data' key.")
 		c.Set("status", http.StatusBadRequest)
+		return
+	}
+	if rc.translated() {
+		putSingletonTranslation(c, st, rc, input.Data)
 		return
 	}
 	if err := models.ValidateSingleItemValues(*st, input.Data); err != nil {
@@ -235,7 +238,7 @@ func CreateOrUpdateSingletonItem(c *gin.Context) {
 		return
 	}
 
-	out, err := singleItemResponse(st, item, level)
+	out, err := singleItemResponseFor(st, item, rc)
 	if err != nil {
 		c.Set("response", "Failed to populate relations")
 		c.Set("status", http.StatusInternalServerError)
@@ -243,6 +246,34 @@ func CreateOrUpdateSingletonItem(c *gin.Context) {
 	}
 	c.Set("response", out)
 	c.Set("status", status)
+}
+
+// putSingletonTranslation writes a singleton's values in another locale.
+func putSingletonTranslation(c *gin.Context, st *models.Singleton, rc readContext, data map[string]any) {
+	item, err := storage.SetSingletonTranslation(actorFrom(c), st, rc.locale, data)
+	if err != nil {
+		var verr *storage.ItemValidationError
+		switch {
+		case errors.As(err, &verr):
+			validationError(c, verr.Error())
+		case errors.Is(err, storage.ErrItemNotFound):
+			c.Set("response", "This singleton has no content yet: create it in the default locale ("+rc.defaultLocale+") first")
+			c.Set("status", http.StatusNotFound)
+		default:
+			logger.Log.WithError(err).WithField("singleton", st.Name).Error("Failed to save singleton translation")
+			c.Set("response", "Failed to save singleton content")
+			c.Set("status", http.StatusInternalServerError)
+		}
+		return
+	}
+	out, err := singleItemResponseFor(st, item, rc)
+	if err != nil {
+		c.Set("response", "Failed to populate relations")
+		c.Set("status", http.StatusInternalServerError)
+		return
+	}
+	c.Set("response", out)
+	c.Set("status", http.StatusOK)
 }
 
 // GetSingletons lists all singleton definitions.
