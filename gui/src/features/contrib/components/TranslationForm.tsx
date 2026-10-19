@@ -32,6 +32,8 @@ interface TranslationFormProps {
   canWrite: boolean;
   /** Called after the translation is saved or removed. */
   onSaved?: () => void;
+  /** Called whenever a field is edited (the form has unsaved changes). */
+  onEdit?: () => void;
   /** Extra buttons before the form's own (e.g. Cancel). */
   extraActions?: ReactNode;
   layout?: TranslationLayout;
@@ -117,6 +119,7 @@ function TranslationFields({
   defaultLocale,
   canWrite,
   onSaved,
+  onEdit,
   extraActions,
   layout,
   idPrefix = "tr-",
@@ -138,17 +141,39 @@ function TranslationFields({
   const target = `${path}?locale=${encodeURIComponent(locale.code)}`;
   const def = defaultLocale.code;
 
-  const hints = useMemo(
-    () =>
-      Object.fromEntries(
-        Object.keys(localized).map((k) => [
-          k,
-          <Text as="span" key={k} noOfLines={2}>
+  const setValue = (key: string, value: unknown) => {
+    onEdit?.();
+    setValues((prev) => ({ ...prev, [key]: value }));
+  };
+  // Clearing a field drops its translated value: it falls back to the
+  // default locale (the only way back for a switch or a choice).
+  const clearValue = (key: string) => {
+    onEdit?.();
+    setValues((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const hints = Object.fromEntries(
+    Object.keys(localized).map((k) => [
+      k,
+      hasValue(values[k]) ? (
+        <HStack as="span" spacing={2} align="baseline">
+          <Text as="span" noOfLines={2}>
             Default ({def}): <Text as="span" color="gray.600">{hintValue(defaults[k])}</Text>
-          </Text>,
-        ]),
+          </Text>
+          <Button size="xs" variant="link" colorScheme="purple" flexShrink={0} title={`Clear the ${locale.code} ${k}: it falls back to the ${def} value`} onClick={() => clearValue(k)}>
+            Use default
+          </Button>
+        </HStack>
+      ) : (
+        <Text as="span" noOfLines={2}>
+          Falls back to the default ({def}): <Text as="span" color="gray.600">{hintValue(defaults[k])}</Text>
+        </Text>
       ),
-    [localized, defaults, def],
+    ]),
   );
   const placeholders = useMemo(
     () =>
@@ -210,7 +235,7 @@ function TranslationFields({
         <EntryFields
           attributes={fields}
           values={values}
-          onChange={(key, value) => setValues((prev) => ({ ...prev, [key]: value }))}
+          onChange={setValue}
           idPrefix={`${idPrefix}${locale.code}-`}
           hints={hints}
           placeholders={placeholders}
@@ -244,4 +269,9 @@ function TranslationFields({
   );
 
   return layout(body, { start, end });
+}
+
+/** Whether a field holds a translated value (an empty one falls back). */
+function hasValue(v: unknown): boolean {
+  return v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0);
 }

@@ -14,6 +14,7 @@ import { EntryFields } from "./EntryFields";
 import { attributeMap, entryLocales, hasLocalizedAttributes, initialValues, missingRequired, toEntryPayload } from "./entryValues";
 import { LocaleSwitcher } from "./LocaleSwitcher";
 import { TranslationForm } from "./TranslationForm";
+import { useLocaleGuard } from "./useLocaleGuard";
 
 /** Loads a singleton's content and shows its form. */
 export function SingletonEditor({ singleton }: { singleton: SingletonDef }) {
@@ -26,6 +27,12 @@ export function SingletonEditor({ singleton }: { singleton: SingletonDef }) {
   const localized = hasLocalizedAttributes(attributes);
   const { locales, defaultLocale } = useLocales(localized);
   const [picked, setPicked] = useState<string | null>(null);
+  // Switching locale replaces the form: unsaved edits are confirmed first.
+  const guard = useLocaleGuard(setPicked);
+  const reload = () => {
+    guard.markClean();
+    refetch();
+  };
   const translatable = localized && locales.length > 1 && !!defaultLocale;
   // Translations need content in the default locale first.
   const active = translatable && content && picked ? (locales.find((l) => l.code === picked && !l.isDefault) ?? null) : null;
@@ -48,7 +55,7 @@ export function SingletonEditor({ singleton }: { singleton: SingletonDef }) {
             <LocaleSwitcher
               locales={locales}
               value={active?.code ?? defaultLocale.code}
-              onChange={setPicked}
+              onChange={guard.request}
               translated={content ? entryLocales(content) : undefined}
               disabledReason={content ? undefined : `Save the content in ${localeLabel(defaultLocale)} first, then translate it.`}
             />
@@ -79,7 +86,8 @@ export function SingletonEditor({ singleton }: { singleton: SingletonDef }) {
             defaultLocale={defaultLocale}
             canWrite={canWrite}
             idPrefix={`single-${singleton.name}-`}
-            onSaved={refetch}
+            onEdit={guard.markDirty}
+            onSaved={reload}
           />
         </Box>
       )}
@@ -90,15 +98,17 @@ export function SingletonEditor({ singleton }: { singleton: SingletonDef }) {
           name={singleton.name}
           attributes={attributes}
           content={content ?? null}
-          onSaved={refetch}
+          onEdit={guard.markDirty}
+          onSaved={reload}
         />
       )}
       <HistoryDrawer
         target={historyOpen ? { kind: "singleton", name: singleton.name } : null}
         onClose={() => setHistoryOpen(false)}
         // The form restarts from the reloaded content (its key is the update time).
-        onRestored={refetch}
+        onRestored={reload}
       />
+      {guard.dialog}
     </Box>
   );
 }
@@ -108,9 +118,11 @@ interface SingletonFormProps {
   attributes: Record<string, Attribute>;
   content: SingletonContent | null;
   onSaved: () => void;
+  /** Called whenever a field is edited. */
+  onEdit: () => void;
 }
 
-function SingletonForm({ name, attributes, content, onSaved }: SingletonFormProps) {
+function SingletonForm({ name, attributes, content, onSaved, onEdit }: SingletonFormProps) {
   const { canWrite } = useMe();
   const notify = useNotify();
   const [values, setValues] = useState<Record<string, unknown>>(() => initialValues(attributes, content));
@@ -121,7 +133,10 @@ function SingletonForm({ name, attributes, content, onSaved }: SingletonFormProp
     return <Text color="gray.500">This single type has no attributes yet. Add some in the content model.</Text>;
   }
 
-  const onChange = (key: string, value: unknown) => setValues((prev) => ({ ...prev, [key]: value }));
+  const onChange = (key: string, value: unknown) => {
+    onEdit();
+    setValues((prev) => ({ ...prev, [key]: value }));
+  };
 
   const save = async () => {
     const empty = missingRequired(attributes, values);

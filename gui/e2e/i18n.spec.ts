@@ -65,11 +65,22 @@ test("locales: translate an entry's localized attribute", async ({ page, request
     const form = page.getByRole("dialog");
     await expect(form.getByLabel("title")).toHaveValue(title);
     await form.getByLabel("Locale").selectOption(LOCALE);
-    await expect(form.getByText(`Default (en): ${title}`)).toBeVisible();
+    // Untranslated: the title falls back to the default locale's.
+    await expect(form.getByText(`Falls back to the default (en): ${title}`)).toBeVisible();
     // Shared attributes are only edited in the default locale.
     await expect(form.getByLabel("isbn")).toHaveCount(0);
     await expect(form.getByLabel("title")).toHaveValue("");
     await form.getByLabel("title").fill(french);
+    await expect(form.getByRole("button", { name: "Use default" })).toBeVisible();
+
+    // Switching locale with unsaved edits asks first; keeping them stays in fr.
+    await form.getByLabel("Locale").selectOption("en");
+    const discard = page.getByRole("alertdialog");
+    await expect(discard.getByText("Discard unsaved changes?")).toBeVisible();
+    await discard.getByRole("button", { name: "Keep editing" }).click();
+    await expect(page.getByRole("alertdialog")).toHaveCount(0);
+    await expect(form.getByLabel("Locale")).toHaveValue(LOCALE);
+    await expect(form.getByLabel("title")).toHaveValue(french);
     await form.getByRole("button", { name: "Save translation" }).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
 

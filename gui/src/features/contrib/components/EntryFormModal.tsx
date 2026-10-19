@@ -25,6 +25,7 @@ import { EntryFields } from "./EntryFields";
 import { entryLocales, hasLocalizedAttributes, initialValues, toEntryPayload } from "./entryValues";
 import { LocaleSwitcher } from "./LocaleSwitcher";
 import { TranslationForm } from "./TranslationForm";
+import { useLocaleGuard } from "./useLocaleGuard";
 
 interface EntryFormDrawerProps {
   isOpen: boolean;
@@ -65,6 +66,8 @@ export function EntryFormModal({
 }: EntryFormDrawerProps) {
   const { canWrite } = useMe();
   const [picked, setPicked] = useState<string | null>(initialLocale ?? null);
+  // Switching locale replaces the form: unsaved edits are confirmed first.
+  const guard = useLocaleGuard(setPicked);
   const defaultLocale = locales.find((l) => l.isDefault) ?? null;
   const showLocales = locales.length > 1 && !!defaultLocale && hasLocalizedAttributes(schema.attributes);
   const active = showLocales && itemToEdit && picked ? (locales.find((l) => l.code === picked && !l.isDefault) ?? null) : null;
@@ -95,7 +98,7 @@ export function EntryFormModal({
               <LocaleSwitcher
                 locales={locales}
                 value={active?.code ?? defaultLocale.code}
-                onChange={setPicked}
+                onChange={guard.request}
                 translated={itemToEdit ? entryLocales(itemToEdit) : undefined}
                 disabledReason={
                   itemToEdit ? undefined : `New entries are created in ${localeLabel(defaultLocale)}: translate them once saved.`
@@ -114,6 +117,7 @@ export function EntryFormModal({
             canWrite={canWrite}
             idPrefix="entry-"
             extraActions={cancelButton}
+            onEdit={guard.markDirty}
             onSaved={() => {
               onTranslationSaved?.();
               onClose();
@@ -142,8 +146,10 @@ export function EntryFormModal({
             onClose={onClose}
             start={historyButton}
             cancel={cancelButton}
+            onEdit={guard.markDirty}
           />
         )}
+        {guard.dialog}
       </DrawerContent>
     </Drawer>
   );
@@ -158,6 +164,8 @@ interface DefaultLocaleEntryProps {
   onClose: () => void;
   start: ReactNode;
   cancel: ReactNode;
+  /** Called whenever a field is edited. */
+  onEdit: () => void;
 }
 
 /** The entry's main (default-locale) content, loaded again when the item given is in another locale. */
@@ -188,11 +196,12 @@ function DefaultLocaleEntry(props: DefaultLocaleEntryProps) {
   return <DefaultLocaleForm {...props} entry={data} />;
 }
 
-function DefaultLocaleForm({ schema, item, entry, onSubmit, onClose, start, cancel }: DefaultLocaleEntryProps & { entry: ContentItem | null }) {
+function DefaultLocaleForm({ schema, item, entry, onSubmit, onClose, start, cancel, onEdit }: DefaultLocaleEntryProps & { entry: ContentItem | null }) {
   const [formData, setFormData] = useState<Record<string, unknown>>(() => initialValues(schema.attributes, entry));
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (key: string, value: unknown) => {
+    onEdit();
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
