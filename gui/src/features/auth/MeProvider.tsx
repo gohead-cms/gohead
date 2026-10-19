@@ -1,6 +1,6 @@
-import { ReactNode, useMemo } from "react";
+import { type ReactNode, useMemo } from "react";
 import { getJSON, useApiQuery } from "../../shared/hooks/useApiQuery";
-import { Me, MeContext, meState } from "./me";
+import { type Me, MeContext, meState } from "./me";
 
 /** Loads the signed-in user once for the whole app. */
 export function MeProvider({ children }: { children: ReactNode }) {

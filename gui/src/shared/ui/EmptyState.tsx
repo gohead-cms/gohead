@@ -1,6 +1,6 @@
-import { ReactNode } from "react";
+import { type ReactNode } from "react";
 import { Box, Icon, Text, VStack } from "@chakra-ui/react";
-import { IconType } from "react-icons";
+import { type IconType } from "react-icons";
 
 /** Shown instead of an empty list: what is missing and how to add it. */
 export function EmptyState({ icon, title, children, action }: { icon?: IconType; title: string; children?: ReactNode; action?: ReactNode }) {

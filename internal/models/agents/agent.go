@@ -285,7 +285,7 @@ func ValidateAgentSchema(agent Agent) error {
 			return errors.New("event trigger requires at least one event type (e.g., 'item:created')")
 		}
 	default:
-		return errors.New("invalid trigger type: must be 'manual', 'cron', or 'webhook'")
+		return errors.New("invalid trigger type: must be 'manual', 'cron', 'webhook' or 'collection_event'")
 	}
 
 	// 5. Functions
@@ -312,7 +312,6 @@ func ValidateAgentSchema(agent Agent) error {
 func validateFunctionSpecs(funcs []FunctionSpec) error {
 	// ---- First pass: duplicate detection
 	seenName := make(map[string]struct{})
-	seenImpl := make(map[string]struct{})
 
 	for _, f := range funcs {
 		// Check for duplicate function names
@@ -325,13 +324,9 @@ func validateFunctionSpecs(funcs []FunctionSpec) error {
 			return errors.New("function must have a non-empty 'name'")
 		}
 
-		// Check for duplicate implementation keys
-		if f.ImplKey != "" {
-			if _, ok := seenImpl[f.ImplKey]; ok {
-				return fmt.Errorf("duplicate function impl_key detected: %s", f.ImplKey)
-			}
-			seenImpl[f.ImplKey] = struct{}{}
-		} else {
+		// Several functions may share an implementation (e.g. the same
+		// collections.* function with different collection scopes).
+		if f.ImplKey == "" {
 			return errors.New("function must have a non-empty 'impl_key'")
 		}
 	}

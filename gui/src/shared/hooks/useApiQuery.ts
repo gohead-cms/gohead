@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, ApiError, Envelope } from "../../services/api";
+import { api, ApiError, type Envelope } from "../../services/api";
 import { errorMessage } from "../utils/errors";
 
 interface Settled<T> {

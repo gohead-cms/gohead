@@ -1,4 +1,4 @@
-import { ReactElement, cloneElement, useRef, useState } from "react";
+import { type ReactElement, cloneElement, useRef, useState } from "react";
 import {
   AlertDialog,
   AlertDialogBody,

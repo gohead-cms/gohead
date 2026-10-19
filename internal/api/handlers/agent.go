@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	agents "github.com/gohead-cms/gohead/internal/models/agents"
@@ -56,6 +58,11 @@ func GetAgents(c *gin.Context) {
 	// Retrieve agents from storage with optional filters and pagination.
 	// The call is updated to match the new storage function signature.
 	agents, total, err := storage.GetAllAgents(filters, rangeValues)
+	if err != nil && strings.HasPrefix(err.Error(), "unknown filter field") {
+		c.Set("response", err.Error())
+		c.Set("status", http.StatusBadRequest)
+		return
+	}
 	if err != nil {
 		logger.Log.WithError(err).Warn("GetAgents: failed to retrieve agents")
 		c.Set("response", "Failed to fetch agents")
@@ -196,6 +203,14 @@ func UpdateAgent(c *gin.Context) {
 	}
 	if agent.Trigger.WebhookToken == utils.SecretMask {
 		agent.Trigger.WebhookToken = existing.Trigger.WebhookToken
+	}
+
+	if agent.Name != existing.Name {
+		if other, err := storage.GetAgentByName(agent.Name); err == nil && other.ID != existing.ID {
+			c.Set("response", fmt.Sprintf("an agent named '%s' already exists", agent.Name))
+			c.Set("status", http.StatusConflict)
+			return
+		}
 	}
 
 	// Update in DB

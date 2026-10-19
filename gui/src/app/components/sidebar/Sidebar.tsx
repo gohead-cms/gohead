@@ -12,7 +12,7 @@ import {
   Collapse,
   Text,
   useColorModeValue,
-  BoxProps,
+  type BoxProps,
   HStack,
 } from "@chakra-ui/react";
 import {
@@ -29,7 +29,7 @@ import {
   FiSend,
   FiLayers,
 } from 'react-icons/fi';
-import { IconType } from 'react-icons';
+import { type IconType } from 'react-icons';
 import { NavLink, useLocation } from "react-router-dom";
 import { LiaProjectDiagramSolid } from "react-icons/lia";
 import { LuBrain } from "react-icons/lu";

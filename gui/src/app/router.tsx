@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { type ReactNode } from "react";
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { Center, Spinner } from "@chakra-ui/react";
 

@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { type ReactNode } from "react";
 import { Box, Flex, Heading, HStack, Text } from "@chakra-ui/react";
 
 /** Title, one-line description and actions at the top of a page. */
