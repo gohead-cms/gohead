@@ -673,3 +673,23 @@ func revertRestore(actor Actor, entityType string, id uint, typeName string, ver
 	_, _, err = RestoreItemRevision(actor, *ct, id, version)
 	return err
 }
+
+// RestoreOutcome tells whether restoring a version of an item would bring
+// it back from deletion, and whether it would be published afterwards.
+func RestoreOutcome(ct models.Collection, itemID, version uint) (undelete, published bool, err error) {
+	rev, err := GetRevision(models.RevisionEntityItem, itemID, version)
+	if err != nil {
+		return false, false, err
+	}
+	var item models.Item
+	if err := database.DB.Unscoped().Where("id = ? AND collection_id = ?", itemID, ct.ID).First(&item).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, false, ErrItemNotFound
+		}
+		return false, false, err
+	}
+	if item.DeletedAt.Valid {
+		return true, ct.DraftAndPublish && rev.Status == models.StatusPublished, nil
+	}
+	return false, ct.DraftAndPublish && item.PublishedAt != nil, nil
+}

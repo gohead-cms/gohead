@@ -294,6 +294,11 @@ func updateCollectionItem(p graphql.ResolveParams, id string, inputData map[stri
 	if err := requireNested(p, collection, inputData); err != nil {
 		return nil, err
 	}
+	if collection.DraftAndPublish && existing.PublishedAt != nil {
+		if err := requirePermission(p, auth.ActionPublish, collection.Name); err != nil {
+			return nil, fmt.Errorf("this item is published: changing it needs the publish permission")
+		}
+	}
 
 	// Updates are partial: merge the input over the stored data (or, in
 	// another locale, over that locale's values).

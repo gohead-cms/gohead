@@ -16,7 +16,15 @@ import (
 // GetSingleItem returns a singleton's content in the flat item shape, with
 // relations populated down to "level" (default 1).
 func GetSingleItem(c *gin.Context) {
-	if !allow(c, auth.ActionRead, auth.SingletonResource(c.Param("name"))) {
+	name := c.Param("name")
+	st, err := storage.GetSingletonByName(name)
+	if err != nil {
+		c.Set("response", "Singleton not found")
+		c.Set("status", http.StatusNotFound)
+		return
+	}
+	// Checked against the stored name, which databases may match loosely.
+	if !allow(c, auth.ActionRead, auth.SingletonResource(st.Name)) {
 		return
 	}
 	rc, ok := writeContext(c) // level and locale
@@ -29,7 +37,7 @@ func GetSingleItem(c *gin.Context) {
 	switch c.Query("status") {
 	case "", models.StatusPublished:
 	case "all":
-		if !auth.CanSeeDrafts(c.GetString("role"), auth.SingletonResource(c.Param("name"))) {
+		if !auth.CanSeeDrafts(c.GetString("role"), auth.SingletonResource(st.Name)) {
 			c.Set("response", "Access denied")
 			c.Set("details", "status=all needs a role that can edit this singleton")
 			c.Set("status", http.StatusForbidden)
@@ -40,14 +48,7 @@ func GetSingleItem(c *gin.Context) {
 		validationError(c, "status must be published or all")
 		return
 	}
-	name := c.Param("name")
-	st, err := storage.GetSingletonByName(name)
-	if err != nil {
-		c.Set("response", "Singleton not found")
-		c.Set("status", http.StatusNotFound)
-		return
-	}
-	item, err := storage.GetSingleItemByType(name)
+	item, err := storage.GetSingleItemByType(st.Name)
 	if err != nil {
 		c.Set("response", err.Error())
 		c.Set("status", http.StatusNotFound)
@@ -189,7 +190,8 @@ func DeleteSingleton(c *gin.Context) {
 // CreateOrUpdateSingletonItem creates or replaces a singleton's content.
 // Requires the update permission.
 func CreateOrUpdateSingletonItem(c *gin.Context) {
-	if !allow(c, auth.ActionUpdate, auth.SingletonResource(c.Param("name"))) {
+	if st, err := storage.GetSingletonByName(c.Param("name")); err == nil &&
+		!allow(c, auth.ActionUpdate, auth.SingletonResource(st.Name)) {
 		return
 	}
 	rc, ok := writeContext(c)

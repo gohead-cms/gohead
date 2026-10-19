@@ -368,6 +368,17 @@ func restoreHistoryRevision(resolve func(*gin.Context) (*historyTarget, bool)) g
 		var res *storage.RestoreResult
 		var err error
 		if t.collection != nil {
+			// Bringing an item back is a create, and touching published
+			// content (or bringing back a published version) needs publish.
+			undelete, published, oerr := storage.RestoreOutcome(*t.collection, t.entityID, version)
+			if oerr == nil {
+				if undelete && !allow(c, auth.ActionCreate, t.collection.Name) {
+					return
+				}
+				if published && !allow(c, auth.ActionPublish, t.collection.Name) {
+					return
+				}
+			}
 			var item *models.Item
 			item, res, err = storage.RestoreItemRevision(actor, *t.collection, t.entityID, version)
 			if err == nil {

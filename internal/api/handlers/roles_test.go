@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/gohead-cms/gohead/internal/api/middleware"
+	"github.com/gohead-cms/gohead/pkg/storage"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -174,5 +175,77 @@ func TestCustomRolesEnforced(t *testing.T) {
 		code, _ := a.do("viewer", "POST", "/api/collections/pages", map[string]any{"data": map[string]any{"title": "x"}})
 		assert.Equal(t, http.StatusForbidden, code)
 		assert.NotEmpty(t, a.ok("viewer", "GET", "/api/collections/pages", nil))
+	})
+}
+
+func TestCustomRolesReviewRules(t *testing.T) {
+	a := newContentAPI(t)
+	a.router.PUT("/admin/users/:id", middleware.AuthMiddleware(), middleware.AdminOnly(), UpdateUser)
+	a.ok("admin", "POST", "/admin/collections", map[string]any{
+		"name": "notes", "kind": "collection", "draft_and_publish": true,
+		"attributes": map[string]any{"text": map[string]any{"type": "string"}},
+	})
+	a.ok("admin", "POST", "/admin/collections", map[string]any{
+		"name": "posts", "kind": "collection", "draft_and_publish": true,
+		"attributes": map[string]any{
+			"title": map[string]any{"type": "string"},
+			"note":  map[string]any{"type": "relation", "relation": "oneToOne", "target": "notes"},
+		},
+	})
+	a.ok("admin", "POST", "/admin/roles", map[string]any{
+		"name": "author",
+		"permissions": map[string]any{"content": map[string]any{
+			"posts": []string{"create", "update", "delete"}, "notes": []string{"read"},
+		}},
+	})
+	draftNote := a.ok("admin", "POST", "/api/collections/notes", map[string]any{"data": map[string]any{"text": "secret draft"}}).(map[string]any)
+
+	t.Run("drafts of other types stay hidden through relations", func(t *testing.T) {
+		post := a.ok("author", "POST", "/api/collections/posts?level=1", map[string]any{"data": map[string]any{"title": "x", "note": draftNote["id"]}}).(map[string]any)
+		assert.Nil(t, post["note"], "the author cannot see drafts of notes")
+		path := fmt.Sprintf("/api/collections/posts/%d", int(post["id"].(float64)))
+		raw := a.ok("author", "GET", path+"?level=0&status=all", nil).(map[string]any)
+		assert.Nil(t, raw["note"], "not even its ID")
+		admin := a.ok("admin", "GET", path+"?level=0", nil).(map[string]any)
+		assert.Equal(t, draftNote["id"], admin["note"])
+	})
+
+	t.Run("published content needs publish to change", func(t *testing.T) {
+		live := a.ok("admin", "POST", "/api/collections/posts", map[string]any{"data": map[string]any{"title": "Live"}, "status": "published"}).(map[string]any)
+		path := fmt.Sprintf("/api/collections/posts/%d", int(live["id"].(float64)))
+		code, out := a.do("author", "PUT", path, map[string]any{"data": map[string]any{"title": "Defaced"}})
+		assert.Equal(t, http.StatusForbidden, code, "%v", out)
+
+		a.ok("author", "DELETE", path, nil)
+		code, _ = a.do("author", "POST", path+"/revisions/1/restore", nil)
+		assert.Equal(t, http.StatusForbidden, code, "restoring would publish it again")
+		a.ok("admin", "POST", path+"/revisions/1/restore", nil)
+	})
+
+	t.Run("roles follow renamed and deleted types", func(t *testing.T) {
+		a.ok("admin", "PUT", "/admin/collections/notes", map[string]any{
+			"name": "memos", "kind": "collection", "draft_and_publish": true,
+			"attributes": map[string]any{"text": map[string]any{"type": "string"}},
+		})
+		roles := a.ok("admin", "GET", "/admin/roles", nil).([]any)
+		for _, r := range roles {
+			if field(r, "name") == "author" {
+				content := field(field(r, "permissions"), "content").(map[string]any)
+				assert.Contains(t, content, "memos")
+				assert.NotContains(t, content, "notes")
+			}
+		}
+	})
+
+	t.Run("a new role applies to existing sessions", func(t *testing.T) {
+		a.ok("admin", "POST", "/admin/users", map[string]any{
+			"username": "author-user", "email": "a@example.com", "password": "correct-horse-battery", "role_name": "author",
+		})
+		user, err := storage.GetUserByUsername("author-user")
+		require.NoError(t, err)
+		a.ok("author", "POST", "/api/collections/posts", map[string]any{"data": map[string]any{"title": "ok"}})
+		a.ok("admin", "PUT", fmt.Sprintf("/admin/users/%d", user.ID), map[string]any{"role_name": "viewer"})
+		code, _ := a.do("author", "POST", "/api/collections/posts", map[string]any{"data": map[string]any{"title": "no"}})
+		assert.Equal(t, http.StatusForbidden, code, "the token still says author, the account is now a viewer")
 	})
 }

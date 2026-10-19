@@ -73,3 +73,20 @@ func allowNested(c *gin.Context, ct models.Collection, data map[string]any) bool
 	}
 	return true
 }
+
+// allowLiveEdit answers 403 and returns false when the item is published
+// in a draft-and-publish collection and the caller cannot publish there:
+// editing it would change live content without review.
+func allowLiveEdit(c *gin.Context, ct models.Collection, itemID uint) bool {
+	if !ct.DraftAndPublish || can(c, auth.ActionPublish, ct.Name) {
+		return true
+	}
+	item, err := storage.GetItemByID(ct.ID, itemID)
+	if err != nil || item.PublishedAt == nil {
+		return true // not found is reported by the update; drafts are fine
+	}
+	c.Set("response", "Access denied")
+	c.Set("details", "this item is published: changing it changes live content, which needs the publish permission; ask someone who can publish, or unpublish it first")
+	c.Set("status", http.StatusForbidden)
+	return false
+}

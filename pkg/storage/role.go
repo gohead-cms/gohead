@@ -363,3 +363,35 @@ func lookupRole(name string) (auth.Permissions, bool) {
 func init() {
 	auth.SetRoleLookup(lookupRole)
 }
+
+// moveRoleKeys renames (to != "") or removes (to == "") a content type's
+// key in every custom role, so a renamed type keeps its permissions and a
+// deleted type's grants do not pass to a new type of the same name.
+func moveRoleKeys(tx *gorm.DB, from, to string) error {
+	var roles []models.UserRole
+	if err := tx.Find(&roles).Error; err != nil {
+		return err
+	}
+	for _, r := range roles {
+		if auth.IsBuiltinRole(r.Name) {
+			continue
+		}
+		p, ok := permissionsFrom(r.Permissions)
+		if !ok {
+			continue
+		}
+		actions, has := p.Content[from]
+		if !has {
+			continue
+		}
+		delete(p.Content, from)
+		if to != "" {
+			p.Content[to] = actions
+		}
+		if err := tx.Model(&models.UserRole{}).Where("id = ?", r.ID).Update("permissions", permissionsMap(p)).Error; err != nil {
+			return err
+		}
+	}
+	invalidateRoles()
+	return nil
+}

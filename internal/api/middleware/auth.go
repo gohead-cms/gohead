@@ -71,10 +71,16 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Retrieve the role using the storage abstraction
-		role, err := storage.GetRoleByName(claims.Role)
+		// The account's current role, so a role change applies to existing
+		// sessions at once (the token's claim is used for accounts the
+		// database does not know).
+		roleName := claims.Role
+		if user, err := storage.GetUserByUsername(claims.Username); err == nil && user.Role.Name != "" {
+			roleName = user.Role.Name
+		}
+		role, err := storage.GetRoleByName(roleName)
 		if err != nil {
-			logger.Log.Warnf("Role '%s' not found", claims.Role)
+			logger.Log.Warnf("Role '%s' not found", roleName)
 			abortWithError(c, http.StatusForbidden, "", "Invalid role")
 			return
 		}

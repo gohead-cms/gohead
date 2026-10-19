@@ -34,7 +34,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Playwright smoke test of the admin UI (login, schema designer, content creation, agents) against the real API in CI.
 
 ### Changed
-- Publishing and unpublishing require the new `publish` permission instead of `update`. Built-in editors and admins have both, so nothing changes for them.
+- Publishing and unpublishing require the new `publish` permission instead of `update`, and so does changing a published item in a draft-and-publish collection. Built-in editors and admins have both, so nothing changes for them.
+- A user's role is read from the account on each request, so changing it no longer waits for the user's token to expire.
 - Deleting a singleton's content removes it for good (it was soft-deleted, which blocked creating new content); its revisions keep the old content. `storage.UpdateItem`, which saved unvalidated data, was removed.
 - MySQL: JSON columns are created as `JSON` (they used PostgreSQL's `JSONB`, which MySQL rejects), and unique text columns (collection, component, singleton, agent and user slug names, token hashes, media keys) have a length. On PostgreSQL these columns become `varchar(191)` (`varchar(64)` and `varchar(255)` for token hashes and media keys) instead of `text`, changed by the automatic migration at startup: it fails if an existing value is longer, so check first, e.g. `SELECT max(length(name)) FROM collections` (and `components`, `singletons`, `agents`, `users.slug`).
 - Use `loc=UTC` in MySQL URLs (the examples did not), so times are stored in UTC like on the other databases.

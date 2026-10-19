@@ -244,6 +244,9 @@ func UpdateItem(collection models.Collection) gin.HandlerFunc {
 		if !allowNested(c, collection, input.Data) {
 			return
 		}
+		if !allowLiveEdit(c, collection, uint(itemID)) {
+			return
+		}
 
 		var item *models.Item
 		if rc.translated() {

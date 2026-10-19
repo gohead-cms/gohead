@@ -212,6 +212,7 @@ func (rc readContext) readOptions() storage.ReadLocale {
 	opts := rc.readLocale()
 	role := rc.role
 	opts.CanRead = func(collection string) bool { return auth.Can(role, auth.ActionRead, collection) }
+	opts.CanSeeDrafts = func(collection string) bool { return auth.CanSeeDrafts(role, collection) }
 	return opts
 }
 

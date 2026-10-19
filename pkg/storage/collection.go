@@ -269,6 +269,10 @@ func UpdateCollection(id uint, updated *models.Collection) error {
 			tx.Rollback()
 			return fmt.Errorf("failed to rename the collection's history: %w", err)
 		}
+		if err := moveRoleKeys(tx, oldName, existing.Name); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to rename the collection in roles: %w", err)
+		}
 	}
 
 	// Without draft and publish every item is visible, so drafts become
@@ -414,6 +418,10 @@ func DeleteCollection(collectionID uint) error {
 	if err := tx.Where("entity_type = ? AND type_name = ?", models.RevisionEntityItem, Collection.Name).Delete(&models.Revision{}).Error; err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to delete the history of collection '%s': %w", Collection.Name, err)
+	}
+	if err := moveRoleKeys(tx, Collection.Name, ""); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to remove collection '%s' from roles: %w", Collection.Name, err)
 	}
 
 	// Delete the collection itself
