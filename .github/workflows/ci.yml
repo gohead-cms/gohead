@@ -74,7 +74,31 @@ jobs:
           go-version: "1.27.x"
           check-latest: true
       # Packages share one database, so run them one at a time.
-      - run: go test -count=1 -p 1 ./pkg/storage/... ./internal/api/... ./internal/graphql/...
+      - run: scripts/go-test-annotate.sh -count=1 -p 1 ./pkg/... ./internal/...
+
+  mysql:
+    name: Go tests on MySQL
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: gohead
+          MYSQL_DATABASE: gohead
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -pgohead" --health-interval 5s
+          --health-timeout 3s --health-retries 30
+    env:
+      GOHEAD_TEST_DATABASE_URL: mysql://root:gohead@tcp(127.0.0.1:3306)/gohead?charset=utf8mb4&parseTime=True&loc=UTC
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27.x"
+          check-latest: true
+      # Packages share one database, so run them one at a time.
+      - run: scripts/go-test-annotate.sh -count=1 -p 1 ./pkg/... ./internal/...
 
   vulncheck:
     name: govulncheck
@@ -111,12 +135,141 @@ jobs:
           cache: npm
           cache-dependency-path: gui/package-lock.json
       - run: npm ci
+      - run: npm run lint
       - run: npm run build
-      # The UI still has pre-existing lint findings; report them without
-      # blocking until they are cleaned up.
-      - name: Lint (advisory)
-        run: npm run lint
-        continue-on-error: true
+
+  e2e:
+    name: Admin UI smoke test
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    env:
+      E2E_API_URL: http://localhost:8080
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27.x"
+          check-latest: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gui/package-lock.json
+
+      - name: Start the API (SQLite, empty database)
+        run: |
+          go build -o gohead ./main
+          ./gohead start > api.log 2>&1 &
+          for i in $(seq 1 60); do curl -fs http://localhost:8080/_health && exit 0; sleep 1; done
+          cat api.log; exit 1
+        env:
+          GOHEAD_DATABASE_URL: sqlite://e2e.db
+          GOHEAD_JWT_SECRET: e2e-only-secret-not-used-anywhere-else
+          GOHEAD_REDIS_ADDRESS: localhost:6379
+          GOHEAD_RATE_LIMIT_ENABLED: "false"
+          GOHEAD_MEDIA_LOCAL_PATH: ./e2e-uploads
+
+      - name: Install
+        working-directory: gui
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Smoke test
+        working-directory: gui
+        run: npx playwright test 2>&1 | tee ../e2e.log; exit "${PIPESTATUS[0]}"
+        shell: bash
+
+      # Job logs are not always at hand: surface the essentials on the PR.
+      - name: Report failure details
+        if: failure()
+        run: |
+          annotate() { [ -s "$2" ] && echo "::error title=$1::$(sed -e 's/%/%25/g' "$2" | awk 'BEGIN{ORS="%0A"} {print}')"; true; }
+          grep -vE '^\s*$' e2e.log 2>/dev/null | grep -E -A25 'Error|✘|failed|Timeout' | head -120 > e2e.fail || true
+          annotate "Playwright" e2e.fail
+          grep -E '"level":"(error|fatal|warning)"' api.log 2>/dev/null | tail -40 > api.fail || true
+          annotate "API log" api.fail
+
+      - name: Keep the report and API log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            gui/playwright-report
+            gui/test-results
+            api.log
+          retention-days: 7
+
+  helm:
+    name: Helm chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v5
+        with:
+          version: v4.3.0
+      - name: Install kubeconform
+        run: |
+          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz \
+            | sudo tar xz -C /usr/local/bin kubeconform
+
+      - name: Lint and validate every values set
+        shell: bash
+        run: |
+          set -o pipefail
+          for values in charts/gohead/ci/*-values.yaml; do
+            echo "== $values"
+            helm lint --strict charts/gohead -f "$values"
+            # ServiceMonitor is a CRD: no schema in the default catalog.
+            helm template ci charts/gohead -f "$values" \
+              | kubeconform -strict -summary -ignore-missing-schemas -kubernetes-version 1.31.0
+          done 2>&1 | tee -a helm.log
+
+      - name: Missing database fails with a clear message
+        shell: bash
+        run: |
+          if out=$(helm template ci charts/gohead 2>&1); then
+            echo "::error::rendering without a database should fail"; exit 1
+          fi
+          echo "$out" >> helm.log
+          grep -q "set database.url" <<<"$out"
+
+      # Install the branch's images on a real cluster, then run `helm test`.
+      - uses: helm/kind-action@v1.15.1
+      - name: Build and load the images
+        run: |
+          docker build -t gohead:ci .
+          docker build -t gohead-admin:ci gui
+          kind load docker-image gohead:ci gohead-admin:ci --name chart-testing
+      - name: Install on kind
+        shell: bash
+        run: |
+          set -o pipefail
+          kubectl create deployment postgres --image=postgres:17-alpine --port=5432
+          kubectl set env deployment/postgres POSTGRES_USER=gohead POSTGRES_PASSWORD=gohead POSTGRES_DB=gohead
+          kubectl expose deployment postgres --port=5432
+          kubectl rollout status deployment/postgres --timeout=180s
+          helm install gohead charts/gohead -f charts/gohead/ci/default-values.yaml \
+            --set image.repository=gohead,image.tag=ci,image.pullPolicy=Never \
+            --set admin.image.repository=gohead-admin,admin.image.tag=ci,admin.image.pullPolicy=Never \
+            --wait --timeout 6m 2>&1 | tee -a helm.log
+          helm test gohead --logs 2>&1 | tee -a helm.log
+      - name: Diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          {
+            helm version; kubeconform -v
+            kubectl get pods -o wide
+            kubectl get events --sort-by=.lastTimestamp | tail -30
+            for d in $(kubectl get deploy -o name); do echo "== $d"; kubectl logs "$d" --tail=15 --all-containers; done
+          } >> helm.log 2>&1 || true
+          { grep -vE '^\s*$' helm.log | grep -vE '^(Summary|==> Linting|1 chart|ci/|$)' | tail -150 > helm.fail; } || true
+          split -l 50 helm.fail helm.chunk.
+          for c in helm.chunk.*; do echo "::error title=helm::$(sed -e 's/%/%25/g' "$c" | awk 'BEGIN{ORS="%0A"} {print}')"; done
 
   docs:
     name: Docs build

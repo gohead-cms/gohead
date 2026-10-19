@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Drawer,
   DrawerOverlay,
@@ -13,12 +13,14 @@ import {
   Input,
   Textarea,
   Switch,
+  Select,
   VStack,
 } from "@chakra-ui/react";
-import { Schema } from "../../../shared/types";
+import { Attribute, Schema } from "../../../shared/types";
 import { ContentItem } from "../hooks/useCollectionContent";
-import { MediaField } from "./MediaField";
+import { MediaField, MediaValue } from "./MediaField";
 import { toMediaRef } from "./mediaRef";
+import { blankValue, inputType, isBooleanType, toItemData } from "./entryValues";
 
 interface EntryFormDrawerProps {
   isOpen: boolean;
@@ -29,19 +31,36 @@ interface EntryFormDrawerProps {
 }
 
 // Helper function to render the correct form field based on attribute type
-const renderFormField = (key: string, attr: any, value: any, handleChange: any) => {
+const renderFormField = (key: string, attr: Attribute, value: unknown, handleChange: (key: string, value: unknown) => void) => {
   const commonProps = {
     id: key,
-    value: value || '',
+    value: typeof value === 'string' || typeof value === 'number' ? value : '',
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => handleChange(key, e.target.value),
   };
 
+  if (isBooleanType(attr.type)) {
+    return (
+      <Switch
+        id={key}
+        isChecked={value === true}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange(key, e.target.checked)}
+      />
+    );
+  }
+  if (attr.type === 'enum' && attr.options?.length) {
+    return (
+      <Select id={key} value={typeof value === 'string' ? value : ''} placeholder="Choose…"
+        onChange={(e) => handleChange(key, e.target.value)}>
+        {attr.options.map((o) => <option key={o} value={o}>{o}</option>)}
+      </Select>
+    );
+  }
   switch (attr.type) {
     case 'media':
       return (
         <MediaField
           id={key}
-          value={value}
+          value={value as MediaValue | MediaValue[]}
           multiple={attr.multiple}
           accept={attr.allowed_types}
           onChange={(v) => handleChange(key, v)}
@@ -51,53 +70,38 @@ const renderFormField = (key: string, attr: any, value: any, handleChange: any) 
       return <Textarea {...commonProps} placeholder={`Enter ${key}`} />;
     case 'richtext':
       return <Textarea {...commonProps} placeholder={`Enter ${key}`} rows={8} />;
-    case 'number':
-      return <Input type="number" {...commonProps} />;
-    case 'date':
-        return <Input type="date" {...commonProps} />;
-    case 'boolean':
-      return (
-        <Switch
-          id={key}
-          isChecked={value || false}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange(key, e.target.checked)}
-        />
-      );
-    case 'string':
     default:
-      return <Input type="text" {...commonProps} placeholder={`Enter ${key}`} />;
+      return <Input type={inputType(attr.type)} {...commonProps} placeholder={`Enter ${key}`} />;
   }
 };
 
-export function EntryFormModal({ isOpen, onClose, schema, itemToEdit, onSubmit }: EntryFormDrawerProps) {
-  const [formData, setFormData] = useState<Partial<ContentItem>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-
-  useEffect(() => {
-    if (isOpen) {
-      if (itemToEdit) {
-        // If editing, pre-fill the form with the item's attributes (items
-        // are flat; drop the system fields).
-        const systemFields = ['id', 'createdAt', 'updatedAt', 'publishedAt', 'status'];
-        setFormData(Object.fromEntries(
-          Object.entries(itemToEdit).filter(([key]) => !systemFields.includes(key) || key in schema.attributes),
-        ));
-      } else {
-        // If creating, initialize a blank form
-        const initialData = Object.entries(schema.attributes).reduce((acc, [key, attr]) => {
-            if (attr.type === 'relation') return acc;
-            if (attr.type === 'media') {
-              if (attr.multiple) acc[key] = [];
-              return acc;
-            }
-            acc[key] = attr.type === 'boolean' ? false : '';
-            return acc;
-        }, {} as any);
-        setFormData(initialData);
-      }
+// The form's starting values: the item's attributes when editing (items are
+// flat; system fields are dropped), blank values when creating.
+function initialFormData(schema: Schema, itemToEdit?: ContentItem | null): Partial<ContentItem> {
+  if (itemToEdit) {
+    const systemFields = ['id', 'createdAt', 'updatedAt', 'publishedAt', 'status'];
+    return Object.fromEntries(
+      Object.entries(itemToEdit).filter(([key]) => !systemFields.includes(key) || key in schema.attributes),
+    );
+  }
+  return Object.entries(schema.attributes).reduce((acc, [key, attr]) => {
+    if (attr.type === 'relation') return acc;
+    if (attr.type === 'media') {
+      if (attr.multiple) acc[key] = [];
+      return acc;
     }
-  }, [isOpen, schema, itemToEdit]);
+    acc[key] = blankValue(attr);
+    return acc;
+  }, {} as Record<string, unknown>);
+}
+
+/**
+ * Creates or edits an entry. The form starts from schema and itemToEdit when
+ * it mounts: give it a new key each time it is opened for another entry.
+ */
+export function EntryFormModal({ isOpen, onClose, schema, itemToEdit, onSubmit }: EntryFormDrawerProps) {
+  const [formData, setFormData] = useState<Partial<ContentItem>>(() => initialFormData(schema, itemToEdit));
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (key: string, value: unknown) => {
     setFormData(prev => ({ ...prev, [key]: value }));
@@ -106,18 +110,17 @@ export function EntryFormModal({ isOpen, onClose, schema, itemToEdit, onSubmit }
   const handleSubmit = async () => {
     setIsSubmitting(true);
 try {
-      // FIX: Wrap the form data in a 'data' object before submitting
-      // Media fields hold uploaded files; the API wants their IDs. Empty
-      // optional media fields are left out.
-      const data: Record<string, unknown> = { ...formData };
+      // Empty fields are left out and numbers converted; media fields hold
+      // uploaded files, and the API wants their IDs.
+      const data = toItemData(schema.attributes, formData);
       Object.entries(schema.attributes).forEach(([key, attr]) => {
         if (attr.type !== 'media') return;
-        if (data[key] === null || data[key] === undefined || data[key] === '') delete data[key];
+        if (data[key] === null || data[key] === undefined) delete data[key];
         else data[key] = toMediaRef(data[key]);
       });
       await onSubmit({ data: data as Partial<ContentItem> }, itemToEdit?.id);
       onClose();
-    } catch (error) {
+    } catch {
       // Parent component handles error toast
     } finally {
       setIsSubmitting(false);

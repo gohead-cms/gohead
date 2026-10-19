@@ -1,0 +1,116 @@
+{{- if .Values.admin.enabled }}
+{{- $component := dict "ctx" . "component" "admin" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "gohead.fullname" . }}-admin
+  labels:
+    {{- include "gohead.componentLabels" $component | nindent 4 }}
+spec:
+  replicas: {{ .Values.admin.replicas }}
+  selector:
+    matchLabels:
+      {{- include "gohead.selectorLabels" $component | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "gohead.componentLabels" $component | nindent 8 }}
+      {{- with .Values.admin.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "gohead.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # nginx-unprivileged runs as its own user (101) and writes its
+      # rendered configuration at startup.
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: admin
+          image: {{ include "gohead.adminImage" . }}
+          imagePullPolicy: {{ .Values.admin.image.pullPolicy }}
+          env:
+            - name: GOHEAD_API_URL
+              value: {{ include "gohead.apiUrl" . | quote }}
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.admin.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+      {{- with .Values.admin.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.admin.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.admin.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "gohead.fullname" . }}-admin
+  labels:
+    {{- include "gohead.componentLabels" $component | nindent 4 }}
+spec:
+  type: {{ .Values.admin.service.type }}
+  selector:
+    {{- include "gohead.selectorLabels" $component | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.admin.service.port }}
+      targetPort: http
+{{- if .Values.admin.ingress.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "gohead.fullname" . }}-admin
+  labels:
+    {{- include "gohead.componentLabels" $component | nindent 4 }}
+  {{- with .Values.admin.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.admin.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.admin.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range .Values.admin.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ . }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "gohead.fullname" $ }}-admin
+                port:
+                  name: http
+          {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}

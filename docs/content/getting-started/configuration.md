@@ -45,7 +45,7 @@ Supported URLs:
 === "MySQL"
 
     ```
-    mysql://user:password@tcp(host:3306)/gohead?charset=utf8mb4&parseTime=True&loc=Local
+    mysql://user:password@tcp(host:3306)/gohead?charset=utf8mb4&parseTime=True&loc=UTC
     ```
 
 === "SQLite"

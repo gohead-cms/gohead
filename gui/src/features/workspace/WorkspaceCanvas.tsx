@@ -39,7 +39,6 @@ import {
   MenuList,
   MenuItem,
   useToast,
-  useDisclosure,
 } from "@chakra-ui/react";
 import {
   Modal,
@@ -82,6 +81,9 @@ type AgentNodeHandlers = {
   onViewLogs: (id: string) => void;
 };
 
+// Agent node actions come from the canvas through a context, so nodeTypes
+// stays a stable module-level object (React Flow re-mounts every node when
+// nodeTypes changes).
 const HandlersContext = createContext<AgentNodeHandlers | null>(null);
 
 const AgentNodeWithCtx = (props: NodeProps<AgentNodeType>) => {
@@ -106,8 +108,6 @@ export default function WorkspaceCanvas() {
   const reactFlowWrapperRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
   const [layoutDirection, setLayoutDirection] = useState("LR");
-  const { isOpen: isCollectionEditorOpen, onOpen: onCollectionEditorOpen, onClose: onCollectionEditorClose } = useDisclosure();
-  const { isOpen: isAgentEditorOpen, onOpen: onAgentEditorOpen, onClose: onAgentEditorClose } = useDisclosure();
   // Custom hooks
   const { nodes, edges, loading, setNodes, setEdges, fetchDataAndLayout } = useWorkspaceData();
   const {
@@ -123,7 +123,6 @@ export default function WorkspaceCanvas() {
     setViewingNode,
     editingCollection,
     setEditingCollection,
-    editingAgent,
     setEditingAgent,
     contextMenu,
     setContextMenu,
@@ -135,6 +134,9 @@ export default function WorkspaceCanvas() {
     setNewConnection,
     resetNewCollectionData,
   } = useWorkspaceModals();
+  const { onOpen: openRelationModal, onClose: closeRelationModal } = relationModal;
+  const { onOpen: openCollectionEditor } = collectionEditorModal;
+  const { onOpen: openAgentEditor } = agentEditorModal;
 
   useEffect(() => {
     fetchDataAndLayout(layoutDirection);
@@ -171,9 +173,9 @@ export default function WorkspaceCanvas() {
     (params: Connection) => {
       if (params.source === params.target) return;
       setNewConnection(params);
-      relationModal.onOpen();
+      openRelationModal();
     },
-    [relationModal.onOpen, setNewConnection]
+    [openRelationModal, setNewConnection]
   );
 
   const onNodeClick = useCallback(
@@ -325,10 +327,10 @@ export default function WorkspaceCanvas() {
         isClosable: true,
       });
 
-      relationModal.onClose();
+      closeRelationModal();
       setNewConnection(null);
     },
-    [newConnection, relationModal.onClose, toast, setNodes, setEdges]
+    [newConnection, closeRelationModal, setNewConnection, toast, setNodes, setEdges]
   );
   
   const handleViewDetails = (nodeToView: AppNode | null) => {
@@ -373,7 +375,7 @@ export default function WorkspaceCanvas() {
        toast({ title: `${node.type === 'agentNode' ? 'Agent' : 'Collection'} deleted.`, status: "info", duration: 5000, isClosable: true });
      }
      setContextMenu(null);
-   }, [setNodes, setEdges, toast]);
+   }, [setNodes, setEdges, toast, setContextMenu]);
   
   // --- Action Handlers (wrapped in useCallback for performance) ---
   const handleViewLogsAction = useCallback((node: AppNode | null) => {
@@ -391,29 +393,22 @@ export default function WorkspaceCanvas() {
   const handleEditAction = useCallback((node: AppNode | null) => {
       if (node?.type === 'collectionNode') {
         setEditingCollection(node);
-        onCollectionEditorOpen();
+        openCollectionEditor();
       } else if (node?.type === 'agentNode') {
         setEditingAgent(node);
-        onAgentEditorOpen();
+        openAgentEditor();
      }
      setContextMenu(null);
-   }, [onCollectionEditorOpen, onAgentEditorOpen, setEditingCollection, setEditingAgent]);
+   }, [openCollectionEditor, openAgentEditor, setEditingCollection, setEditingAgent, setContextMenu]);
 
-  const nodeTypes = useMemo(() => ({
-    collectionNode: CollectionNode,
-    agentNode: (props: NodeProps<AgentNodeType>) => {
-      const node = nodes.find(n => n.id === props.id);
-      return (
-        <AgentNode 
-          data={props.data} 
-          selected={props.selected} 
-          onEdit={() => handleEditAction( node as AppNode)}
-          onDelete={() => handleDeleteAction(node as AppNode)}
-          onViewLogs={() => handleViewLogsAction(node as AppNode)}
-        />
-      );
-    },
-  }), [nodes, handleEditAction, handleDeleteAction, handleViewLogsAction]); 
+  const agentHandlers = useMemo<AgentNodeHandlers>(() => {
+    const byId = (id: string) => nodes.find(n => n.id === id) ?? null;
+    return {
+      onEdit: (id) => handleEditAction(byId(id)),
+      onDelete: (id) => handleDeleteAction(byId(id)),
+      onViewLogs: (id) => handleViewLogsAction(byId(id)),
+    };
+  }, [nodes, handleEditAction, handleDeleteAction, handleViewLogsAction]);
 
   if (loading) return <Spinner />;
   
@@ -432,6 +427,7 @@ export default function WorkspaceCanvas() {
   const allNodeLabels = nodes.map(node => (node.data as { label: string; attributes: AttributeItem[] }).label);
 
   return (
+    <HandlersContext.Provider value={agentHandlers}>
     <Box w="100%" h="calc(100vh - 64px)" bg="#fafdff" ref={reactFlowWrapperRef}>
       <ReactFlow
         nodes={nodes}
@@ -639,6 +635,7 @@ export default function WorkspaceCanvas() {
       </Modal>
       
        <AttributeEditorSidebar
+        key={editingCollection?.id ?? "none"}
         isOpen={collectionEditorModal.isOpen}
         onClose={collectionEditorModal.onClose}
         node={editingCollection}
@@ -657,5 +654,6 @@ export default function WorkspaceCanvas() {
         allNodeLabels={allNodeLabels}
       />
     </Box>
+    </HandlersContext.Provider>
   );
 }

@@ -19,7 +19,7 @@ import (
 type Collection struct {
 	gorm.Model
 	ID          uint   `json:"id"`
-	Name        string `json:"name" gorm:"uniqueIndex"`
+	Name        string `json:"name" gorm:"uniqueIndex;size:191"`
 	Kind        string `json:"kind" gorm:"type:varchar(50);not null"`
 	Description string `json:"description"`
 	// DraftAndPublish enables the draft/publish workflow: items start as

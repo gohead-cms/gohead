@@ -1,0 +1,11 @@
+# Existing Secret and managed Redis; optional processes off.
+existingSecret: gohead-secrets
+redis:
+  enabled: false
+  address: redis.example.internal:6379
+admin:
+  enabled: false
+scheduler:
+  enabled: false
+serviceAccount:
+  create: false

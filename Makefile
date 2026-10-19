@@ -35,10 +35,21 @@ unit-test: ## Run the Go test suite
 test-race: ## Run the Go test suite with the race detector
 	$Q $(go) test -race -count=1 ./...
 
+.PHONY: test-db
+test-db: ## Run DB tests against PostgreSQL or MySQL (needs GOHEAD_TEST_DATABASE_URL; wipes that database)
+	$Q test -n "$$GOHEAD_TEST_DATABASE_URL" || { echo "set GOHEAD_TEST_DATABASE_URL=postgres://... or mysql://..."; exit 1; }
+	$Q $(go) test -count=1 -p 1 ./pkg/... ./internal/...
+
 .PHONY: test-postgres
-test-postgres: ## Run DB tests against PostgreSQL (needs GOHEAD_TEST_DATABASE_URL)
-	$Q test -n "$$GOHEAD_TEST_DATABASE_URL" || { echo "set GOHEAD_TEST_DATABASE_URL=postgres://..."; exit 1; }
-	$Q $(go) test -count=1 -p 1 ./pkg/storage/... ./internal/api/... ./internal/graphql/...
+test-postgres: test-db
+
+.PHONY: test-e2e
+test-e2e: ## Run the admin UI smoke tests (needs an API on :8080 with an empty database)
+	$Q cd gui && npx playwright test
+
+.PHONY: helm-lint
+helm-lint: ## Lint the Helm chart with every CI values file
+	$Q for v in charts/gohead/ci/*-values.yaml; do helm lint --strict charts/gohead -f $$v || exit 1; done
 
 .PHONY: lint
 lint: ## gofmt check and go vet

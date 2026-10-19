@@ -1,5 +1,5 @@
 import React from 'react';
-import { EdgeProps, getSmoothStepPath, EdgeLabelRenderer, BaseEdge, Edge, MarkerType, getBezierPath } from '@xyflow/react';
+import { EdgeProps, EdgeLabelRenderer, BaseEdge, Edge, getBezierPath } from '@xyflow/react';
 import { Box, HStack, Icon, Badge } from '@chakra-ui/react';
 import { FaPlusCircle, FaPencilAlt, FaTrashAlt, FaBolt, FaEye } from 'react-icons/fa';
 
@@ -24,7 +24,6 @@ const eventIcons: Record<string, React.ElementType> = {
 };
 
 export function TriggerEdge({
-  id,
   sourceX,
   sourceY,
   targetX,

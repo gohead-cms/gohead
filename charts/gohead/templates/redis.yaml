@@ -1,0 +1,95 @@
+{{- if and .Values.redis.enabled (not .Values.redis.address) }}
+{{- $component := dict "ctx" . "component" "redis" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "gohead.fullname" . }}-redis
+  labels:
+    {{- include "gohead.componentLabels" $component | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "gohead.selectorLabels" $component | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "gohead.componentLabels" $component | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: redis
+          image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
+          imagePullPolicy: {{ .Values.redis.image.pullPolicy }}
+          args:
+            {{- if .Values.redis.persistence.enabled }}
+            ["redis-server", "--appendonly", "yes", "--dir", "/data"]
+            {{- else }}
+            ["redis-server", "--save", "", "--appendonly", "no"]
+            {{- end }}
+          ports:
+            - name: redis
+              containerPort: 6379
+          readinessProbe:
+            exec: { command: ["redis-cli", "ping"] }
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: redis }
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.redis.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          {{- if .Values.redis.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "gohead.fullname" . }}-redis
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "gohead.fullname" . }}-redis
+  labels:
+    {{- include "gohead.componentLabels" $component | nindent 4 }}
+spec:
+  selector:
+    {{- include "gohead.selectorLabels" $component | nindent 4 }}
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+{{- if .Values.redis.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "gohead.fullname" . }}-redis
+  labels:
+    {{- include "gohead.componentLabels" $component | nindent 4 }}
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- with .Values.redis.persistence.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.redis.persistence.size }}
+{{- end }}
+{{- end }}

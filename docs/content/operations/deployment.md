@@ -38,6 +38,87 @@ ENV
 docker compose pull && docker compose up -d
 ```
 
+## Kubernetes with Helm
+
+The chart deploys the API, the worker, the dispatcher, the scheduler, the admin UI and,
+unless you point it at your own, a Redis. It is published with every release:
+
+```bash
+helm install gohead oci://ghcr.io/gohead-cms/charts/gohead --version 0.5.0 \
+  --namespace gohead --create-namespace \
+  --set database.url='postgres://gohead:<password>@db.example.internal:5432/gohead?sslmode=require'
+```
+
+Without an ingress, reach it with port-forwards, as the install notes explain:
+
+```bash
+kubectl -n gohead port-forward svc/gohead-api 8080:80     # API
+kubectl -n gohead port-forward svc/gohead-admin 3000:80   # admin UI, calls localhost:8080
+```
+
+Register the first account right away: it becomes the admin.
+
+For production, keep secrets out of values and set your hosts in a values file:
+
+```yaml title="values-production.yaml"
+existingSecret: gohead-secrets   # GOHEAD_DATABASE_URL, GOHEAD_JWT_SECRET, OPENAI_API_KEY…
+
+config:
+  GOHEAD_TRUSTED_PROXIES: 10.0.0.0/8
+  GOHEAD_CORS_ALLOWED_ORIGINS: https://www.example.com,https://admin.example.com
+  GOHEAD_MEDIA_DRIVER: s3
+  GOHEAD_MEDIA_S3_REGION: eu-west-1
+  GOHEAD_MEDIA_S3_BUCKET: example-gohead-media
+
+api:
+  replicas: 3
+  ingress:
+    enabled: true
+    className: nginx
+    hosts: [{ host: api.example.com, paths: [/] }]
+    tls: [{ secretName: api-tls, hosts: [api.example.com] }]
+
+admin:
+  ingress:
+    enabled: true
+    className: nginx
+    hosts: [{ host: admin.example.com, paths: [/] }]
+    tls: [{ secretName: admin-tls, hosts: [admin.example.com] }]
+  # apiUrl defaults to the first API ingress host (https://api.example.com)
+
+redis:
+  enabled: false
+  address: my-redis.cache.amazonaws.com:6379   # password: GOHEAD_REDIS_PASSWORD in the Secret
+
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/gohead-media   # S3 without keys
+```
+
+| Value | Default | |
+|-------|---------|-|
+| `database.url` / `existingSecret` | – | **Required.** PostgreSQL or MySQL; SQLite cannot be shared by the API and the workers |
+| `jwtSecret` | generated | When empty, generated at install and kept by `helm upgrade`. With Argo CD, Flux or `helm template`, set it or use `existingSecret`: they render without the cluster and would generate a new one each time |
+| `extraSecretEnv` | `{}` | More secret variables (provider API keys, S3 keys) when the chart creates the Secret |
+| `config` | log level, mode | Any `GOHEAD_*` setting from the [configuration reference](../getting-started/configuration.md) |
+| `image.tag`, `admin.image.tag` | chart `appVersion` | Pin or override the GoHead version |
+| `api.replicas`, `api.autoscaling.*` | 2, off | HPA on CPU when enabled |
+| `api.ingress.*`, `admin.ingress.*` | off | Standard `networking.k8s.io/v1` ingresses |
+| `api.uploads.persistence.*` | off | Volume for local uploads (one API replica with `ReadWriteOnce`) |
+| `api.podDisruptionBudget.*` | on, `minAvailable: 1` | Only created with 2+ replicas or autoscaling |
+| `worker.*`, `dispatcher.*` | 1 replica each | Disable both if you don't use agents or webhooks |
+| `scheduler.enabled` | on | Always a single replica, recreated on upgrade |
+| `redis.enabled` / `redis.address` | bundled, no persistence | Use a managed Redis in production |
+| `serviceMonitor.enabled` | off | Prometheus Operator scrape of `/_metrics` |
+
+Pods run as non-root without capabilities (GoHead and Redis also with a read-only root
+filesystem; the admin UI's nginx writes its configuration at startup), and roll
+automatically when the configuration or the Secret the chart manages changes. The API's
+`/_metrics` endpoint is not authenticated: block it at your ingress if the API is public. `helm test`
+checks that the API answers. See
+[`charts/gohead/values.yaml`](https://github.com/gohead-cms/gohead/blob/master/charts/gohead/values.yaml)
+for every option.
+
 ## Kubernetes with Flux
 
 `deploy/` contains everything needed for a GitOps setup:

@@ -49,7 +49,7 @@ export function useAgentStatus() {
         
         await new Promise(resolve => setTimeout(resolve, 600));
         setAgents(mockAgents);
-      } catch (err) {
+      } catch {
         setError("Failed to fetch agent status");
       } finally {
         setIsLoading(false);

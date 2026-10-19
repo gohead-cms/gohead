@@ -208,6 +208,7 @@ func updateSingletonAttributes(tx *gorm.DB, existing *models.Singleton, updatedA
 		if existingAttr, ok := existingMap[updatedAttr.Name]; ok {
 			// Update existing
 			updatedAttr.ID = existingAttr.ID
+			updatedAttr.CreatedAt = existingAttr.CreatedAt // MySQL rejects the zero time
 			updatedAttr.SingletonID = &existing.ID
 			updatedAttr.CollectionID = nil // ensure we don't mix collection vs single type
 			if err := tx.Save(&updatedAttr).Error; err != nil {

@@ -11,12 +11,13 @@ import (
 	"github.com/robfig/cron"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/schema"
 )
 
 // Agent represents an autonomous agent configuration.
 type Agent struct {
 	gorm.Model
-	Name         string         `json:"name" gorm:"uniqueIndex"`
+	Name         string         `json:"name" gorm:"uniqueIndex;size:191"`
 	SystemPrompt string         `json:"system_prompt" gorm:"type:text;not null"`
 	MaxTurns     int            `json:"max_turns" gorm:"not null;default:4"`
 	LLMConfig    LLMConfig      `json:"llm_config" gorm:"type:jsonb"`
@@ -45,16 +46,21 @@ func (c LLMConfig) Value() (driver.Value, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal LLMConfig: %w", err)
 	}
-	return data, nil
+	return string(data), nil // MySQL refuses binary strings in JSON columns
 }
 
 // Scan implements the Scanner interface for `LLMConfig`.
 func (c *LLMConfig) Scan(value any) error {
-	bytes, ok := value.([]byte)
-	if !ok {
+	bytes, err := models.JSONBytes(value)
+	if err != nil {
 		return errors.New("invalid data type for LLMConfig")
 	}
 	return json.Unmarshal(bytes, c)
+}
+
+// GormDBDataType makes the column JSON on MySQL.
+func (LLMConfig) GormDBDataType(db *gorm.DB, field *schema.Field) string {
+	return models.JSONDBDataType(db, field)
 }
 
 // MemoryConfig defines how the conversation memory is stored.
@@ -69,16 +75,21 @@ func (c MemoryConfig) Value() (driver.Value, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal MemoryConfig: %w", err)
 	}
-	return data, nil
+	return string(data), nil
 }
 
 // Scan implements the Scanner interface for `MemoryConfig`.
 func (c *MemoryConfig) Scan(value interface{}) error {
-	bytes, ok := value.([]byte)
-	if !ok {
+	bytes, err := models.JSONBytes(value)
+	if err != nil {
 		return errors.New("invalid data type for MemoryConfig")
 	}
 	return json.Unmarshal(bytes, c)
+}
+
+// GormDBDataType makes the column JSON on MySQL.
+func (MemoryConfig) GormDBDataType(db *gorm.DB, field *schema.Field) string {
+	return models.JSONDBDataType(db, field)
 }
 
 // EventTriggerConfig defines the specifics for a collection event trigger.
@@ -102,7 +113,16 @@ func (t TriggerConfig) Value() (driver.Value, error) {
 	if t.Type == "" {
 		return nil, nil
 	}
-	return json.Marshal(t)
+	b, err := json.Marshal(t)
+	if err != nil {
+		return nil, err
+	}
+	return string(b), nil
+}
+
+// GormDBDataType makes the column JSON on MySQL.
+func (TriggerConfig) GormDBDataType(db *gorm.DB, field *schema.Field) string {
+	return models.JSONDBDataType(db, field)
 }
 
 // Scan implements the Scanner interface for `TriggerConfig`.
@@ -144,7 +164,16 @@ func (f FunctionSpecs) Value() (driver.Value, error) {
 	if len(f) == 0 {
 		return "[]", nil // Return an empty JSON array if the slice is empty
 	}
-	return json.Marshal(f)
+	b, err := json.Marshal(f)
+	if err != nil {
+		return nil, err
+	}
+	return string(b), nil
+}
+
+// GormDBDataType makes the column JSON on MySQL.
+func (FunctionSpecs) GormDBDataType(db *gorm.DB, field *schema.Field) string {
+	return models.JSONDBDataType(db, field)
 }
 
 // Scan implements sql.Scanner for FunctionSpecs, accepting either a JSON array

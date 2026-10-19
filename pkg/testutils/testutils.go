@@ -14,6 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
+	"gorm.io/gorm/schema"
 )
 
 // JSONMap is a custom type that implements driver.Valuer and sql.Scanner.
@@ -28,6 +29,14 @@ func (m JSONMap) Value() (driver.Value, error) {
 	}
 	b, err := json.Marshal(m)
 	return string(b), err
+}
+
+// GormDBDataType makes the column JSON on MySQL (which has no JSONB).
+func (JSONMap) GormDBDataType(db *gorm.DB, _ *schema.Field) string {
+	if db.Dialector.Name() == "mysql" {
+		return "JSON"
+	}
+	return ""
 }
 
 // Scan deserializes JSON from the database.
@@ -49,9 +58,9 @@ func (m *JSONMap) Scan(value interface{}) error {
 
 type UserRole struct {
 	ID          uint    `json:"id"`
-	Name        string  `json:"name"`                                                // Role name (e.g., admin, editor, viewer)
-	Description string  `json:"description"`                                         // Role description
-	Permissions JSONMap `json:"permissions" gorm:"type:jsonb;default:'[]';not null"` // Use 'jsonb' for PostgreSQL // Permissions associated with the role
+	Name        string  `json:"name"`                                   // Role name (e.g., admin, editor, viewer)
+	Description string  `json:"description"`                            // Role description
+	Permissions JSONMap `json:"permissions" gorm:"type:jsonb;not null"` // Permissions associated with the role
 }
 
 // setupTestServer initializes a Gin router and database for testing.
@@ -59,11 +68,14 @@ func SetupTestServer() (*gin.Engine, *gorm.DB) {
 	// Initialize the logger
 	logger.InitLogger("debug")
 	// Tests use an in-memory SQLite database by default. Set
-	// GOHEAD_TEST_DATABASE_URL to a postgres:// URL to run the same tests
-	// against PostgreSQL; its public schema is wiped before each setup.
+	// GOHEAD_TEST_DATABASE_URL to a postgres:// or mysql:// URL to run the
+	// same tests against that database; it is wiped before each setup.
 	dbURL := os.Getenv("GOHEAD_TEST_DATABASE_URL")
 	if dbURL == "" {
 		dbURL = "sqlite://:memory:"
+	}
+	if strings.HasPrefix(dbURL, "mysql://") {
+		resetMySQL(dbURL)
 	}
 	db, err := database.InitDatabase(dbURL, gormlogger.Info)
 	if err != nil {
@@ -105,6 +117,38 @@ func SetupTestServer() (*gin.Engine, *gorm.DB) {
 	router := gin.Default()
 
 	return router, db
+}
+
+// resetMySQL drops and re-creates the test database. It runs before the
+// pool is opened, as MySQL has no per-database schema to drop and
+// recreating the database under open connections would leave them without
+// a selected database.
+func resetMySQL(dbURL string) {
+	dsn := strings.TrimPrefix(dbURL, "mysql://")
+	slash := strings.LastIndex(dsn, "/")
+	if slash < 0 {
+		panic("mysql test URL needs a database name: " + dbURL)
+	}
+	name := dsn[slash+1:]
+	if q := strings.IndexByte(name, '?'); q >= 0 {
+		name = name[:q]
+	}
+	if name == "" || strings.ContainsAny(name, "`;' ") {
+		panic("invalid mysql test database name: " + name)
+	}
+	// Connect without selecting the database (it may not exist yet).
+	db, err := database.InitDatabase("mysql://"+dsn[:slash+1]+dsn[slash+1+len(name):], gormlogger.Warn)
+	if err != nil {
+		panic("Failed to connect to MySQL: " + err.Error())
+	}
+	for _, stmt := range []string{"DROP DATABASE IF EXISTS `" + name + "`", "CREATE DATABASE `" + name + "` CHARACTER SET utf8mb4"} {
+		if err := db.Exec(stmt).Error; err != nil {
+			panic("Failed to reset MySQL test database: " + err.Error())
+		}
+	}
+	if sqlDB, err := db.DB(); err == nil {
+		_ = sqlDB.Close()
+	}
 }
 
 func CleanupTestDB() {

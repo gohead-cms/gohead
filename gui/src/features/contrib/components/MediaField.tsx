@@ -10,7 +10,7 @@ export interface MediaFile {
   name?: string;
   mime?: string;
 }
-type MediaValue = MediaFile | number | string | null | undefined;
+export type MediaValue = MediaFile | number | string | null | undefined;
 
 interface MediaFieldProps {
   id: string;

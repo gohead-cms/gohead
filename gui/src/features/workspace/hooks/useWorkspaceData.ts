@@ -38,7 +38,7 @@ export function useWorkspaceData() {
       const collectionEdges: CollectionEdgeType[] = collections.flatMap((col) => {
         const collectionName = col.schema.collectionName;
         if (!collectionName) return [];
-        return Object.entries(col.schema.attributes || {}).map(([attrName, attr]: [string, any]) => {
+        return Object.entries(col.schema.attributes || {}).map(([attrName, attr]) => {
           if (attr.type.includes("relation") && attr.target) {
             const targetName = attr.target.split(".").pop();
             return {

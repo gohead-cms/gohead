@@ -142,6 +142,9 @@ func updateComponentAttributes(tx *gorm.DB, existing *models.Component, updatedA
 			// Attribute exists, so update it
 			// GORM's Save will update if the primary key is set
 			newAttr.ID = oldAttr.ID
+			// Keep the creation time: Save writes every column, and MySQL
+			// rejects the zero time.
+			newAttr.CreatedAt = oldAttr.CreatedAt
 			newAttr.ComponentID = existing.ID
 			if err := tx.Save(&newAttr).Error; err != nil {
 				return err

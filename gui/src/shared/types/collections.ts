@@ -6,11 +6,16 @@ export interface Attribute {
   required?: boolean;
   enum?: string[];
   target?: string;
+  relation?: string;
+  options?: string[];
   component?: string;
   repeatable?: boolean;
   multiple?: boolean;
   allowed_types?: string[];
 }
+
+/** A value of a simple form field (text, number, date, boolean). */
+export type FieldValue = string | number | boolean;
 
 export interface Schema {
   attributes: Record<string, Attribute>;

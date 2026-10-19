@@ -1,0 +1,227 @@
+{{- $component := dict "ctx" . "component" "api" }}
+{{- if and .Values.api.autoscaling.enabled .Values.api.uploads.persistence.enabled (has "ReadWriteOnce" .Values.api.uploads.persistence.accessModes) }}
+{{- fail "api: autoscaling needs uploads on S3 or a ReadWriteMany volume (a ReadWriteOnce volume attaches to one pod)" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "gohead.fullname" . }}-api
+  labels:
+    {{- include "gohead.componentLabels" $component | nindent 4 }}
+spec:
+  {{- if not .Values.api.autoscaling.enabled }}
+  replicas: {{ .Values.api.replicas }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "gohead.selectorLabels" $component | nindent 6 }}
+  {{- if and .Values.api.uploads.persistence.enabled (has "ReadWriteOnce" .Values.api.uploads.persistence.accessModes) }}
+  # A ReadWriteOnce volume cannot be attached to two pods during a rollout.
+  strategy:
+    type: Recreate
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        {{- include "gohead.componentLabels" $component | nindent 8 }}
+      annotations:
+        {{- include "gohead.configChecksums" . | nindent 8 }}
+        {{- with .Values.api.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "gohead.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: api
+          image: {{ include "gohead.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # Configuration comes from the environment (no config file).
+          args: ["start"]
+          {{- include "gohead.env" . | nindent 10 }}
+          ports:
+            - name: http
+              containerPort: 8080
+          startupProbe:
+            httpGet: { path: /_health, port: http }
+            periodSeconds: 2
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: { path: /_health, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /_health, port: http }
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: uploads
+              mountPath: /data/uploads
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: uploads
+          {{- if .Values.api.uploads.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ default (printf "%s-uploads" (include "gohead.fullname" .)) .Values.api.uploads.persistence.existingClaim }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.api.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "gohead.fullname" . }}-api
+  labels:
+    {{- include "gohead.componentLabels" $component | nindent 4 }}
+  {{- with .Values.api.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.api.service.type }}
+  selector:
+    {{- include "gohead.selectorLabels" $component | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.api.service.port }}
+      targetPort: http
+{{- if and .Values.api.uploads.persistence.enabled (not .Values.api.uploads.persistence.existingClaim) }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "gohead.fullname" . }}-uploads
+  labels:
+    {{- include "gohead.componentLabels" $component | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    {{- toYaml .Values.api.uploads.persistence.accessModes | nindent 4 }}
+  {{- with .Values.api.uploads.persistence.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.api.uploads.persistence.size }}
+{{- end }}
+{{- if .Values.api.ingress.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "gohead.fullname" . }}-api
+  labels:
+    {{- include "gohead.componentLabels" $component | nindent 4 }}
+  {{- with .Values.api.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.api.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.api.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range .Values.api.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ . }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "gohead.fullname" $ }}-api
+                port:
+                  name: http
+          {{- end }}
+    {{- end }}
+{{- end }}
+{{- if .Values.api.autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "gohead.fullname" . }}-api
+  labels:
+    {{- include "gohead.componentLabels" $component | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "gohead.fullname" . }}-api
+  minReplicas: {{ .Values.api.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.api.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.api.autoscaling.targetCPUUtilizationPercentage }}
+{{- end }}
+{{- /* With a single replica, minAvailable: 1 would block node drains. */}}
+{{- if and .Values.api.podDisruptionBudget.enabled (or .Values.api.autoscaling.enabled (gt (int .Values.api.replicas) 1)) }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "gohead.fullname" . }}-api
+  labels:
+    {{- include "gohead.componentLabels" $component | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.api.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "gohead.selectorLabels" $component | nindent 6 }}
+{{- end }}
+{{- if .Values.serviceMonitor.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "gohead.fullname" . }}-api
+  labels:
+    {{- include "gohead.componentLabels" $component | nindent 4 }}
+    {{- with .Values.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "gohead.selectorLabels" $component | nindent 6 }}
+  endpoints:
+    - port: http
+      path: /_metrics
+      interval: {{ .Values.serviceMonitor.interval }}
+{{- end }}

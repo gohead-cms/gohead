@@ -1,7 +1,5 @@
 import React from "react";
 import {
-  Box,
-  Flex,
   Text,
   Icon,
   Badge,
@@ -15,6 +13,7 @@ import {
   Td,
   TableContainer,
 } from "@chakra-ui/react";
+import type { Attribute } from "../../../shared/types";
 import {
   FiCheckCircle,
   FiLock,
@@ -40,7 +39,7 @@ function getTypeIcon(type: string) {
   return <Icon as={IconComp} boxSize={4} />;
 }
 
-export function AttributesTable({ attributes }: { attributes: Record<string, any> }) {
+export function AttributesTable({ attributes }: { attributes: Record<string, Attribute> }) {
   return (
     <TableContainer borderWidth="1px" borderColor="gray.200" borderRadius="xl">
       <Table variant="simple">

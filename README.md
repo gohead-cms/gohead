@@ -45,7 +45,7 @@ permissions as a human.
 | 🔎 **Real querying** | Filters (`$eq $ne $lt $gte $contains`…), multi-key sort, pagination, relation population, batch writes in one transaction. |
 | 🔐 **Secure by default** | Roles enforced identically in REST and GraphQL, schema-validated writes, masked secrets, signed images, distroless containers. |
 | 🪶 **One binary** | API, worker, dispatcher and scheduler in one Go binary. SQLite on your laptop, PostgreSQL or MySQL in production. |
-| 🚢 **GitOps-ready** | Multi-arch images, Kubernetes manifests and Flux image automation included. |
+| 🚢 **Ships anywhere** | Multi-arch images, a Helm chart, Kubernetes manifests and Flux image automation included. Tested on SQLite, PostgreSQL and MySQL. |
 
 ## 60-second start
 
@@ -138,7 +138,8 @@ flowchart LR
 |---|---|
 | **Docker Compose** | `docker compose up -d` (everything, as above) |
 | **Container** | `docker run -p 8080:8080 -e GOHEAD_JWT_SECRET=… ghcr.io/gohead-cms/gohead` |
-| **Kubernetes** | `kubectl apply -k deploy/kubernetes/overlays/production` (or let Flux do it) |
+| **Helm** | `helm install gohead oci://ghcr.io/gohead-cms/charts/gohead --set database.url=postgres://…` |
+| **Kubernetes (GitOps)** | `kubectl apply -k deploy/kubernetes/overlays/production` (or let Flux do it) |
 | **Binary** | [Releases](https://github.com/gohead-cms/gohead/releases) for Linux, macOS, Windows (PostgreSQL/MySQL) |
 | **Source** | `make build` (Go 1.26+, cgo for SQLite) |
 

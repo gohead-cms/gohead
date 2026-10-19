@@ -11,7 +11,7 @@ import (
 type Component struct {
 	gorm.Model
 	ID          uint                 `json:"id"`
-	Name        string               `json:"name" gorm:"uniqueIndex"`
+	Name        string               `json:"name" gorm:"uniqueIndex;size:191"`
 	Description string               `json:"description"`
 	Attributes  []ComponentAttribute `json:"attributes" gorm:"foreignKey:ComponentID;constraint:OnDelete:CASCADE;"`
 }

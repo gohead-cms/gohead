@@ -45,3 +45,23 @@ jobs:
         uses: actions/attest-build-provenance@v4
         with:
           subject-path: dist/*.tar.gz, dist/*.zip, dist/checksums.txt
+
+  chart:
+    name: Helm chart (OCI)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v5
+        with:
+          version: v4.3.0
+      # The chart is versioned with GoHead: vX.Y.Z publishes chart X.Y.Z
+      # deploying images X.Y.Z, at oci://ghcr.io/<owner>/charts/gohead.
+      - name: Package and push
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          helm package charts/gohead --version "$version" --app-version "$version" --destination dist
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+          helm push "dist/gohead-$version.tgz" "oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts"

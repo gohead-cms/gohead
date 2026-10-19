@@ -1,6 +1,5 @@
 export * from './ContentSelector'
 export * from './ContentTable'
 export * from './EntryFormModal'
-export * from './EntryFormDrawer'
 export * from './ContribEditorPage'
 export * from './ContribPage'

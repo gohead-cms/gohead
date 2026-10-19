@@ -1,28 +1,11 @@
-import { useState, useEffect } from "react";
-import { apiFetchWithAuth } from "../../../services/api";
 import { AgentNodeData } from "../../../shared/types";
+import { getJSON, useApiQuery } from "../../../shared/hooks/useApiQuery";
 
 export function useAgentDetails(agentName: string | null) {
-  const [agentDetails, setAgentDetails] = useState<AgentNodeData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!agentName) {
-      setAgentDetails(null);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    apiFetchWithAuth(`/admin/agents/${agentName}`)
-      .then(async (res) => {
-        if (!res.ok) throw new Error("Failed to fetch agent details");
-        const json = await res.json();
-        setAgentDetails(json.data || null);
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, [agentName]);
-
-  return { agentDetails, loading, error };
+  const path = agentName ? `/admin/agents/${encodeURIComponent(agentName)}` : null;
+  const { data, loading, error } = useApiQuery(path, async () => {
+    const json = await getJSON<AgentNodeData>(path!, "Failed to fetch agent details");
+    return json.data ?? null;
+  });
+  return { agentDetails: data, loading, error };
 }

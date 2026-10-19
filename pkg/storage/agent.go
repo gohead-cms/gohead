@@ -279,17 +279,14 @@ func SaveConversationHistory(agentID uint, messages []llm.Message) error {
 	return nil
 }
 
-// FindAgentsByEventTrigger queries for agents subscribed to a specific collection event.
-// TOFIX This version uses a query for JSONB that is compatible with PostgreSQL.
+// FindAgentsByEventTrigger returns the agents subscribed to a collection
+// event. Agents are few, so they are filtered here rather than with
+// dialect-specific JSON SQL (and "trigger" is a reserved word in MySQL).
 func FindAgentsByEventTrigger(collectionName string, eventType string) ([]models.Agent, error) {
 	var allEventAgents []models.Agent
 	var subscribedAgents []models.Agent
 
-	// This query is specific and reliable for finding agents with a 'collection_event' trigger type
-	// by directly querying the 'type' key within the JSONB 'trigger' column.
-	err := database.DB.
-		Where("trigger ->> 'type' = ?", "collection_event").
-		Find(&allEventAgents).Error
+	err := database.DB.Find(&allEventAgents).Error
 
 	if err != nil {
 		logger.Log.WithError(err).
@@ -300,7 +297,6 @@ func FindAgentsByEventTrigger(collectionName string, eventType string) ([]models
 	}
 
 	for _, agent := range allEventAgents {
-		// This check is a good practice, though the query should already ensure it.
 		if agent.Trigger.Type != "collection_event" {
 			continue
 		}

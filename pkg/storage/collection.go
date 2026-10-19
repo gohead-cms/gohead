@@ -317,6 +317,9 @@ func updateAssociatedFields(tx *gorm.DB, collectionID *uint, updatedAttributes [
 		if existingAttr, exists := existingMap[updatedAttr.Name]; exists {
 			// Update existing attribute
 			updatedAttr.ID = existingAttr.ID
+			// Keep the creation time: Save writes every column, and MySQL
+			// rejects the zero time.
+			updatedAttr.CreatedAt = existingAttr.CreatedAt
 			updatedAttr.CollectionID = collectionID
 			if err := tx.Save(&updatedAttr).Error; err != nil {
 				return fmt.Errorf("failed to update attribute '%s': %w", updatedAttr.Name, err)

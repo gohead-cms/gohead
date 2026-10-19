@@ -3,7 +3,6 @@ import {
   Box,
   Button,
   Input,
-  Heading,
   Alert,
   Flex,
   Text,
@@ -51,8 +50,8 @@ export function LoginPage() {
       if (!token) throw new Error("No token received from server");
       setToken(token);
       navigate("/workspace");
-    } catch (err: any) {
-      setError(err.message || "Login failed");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Login failed");
     }
   };
 
