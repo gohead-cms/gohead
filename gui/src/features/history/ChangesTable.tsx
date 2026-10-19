@@ -1,5 +1,5 @@
 import { Badge, Box, Code, Table, TableContainer, Tbody, Td, Text, Th, Thead, Tr, useColorModeValue } from "@chakra-ui/react";
-import type { FieldChange } from "./history";
+import { type FieldChange, REDACTED } from "./history";
 import { type DiffPart, isLongText, wordDiff } from "./wordDiff";
 
 const changeColor: Record<FieldChange["change"], string> = {
@@ -15,6 +15,14 @@ function Value({ value }: { value: unknown }) {
     return (
       <Text as="span" color="gray.400" fontStyle="italic">
         empty
+      </Text>
+    );
+  }
+  if (value === REDACTED) {
+    // Password attributes are redacted by the API.
+    return (
+      <Text as="span" color="gray.500" fontStyle="italic" title="Passwords are not shown">
+        (hidden)
       </Text>
     );
   }

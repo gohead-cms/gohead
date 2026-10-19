@@ -56,16 +56,23 @@ export function RunContentChanges({ agentName, runId }: { agentName: string; run
       );
       const list = Array.isArray(res.data) ? res.data : [];
       setOutcomes(list);
-      const counts = (res.meta?.counts ?? {}) as Record<string, number>;
-      const summary = Object.entries(counts)
-        .map(([k, n]) => `${n} ${k}`)
+      const counts: Record<string, number> = {};
+      for (const o of list) counts[o.result] = (counts[o.result] ?? 0) + 1;
+      Object.assign(counts, (res.meta?.counts ?? {}) as Record<string, number>);
+      const summary = (["reverted", "deleted", "skipped", "failed"] as const)
+        .filter((k) => counts[k])
+        .map((k) => `${counts[k]} ${k}`)
         .join(", ");
-      notify.success("Run reverted", summary || undefined);
-      setForce(false);
+      if ((counts.reverted ?? 0) + (counts.deleted ?? 0) === 0) {
+        notify.warning("Nothing was reverted — see details", summary || undefined);
+      } else {
+        notify.success("Run reverted", summary);
+      }
       setVersion((v) => v + 1);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        notify.failure(err, "Nothing to revert");
+        // The run is still going, or it changed no content.
+        notify.failure(err, /still running/i.test(err.message) ? "The run is still running: revert it once it ends" : "Nothing to revert");
       } else {
         notify.failure(err, "Could not revert the run");
       }
@@ -102,6 +109,8 @@ export function RunContentChanges({ agentName, runId }: { agentName: string; run
             }
             confirmLabel="Revert"
             onConfirm={revert}
+            // Each revert starts unforced, whether the last was confirmed or cancelled.
+            onClose={() => setForce(false)}
           />
         )}
       </Flex>

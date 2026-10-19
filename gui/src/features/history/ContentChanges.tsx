@@ -88,6 +88,7 @@ export function ContentChanges({ fixed, filters = false, pageSize = 25, emptyTex
               <option value="unpublish">Unpublished</option>
               <option value="delete">Deleted</option>
               <option value="restore">Restored</option>
+              <option value="baseline">Before history (baseline)</option>
             </Select>
           </>
         )}

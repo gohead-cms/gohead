@@ -6,6 +6,8 @@ import (
 	"strconv"
 
 	"github.com/gohead-cms/gohead/internal/models"
+	agentModels "github.com/gohead-cms/gohead/internal/models/agents"
+	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
 
 	"github.com/gin-gonic/gin"
@@ -62,16 +64,27 @@ func uintParam(c *gin.Context, name string) (uint, bool) {
 	return uint(v), true
 }
 
-func pageParams(c *gin.Context) (int, int) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	size, _ := strconv.Atoi(c.DefaultQuery("pageSize", "20"))
-	if page < 1 {
-		page = 1
+// pageParams reads page and pageSize (1–100, default 20), answering 400
+// for invalid values like the other list endpoints.
+func pageParams(c *gin.Context) (int, int, bool) {
+	page, size := 1, 20
+	if v := c.Query("page"); v != "" {
+		p, err := strconv.Atoi(v)
+		if err != nil || p < 1 {
+			validationError(c, "invalid page")
+			return 0, 0, false
+		}
+		page = p
 	}
-	if size < 1 || size > 100 {
-		size = 20
+	if v := c.Query("pageSize"); v != "" {
+		ps, err := strconv.Atoi(v)
+		if err != nil || ps < 1 || ps > 100 {
+			validationError(c, "pageSize must be between 1 and 100")
+			return 0, 0, false
+		}
+		size = ps
 	}
-	return page, size
+	return page, size, true
 }
 
 func setRevisionList(c *gin.Context, revs []models.Revision, total, page, size int) {
@@ -122,6 +135,58 @@ func singletonTarget(c *gin.Context) (*historyTarget, bool) {
 	return &historyTarget{entityType: models.RevisionEntitySingleton, entityID: st.ID, typeName: st.Name, singleton: st}, true
 }
 
+// itemTypeName filters item history by collection name; singletons are
+// found by ID alone.
+func (t *historyTarget) itemTypeName() string {
+	if t.collection != nil {
+		return t.typeName
+	}
+	return ""
+}
+
+// owns reports whether a revision belongs to this entry's type.
+func (t *historyTarget) owns(rev *models.Revision) bool {
+	return t.collection == nil || rev.TypeName == t.typeName
+}
+
+// passwordFields lists the type's password attributes, which revision
+// responses mask.
+func (t *historyTarget) passwordFields() map[string]bool {
+	attrs := []models.Attribute{}
+	if t.collection != nil {
+		attrs = t.collection.Attributes
+	} else if t.singleton != nil {
+		attrs = t.singleton.Attributes
+	}
+	out := map[string]bool{}
+	for _, a := range attrs {
+		if a.Type == "password" {
+			out[a.Name] = true
+		}
+	}
+	return out
+}
+
+const maskedValue = "********"
+
+func maskValue(v any) any {
+	if v == nil {
+		return nil
+	}
+	return maskedValue
+}
+
+func redact(data models.JSONMap, hidden map[string]bool) models.JSONMap {
+	out := make(models.JSONMap, len(data))
+	for k, v := range data {
+		if hidden[k] {
+			v = maskValue(v)
+		}
+		out[k] = v
+	}
+	return out
+}
+
 func listHistory(resolve func(*gin.Context) (*historyTarget, bool)) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !canEditContent(c) {
@@ -131,9 +196,12 @@ func listHistory(resolve func(*gin.Context) (*historyTarget, bool)) gin.HandlerF
 		if !ok {
 			return
 		}
-		page, size := pageParams(c)
+		page, size, ok := pageParams(c)
+		if !ok {
+			return
+		}
 		revs, total, err := storage.ListRevisions(storage.RevisionQuery{
-			EntityType: t.entityType, EntityID: t.entityID, TypeName: t.typeName, Page: page, PageSize: size,
+			EntityType: t.entityType, EntityID: t.entityID, TypeName: t.itemTypeName(), Page: page, PageSize: size,
 		})
 		if err != nil {
 			c.Set("response", "Failed to load the history")
@@ -168,7 +236,7 @@ func getHistoryRevision(resolve func(*gin.Context) (*historyTarget, bool)) gin.H
 			return
 		}
 		rev, err := storage.GetRevision(t.entityType, t.entityID, version)
-		if err != nil || rev.TypeName != t.typeName {
+		if err != nil || !t.owns(rev) {
 			revisionLookupError(c, err)
 			return
 		}
@@ -197,7 +265,9 @@ func getHistoryRevision(resolve func(*gin.Context) (*historyTarget, bool)) gin.H
 			return
 		}
 
-		out := revisionJSON(*rev, true)
+		hidden := t.passwordFields()
+		out := revisionJSON(*rev, false)
+		out["data"] = redact(rev.Data, hidden)
 		var baseData models.JSONMap
 		if base != nil {
 			out["comparedTo"] = base.Version
@@ -206,7 +276,13 @@ func getHistoryRevision(resolve func(*gin.Context) (*historyTarget, bool)) gin.H
 			out["comparedTo"] = nil
 		}
 		// Changes read from the compared version to this one.
-		out["changes"] = storage.DiffData(baseData, rev.Data)
+		changes := storage.DiffData(baseData, rev.Data)
+		for i := range changes {
+			if hidden[changes[i].Field] {
+				changes[i].Before, changes[i].After = maskValue(changes[i].Before), maskValue(changes[i].After)
+			}
+		}
+		out["changes"] = changes
 		c.Set("response", out)
 		c.Set("status", http.StatusOK)
 	}
@@ -265,8 +341,8 @@ func restoreHistoryRevision(resolve func(*gin.Context) (*historyTarget, bool)) g
 				c.Set("response", "Item not found in this collection")
 				c.Set("status", http.StatusNotFound)
 			default:
+				logger.Log.WithError(err).WithField("type", t.typeName).WithField("version", version).Error("Restore failed")
 				c.Set("response", "Failed to restore the revision")
-				c.Set("details", err.Error())
 				c.Set("status", http.StatusInternalServerError)
 			}
 			return
@@ -280,6 +356,7 @@ func restoreHistoryRevision(resolve func(*gin.Context) (*historyTarget, bool)) g
 			"revision":  revisionJSON(*res.Revision, false),
 			"dropped":   dropped,
 			"undeleted": res.Undeleted,
+			"unchanged": res.Unchanged,
 		})
 		c.Set("status", http.StatusOK)
 	}
@@ -313,7 +390,14 @@ func ListRevisions(c *gin.Context) {
 	case c.Query("collection") != "":
 		q.EntityType, q.TypeName = models.RevisionEntityItem, c.Query("collection")
 	case c.Query("singleton") != "":
-		q.EntityType, q.TypeName = models.RevisionEntitySingleton, c.Query("singleton")
+		// By ID: a singleton's history follows it when it is renamed.
+		st, err := storage.GetSingletonByName(c.Query("singleton"))
+		if err != nil {
+			c.Set("response", "Singleton not found")
+			c.Set("status", http.StatusNotFound)
+			return
+		}
+		q.EntityType, q.EntityID = models.RevisionEntitySingleton, st.ID
 	}
 	if v := c.Query("agentRun"); v != "" {
 		n, err := strconv.ParseUint(v, 10, 32)
@@ -325,7 +409,7 @@ func ListRevisions(c *gin.Context) {
 	}
 	switch q.Action {
 	case "", models.RevisionCreate, models.RevisionUpdate, models.RevisionPublish,
-		models.RevisionUnpublish, models.RevisionDelete, models.RevisionRestore:
+		models.RevisionUnpublish, models.RevisionDelete, models.RevisionRestore, models.RevisionBaseline:
 	default:
 		validationError(c, "unknown action '"+q.Action+"'")
 		return
@@ -336,7 +420,10 @@ func ListRevisions(c *gin.Context) {
 		validationError(c, "actorKind must be user, token, agent or system")
 		return
 	}
-	q.Page, q.PageSize = pageParams(c)
+	var ok bool
+	if q.Page, q.PageSize, ok = pageParams(c); !ok {
+		return
+	}
 	revs, total, err := storage.ListRevisions(q)
 	if err != nil {
 		c.Set("response", "Failed to load the history")
@@ -357,7 +444,8 @@ func RevertAgentRun(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if _, err := storage.GetAgentRun(agent.ID, id); err != nil {
+	run, err := storage.GetAgentRun(agent.ID, id)
+	if err != nil {
 		if errors.Is(err, storage.ErrRunNotFound) {
 			c.Set("response", "Run not found")
 			c.Set("status", http.StatusNotFound)
@@ -367,6 +455,11 @@ func RevertAgentRun(c *gin.Context) {
 		c.Set("status", http.StatusInternalServerError)
 		return
 	}
+	if run.Status == agentModels.RunRunning {
+		c.Set("response", "the run is still running; revert it once it has finished")
+		c.Set("status", http.StatusConflict)
+		return
+	}
 	outcomes, err := storage.RevertAgentRun(actorFrom(c), id, c.Query("force") == "true")
 	if err != nil {
 		if errors.Is(err, storage.ErrRunHasNoChanges) {
@@ -374,8 +467,8 @@ func RevertAgentRun(c *gin.Context) {
 			c.Set("status", http.StatusConflict)
 			return
 		}
+		logger.Log.WithError(err).WithField("run_id", id).Error("Revert failed")
 		c.Set("response", "Failed to revert the run")
-		c.Set("details", err.Error())
 		c.Set("status", http.StatusInternalServerError)
 		return
 	}

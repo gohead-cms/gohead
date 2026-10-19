@@ -148,6 +148,7 @@ func historyPaths(base string, tag []string, name string, params []any, restored
 				"revision":  ref("Revision"),
 				"dropped":   obj{"type": "array", "items": obj{"type": "string"}, "description": "Attributes of the old version the type no longer has"},
 				"undeleted": obj{"type": "boolean"},
+				"unchanged": obj{"type": "boolean", "description": "The entry already had this content: no revision was recorded"},
 			}}))}, errorResponses("400", "401", "403", "404")),
 		}},
 	}
@@ -297,7 +298,7 @@ func schemaPath(summary, operationID string, list bool) obj {
 }
 
 var (
-	revisionActions = []string{models.RevisionCreate, models.RevisionUpdate, models.RevisionPublish, models.RevisionUnpublish, models.RevisionDelete, models.RevisionRestore}
+	revisionActions = []string{models.RevisionCreate, models.RevisionUpdate, models.RevisionPublish, models.RevisionUnpublish, models.RevisionDelete, models.RevisionRestore, models.RevisionBaseline}
 	actorKinds      = []string{models.ActorUser, models.ActorToken, models.ActorAgent, models.ActorSystem}
 )
 

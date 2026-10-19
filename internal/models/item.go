@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"fmt"
 	"maps"
 	"strconv"
@@ -225,6 +226,9 @@ func validateRelationship(attribute Attribute, value any, tx *gorm.DB) (any, err
 		if err := tx.Create(newItem).Error; err != nil {
 			return 0, fmt.Errorf("failed to create nested item in '%s': %w", attribute.Target, err)
 		}
+		if c := nestedCollector(tx); c != nil {
+			c.Items = append(c.Items, NestedItem{Item: newItem, Collection: relatedCollection})
+		}
 
 		return newItem.ID, nil
 	}
@@ -371,4 +375,37 @@ func lookup(collection Collection, data map[string]any, tx *gorm.DB) (uint, bool
 
 	// No matches
 	return 0, false, nil
+}
+
+// NestedItem is an item created while validating a relation given as an
+// object (see ValidateItemValues).
+type NestedItem struct {
+	Item       *Item
+	Collection Collection
+}
+
+// NestedCreated collects the items validation creates, so the caller can
+// record them (history, events).
+type NestedCreated struct {
+	Items []NestedItem
+}
+
+type nestedKey struct{}
+
+// WithNestedCollector returns tx with c attached: items that validation
+// creates for relations given as objects are appended to c.
+func WithNestedCollector(tx *gorm.DB, c *NestedCreated) *gorm.DB {
+	ctx := tx.Statement.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return tx.WithContext(context.WithValue(ctx, nestedKey{}, c))
+}
+
+func nestedCollector(tx *gorm.DB) *NestedCreated {
+	if tx.Statement == nil || tx.Statement.Context == nil {
+		return nil
+	}
+	c, _ := tx.Statement.Context.Value(nestedKey{}).(*NestedCreated)
+	return c
 }

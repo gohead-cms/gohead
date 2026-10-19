@@ -9,7 +9,7 @@ History is for **editors and admins**. Viewers get `403`, because revisions can 
 | Field | Description |
 |-------|-------------|
 | `version` | `1, 2, 3…` per entry |
-| `action` | `create`, `update`, `publish`, `unpublish`, `delete` or `restore` |
+| `action` | `create`, `update`, `publish`, `unpublish`, `delete`, `restore` or `baseline` (see below) |
 | `data` | The entry's stored data after the change, with relations as IDs. For a `delete`, the data the entry had. |
 | `status` | `draft` or `published` after the change (draft-and-publish collections) |
 | `actorKind`, `actorName` | Who made the change: `user` (username), `token` (API token name), `agent` (agent name) or `system` |
@@ -21,7 +21,7 @@ A save that changes nothing (same data, same status) doesn't add a revision. The
 The newest **100 revisions per entry** are kept. Older ones are pruned as new ones arrive. Change the limit with [`content.revisions_kept`](../getting-started/configuration.md#content-history), where `0` keeps everything. Deleting a collection or a singleton type deletes its history too.
 
 !!! note "Upgrading"
-    Entries that existed before 0.5 have no history yet. Their first revision is recorded the next time they change.
+    Entries that existed before 0.5 have no history yet. The first time one changes, GoHead first records its current content as version 1 (`baseline`, by `system`), then the change as version 2. The content from before the first edit can therefore always be restored, and a run that edits old content can be reverted.
 
 ## In the admin UI
 
@@ -70,8 +70,9 @@ Singletons have the same three routes under `/api/singleton/{name}/revisions`.
 A restore copies the old version's data into the entry and records a new `restore` revision. Nothing is rewritten in place, so a restore can itself be undone.
 
 - The data is validated against the **current** content model, as a normal update would be. Attributes the type no longer has are left out and listed in `meta.dropped`. If the old data no longer fits (a required attribute was added since, a unique value is now taken, a related entry is gone), the restore fails with `400` and says why.
-- **Restoring a deleted entry brings it back** under the same ID (`meta.undeleted: true`). Use the version of its `delete` revision to get the content it had before it was deleted. In a draft-and-publish collection it comes back as a **draft**.
+- **Restoring a deleted entry brings it back** under the same ID (`meta.undeleted: true`). Use the version of its `delete` revision to get the content it had before it was deleted. In a draft-and-publish collection it comes back with the publication state of the version you restore: restoring the `delete` revision of a published article brings it back published.
 - Otherwise the entry's publication state is left as it is: restoring an old version of a published article changes its content, and it stays published.
+- Restoring the content the entry already has records nothing and returns `meta.unchanged: true`.
 - Restores send the usual `item:updated` webhook and agent events (`item:created` for an entry brought back).
 
 ```json
@@ -133,9 +134,13 @@ The response lists what happened to each entry:
 }
 ```
 
-The revert's own changes are attributed to the admin who asked for it. A run that changed no content returns `409`. An entry can't be reverted if the version from before the run has already been pruned: it's skipped with a reason.
+The revert's own changes are attributed to the admin who asked for it. A run that changed no content returns `409`, and so does a run that is still running. Items an agent created through a relation (an `author` given as an object, for example) are part of the run too, and are deleted with it. An entry can't be reverted if the version from before the run has already been pruned: it's skipped with a reason.
+
+## Passwords
+
+Values of `password` attributes are kept in revisions, so they can be restored. API responses mask them as `"********"`, in the revision's `data` and in `changes`. A changed password still shows as a change.
 
 ## Not covered
 
-- Changes to the **content model** (collections, attributes, components) and to media files aren't versioned.
+- Changes to the **content model** (collections, attributes, components) and to media files aren't versioned. When draft and publish is turned on or off for a collection, its drafts are published without a revision. Renaming a collection keeps its history.
 - History is available through REST only. GraphQL mutations do record revisions, but there's no GraphQL query for history.

@@ -2,7 +2,8 @@ import { Badge, HStack, Icon, Link, Text, Tooltip } from "@chakra-ui/react";
 import { Link as RouterLink } from "react-router-dom";
 import { FiCpu, FiKey, FiServer, FiUser } from "react-icons/fi";
 import type { IconType } from "react-icons";
-import { type ActorKind, type Revision, type RevisionAction, actionColor, actorKindColor, agentRunLink } from "./history";
+import { useMe } from "../auth/me";
+import { type ActorKind, type Revision, type RevisionAction, actionColor, actionLabel, actorKindColor, agentRunLink } from "./history";
 
 const actorIcon: Record<ActorKind, IconType> = {
   user: FiUser,
@@ -12,7 +13,14 @@ const actorIcon: Record<ActorKind, IconType> = {
 };
 
 export function ActionBadge({ action }: { action: RevisionAction }) {
-  return <Badge colorScheme={actionColor[action] ?? "gray"}>{action}</Badge>;
+  return (
+    <Badge
+      colorScheme={actionColor[action] ?? "gray"}
+      title={action === "baseline" ? "Baseline: the content before history was recorded" : undefined}
+    >
+      {actionLabel[action] ?? action}
+    </Badge>
+  );
 }
 
 export function StatusBadge({ status }: { status?: string }) {
@@ -26,11 +34,12 @@ export function StatusBadge({ status }: { status?: string }) {
 
 /**
  * Who made a change: an icon and badge for the kind of actor, its name, and
- * for an agent a link to the run (links=false shows the run as text, inside
- * clickable rows).
+ * for an agent its run: a link for admins (the agents pages are admin-only),
+ * text otherwise and with links=false (inside clickable rows).
  */
 export function ActorTag({ revision, links = true }: { revision: Pick<Revision, "actorKind" | "actorName" | "agentRunId">; links?: boolean }) {
   const { actorKind, actorName, agentRunId } = revision;
+  const { isAdmin } = useMe();
   return (
     <HStack spacing={1.5} minW={0} fontSize="sm">
       <Tooltip label={actorKind}>
@@ -43,7 +52,7 @@ export function ActorTag({ revision, links = true }: { revision: Pick<Revision, 
         {actorName || "unknown"}
       </Text>
       {actorKind === "agent" && agentRunId !== undefined && (
-        links && actorName ? (
+        links && isAdmin && actorName ? (
           <Link as={RouterLink} to={agentRunLink(actorName, agentRunId)} color="purple.600" whiteSpace="nowrap" onClick={(e) => e.stopPropagation()}>
             run #{agentRunId}
           </Link>

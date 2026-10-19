@@ -31,7 +31,7 @@ import {
   type RestoreMeta,
   type Revision,
   restoreRevision,
-  restoredDescription,
+  restoreToast,
   targetKey,
   targetLabel,
 } from "./history";
@@ -97,7 +97,8 @@ function HistoryContent({ target, onRestored }: { target: HistoryTarget; onResto
     try {
       const res = await restoreRevision(target, version);
       const meta = res.meta as RestoreMeta | undefined;
-      notify.success(meta?.undeleted ? "Entry brought back" : "Version restored", restoredDescription(version, meta));
+      const toast = restoreToast(version, meta);
+      notify[toast.status](toast.title, toast.description);
       setSelected(null);
       setCompare("previous");
       refetch();
@@ -177,6 +178,7 @@ function HistoryContent({ target, onRestored }: { target: HistoryTarget; onResto
             target={target}
             revision={current}
             isLatest={current.version === latest?.version}
+            latest={latest}
             compare={compare}
             onCompare={setCompare}
             onRestore={() => restore(current.version)}
@@ -219,22 +221,27 @@ interface RevisionPanelProps {
   target: HistoryTarget;
   revision: Revision;
   isLatest: boolean;
+  /** The entry's newest revision (a delete when the entry is deleted). */
+  latest: Revision | undefined;
   compare: "previous" | "current";
   onCompare: (c: "previous" | "current") => void;
   onRestore: () => Promise<void>;
 }
 
 /** One version: who made it, the fields it changed, and restoring it. */
-function RevisionPanel({ target, revision: r, isLatest, compare, onCompare, onRestore }: RevisionPanelProps) {
+function RevisionPanel({ target, revision: r, isLatest, latest, compare, onCompare, onRestore }: RevisionPanelProps) {
   const { revision: detail, loading, error } = useRevision(target, r.version, compare);
   const [showData, setShowData] = useState(false);
   const codeBg = useColorModeValue("gray.50", "gray.800");
   // Restoring the current version changes nothing, unless it is a delete.
   const canRestore = !isLatest || r.action === "delete";
 
+  // A deleted entry has no current content: "current" is the delete
+  // revision, which holds the content it had when it was deleted.
+  const deleted = latest?.action === "delete";
   const beforeLabel =
     compare === "current"
-      ? `Current${detail?.comparedTo ? ` (v${detail.comparedTo})` : ""}`
+      ? `${deleted ? "Deleted (last content)" : "Current"}${detail?.comparedTo ? ` (v${detail.comparedTo})` : ""}`
       : detail?.comparedTo
         ? `v${detail.comparedTo}`
         : "Before";
@@ -284,7 +291,13 @@ function RevisionPanel({ target, revision: r, isLatest, compare, onCompare, onRe
 
       <Box>
         <Flex justify="space-between" align="center" mb={3} gap={3} wrap="wrap">
-          <Text fontWeight="semibold">{compare === "current" ? "Differences from the current version" : "Changes in this version"}</Text>
+          <Text fontWeight="semibold">
+            {compare === "current"
+              ? deleted
+                ? "Differences from the deleted content"
+                : "Differences from the current version"
+              : "Changes in this version"}
+          </Text>
           <ButtonGroup size="xs" isAttached variant="outline" role="group" aria-label="Compare with">
             <Button
               colorScheme={compare === "previous" ? "purple" : "gray"}
@@ -315,17 +328,30 @@ function RevisionPanel({ target, revision: r, isLatest, compare, onCompare, onRe
           <>
             {compare === "previous" && detail.comparedTo === null && (
               <Text fontSize="sm" color="gray.500" mb={2}>
-                {r.version === 1 ? "The first version: every field it was created with." : "The previous version is no longer kept."}
+                {r.action === "baseline"
+                  ? "Baseline: the content as it was when history started to be recorded."
+                  : r.action === "create"
+                    ? "The first version: every field it was created with."
+                    : "The previous version is no longer kept."}
               </Text>
             )}
-            {compare === "current" && detail.changes.length > 0 && (
+            {compare === "current" && deleted && (
+              <Text fontSize="sm" color="gray.500" mb={2}>
+                The entry is deleted: this compares with the content it had when it was deleted.
+              </Text>
+            )}
+            {compare === "current" && !deleted && detail.changes.length > 0 && (
               <Text fontSize="sm" color="gray.500" mb={2}>
                 What restoring this version would change.
               </Text>
             )}
             {detail.changes.length === 0 ? (
               <Text fontSize="sm" color="gray.500">
-                {compare === "current" ? "Same content as the current version." : "No field changed in this version."}
+                {compare === "current"
+                  ? deleted
+                    ? "Same content as when the entry was deleted."
+                    : "Same content as the current version."
+                  : "No field changed in this version."}
               </Text>
             ) : (
               <ChangesTable changes={detail.changes} beforeLabel={beforeLabel} afterLabel={`v${r.version}`} />

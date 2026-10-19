@@ -72,8 +72,11 @@ export interface DeletedEntry {
   title?: string;
 }
 
-/** Deleted entries looked at, at most: each costs two requests. */
-const DELETED_LIMIT = 20;
+/** Delete revisions scanned for "Recently deleted" (the newest ones). */
+export const DELETES_SCANNED = 50;
+
+/** Deleted entries listed, at most: each costs two requests. */
+export const DELETED_LIMIT = 20;
 
 /**
  * The collection's recently deleted entries (null loads nothing). An entry
@@ -81,7 +84,7 @@ const DELETED_LIMIT = 20;
  */
 export function useDeletedEntries(collection: string | null) {
   const key = collection
-    ? `/api/revisions?${new URLSearchParams({ collection, action: "delete", pageSize: "50" })}`
+    ? `/api/revisions?${new URLSearchParams({ collection, action: "delete", pageSize: String(DELETES_SCANNED) })}`
     : null;
   const { data, loading, error, refetch } = useApiQuery(key, async (): Promise<DeletedEntry[]> => {
     const json = await getJSON<Revision[]>(key!, "Failed to load deleted entries");

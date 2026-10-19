@@ -1,6 +1,7 @@
 import { api, type Envelope } from "../../services/api";
 
-export type RevisionAction = "create" | "update" | "publish" | "unpublish" | "delete" | "restore";
+/** "baseline": the content an entry had before history was recorded (made by the system before its first recorded change). */
+export type RevisionAction = "baseline" | "create" | "update" | "publish" | "unpublish" | "delete" | "restore";
 export type ActorKind = "user" | "token" | "agent" | "system";
 
 /** One change of an entry (lists leave the data out). */
@@ -41,9 +42,12 @@ export interface RevisionPagination {
 }
 
 export interface RestoreMeta {
+  /** The new revision, or the current one when nothing changed. */
   revision?: Revision;
   dropped?: string[];
   undeleted?: boolean;
+  /** The version was already the current content: no new revision. */
+  unchanged?: boolean;
 }
 
 /** The entry a history is about: a collection item or a singleton. */
@@ -81,6 +85,18 @@ export function restoreRevision(target: HistoryTarget, version: number): Promise
   return api<Record<string, unknown>>("POST", `${historyPath(target)}/${version}/restore`);
 }
 
+/** The toast after a restore: info when nothing changed, success otherwise. */
+export function restoreToast(version: number, meta: RestoreMeta | undefined): { status: "success" | "info"; title: string; description: string } {
+  if (meta?.unchanged) {
+    return { status: "info", title: "Already the current content", description: `Version ${version} matches the current content: nothing changed.` };
+  }
+  return {
+    status: "success",
+    title: meta?.undeleted ? "Entry brought back" : "Version restored",
+    description: restoredDescription(version, meta),
+  };
+}
+
 /** The toast text after a restore: what came back and what was left out. */
 export function restoredDescription(version: number, meta: RestoreMeta | undefined): string {
   const parts = [meta?.undeleted ? `Version ${version} restored: the entry is brought back.` : `Version ${version} is now the current content.`];
@@ -92,6 +108,7 @@ export function restoredDescription(version: number, meta: RestoreMeta | undefin
 }
 
 export const actionColor: Record<RevisionAction, string> = {
+  baseline: "gray",
   create: "green",
   update: "blue",
   publish: "teal",
@@ -106,6 +123,20 @@ export const actorKindColor: Record<ActorKind, string> = {
   agent: "purple",
   system: "yellow",
 };
+
+/** Badge text of an action. */
+export const actionLabel: Record<RevisionAction, string> = {
+  baseline: "before history",
+  create: "create",
+  update: "update",
+  publish: "publish",
+  unpublish: "unpublish",
+  delete: "delete",
+  restore: "restore",
+};
+
+/** Password attributes come back redacted as this string. */
+export const REDACTED = "********";
 
 /** A readable title for an entry's data: its title, name or first short text. */
 export function dataTitle(data: Record<string, unknown> | null | undefined): string | undefined {

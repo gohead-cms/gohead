@@ -24,8 +24,8 @@ import {
 import { FiRotateCcw, FiTrash } from "react-icons/fi";
 import { useNotify } from "../../shared/hooks/useNotify";
 import { formatShortTime, formatTime } from "../agents/components/runFormat";
-import { type DeletedEntry, useDeletedEntries } from "./useHistory";
-import { type RestoreMeta, restoreRevision, restoredDescription } from "./history";
+import { DELETED_LIMIT, DELETES_SCANNED, type DeletedEntry, useDeletedEntries } from "./useHistory";
+import { type RestoreMeta, restoreRevision, restoreToast } from "./history";
 import { ActorTag } from "./RevisionBadges";
 
 /**
@@ -62,7 +62,8 @@ function DeletedList({ collection, onRestored }: { collection: string; onRestore
     setRestoring(entityId);
     try {
       const res = await restoreRevision({ kind: "item", collection, id: entityId }, version);
-      notify.success(`Entry #${entityId} brought back`, restoredDescription(version, res.meta as RestoreMeta | undefined));
+      const toast = restoreToast(version, res.meta as RestoreMeta | undefined);
+      notify[toast.status](toast.status === "success" ? `Entry #${entityId} brought back` : toast.title, toast.description);
       refetch();
       onRestored();
     } catch (err) {
@@ -88,12 +89,17 @@ function DeletedList({ collection, onRestored }: { collection: string; onRestore
     );
   }
   if (entries.length === 0) {
-    return <Text color="gray.500">No deleted entries in this collection.</Text>;
+    return (
+      <>
+        <Text color="gray.500">No deleted entries among the latest deletions in this collection.</Text>
+        <ScanNote />
+      </>
+    );
   }
   return (
     <>
       <Text fontSize="sm" color="gray.500" mb={3}>
-        Restoring brings an entry back with the content it had when it was deleted.
+        Restoring brings an entry back with the content and publication state it had when it was deleted.
       </Text>
       <TableContainer borderWidth="1px" borderRadius="md">
         <Table size="sm" sx={{ "th, td": { px: 3 } }}>
@@ -140,6 +146,17 @@ function DeletedList({ collection, onRestored }: { collection: string; onRestore
           </Tbody>
         </Table>
       </TableContainer>
+      <ScanNote />
     </>
+  );
+}
+
+/** What the list covers: only the newest deletions are looked at. */
+function ScanNote() {
+  return (
+    <Text fontSize="xs" color="gray.500" mt={3}>
+      Looks at the latest {DELETES_SCANNED} deletions in this collection and lists up to {DELETED_LIMIT} entries. Older deletions are
+      in Activity → Content changes, filtered by Deleted (admins), and each entry's history can still restore it.
+    </Text>
   );
 }

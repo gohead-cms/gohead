@@ -12,6 +12,7 @@ import (
 	"github.com/gohead-cms/gohead/internal/agent/events"
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/database"
+	"github.com/gohead-cms/gohead/pkg/logger"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -22,7 +23,15 @@ type Actor struct {
 	Kind       string // models.ActorUser, ActorToken, ActorAgent or ActorSystem
 	Name       string // username, token name or agent name
 	AgentRunID uint   // the agent run, for agents
+
+	// expectVersion, when set, makes the change fail with errChangedSince
+	// unless the entry's latest version is still this one (checked under
+	// the row lock, in the change's transaction).
+	expectVersion uint
 }
+
+// errChangedSince: the entry changed between a check and the change.
+var errChangedSince = errors.New("changed in the meantime")
 
 // SystemActor is used for changes nobody in particular made (imports,
 // tests, internal jobs).
@@ -64,6 +73,16 @@ type revisionInput struct {
 	status       string
 	data         models.JSONMap
 	restoredFrom *uint
+	// before is the entry's state before the change. When the entry has no
+	// revision yet (it predates history), it is recorded first as a
+	// "baseline", so the change can be undone.
+	before *entryState
+}
+
+// entryState is an entry's content and status at one point.
+type entryState struct {
+	data   models.JSONMap
+	status string
 }
 
 // recordRevision stores the next revision of an entry inside tx and prunes
@@ -77,8 +96,22 @@ func recordRevision(tx *gorm.DB, actor Actor, in revisionInput) (*models.Revisio
 		Select("COALESCE(MAX(version), 0)").Scan(&last).Error; err != nil {
 		return nil, fmt.Errorf("failed to read the last revision: %w", err)
 	}
+	if actor.expectVersion != 0 && last != actor.expectVersion {
+		return nil, errChangedSince
+	}
 	if actor.Kind == "" {
 		actor = SystemActor
+	}
+	if last == 0 && in.before != nil {
+		base := &models.Revision{
+			EntityType: in.entityType, EntityID: in.entityID, Version: 1, TypeName: in.typeName,
+			Action: models.RevisionBaseline, Status: in.before.status, Data: copyMap(in.before.data),
+			ActorKind: SystemActor.Kind, ActorName: SystemActor.Name, CreatedAt: models.APITime(time.Now()),
+		}
+		if err := tx.Create(base).Error; err != nil {
+			return nil, fmt.Errorf("failed to record the baseline revision: %w", err)
+		}
+		last = 1
 	}
 	rev := &models.Revision{
 		EntityType:   in.entityType,
@@ -108,6 +141,28 @@ func recordRevision(tx *gorm.DB, actor Actor, in revisionInput) (*models.Revisio
 		}
 	}
 	return rev, nil
+}
+
+// recordNested records the first revision of the items validation created
+// for relations given as objects (see models.WithNestedCollector).
+func recordNested(tx *gorm.DB, actor Actor, nested *models.NestedCreated) error {
+	actor.expectVersion = 0 // new entries
+	for _, n := range nested.Items {
+		if _, err := recordRevision(tx, actor, revisionInput{
+			entityType: models.RevisionEntityItem, entityID: n.Item.ID, typeName: n.Collection.Name,
+			action: models.RevisionCreate, status: itemStatus(n.Collection, n.Item), data: n.Item.Data,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// publishNested sends item:created for nested items, after the commit.
+func publishNested(nested *models.NestedCreated) {
+	for _, n := range nested.Items {
+		publishEvent(database.DB, events.EventTypeItemCreated, n.Item)
+	}
 }
 
 // lockRow adds SELECT … FOR UPDATE where the database supports it. SQLite
@@ -296,12 +351,24 @@ type RestoreResult struct {
 	Dropped []string
 	// Undeleted is true when the restore brought back a deleted entry.
 	Undeleted bool
+	// Unchanged is true when the entry already had that content: no
+	// revision was recorded, and Revision is the latest one.
+	Unchanged bool
+}
+
+// latestRevisionTx is LatestRevision inside a transaction.
+func latestRevisionTx(tx *gorm.DB, entityType string, entityID uint) (*models.Revision, error) {
+	var rev models.Revision
+	if err := tx.Where("entity_type = ? AND entity_id = ?", entityType, entityID).Order("version DESC").First(&rev).Error; err != nil {
+		return nil, err
+	}
+	return &rev, nil
 }
 
 // RestoreItemRevision makes a version of an item its current content, as a
-// new revision. A deleted item is brought back (as a draft in
-// draft-and-publish collections); otherwise the publication state is left
-// as it is. The data is validated against the current schema.
+// new revision. A deleted item is brought back with the publication state
+// the restored version had; otherwise the publication state is left as it
+// is. The data is validated against the current schema.
 func RestoreItemRevision(actor Actor, ct models.Collection, itemID, version uint) (*models.Item, *RestoreResult, error) {
 	rev, err := GetRevision(models.RevisionEntityItem, itemID, version)
 	if err != nil {
@@ -312,6 +379,7 @@ func RestoreItemRevision(actor Actor, ct models.Collection, itemID, version uint
 	}
 	data, dropped := restorableData(ct.Attributes, rev.Data)
 	res := &RestoreResult{Dropped: dropped}
+	nested := &models.NestedCreated{}
 	var item models.Item
 	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
 		if err := lockRow(tx.Unscoped()).Where("id = ? AND collection_id = ?", itemID, ct.ID).First(&item).Error; err != nil {
@@ -320,15 +388,26 @@ func RestoreItemRevision(actor Actor, ct models.Collection, itemID, version uint
 			}
 			return err
 		}
-		processed, err := models.ValidateItemUpdate(ct, data, tx, item.ID)
+		processed, err := models.ValidateItemUpdate(ct, data, models.WithNestedCollector(tx, nested), item.ID)
 		if err != nil {
 			return &ItemValidationError{Err: fmt.Errorf("version %d no longer fits the collection: %w", version, err)}
+		}
+		if !item.DeletedAt.Valid && len(nested.Items) == 0 && sameData(item.Data, processed) {
+			res.Unchanged = true
+			res.Revision, err = latestRevisionTx(tx, models.RevisionEntityItem, item.ID)
+			return err
+		}
+		if err := recordNested(tx, actor, nested); err != nil {
+			return err
 		}
 		updates := map[string]any{"data": processed}
 		if item.DeletedAt.Valid {
 			res.Undeleted = true
 			updates["deleted_at"] = nil
 			updates["published_at"] = nil
+			if ct.DraftAndPublish && rev.Status == models.StatusPublished {
+				updates["published_at"] = models.APITime(time.Now())
+			}
 		}
 		if err := tx.Unscoped().Model(&item).Updates(updates).Error; err != nil {
 			return err
@@ -346,9 +425,15 @@ func RestoreItemRevision(actor Actor, ct models.Collection, itemID, version uint
 	if txErr != nil {
 		return nil, nil, txErr
 	}
-	if res.Undeleted {
+	publishNested(nested)
+	switch {
+	case res.Unchanged:
+	case res.Undeleted:
 		publishEvent(database.DB, events.EventTypeItemCreated, &item)
-	} else {
+		if item.PublishedAt != nil {
+			publishEvent(database.DB, events.EventTypeItemPublished, &item)
+		}
+	default:
 		publishEvent(database.DB, events.EventTypeItemUpdated, &item)
 	}
 	return &item, res, nil
@@ -379,6 +464,11 @@ func RestoreSingletonRevision(actor Actor, st *models.Singleton, version uint) (
 		case err != nil:
 			return err
 		default:
+			if sameData(item.Data, data) {
+				res.Unchanged = true
+				res.Revision, err = latestRevisionTx(tx, models.RevisionEntitySingleton, st.ID)
+				return err
+			}
 			if err := tx.Model(&item).Updates(map[string]any{"data": data}).Error; err != nil {
 				return err
 			}
@@ -448,9 +538,16 @@ func RevertAgentRun(actor Actor, runID uint, force bool) ([]RevertOutcome, error
 		o := RevertOutcome{EntityType: e.entityType, EntityID: e.entityID, TypeName: e.typeName}
 		latest, err := LatestRevision(e.entityType, e.entityID)
 		if err != nil {
-			o.Result, o.Reason = "failed", err.Error()
+			logger.Log.WithError(err).WithField("run_id", runID).Warn("Revert: failed to read the latest revision")
+			o.Result, o.Reason = "failed", "could not read the entry's history"
 			out = append(out, o)
 			continue
+		}
+		// Without force, the change only applies if nobody changed the
+		// entry between this check and the change itself.
+		guarded := actor
+		if !force {
+			guarded.expectVersion = latest.Version
 		}
 		if latest.ID != e.last.ID && !force {
 			o.Result = "skipped"
@@ -463,7 +560,7 @@ func RevertAgentRun(actor Actor, runID uint, force bool) ([]RevertOutcome, error
 		case created && latest.Action == models.RevisionDelete:
 			o.Result, o.Reason = "skipped", "already deleted"
 		case created:
-			err = revertDelete(actor, e.entityType, e.entityID, e.typeName)
+			err = revertDelete(guarded, e.entityType, e.entityID, e.typeName)
 			o.Result = "deleted"
 		case e.first.Version <= 1:
 			o.Result, o.Reason = "skipped", "no earlier version is kept"
@@ -474,12 +571,20 @@ func RevertAgentRun(actor Actor, runID uint, force bool) ([]RevertOutcome, error
 				break
 			}
 			if err == nil {
-				err = revertRestore(actor, e.entityType, e.entityID, e.typeName, o.Version)
+				err = revertRestore(guarded, e.entityType, e.entityID, e.typeName, o.Version)
 			}
 			o.Result = "reverted"
 		}
-		if err != nil {
-			o.Result, o.Reason, o.Version = "failed", err.Error(), 0
+		var verr *ItemValidationError
+		switch {
+		case err == nil:
+		case errors.Is(err, errChangedSince):
+			o.Result, o.Reason, o.Version = "skipped", "changed while reverting", 0
+		case errors.As(err, &verr):
+			o.Result, o.Reason, o.Version = "failed", verr.Error(), 0
+		default:
+			logger.Log.WithError(err).WithField("run_id", runID).WithField("entity_id", e.entityID).Warn("Revert failed")
+			o.Result, o.Reason, o.Version = "failed", "could not revert (see the server log)", 0
 		}
 		out = append(out, o)
 	}

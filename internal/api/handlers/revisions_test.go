@@ -171,3 +171,36 @@ func TestSingletonHistory(t *testing.T) {
 	code, _ := a.do("editor", "GET", "/api/singleton/nope/revisions", nil)
 	assert.Equal(t, http.StatusNotFound, code)
 }
+
+func TestHistoryHidesPasswordsAndValidatesPaging(t *testing.T) {
+	a := newContentAPI(t)
+	a.ok("admin", "POST", "/admin/collections", map[string]any{
+		"name": "members", "kind": "collection",
+		"attributes": map[string]any{
+			"name":   map[string]any{"type": "string"},
+			"secret": map[string]any{"type": "password"},
+		},
+	})
+	m := a.ok("editor", "POST", "/api/collections/members", map[string]any{
+		"data": map[string]any{"name": "Ada", "secret": "hunter2hunter2"},
+	}).(map[string]any)
+	history := fmt.Sprintf("/api/collections/members/%d/revisions", int(m["id"].(float64)))
+
+	rev := a.ok("editor", "GET", history+"/1", nil).(map[string]any)
+	assert.Equal(t, "********", field(rev["data"], "secret"))
+	for _, ch := range rev["changes"].([]any) {
+		if field(ch, "field") == "secret" {
+			assert.Equal(t, "********", field(ch, "after"))
+		}
+	}
+
+	code, _ := a.do("editor", "GET", history+"?pageSize=500", nil)
+	assert.Equal(t, http.StatusBadRequest, code)
+	code, _ = a.do("editor", "GET", "/api/revisions?page=0", nil)
+	assert.Equal(t, http.StatusBadRequest, code)
+
+	code, out := a.do("editor", "POST", history+"/1/restore", nil)
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Equal(t, true, field(out["meta"], "unchanged"), "restoring the current content records nothing")
+	assert.Len(t, a.ok("editor", "GET", history, nil), 1)
+}

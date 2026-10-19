@@ -91,7 +91,7 @@ export function ContentTable({ schema, items, canWrite, onAdd, onEdit, onHistory
                         <ConfirmButton
                           trigger={<IconButton aria-label="Delete item" icon={<FiTrash2 />} size="sm" variant="ghost" colorScheme="red" />}
                           title="Delete this entry?"
-                          body={`Entry #${item.id} will be deleted. This cannot be undone.`}
+                          body={`Entry #${item.id} will be deleted. You can bring it back later from "Recently deleted".`}
                           onConfirm={() => onDelete(item)}
                         />
                       </HStack>

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/testutils"
 
 	"github.com/stretchr/testify/assert"
@@ -147,4 +148,103 @@ func TestDiffData(t *testing.T) {
 		{Field: "c", Change: "removed", Before: []any{1.0}},
 		{Field: "d", Change: "added", After: true},
 	}, changes, "numbers compare by JSON value")
+}
+
+func TestBaselineForContentWithoutHistory(t *testing.T) {
+	ct := historyFixture(t)
+	// An item from before history existed: no revision.
+	old := &models.Item{CollectionID: ct.ID, Data: models.JSONMap{"title": "Original"}}
+	require.NoError(t, database.DB.Create(old).Error)
+
+	agent := Actor{Kind: models.ActorAgent, Name: "rewriter", AgentRunID: 9}
+	_, err := UpdateItemContent(agent, ct, old.ID, models.JSONMap{"title": "Rewritten"}, nil)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"update", "baseline"}, versions(t, old.ID))
+	base, err := GetRevision(models.RevisionEntityItem, old.ID, 1)
+	require.NoError(t, err)
+	assert.Equal(t, "Original", base.Data["title"])
+	assert.Equal(t, models.ActorSystem, base.ActorKind)
+	assert.Nil(t, base.AgentRunID, "the baseline is not part of the run")
+
+	out, err := RevertAgentRun(SystemActor, 9, false)
+	require.NoError(t, err)
+	require.Len(t, out, 1)
+	assert.Equal(t, "reverted", out[0].Result)
+	item, err := GetItemByID(ct.ID, old.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "Original", item.Data["title"])
+
+	// Deleting content without history keeps it restorable too.
+	other := &models.Item{CollectionID: ct.ID, Data: models.JSONMap{"title": "Old"}}
+	require.NoError(t, database.DB.Create(other).Error)
+	require.NoError(t, DeleteItem(SystemActor, other.ID))
+	assert.Equal(t, []string{"delete", "baseline"}, versions(t, other.ID))
+}
+
+func TestNestedItemsHaveHistory(t *testing.T) {
+	_, db := testutils.SetupTestServer()
+	t.Cleanup(testutils.CleanupTestDB)
+	require.NoError(t, db.AutoMigrate(&models.Item{}, &models.Collection{}, &models.Attribute{}, &models.Revision{}))
+	authors := &models.Collection{Name: "authors", Attributes: []models.Attribute{{Name: "name", Type: "string"}}}
+	require.NoError(t, db.Create(authors).Error)
+	posts := &models.Collection{Name: "posts", Attributes: []models.Attribute{
+		{Name: "title", Type: "string"},
+		{Name: "author", Type: "relation", Relation: "oneToOne", Target: "authors"},
+	}}
+	require.NoError(t, db.Create(posts).Error)
+
+	agent := Actor{Kind: models.ActorAgent, Name: "writer", AgentRunID: 3}
+	post, err := SaveItem(agent, *posts, models.JSONMap{"title": "Hi", "author": map[string]any{"name": "Ada"}})
+	require.NoError(t, err)
+
+	revs, total, err := ListRevisions(RevisionQuery{AgentRunID: 3})
+	require.NoError(t, err)
+	require.Equal(t, 2, total, "the post and the author it created")
+	assert.Equal(t, "authors", revs[0].TypeName)
+	assert.Equal(t, models.RevisionCreate, revs[0].Action)
+
+	out, err := RevertAgentRun(SystemActor, 3, false)
+	require.NoError(t, err)
+	for _, o := range out {
+		assert.Equal(t, "deleted", o.Result, "%+v", o)
+	}
+	_, err = GetItemByID(posts.ID, post.ID)
+	assert.Error(t, err)
+	var left int64
+	require.NoError(t, db.Model(&models.Item{}).Where("collection_id = ?", authors.ID).Count(&left).Error)
+	assert.Zero(t, left, "the nested author is removed too")
+}
+
+func TestRestoreDetails(t *testing.T) {
+	_, db := testutils.SetupTestServer()
+	t.Cleanup(testutils.CleanupTestDB)
+	require.NoError(t, db.AutoMigrate(&models.Item{}, &models.Collection{}, &models.Attribute{}, &models.Revision{}))
+	ct := &models.Collection{Name: "news", DraftAndPublish: true, Attributes: []models.Attribute{{Name: "title", Type: "string"}}}
+	require.NoError(t, db.Create(ct).Error)
+
+	items, err := CreateItems(SystemActor, *ct, []ItemInput{{Data: models.JSONMap{"title": "Live"}, Publish: true}})
+	require.NoError(t, err)
+	id := items[0].ID
+
+	// Restoring the current content records nothing.
+	_, res, err := RestoreItemRevision(SystemActor, *ct, id, 1)
+	require.NoError(t, err)
+	assert.True(t, res.Unchanged)
+	assert.EqualValues(t, 1, res.Revision.Version)
+
+	// A published item deleted and restored comes back published.
+	require.NoError(t, DeleteItem(SystemActor, id))
+	item, res, err := RestoreItemRevision(SystemActor, *ct, id, 2)
+	require.NoError(t, err)
+	assert.True(t, res.Undeleted)
+	assert.NotNil(t, item.PublishedAt, "it keeps the publication state of the restored version")
+	assert.Equal(t, models.StatusPublished, res.Revision.Status)
+
+	// Renaming the collection keeps its history.
+	renamed := *ct
+	renamed.Name = "articles"
+	require.NoError(t, UpdateCollection(ct.ID, &renamed))
+	_, total, err := ListRevisions(RevisionQuery{EntityType: models.RevisionEntityItem, TypeName: "articles"})
+	require.NoError(t, err)
+	assert.Equal(t, 3, total)
 }

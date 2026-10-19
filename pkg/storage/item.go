@@ -67,10 +67,11 @@ var ErrDraftAndPublishDisabled = errors.New("this collection does not use draft 
 func CreateItems(actor Actor, collection models.Collection, inputs []ItemInput) ([]*models.Item, error) {
 	created := make([]*models.Item, 0, len(inputs))
 	now := models.APITime(time.Now())
+	nested := &models.NestedCreated{}
 
 	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
 		for i, in := range inputs {
-			processedData, err := models.ValidateItemValues(collection, in.Data, tx)
+			processedData, err := models.ValidateItemValues(collection, in.Data, models.WithNestedCollector(tx, nested))
 			if err != nil {
 				return &ItemValidationError{Index: i, Err: err}
 			}
@@ -92,12 +93,14 @@ func CreateItems(actor Actor, collection models.Collection, inputs []ItemInput) 
 			}
 			created = append(created, item)
 		}
-		return nil
+		// Items created for relations given as objects get their history too.
+		return recordNested(tx, actor, nested)
 	})
 	if txErr != nil {
 		return nil, txErr
 	}
 
+	publishNested(nested)
 	for _, item := range created {
 		publishEvent(database.DB, events.EventTypeItemCreated, item)
 		if item.PublishedAt != nil {
@@ -119,6 +122,7 @@ func UpdateItemContent(actor Actor, collection models.Collection, itemID uint, d
 	}
 	var item models.Item
 	var transition events.EventType
+	nested := &models.NestedCreated{}
 	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
 		if err := lockRow(tx).Where("id = ? AND collection_id = ?", itemID, collection.ID).First(&item).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -126,10 +130,14 @@ func UpdateItemContent(actor Actor, collection models.Collection, itemID uint, d
 			}
 			return err
 		}
+		before := &entryState{data: item.Data, status: itemStatus(collection, &item)}
 		previous := item.Data
-		processed, err := models.ValidateItemUpdate(collection, data, tx, item.ID)
+		processed, err := models.ValidateItemUpdate(collection, data, models.WithNestedCollector(tx, nested), item.ID)
 		if err != nil {
 			return &ItemValidationError{Err: err}
+		}
+		if err := recordNested(tx, actor, nested); err != nil {
+			return err
 		}
 		// Write only what this request changes, so a concurrent publish or
 		// unpublish of the same item is not overwritten.
@@ -157,13 +165,14 @@ func UpdateItemContent(actor Actor, collection models.Collection, itemID uint, d
 		}
 		_, err = recordRevision(tx, actor, revisionInput{
 			entityType: models.RevisionEntityItem, entityID: item.ID, typeName: collection.Name,
-			action: action, status: itemStatus(collection, &item), data: item.Data,
+			action: action, status: itemStatus(collection, &item), data: item.Data, before: before,
 		})
 		return err
 	})
 	if txErr != nil {
 		return nil, txErr
 	}
+	publishNested(nested)
 	publishEvent(database.DB, events.EventTypeItemUpdated, &item)
 	if transition != "" {
 		publishEvent(database.DB, transition, &item)
@@ -186,6 +195,7 @@ func SetItemPublished(actor Actor, collection models.Collection, itemID uint, pu
 			}
 			return err
 		}
+		before := &entryState{data: item.Data, status: itemStatus(collection, &item)}
 		var err error
 		if transition, err = setPublishedTx(tx, &item, publish); err != nil {
 			return err
@@ -202,7 +212,7 @@ func SetItemPublished(actor Actor, collection models.Collection, itemID uint, pu
 		}
 		_, err = recordRevision(tx, actor, revisionInput{
 			entityType: models.RevisionEntityItem, entityID: item.ID, typeName: collection.Name,
-			action: action, status: itemStatus(collection, &item), data: item.Data,
+			action: action, status: itemStatus(collection, &item), data: item.Data, before: before,
 		})
 		return err
 	})
@@ -367,6 +377,7 @@ func DeleteItem(actor Actor, id uint) error {
 		if _, err := recordRevision(tx, actor, revisionInput{
 			entityType: models.RevisionEntityItem, entityID: item.ID, typeName: collection.Name,
 			action: models.RevisionDelete, status: itemStatus(collection, &item), data: item.Data,
+			before: &entryState{data: item.Data, status: itemStatus(collection, &item)},
 		}); err != nil {
 			return err
 		}

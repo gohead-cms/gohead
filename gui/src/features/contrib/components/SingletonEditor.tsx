@@ -34,7 +34,8 @@ export function SingletonEditor({ singleton }: { singleton: SingletonDef }) {
               (content?.updatedAt ? `Last updated ${formatTime(content.updatedAt)}` : "One entry, edited in place.")}
           </Text>
         </Box>
-        {canWrite && content && (
+        {/* Also without content: deleted content can be restored from history. */}
+        {canWrite && (
           <Button bg="white" variant="outline" size="sm" leftIcon={<Icon as={FiClock} />} onClick={() => setHistoryOpen(true)}>
             History
           </Button>

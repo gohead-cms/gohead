@@ -147,7 +147,8 @@
               "publish",
               "unpublish",
               "delete",
-              "restore"
+              "restore",
+              "baseline"
             ],
             "type": "string"
           },
@@ -222,7 +223,8 @@
               "publish",
               "unpublish",
               "delete",
-              "restore"
+              "restore",
+              "baseline"
             ],
             "type": "string"
           },
@@ -1393,6 +1395,10 @@
                         "revision": {
                           "$ref": "#/components/schemas/Revision"
                         },
+                        "unchanged": {
+                          "description": "The entry already had this content: no revision was recorded",
+                          "type": "boolean"
+                        },
                         "undeleted": {
                           "type": "boolean"
                         }
@@ -2058,6 +2064,10 @@
                         "revision": {
                           "$ref": "#/components/schemas/Revision"
                         },
+                        "unchanged": {
+                          "description": "The entry already had this content: no revision was recorded",
+                          "type": "boolean"
+                        },
                         "undeleted": {
                           "type": "boolean"
                         }
@@ -2465,7 +2475,8 @@
                 "publish",
                 "unpublish",
                 "delete",
-                "restore"
+                "restore",
+                "baseline"
               ],
               "type": "string"
             }
@@ -3133,6 +3144,10 @@
                         },
                         "revision": {
                           "$ref": "#/components/schemas/Revision"
+                        },
+                        "unchanged": {
+                          "description": "The entry already had this content: no revision was recorded",
+                          "type": "boolean"
                         },
                         "undeleted": {
                           "type": "boolean"

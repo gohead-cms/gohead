@@ -16,6 +16,10 @@ const (
 	RevisionUnpublish = "unpublish"
 	RevisionDelete    = "delete"
 	RevisionRestore   = "restore"
+	// RevisionBaseline holds an entry's content from before history was
+	// recorded: it is written just before the first change of an entry
+	// that has no revisions yet.
+	RevisionBaseline = "baseline"
 )
 
 // Revision actor kinds.
