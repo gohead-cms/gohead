@@ -1,90 +1,66 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
+  Accordion,
+  AccordionButton,
+  AccordionIcon,
+  AccordionItem,
+  AccordionPanel,
+  Alert,
+  AlertIcon,
   Box,
-  Flex,
-  Heading,
-  Text,
   Button,
-  VStack,
+  Flex,
+  FormControl,
   Grid,
   GridItem,
-  Input,
-  Textarea,
-  Switch,
-  FormControl,
-  FormLabel,
-  useToast,
+  Heading,
   HStack,
   Icon,
-  Accordion,
-  AccordionItem,
-  AccordionButton,
-  AccordionPanel,
-  AccordionIcon,
+  Input,
+  Text,
+  Textarea,
+  VStack,
 } from "@chakra-ui/react";
 import { useNavigate, useParams } from "react-router-dom";
 import { FiSave, FiX } from "react-icons/fi";
+import { api } from "../../../services/api";
+import { useNotify } from "../../../shared/hooks/useNotify";
 import { PageLoader } from "../../../shared/ui/page-loader";
-import { apiFetchWithAuth } from "../../../services/api"
-import { Attribute, FieldValue, Schema } from "../../../shared/types";
+import type { Attribute, Schema } from "../../../shared/types";
 import { useCollectionSchema } from "../../collections/hook/useCollectionSchema";
-import { blankValue, inputType, isBooleanType, toItemData } from "./entryValues";
-
-
-type ChangeHandler = (key: string, value: FieldValue) => void;
-
-// Helper to render form fields in the sidebar
-const renderSidebarField = (key: string, attr: Attribute, value: FieldValue | undefined, handleChange: ChangeHandler) => {
-    const commonProps = {
-      id: key,
-      value: typeof value === 'boolean' ? '' : (value ?? ''),
-      onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => handleChange(key, e.target.value),
-      size: 'sm',
-    };
-  
-    if (isBooleanType(attr.type)) {
-        return (
-          <Flex justify="space-between" align="center">
-            <FormLabel htmlFor={key} mb="0" fontSize="sm">
-              Enable
-            </FormLabel>
-            <Switch
-              id={key}
-              isChecked={value === true}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange(key, e.target.checked)}
-            />
-          </Flex>
-        );
-    }
-    return <Input type={inputType(attr.type)} {...commonProps} />;
-};
+import { EntryFields } from "./EntryFields";
+import { initialValues, missingRequired, toEntryPayload } from "./entryValues";
 
 type Field = { key: string; attr: Attribute };
 
 // Places a collection's fields: the title on top, the first long text as the
-// main editor, everything else (but relations) in the sidebar.
+// main editor, everything else in the sidebar.
 function layoutFields(schema: Schema) {
-  let main: Field | null = null;
   let title: Field | null = null;
+  let main: Field | null = null;
   const sidebar: Record<string, Attribute> = {};
-  const initialData: Record<string, FieldValue> = {};
-  Object.entries(schema.attributes).forEach(([key, attr]) => {
-    if (attr.type === 'relation') return;
-    if (!title && key.toLowerCase() === 'title') {
-      title = { key, attr };
-    } else if (!main && (attr.type === 'richtext' || attr.type === 'text')) {
-      main = { key, attr };
-    } else {
-      sidebar[key] = attr;
-    }
-    initialData[key] = blankValue(attr) as FieldValue;
-  });
-  return { mainField: main as Field | null, titleField: title as Field | null, sidebarFields: sidebar, initialData };
+  for (const [key, attr] of Object.entries(schema.attributes)) {
+    if (attr.type === "relation") continue;
+    if (!title && key.toLowerCase() === "title") title = { key, attr };
+    else if (!main && (attr.type === "richtext" || attr.type === "text")) main = { key, attr };
+    else sidebar[key] = attr;
+  }
+  return { titleField: title as Field | null, mainField: main as Field | null, sidebarFields: sidebar };
 }
 
 export function ContributionEditorPage() {
   const { collectionName } = useParams<{ collectionName: string }>();
-  const { schema, loading } = useCollectionSchema(collectionName);
+  const { schema, loading, error } = useCollectionSchema(collectionName);
+  if (error) {
+    return (
+      <Box p={8}>
+        <Alert status="error" borderRadius="md">
+          <AlertIcon />
+          {error}
+        </Alert>
+      </Box>
+    );
+  }
   if (loading || !schema || !collectionName) return <PageLoader text="Loading editor..." />;
   // A new collection starts a new, empty form.
   return <ContributionEditor key={collectionName} collectionName={collectionName} schema={schema} />;
@@ -92,30 +68,29 @@ export function ContributionEditorPage() {
 
 function ContributionEditor({ collectionName, schema }: { collectionName: string; schema: Schema }) {
   const navigate = useNavigate();
-  const toast = useToast();
-  const { mainField, titleField, sidebarFields, initialData } = useMemo(() => layoutFields(schema), [schema]);
-  const [formData, setFormData] = useState<Record<string, FieldValue>>(initialData);
+  const notify = useNotify();
+  const { mainField, titleField, sidebarFields } = useMemo(() => layoutFields(schema), [schema]);
+  const [formData, setFormData] = useState<Record<string, unknown>>(() => initialValues(schema.attributes));
+  const [missing, setMissing] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleChange: ChangeHandler = (key, value) => {
-    setFormData(prev => ({ ...prev, [key]: value }));
+  const handleChange = (key: string, value: unknown) => {
+    setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
   const handleSubmit = async () => {
+    const empty = missingRequired(schema.attributes, formData);
+    setMissing(empty);
+    if (empty.length > 0) return;
     setIsSubmitting(true);
     try {
-        const response = await apiFetchWithAuth(`/api/collections/${collectionName}`, {
-            method: 'POST',
-            // The API takes the attributes under "data"; empty fields are left out.
-            body: JSON.stringify({ data: toItemData(schema.attributes, formData) }),
-        });
-        if (!response.ok) throw new Error("Failed to save entry.");
-        toast({ title: "Entry Saved", status: "success", duration: 3000, isClosable: true });
-        navigate('/contrib');
-    } catch (error: unknown) {
-        toast({ title: "Error", description: error instanceof Error ? error.message : String(error), status: "error", duration: 5000, isClosable: true });
+      await api("POST", `/api/collections/${encodeURIComponent(collectionName)}`, { data: toEntryPayload(schema.attributes, formData) });
+      notify.success("Entry saved");
+      navigate("/contrib");
+    } catch (err) {
+      notify.failure(err, "Could not save the entry");
     } finally {
-        setIsSubmitting(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -123,49 +98,73 @@ function ContributionEditor({ collectionName, schema }: { collectionName: string
     <Box bg="gray.50" minH="calc(100vh - 64px)">
       <Flex as="header" position="sticky" top="64px" zIndex="docked" bg="white" px={8} py={3} borderBottomWidth="1px" justify="space-between" align="center">
         <Box>
-            <Heading size="md">{schema.info?.displayName}</Heading>
-            <Text fontSize="sm" color="gray.500">Creative Editor</Text>
+          <Heading size="md">{schema.info?.displayName || collectionName}</Heading>
+          <Text fontSize="sm" color="gray.500">
+            Creative Editor
+          </Text>
         </Box>
         <HStack>
-          <Button variant="ghost" leftIcon={<Icon as={FiX} />} onClick={() => navigate('/contrib')}>Cancel</Button>
-          <Button colorScheme="purple" leftIcon={<Icon as={FiSave} />} onClick={handleSubmit} isLoading={isSubmitting}>Save Entry</Button>
+          <Button variant="ghost" leftIcon={<Icon as={FiX} />} onClick={() => navigate("/contrib")}>
+            Cancel
+          </Button>
+          <Button colorScheme="purple" leftIcon={<Icon as={FiSave} />} onClick={handleSubmit} isLoading={isSubmitting}>
+            Save Entry
+          </Button>
         </HStack>
       </Flex>
-      <Grid templateColumns={{ base: '1fr', lg: '3fr 1fr' }} gap={8} maxW="1200px" mx="auto" p={8}>
+      <Grid templateColumns={{ base: "1fr", lg: "minmax(0, 3fr) minmax(0, 1fr)" }} gap={8} maxW="1200px" mx="auto" p={8}>
         <GridItem as={VStack} spacing={6} align="stretch">
+          {missing.length > 0 && (
+            <Alert status="warning" borderRadius="md">
+              <AlertIcon />
+              Required: {missing.join(", ")}
+            </Alert>
+          )}
           {titleField && (
             <FormControl isRequired={titleField.attr.required}>
-              <Input value={String(formData[titleField.key] ?? '')} onChange={(e) => handleChange(titleField.key, e.target.value)} placeholder="Your post title..." variant="unstyled" fontSize="4xl" fontWeight="bold"/>
+              <Input
+                aria-label={titleField.key}
+                value={String(formData[titleField.key] ?? "")}
+                onChange={(e) => handleChange(titleField.key, e.target.value)}
+                placeholder="Your post title..."
+                variant="unstyled"
+                fontSize="4xl"
+                fontWeight="bold"
+              />
             </FormControl>
           )}
           {mainField && (
             <FormControl isRequired={mainField.attr.required}>
-              <Textarea value={String(formData[mainField.key] ?? '')} onChange={(e) => handleChange(mainField.key, e.target.value)} placeholder="Begin writing your content..." variant="unstyled" fontSize="lg" rows={20}/>
+              <Textarea
+                aria-label={mainField.key}
+                value={String(formData[mainField.key] ?? "")}
+                onChange={(e) => handleChange(mainField.key, e.target.value)}
+                placeholder="Begin writing your content..."
+                variant="unstyled"
+                fontSize="lg"
+                rows={20}
+              />
             </FormControl>
           )}
         </GridItem>
-        <GridItem as={VStack} spacing={4} align="stretch" pos="sticky" top="150px">
-              <Accordion allowToggle defaultIndex={[0]}>
-                <AccordionItem borderWidth="0" bg="white" borderRadius="lg" boxShadow="sm">
-                  <AccordionButton>
-                    <Box flex="1" textAlign="left" fontWeight="semibold">Metadata</Box>
-                    <AccordionIcon />
-                  </AccordionButton>
-                  <AccordionPanel pb={4}>
-                    <VStack spacing={4} align="stretch">
-                      {Object.entries(sidebarFields).map(([key, attr]) => (
-                        <FormControl key={key} isRequired={attr.required}>
-                          <FormLabel htmlFor={key} fontSize="sm" fontWeight="medium">{key}</FormLabel>
-                          {renderSidebarField(key, attr, formData[key], handleChange)}
-                        </FormControl>
-                      ))}
-                    </VStack>
-                  </AccordionPanel>
-                </AccordionItem>
-              </Accordion>
-        </GridItem>
+        {Object.keys(sidebarFields).length > 0 && (
+          <GridItem as={VStack} spacing={4} align="stretch" pos="sticky" top="150px" alignSelf="start">
+            <Accordion allowToggle defaultIndex={[0]}>
+              <AccordionItem borderWidth="0" bg="white" borderRadius="lg" boxShadow="sm">
+                <AccordionButton>
+                  <Box flex="1" textAlign="left" fontWeight="semibold">
+                    Metadata
+                  </Box>
+                  <AccordionIcon />
+                </AccordionButton>
+                <AccordionPanel pb={4}>
+                  <EntryFields attributes={sidebarFields} values={formData} onChange={handleChange} idPrefix="editor-" />
+                </AccordionPanel>
+              </AccordionItem>
+            </Accordion>
+          </GridItem>
+        )}
       </Grid>
     </Box>
   );
 }
-

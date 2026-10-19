@@ -1,4 +1,3 @@
-import React from "react";
 import { Flex, Spinner, Text, VStack } from "@chakra-ui/react";
 
 interface PageLoaderProps {

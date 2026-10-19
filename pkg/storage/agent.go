@@ -101,15 +101,20 @@ func GetAgentByName(name string) (*models.Agent, error) {
 }
 
 // GetAllAgents retrieves agents with optional filtering and pagination.
+// agentFilterColumns are the fields agents can be filtered on.
+var agentFilterColumns = map[string]string{"id": "id", "name": "name", "max_turns": "max_turns"}
+
 func GetAllAgents(filters map[string]any, rangeValues []int) ([]models.Agent, int, error) {
 	var agents []models.Agent
 	query := database.DB.Model(&models.Agent{})
 
-	// Apply filters.
-	if len(filters) > 0 {
-		for key, value := range filters {
-			query = query.Where(fmt.Sprintf("%s = ?", key), value)
+	// Apply filters: only known columns, never interpolated from input.
+	for key, value := range filters {
+		column, ok := agentFilterColumns[key]
+		if !ok {
+			return nil, 0, fmt.Errorf("unknown filter field %q", key)
 		}
+		query = query.Where(column+" = ?", value)
 	}
 
 	// Count total number of agents.

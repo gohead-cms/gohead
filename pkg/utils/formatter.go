@@ -22,6 +22,23 @@ func FormatCollectionSchema(collection *models.Collection) map[string]any {
 			"type":     attr.Type,
 			"required": attr.Required,
 		}
+		// Every setting the input accepts is returned, so a schema read,
+		// edited and sent back (PUT replaces it) keeps them.
+		if attr.Unique {
+			attrDef["unique"] = true
+		}
+		if len(attr.Options) > 0 {
+			attrDef["options"] = attr.Options
+		}
+		if attr.Min != nil {
+			attrDef["min"] = *attr.Min
+		}
+		if attr.Max != nil {
+			attrDef["max"] = *attr.Max
+		}
+		if attr.Pattern != "" {
+			attrDef["pattern"] = attr.Pattern
+		}
 		if attr.Type == "relation" {
 			attrDef["target"] = "api::" + attr.Target + "." + attr.Target
 			attrDef["relation"] = attr.Relation
@@ -44,6 +61,7 @@ func FormatCollectionSchema(collection *models.Collection) map[string]any {
 		"uid": "api::" + collection.Name + "." + collection.Name,
 		"schema": map[string]any{
 			"collectionName": collection.Name,
+			"description":    collection.Description,
 			"info": map[string]any{
 				"singularName": singular,
 				"pluralName":   plural,

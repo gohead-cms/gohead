@@ -173,6 +173,9 @@ func UpdateUser(c *gin.Context) {
 			c.Set("status", http.StatusBadRequest)
 			return
 		}
+		if role.Name != "admin" && !adminCanStepDown(c, uint(id)) {
+			return
+		}
 		updates["user_role_id"] = role.ID
 	}
 	if len(updates) == 0 {
@@ -218,6 +221,9 @@ func DeleteUser(c *gin.Context) {
 			return
 		}
 	}
+	if !adminCanStepDown(c, uint(id)) {
+		return
+	}
 
 	if err := storage.DeleteUser(uint(id)); err != nil {
 		logger.Log.WithFields(logrus.Fields{
@@ -234,4 +240,33 @@ func DeleteUser(c *gin.Context) {
 	}).Info("User deleted successfully")
 	c.Set("response", gin.H{"message": "User deleted successfully"})
 	c.Set("status", http.StatusOK)
+}
+
+// adminCanStepDown checks that user id may lose the admin role (deletion or
+// demotion): never your own account, never the last admin. It answers the
+// request (409) and returns false when not.
+func adminCanStepDown(c *gin.Context, id uint) bool {
+	target, err := storage.GetUserByID(id)
+	if err != nil || target.Role.Name != "admin" {
+		return true // not an admin (or unknown: the caller reports it)
+	}
+	if current, ok := c.Get("username"); ok && current == target.Username {
+		c.Set("response", "Cannot remove your own admin role")
+		c.Set("details", "ask another admin")
+		c.Set("status", http.StatusConflict)
+		return false
+	}
+	admins, err := storage.CountUsersWithRole("admin")
+	if err != nil {
+		c.Set("response", "Failed to check the remaining admins")
+		c.Set("status", http.StatusInternalServerError)
+		return false
+	}
+	if admins <= 1 {
+		c.Set("response", "Cannot remove the last admin")
+		c.Set("details", "promote another user to admin first")
+		c.Set("status", http.StatusConflict)
+		return false
+	}
+	return true
 }

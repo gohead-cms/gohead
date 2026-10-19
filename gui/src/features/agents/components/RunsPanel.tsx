@@ -26,7 +26,7 @@ import {
   useColorModeValue,
 } from "@chakra-ui/react";
 import { FiRefreshCw } from "react-icons/fi";
-import { RunStatus } from "../../../shared/types";
+import { type RunStatus } from "../../../shared/types";
 import { useAgentRuns } from "../hook/useAgentRuns";
 import { RunDetailDrawer } from "./RunDetailDrawer";
 import {

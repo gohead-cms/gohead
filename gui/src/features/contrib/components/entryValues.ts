@@ -1,7 +1,9 @@
-import { Attribute } from "../../../shared/types";
+import type { Attribute } from "../../../shared/types";
+import { toMediaRef } from "./mediaRef";
 
 const NUMBER_TYPES = new Set(["int", "integer", "float", "decimal", "number"]);
 const BOOLEAN_TYPES = new Set(["bool", "boolean"]);
+const SYSTEM_FIELDS = new Set(["id", "createdAt", "updatedAt", "publishedAt", "status"]);
 
 export const isNumberType = (type: string) => NUMBER_TYPES.has(type);
 export const isBooleanType = (type: string) => BOOLEAN_TYPES.has(type);
@@ -14,10 +16,70 @@ export function inputType(type: string): string {
   return "text";
 }
 
+/** A relation value as the API stores it: an ID or a list of IDs. */
+function relationIDs(value: unknown): unknown {
+  const id = (v: unknown) => (v !== null && typeof v === "object" && "id" in v ? (v as { id: unknown }).id : v);
+  if (value === null || value === undefined) return undefined;
+  if (Array.isArray(value)) return value.map(id).filter((v) => v !== null && v !== undefined);
+  return id(value);
+}
+
+/** An ISO time as a datetime-local input value (local time, minutes). */
+function toLocalInput(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 /** The blank value a new entry's field starts with. */
 export function blankValue(attr: Attribute): unknown {
   if (isBooleanType(attr.type)) return false;
   return "";
+}
+
+/** Attributes as a map by name (singletons list them as an array). */
+export function attributeMap(attributes: Attribute[] | Record<string, Attribute> | undefined): Record<string, Attribute> {
+  if (!attributes) return {};
+  if (!Array.isArray(attributes)) return attributes;
+  return Object.fromEntries(attributes.map((a) => [a.name, a]));
+}
+
+/**
+ * The form's starting values: an existing entry's attributes (entries are
+ * flat; system fields are dropped unless the schema defines them), or blank
+ * values for a new one.
+ */
+export function initialValues(attributes: Record<string, Attribute>, entry?: Record<string, unknown> | null): Record<string, unknown> {
+  if (entry) {
+    const values: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(entry)) {
+      if (SYSTEM_FIELDS.has(key) && !(key in attributes)) continue;
+      const attr = attributes[key];
+      if (attr?.type === "relation") {
+        // Lists populate relations as objects; the API takes their IDs back.
+        const ids = relationIDs(value);
+        if (ids !== undefined) values[key] = ids;
+        continue;
+      }
+      if (attr?.type === "datetime" && typeof value === "string") {
+        values[key] = toLocalInput(value);
+        continue;
+      }
+      values[key] = value;
+    }
+    return values;
+  }
+  const values: Record<string, unknown> = {};
+  for (const [key, attr] of Object.entries(attributes)) {
+    if (attr.type === "relation") continue;
+    if (attr.type === "media") {
+      if (attr.multiple) values[key] = [];
+      continue;
+    }
+    values[key] = blankValue(attr);
+  }
+  return values;
 }
 
 /**
@@ -29,7 +91,13 @@ export function toItemData(attributes: Record<string, Attribute>, values: Record
   const data: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(values)) {
     const attr = attributes[key];
-    if (value === "" || value === undefined) continue;
+    // Empty means unset: the entry's data is replaced, so the field goes.
+    if (value === "" || value === undefined || value === null) continue;
+    if (attr?.type === "datetime" && typeof value === "string") {
+      const d = new Date(value);
+      data[key] = Number.isNaN(d.getTime()) ? value : d.toISOString();
+      continue;
+    }
     if (attr && isNumberType(attr.type) && typeof value === "string") {
       const n = Number(value);
       data[key] = Number.isNaN(n) ? value : n;
@@ -38,4 +106,48 @@ export function toItemData(attributes: Record<string, Attribute>, values: Record
     data[key] = value;
   }
   return data;
+}
+
+/**
+ * Like toItemData, and media fields (which hold uploaded files) become the
+ * IDs or URLs the API accepts.
+ */
+export function toEntryPayload(attributes: Record<string, Attribute>, values: Record<string, unknown>): Record<string, unknown> {
+  const data = toItemData(attributes, values);
+  for (const [key, attr] of Object.entries(attributes)) {
+    if (attr.type !== "media") continue;
+    if (data[key] === null || data[key] === undefined) delete data[key];
+    else data[key] = toMediaRef(data[key]);
+  }
+  return data;
+}
+
+/** The required, editable fields left empty. */
+export function missingRequired(attributes: Record<string, Attribute>, values: Record<string, unknown>): string[] {
+  return Object.entries(attributes)
+    .filter(([, attr]) => attr.required && attr.type !== "relation" && attr.type !== "component" && !isBooleanType(attr.type))
+    .filter(([key]) => {
+      const v = values[key];
+      return v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
+    })
+    .map(([key]) => key);
+}
+
+/** The table columns of a collection: id, then up to four preferred attributes. */
+export function tableColumns(schema: { attributes: Record<string, Attribute> }): string[] {
+  const attributes = Object.keys(schema.attributes).filter((a) => schema.attributes[a].type !== "relation");
+  const preferred = ["title", "name", "slug"];
+  const ordered = [...attributes.filter((a) => preferred.includes(a.toLowerCase())), ...attributes.filter((a) => !preferred.includes(a.toLowerCase()))];
+  return ["id", ...ordered.filter((h) => h !== "id")].slice(0, 5);
+}
+
+/** A short text for a table cell. */
+export function displayValue(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "–";
+  if (typeof value === "object") {
+    const s = JSON.stringify(value);
+    return s.length > 30 ? `${s.substring(0, 30)}…` : s;
+  }
+  const s = String(value);
+  return s.length > 50 ? `${s.substring(0, 50)}…` : s;
 }

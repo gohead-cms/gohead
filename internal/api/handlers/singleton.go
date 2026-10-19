@@ -23,6 +23,23 @@ func GetSingleItem(c *gin.Context) {
 	if !ok {
 		return
 	}
+	// status=all: related drafts too (editors and admins), so a form can
+	// send the content back without losing links to drafts.
+	publishedOnly := true
+	switch c.Query("status") {
+	case "", models.StatusPublished:
+	case "all":
+		if !hasPermission(c.GetString("role"), "update") {
+			c.Set("response", "Access denied")
+			c.Set("details", "status=all needs the editor or admin role")
+			c.Set("status", http.StatusForbidden)
+			return
+		}
+		publishedOnly = false
+	default:
+		validationError(c, "status must be published or all")
+		return
+	}
 	name := c.Param("name")
 	st, err := storage.GetSingletonByName(name)
 	if err != nil {
@@ -36,7 +53,7 @@ func GetSingleItem(c *gin.Context) {
 		c.Set("status", http.StatusNotFound)
 		return
 	}
-	out, err := singleItemResponse(st, item, level)
+	out, err := singleItemResponseFor(st, item, level, publishedOnly)
 	if err != nil {
 		c.Set("response", "Failed to populate relations")
 		c.Set("status", http.StatusInternalServerError)
@@ -46,14 +63,20 @@ func GetSingleItem(c *gin.Context) {
 	c.Set("status", http.StatusOK)
 }
 
-// singleItemResponse populates relations (published related items only)
-// and builds the flat response.
-func singleItemResponse(st *models.Singleton, item *models.SingleItem, level uint) (map[string]any, error) {
-	data, err := storage.PopulateRelations(models.Collection{Attributes: st.Attributes}, item.Data, level, true)
+// singleItemResponseFor is singleItemResponse with the draft filter chosen
+// by the caller.
+func singleItemResponseFor(st *models.Singleton, item *models.SingleItem, level uint, publishedOnly bool) (map[string]any, error) {
+	data, err := storage.PopulateRelations(models.Collection{Attributes: st.Attributes}, item.Data, level, publishedOnly)
 	if err != nil {
 		return nil, err
 	}
 	return models.SingleItemResponse(*item, data), nil
+}
+
+// singleItemResponse populates relations (published related items only)
+// and builds the flat response.
+func singleItemResponse(st *models.Singleton, item *models.SingleItem, level uint) (map[string]any, error) {
+	return singleItemResponseFor(st, item, level, true)
 }
 
 // GetSingleton retrieves a single type by its name.
@@ -72,8 +95,9 @@ func GetSingleton(c *gin.Context) {
 
 	// Prepare response
 	response := map[string]any{
-		"name":       st.Name,
-		"attributes": st.Attributes,
+		"name":        st.Name,
+		"description": st.Description,
+		"attributes":  st.Attributes,
 	}
 
 	logger.Log.WithField("name", name).Info("GetSingleton: single type retrieved successfully")
@@ -111,7 +135,7 @@ func CreateOrUpdateSingleton(c *gin.Context) {
 	// Validate the single type
 	if err := models.ValidateSingletonSchema(Singleton); err != nil {
 		logger.Log.WithError(err).Warn("CreateOrUpdateSingleton: validation failed")
-		c.Set("response", gin.H{"message": "Validation schema for failed", "single_type": input})
+		c.Set("response", "Single type validation failed")
 		c.Set("details", err.Error())
 		c.Set("status", http.StatusBadRequest)
 		return
@@ -120,7 +144,7 @@ func CreateOrUpdateSingleton(c *gin.Context) {
 	// Save or update the Singleton in the database
 	if err := storage.SaveOrUpdateSingleton(&Singleton); err != nil {
 		logger.Log.WithError(err).Error("CreateOrUpdateSingleton: Failed to save single type")
-		c.Set("response", gin.H{"message": "Failed to save single type", "single_type": input})
+		c.Set("response", "Failed to save single type")
 		c.Set("details", err.Error())
 		c.Set("status", http.StatusInternalServerError)
 		return
@@ -139,7 +163,8 @@ func DeleteSingleton(c *gin.Context) {
 	st, err := storage.GetSingletonByName(name)
 	if err != nil {
 		logger.Log.WithError(err).Warn("DeleteSingleton: single type not found")
-		c.Set("response", gin.H{"message": "Single type not found", "details": err})
+		c.Set("response", "Single type not found")
+		c.Set("details", err.Error())
 		c.Set("status", http.StatusNotFound)
 		return
 	}
@@ -147,7 +172,8 @@ func DeleteSingleton(c *gin.Context) {
 	// Call the storage function to delete the single type
 	if err := storage.DeleteSingleton(st.ID); err != nil {
 		logger.Log.WithError(err).Error("DeleteSingleton: Failed to delete single type")
-		c.Set("response", gin.H{"message": "Failed to delete single type", "details": err})
+		c.Set("response", "Failed to delete single type")
+		c.Set("details", err.Error())
 		c.Set("status", http.StatusInternalServerError)
 		return
 	}
