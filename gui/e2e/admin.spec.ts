@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { login, trackErrors } from "./fixtures";
+import { editor, login, trackErrors } from "./fixtures";
 
 // The admin sections, end to end against the real API: each test changes
 // something through the UI and checks the result the API sends back.
@@ -74,4 +74,15 @@ test.describe("admin", () => {
     await expect(page.getByRole("heading", { name: "Webhooks" })).toBeVisible();
     expect(errors).toEqual([]);
   });
+});
+
+test("an editor edits content but sees no admin sections", async ({ page }) => {
+  const errors = trackErrors(page);
+  await login(page, editor);
+  await page.goto("/contrib");
+  await expect(page.getByRole("cell", { name: "Seeded article" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Agents" })).toHaveCount(0);
+  await page.goto("/settings/users");
+  await expect(page).toHaveURL(/\/dashboard$/);
+  expect(errors).toEqual([]);
 });

@@ -27,7 +27,7 @@ export function LoginPage() {
 
   useEffect(() => {
     if (token) {
-      navigate("/workspace", { replace: true });
+      navigate("/dashboard", { replace: true });
     }
   }, [token, navigate]);
 
@@ -49,7 +49,7 @@ export function LoginPage() {
       const token = json?.data?.token;
       if (!token) throw new Error("No token received from server");
       setToken(token);
-      navigate("/workspace");
+      navigate("/dashboard");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login failed");
     }

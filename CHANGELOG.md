@@ -16,6 +16,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **API contract**: `api/openapi.json` and `api/graphql.json` snapshot the public API; CI fails when they drift from the code and reports breaking changes against the last release (oasdiff, GraphQL Inspector). See *API stability*.
 - Docs: upgrade guide with version notes, API stability policy, release checklist. Image builds warn when a package cannot be pulled anonymously.
 - Helm: `bootstrapAdmin` values and a `migrate` init container (`migrations.initContainer`).
+- **A complete admin UI**: a real dashboard; a content model editor for collections, components and single types (every attribute type and option); the schema designer shows the saved model; content editing for single types; a media library (drag-and-drop upload, metadata, search); agents can be created, edited, deleted and run from the UI, with a function catalog and collection scopes; an activity page across agents; users, API tokens and webhooks (with test sends and delivery logs) under Settings. Navigation follows the signed-in user's role, and an expired session signs out.
+- API: `GET /auth/me`; `GET /admin/overview` (dashboard counts and recent activity); `GET /admin/runs` (runs of every agent); `GET /admin/agent-functions` (built-in functions with descriptions and argument schemas); `POST /admin/agents/{name}/run` (run an agent now); `GET /api/schema/collections|singletons|components[/{name}]`, the content model read-only for every signed-in user.
 - **API tokens**: long-lived, role-scoped (`viewer`, `editor`, `admin`), optionally expiring and revocable keys (`ght_…`) for front-ends, CI and integrations, managed under `/admin/tokens`. Only a SHA-256 hash is stored; last use is recorded. Tokens cannot manage tokens or users.
 - **OpenAPI 3.1** description generated from the content model (collections, components, singletons, media, auth, GraphQL) at `/api/openapi.json`, with Swagger UI at `/api/docs`. Behind a token unless `openapi.public` is on.
 - **Outbound webhooks** on content events (`item:created|updated|deleted|published|unpublished`), filtered by event and collection, in JSON or Slack format, with custom headers, HMAC-SHA256 signatures, retries with backoff, a delivery log and a test endpoint (`/admin/webhooks`). Private and link-local addresses are refused by default.
@@ -38,6 +40,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Deleting an agent deletes its run history and conversation.
 
 ### Fixed
+- Editing a collection through the API's own schema dropped `unique`, enum `options`, `min`/`max`, `pattern` and the description (they were not returned, and an update replaces the definition); relation targets returned as `api::x.x` are accepted back.
+- Admins can no longer demote or delete their own account or the last admin.
+- Two agent functions may use the same implementation with different scopes, as documented; renaming an agent to a taken name returns `409` instead of `500`; agent list filters only accept known fields.
+- Single type admin endpoints returned objects as error messages.
+- Removed admin UI pages that only showed mock data (dashboard) or saved nothing (schema designer edits, relation drawing).
 - MySQL: updating a collection, component or singleton failed (`Incorrect datetime value`), looking up related items by unique fields used PostgreSQL-only SQL, and finding the agents of a collection event failed (`trigger` is a reserved word).
 - Admin UI: the workspace's Edit action on a collection node opened nothing; the relation dialog sent `oneToMny` and labelled many-to-many as many-to-one; hooks were called conditionally in the sidebar and the collection list.
 - Re-creating an agent with the name of a deleted one restored the old configuration instead of the new one.
