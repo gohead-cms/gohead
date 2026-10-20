@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Fixed
+- `docker compose` no longer depends on MinIO images, which MinIO stopped publishing: uploads are kept on local disk (the `gohead-data` volume) by default, and any S3-compatible bucket can be set with `GOHEAD_MEDIA_*` variables.
+
 ### Added
 - **JavaScript client** `@gohead-cms/client` (npm): typed reads and writes for collections, singletons, media, locales and GraphQL, filters and sorts checked against your model, pagination helpers, Next.js-friendly fetch options, `GoHeadError`, and webhook signature verification. No dependencies; Node 20+, browsers and edge runtimes.
 - **`gohead-client` CLI**: TypeScript types from the content model (`types`), content models as code (`model pull`, `model push`, with a JSON Schema for editors), sample content with references and translations (`seed`), API tokens (`token create`).
