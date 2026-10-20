@@ -157,8 +157,8 @@ then finished. Unlike a test run, a run started this way really changes content 
 proposes the changes, for an agent that needs approval).
 
 !!! warning "Could not queue the run"
-    If the dialog answers that the job queue (Redis) is unreachable, GoHead's background
-    workers are not running: neither **Run now**, **Test run** nor triggers can start agents.
+    If the dialog answers that the job queue is unreachable, GoHead's background workers are
+    not running: neither **Run now**, **Test run** nor triggers can start agents.
     Ask whoever runs GoHead.
 
 ## Undo what a run changed

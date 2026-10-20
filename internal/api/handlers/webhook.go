@@ -9,20 +9,19 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hibiken/asynq"
+	"github.com/gohead-cms/gohead/pkg/queue"
 
 	"github.com/gohead-cms/gohead/internal/agent/jobs"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
 )
 
-// asynqClient is a package-level variable to hold the client instance.
-var asynqClient *asynq.Client
+// queueClient queues agent runs (webhook triggers, manual runs).
+var queueClient queue.Client
 
-// InitAsynqClient initializes the trigger package with a shared Asynq client.
-// This function should be called once when your server starts.
-func InitAsynqClient(client *asynq.Client) {
-	asynqClient = client
+// InitQueue sets the queue client of the handlers.
+func InitQueue(client queue.Client) {
+	queueClient = client
 }
 
 // HandleWebhook is the Gin handler for incoming agent webhook requests.
@@ -77,7 +76,7 @@ func HandleWebhook(c *gin.Context) {
 	}
 
 	// 7. Enqueue the job for the worker.
-	if err := jobs.EnqueueAgentJob(context.Background(), asynqClient, payload); err != nil {
+	if err := jobs.EnqueueAgentJob(context.Background(), queueClient, payload); err != nil {
 		logger.Log.WithError(err).WithField("agent_id", agentID).Error("Failed to enqueue webhook job")
 		c.Set("status", http.StatusInternalServerError)
 		c.Set("response", "Failed to process webhook")

@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/gohead-cms/gohead/pkg/logger"
-	"github.com/hibiken/asynq"
+	"github.com/gohead-cms/gohead/pkg/queue"
 )
 
 // EventType defines the type of collection event that occurred.
@@ -49,10 +49,13 @@ type CollectionEventPayload struct {
 	ActorName string `json:"actor_name,omitempty"`
 }
 
+// QueueEvents is the queue of collection events, processed by the dispatcher.
+const QueueEvents = "events"
+
 // EnqueueCollectionEvent creates and enqueues a new generic collection event.
 // When no queue client is configured (e.g. in tests or a deployment without
 // Redis), the event is dropped with a debug log instead of panicking.
-func EnqueueCollectionEvent(ctx context.Context, client *asynq.Client, payload CollectionEventPayload) error {
+func EnqueueCollectionEvent(ctx context.Context, client queue.Client, payload CollectionEventPayload) error {
 	if client == nil {
 		logger.Log.WithField("event_type", payload.EventType).Debug("No queue client configured; skipping collection event")
 		return nil
@@ -63,17 +66,14 @@ func EnqueueCollectionEvent(ctx context.Context, client *asynq.Client, payload C
 		return fmt.Errorf("could not marshal event payload: %w", err)
 	}
 
-	// Specify that this task should go to the "events" queue.
-	task := asynq.NewTask(TaskTypeCollectionEvent, payloadBytes, asynq.Queue("events"))
-
-	info, err := client.EnqueueContext(ctx, task)
+	id, err := client.Enqueue(ctx, TaskTypeCollectionEvent, payloadBytes, queue.Queue(QueueEvents))
 	if err != nil {
 		logger.Log.WithError(err).Error("Failed to enqueue collection event")
 		return fmt.Errorf("could not enqueue event task: %w", err)
 	}
 
 	logger.Log.
-		WithField("job_id", info.ID).
+		WithField("job_id", id).
 		WithField("event_type", payload.EventType).
 		WithField("collection", payload.CollectionName).
 		Info("Successfully enqueued collection event")

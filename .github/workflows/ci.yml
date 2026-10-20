@@ -291,6 +291,51 @@ jobs:
             api.log
           retention-days: 7
 
+  standalone:
+    name: Standalone (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+          # Real ARM hardware, as on a Raspberry Pi with a 64-bit OS.
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27.x"
+          check-latest: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gui/package-lock.json
+
+      - name: Build (admin UI embedded, pure Go)
+        run: make ui build
+      - name: One process, no Redis
+        run: scripts/smoke-standalone.sh dist/gohead | tee smoke.log
+      - name: Report
+        run: |
+          size=$(du -h dist/gohead | cut -f1)
+          mem=$(grep -o 'memory: .*' smoke.log)
+          echo "**${{ matrix.arch }}**: binary $size, $mem" >> "$GITHUB_STEP_SUMMARY"
+
+      # 32-bit Raspberry Pi OS: the armv7 binary migrates a SQLite database
+      # under emulation.
+      - name: armv7 binary
+        if: matrix.arch == 'amd64'
+        run: |
+          docker run --privileged --rm tonistiigi/binfmt --install arm
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -o gohead-armv7 ./main
+          docker run --rm --platform linux/arm/v7 -v "$PWD:/w" -w /tmp \
+            -e GOHEAD_DATABASE_URL=sqlite:///tmp/arm.db busybox:1.37 \
+            sh -c '/w/gohead-armv7 version && /w/gohead-armv7 migrate && /w/gohead-armv7 migrate status'
+
   js:
     name: JavaScript client and starter
     runs-on: ubuntu-latest

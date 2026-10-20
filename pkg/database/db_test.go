@@ -1,6 +1,7 @@
 package database_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/gohead-cms/gohead/pkg/database"
@@ -41,4 +42,21 @@ func TestInitDatabase(t *testing.T) {
 		assert.Nil(t, db, "Expected DB instance to be nil for unsupported database type")
 		assert.Contains(t, err.Error(), "unsupported database type", "Error message should mention unsupported type")
 	})
+}
+
+func TestSQLiteDSN(t *testing.T) {
+	dsn := database.SQLiteDSN("/data/gohead.db")
+	assert.True(t, strings.HasPrefix(dsn, "file:/data/gohead.db?"), dsn)
+	for _, want := range []string{"_txlock=immediate", "busy_timeout%2810000%29", "foreign_keys%280%29", "journal_mode%28wal%29", "_timefmt="} {
+		assert.Contains(t, dsn, want)
+	}
+	assert.NotContains(t, database.SQLiteDSN(":memory:"), "journal_mode", "no WAL in memory")
+
+	// The URL's own settings win.
+	dsn = database.SQLiteDSN("x.db?_pragma=foreign_keys(1)&_txlock=deferred")
+	assert.NotContains(t, dsn, "foreign_keys%280%29")
+	assert.NotContains(t, dsn, "_txlock=immediate")
+	assert.Contains(t, dsn, "_pragma=foreign_keys(1)")
+	assert.Contains(t, dsn, "busy_timeout%2810000%29")
+	assert.Equal(t, "file:a%23b.db?", database.SQLiteDSN("a#b.db")[:14])
 }

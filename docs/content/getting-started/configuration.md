@@ -67,8 +67,9 @@ Supported URLs:
     sqlite://path/to/gohead.db
     ```
 
-    Needs a cgo build (container image or `make build`). One writer at a time: fine for
-    development and small sites.
+    Built in (pure Go). GoHead opens it in WAL mode with a busy timeout. One writer at a
+    time: fine for development, small sites and [standalone](../operations/standalone.md)
+    installs.
 
 The schema is migrated automatically when the API starts.
 
@@ -80,10 +81,36 @@ The schema is migrated automatically when the API starts.
 | `redis.password` | `GOHEAD_REDIS_PASSWORD` | *(empty)* |
 | `redis.db` | `GOHEAD_REDIS_DB` | `0` |
 
-Redis carries content events and agent jobs, and lets API replicas cooperate: GraphQL schema
-changes are broadcast to every replica, and rate limits are shared. The API keeps working
-without it (events are dropped with an error log, limits are counted per process), but agents
-will not run and you should keep a single API replica.
+With the `redis` job queue (the default of `gohead start`), Redis carries content events,
+agent jobs and webhook deliveries. It also lets API replicas cooperate: GraphQL schema changes
+are broadcast to every replica, and rate limits are shared. Without Redis, limits are counted
+per process and you should keep a single API process.
+
+With the `database` job queue (the default of `gohead standalone`), Redis is only used when
+`redis.address` is set explicitly.
+
+### Job queue
+
+| Key | Env | Default |
+|-----|-----|---------|
+| `queue.driver` | `GOHEAD_QUEUE_DRIVER` | `redis` for `start`, `worker`, `dispatcher`, `scheduler`; `database` for `standalone` |
+| `queue.concurrency` | `GOHEAD_QUEUE_CONCURRENCY` | jobs run at once per process: `4` (standalone, plus 2 for content events), `10` (worker), `5` (dispatcher) |
+| `queue.poll_interval` | `GOHEAD_QUEUE_POLL_INTERVAL` | `1s` |
+
+`redis` queues background jobs in Redis (asynq). `database` keeps them in the `jobs` table of
+GoHead's own database: no Redis to run, at the cost of a small query every `poll_interval`;
+see [how it works](../operations/standalone.md#how-the-job-queue-works-without-redis). Every
+process of an installation must use the same driver.
+
+### Admin UI
+
+| Key | Env | Default |
+|-----|-----|---------|
+| `ui.enabled` | `GOHEAD_UI_ENABLED` | `true` |
+
+Release binaries and images include the admin UI and serve it at `/` (the API keeps its paths:
+`/api`, `/admin`, `/auth`, `/uploads`). Set `false` to serve the API only, e.g. when the UI
+runs from the `gohead-admin` image.
 
 ### Media
 

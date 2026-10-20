@@ -6,12 +6,18 @@ import (
 	"fmt"
 
 	"github.com/gohead-cms/gohead/pkg/logger"
-	"github.com/hibiken/asynq"
+	"github.com/gohead-cms/gohead/pkg/queue"
+)
+
+// Task type and queue of agent runs.
+const (
+	TaskTypeAgentRun = "agent:run"
+	QueueAgents      = "agents"
 )
 
 // EnqueueAgentJob creates and enqueues a new agent job.
 // This is the single entry point for all triggers.
-func EnqueueAgentJob(ctx context.Context, client *asynq.Client, payload AgentJobPayload) error {
+func EnqueueAgentJob(ctx context.Context, client queue.Client, payload AgentJobPayload) error {
 	if client == nil {
 		return fmt.Errorf("cannot enqueue agent job: queue client is not configured")
 	}
@@ -22,19 +28,15 @@ func EnqueueAgentJob(ctx context.Context, client *asynq.Client, payload AgentJob
 		return fmt.Errorf("could not marshal payload: %w", err)
 	}
 
-	// 2. Create a new Asynq task.
-	// "agent:run" is the task type that your worker will listen for.
-	task := asynq.NewTask("agent:run", payloadBytes, asynq.Queue("agents"))
-
-	// 3. Enqueue the task.
-	info, err := client.EnqueueContext(ctx, task)
+	// 2. Queue it: "agent:run" tasks are run by the worker.
+	id, err := client.Enqueue(ctx, TaskTypeAgentRun, payloadBytes, queue.Queue(QueueAgents))
 	if err != nil {
 		logger.Log.WithError(err).Error("Failed to enqueue agent job")
 		return fmt.Errorf("could not enqueue task: %w", err)
 	}
 
 	logger.Log.
-		WithField("job_id", info.ID).
+		WithField("job_id", id).
 		WithField("agent_id", payload.AgentID).
 		Info("Successfully enqueued agent job")
 

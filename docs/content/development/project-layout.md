@@ -3,7 +3,7 @@
 ```text
 .
 ├── main/                 # main.go: calls cmd.Execute()
-├── cmd/                  # cobra commands: start, worker, dispatcher, scheduler, version
+├── cmd/                  # cobra commands: standalone, start, worker, dispatcher, scheduler, migrate…
 ├── internal/
 │   ├── api/handlers      # REST handlers (collections, items, users, agents, webhooks, GraphQL)
 │   ├── api/middleware    # auth, roles, CORS, metrics, response envelope
@@ -11,13 +11,15 @@
 │   ├── models            # collections, attributes, items, users + validation
 │   ├── models/agents     # agent definition and validation
 │   ├── agent/            # dispatcher, runners (worker loop), functions, triggers, jobs, events
-│   └── types             # CMS type → GraphQL type registry
+│   ├── types             # CMS type → GraphQL type registry
+│   └── webui             # admin UI embedded in the binary (static/ is built by make ui)
 ├── pkg/
 │   ├── auth              # JWT, role permissions
 │   ├── config            # configuration loading (viper)
 │   ├── database          # connections (SQLite, PostgreSQL, MySQL)
 │   ├── llm               # LLM adapters (langchaingo)
 │   ├── migrations, seed  # schema migration, default roles
+│   ├── queue             # job queue: Redis (asynq) and database drivers
 │   ├── storage           # data access, item queries, events
 │   └── testutils         # test database helpers
 ├── gui/                  # admin UI (React, Vite, Chakra UI)
@@ -28,7 +30,7 @@
 ├── package.json          # npm workspaces of sdk/ and templates/
 ├── deploy/               # Kubernetes (kustomize) and Flux image automation
 ├── docs/                 # this handbook (MkDocs Material)
-├── Dockerfile            # API image
+├── Dockerfile            # gohead image (API, embedded UI, every command)
 ├── docker-compose.yml    # full local stack
 └── .goreleaser.yaml      # release binaries
 ```

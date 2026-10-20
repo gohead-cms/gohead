@@ -1,18 +1,20 @@
 # Installation
 
-GoHead is a single binary (`gohead`) with four commands: `start` (the API), `worker`,
-`dispatcher` and `scheduler`. Only `start` is required for content management; the other
-three run [agents](../agents/index.md) and need Redis.
+GoHead is a single binary (`gohead`), the admin UI included. It runs in one of two ways:
 
-| Method                         | Best for                          | SQLite | Agents |
-|--------------------------------|-----------------------------------|:------:|:------:|
-| [Docker Compose](#docker-compose) | Trying everything locally      | yes    | yes    |
-| [Container image](#container-image) | Servers, Kubernetes          | yes    | yes    |
-| [Release binary](#release-binary)   | Bare-metal with Postgres/MySQL | no¹    | yes    |
-| [From source](#from-source)         | Development                  | yes    | yes    |
+- **Standalone**: `gohead standalone` runs everything in one process (API, admin UI, agents,
+  webhooks) with SQLite and no other service. See
+  [Standalone and Raspberry Pi](../operations/standalone.md).
+- **Separate processes**: `start` (the API and admin UI), `worker`, `dispatcher` and
+  `scheduler`, with Redis and PostgreSQL or MySQL, to scale out. Only `start` is required for
+  content management; the other three run [agents](../agents/index.md) and webhooks.
 
-¹ Release binaries are built without cgo, and the SQLite driver needs cgo. Use PostgreSQL or
-MySQL with them, or use the container image.
+| Method                         | Best for                          |
+|--------------------------------|-----------------------------------|
+| [Release binary](#release-binary)   | Standalone, small servers, Raspberry Pi |
+| [Docker Compose](#docker-compose) | Trying the full stack locally  |
+| [Container image](#container-image) | Servers, Kubernetes          |
+| [From source](#from-source)         | Development                  |
 
 ## Docker Compose
 
@@ -55,32 +57,45 @@ Without `GOHEAD_DATABASE_URL`, the image stores a SQLite database in `/data`. Ta
 | `edge`                    | Latest `master` build                      |
 | `master-<sha>-<timestamp>`| Every `master` build (used by Flux staging)|
 
-The admin UI image is `ghcr.io/gohead-cms/gohead-admin`; point it at your API with
-`GOHEAD_API_URL`. Images are signed, see [verifying images](../operations/security.md#verify-container-images).
+The image serves the admin UI at `/` too. To serve it separately, the admin UI image is
+`ghcr.io/gohead-cms/gohead-admin`; point it at your API with `GOHEAD_API_URL`. Run
+`… gohead:latest standalone` for a single container with agents and webhooks (no Redis); it
+keeps its data in `/data`. Images are signed, see [verifying images](../operations/security.md#verify-container-images).
 
 ## Release binary
 
 Download an archive for your platform from the
-[releases page](https://github.com/gohead-cms/gohead/releases), check it against
-`checksums.txt`, then:
+[releases page](https://github.com/gohead-cms/gohead/releases) (Linux and macOS on x86-64 and
+ARM64, Windows on x86-64, Linux on ARMv7 and ARMv6), check it against `checksums.txt`, then:
 
 ```bash
 tar xzf gohead_*_linux_amd64.tar.gz
 ./gohead version
+GOHEAD_ADMIN_USERNAME=admin GOHEAD_ADMIN_EMAIL=you@example.com \
+GOHEAD_ADMIN_PASSWORD='choose-a-long-password' ./gohead standalone
+```
+
+Open <http://localhost:8080>: the admin UI and the API share the address. Data goes to
+`./data`. To run the processes separately on PostgreSQL instead:
+
+```bash
 GOHEAD_DATABASE_URL="postgres://user:pass@localhost:5432/gohead?sslmode=disable" \
 GOHEAD_JWT_SECRET="$(openssl rand -hex 32)" ./gohead start
 ```
 
 ## From source
 
-Requirements: Go 1.26+, a C compiler (for SQLite), Node 22 for the admin UI.
+Requirements: Go 1.26+ and Node 22 (for the admin UI). No C compiler: SQLite is pure Go.
 
 ```bash
 git clone https://github.com/gohead-cms/gohead.git && cd gohead
-make build                       # -> dist/gohead
+make ui build                    # admin UI, then -> dist/gohead
 cp config.sample.yaml config.yaml
 ./dist/gohead start --config config.yaml
 ```
+
+`make build` alone builds a binary without the admin UI (run the UI with `npm run dev` in
+`gui/`).
 
 Check the server:
 

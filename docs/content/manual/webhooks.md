@@ -80,9 +80,9 @@ automatically for several hours, each retry with a new attempt number. Other err
 redirects) are not retried: fix the webhook, then send a test.
 
 !!! warning
-    Content events are sent by GoHead's background workers, which need Redis. If deliveries
-    never appear while tests work, ask whoever runs GoHead to check the `dispatcher` and
-    `worker` processes.
+    Content events are sent by GoHead's background workers. If deliveries never appear while
+    tests work, ask whoever runs GoHead to check the `dispatcher` and `worker` processes (or,
+    with `gohead standalone`, the server's log).
 
 To change a webhook, click its pencil; to stop it for a while, turn **Enabled** off; to
 remove it and its delivery log, click its bin. For the request format and every option, see

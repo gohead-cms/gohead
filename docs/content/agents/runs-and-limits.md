@@ -92,7 +92,7 @@ curl -X POST $GOHEAD/admin/agents/summarizer/test -H "$AUTH" -d '{"item_id": 3, 
 
 Both this and **Run now** (`POST /admin/agents/{name}/run`) answer `202` with
 `{"status": "queued", "runId": 57, "dryRun": true}`: follow the run at
-`/admin/agents/{name}/runs/57`. They need Redis and a worker (`503` when the queue is unreachable). Runs
+`/admin/agents/{name}/runs/57`. They need the job queue and a worker (`503` when the queue is unreachable). Runs
 started this way are not retried when they fail, so the run you follow is the one that
 happens.
 

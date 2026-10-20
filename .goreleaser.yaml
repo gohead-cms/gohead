@@ -7,21 +7,27 @@ project_name: gohead
 before:
   hooks:
     - go mod download
+    # Embed the admin UI (needs Node.js and npm).
+    - make ui
 
 builds:
   - id: gohead
     main: ./main
     binary: gohead
-    # Prebuilt binaries are pure Go, so the SQLite driver (which needs cgo)
-    # is not available in them: use PostgreSQL/MySQL, the container image,
-    # or `make build` for SQLite.
+    # Pure Go, SQLite and the admin UI included: one file runs GoHead
+    # (`gohead standalone`), down to a Raspberry Pi (linux arm64, armv7, armv6).
     env:
       - CGO_ENABLED=0
     goos: [linux, darwin, windows]
-    goarch: [amd64, arm64]
+    goarch: [amd64, arm64, arm]
+    goarm: ["6", "7"]
     ignore:
       - goos: windows
         goarch: arm64
+      - goos: windows
+        goarch: arm
+      - goos: darwin
+        goarch: arm
     flags:
       - -trimpath
     ldflags:
@@ -36,7 +42,7 @@ archives:
     format_overrides:
       - goos: windows
         formats: [zip]
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
     files:
       - LICENSE.md
       - README.md

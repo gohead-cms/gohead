@@ -182,8 +182,8 @@ func TestAgent(c *gin.Context) {
 // queueRun records a queued run and sends the job to the workers; the
 // response carries the run ID to follow.
 func queueRun(c *gin.Context, agent *agents.Agent, payload jobs.AgentJobPayload) {
-	if asynqClient == nil {
-		c.Set("response", "Agent runs need Redis, which is not configured")
+	if queueClient == nil {
+		c.Set("response", "Agent runs need the job queue, which is not configured")
 		c.Set("status", http.StatusServiceUnavailable)
 		return
 	}
@@ -201,11 +201,11 @@ func queueRun(c *gin.Context, agent *agents.Agent, payload jobs.AgentJobPayload)
 		return
 	}
 	payload.RunID = run.ID
-	if err := jobs.EnqueueAgentJob(context.Background(), asynqClient, payload); err != nil {
+	if err := jobs.EnqueueAgentJob(context.Background(), queueClient, payload); err != nil {
 		logger.Log.WithError(err).WithField("agent", agent.Name).Error("Failed to queue a run")
 		run.Status, run.Error = agents.RunFailed, "could not be queued"
 		_ = storage.SaveAgentRun(run)
-		c.Set("response", "Could not queue the run: the job queue (Redis) is unreachable")
+		c.Set("response", "Could not queue the run: the job queue is unreachable")
 		c.Set("status", http.StatusServiceUnavailable)
 		return
 	}

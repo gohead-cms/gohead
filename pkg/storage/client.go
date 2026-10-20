@@ -1,9 +1,9 @@
 package storage
 
-import "github.com/hibiken/asynq"
+import "github.com/gohead-cms/gohead/pkg/queue"
 
-var asynqClient *asynq.Client
+var queueClient queue.Client
 
-func InitAsynqClient(client *asynq.Client) {
-	asynqClient = client
+func InitQueue(client queue.Client) {
+	queueClient = client
 }

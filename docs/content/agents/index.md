@@ -19,7 +19,7 @@ flowchart LR
 ## Requirements
 
 Agents run outside the API, in three background processes that share the API's
-configuration and need Redis:
+configuration and its job queue (Redis, or the database):
 
 | Process | Command | Role | Replicas |
 |---------|---------|------|----------|
@@ -27,7 +27,8 @@ configuration and need Redis:
 | Worker | `gohead worker` | Runs agent jobs (LLM calls, functions) | 1+ |
 | Scheduler | `gohead scheduler` | Enqueues cron-triggered runs | **exactly 1** |
 
-Docker Compose and the Kubernetes manifests start all three.
+Docker Compose and the Kubernetes manifests start all three. `gohead standalone` runs all
+three inside the API process, with no Redis (see [Standalone](../operations/standalone.md)).
 
 ## A complete example
 

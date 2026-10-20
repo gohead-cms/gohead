@@ -15,8 +15,10 @@ import (
 
 	"github.com/gohead-cms/gohead/internal/agent/events"
 	"github.com/gohead-cms/gohead/internal/models"
+	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/migrations"
+	"github.com/gohead-cms/gohead/pkg/queue"
 	"github.com/gohead-cms/gohead/pkg/storage"
 	"github.com/gohead-cms/gohead/pkg/testutils"
 
@@ -211,13 +213,12 @@ func TestValidation(t *testing.T) {
 	}
 }
 
-// Fan-out enqueues one delivery per matching webhook. (Deduplication of a
-// retried event relies on the event task's ID, which only asynq sets.)
+// Fan-out enqueues one delivery per matching webhook.
 func TestFanout(t *testing.T) {
 	setup(t)
 	mr := miniredis.RunT(t)
 	opt := asynq.RedisClientOpt{Addr: mr.Addr()}
-	client := asynq.NewClient(opt)
+	client := queue.NewRedisClient(opt)
 	defer client.Close()
 	inspector := asynq.NewInspector(opt)
 	defer inspector.Close()
@@ -266,4 +267,27 @@ func TestFanout(t *testing.T) {
 	for _, task := range tasks {
 		assert.NotContains(t, string(task.Payload), "1234", "password attributes are never sent")
 	}
+}
+
+// A retried event (same task ID) does not deliver twice, with the
+// database queue too.
+func TestFanoutDeduplicatesRetriedEvents(t *testing.T) {
+	setup(t)
+	db := database.DB
+	client := queue.NewDatabaseClient(db)
+	require.NoError(t, storage.CreateWebhook(&models.Webhook{Name: "all", URL: "https://example.com/a", Enabled: true}))
+	require.NoError(t, storage.CreateWebhook(&models.Webhook{Name: "too", URL: "https://example.com/b", Enabled: true}))
+	ev := events.CollectionEventPayload{EventType: "item:created", CollectionName: "articles", ItemID: 1}
+
+	ctx := queue.WithTaskInfo(context.Background(), "ev-1", 0)
+	require.NoError(t, Fanout(ctx, client, ev))
+	retry := queue.WithTaskInfo(context.Background(), "ev-1", 1)
+	require.NoError(t, Fanout(retry, client, ev))
+	var n int64
+	require.NoError(t, db.Model(&queue.Job{}).Where("queue = ?", Queue).Count(&n).Error)
+	assert.Equal(t, int64(2), n, "one delivery per webhook, not per attempt")
+
+	require.NoError(t, Fanout(queue.WithTaskInfo(context.Background(), "ev-2", 0), client, ev))
+	require.NoError(t, db.Model(&queue.Job{}).Where("queue = ?", Queue).Count(&n).Error)
+	assert.Equal(t, int64(4), n, "another event delivers again")
 }

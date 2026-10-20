@@ -5,8 +5,20 @@ LDFLAGS += -X "$(MODULE)/cmd.version=$(VERSION)" -X "$(MODULE)/cmd.commit=$(VERS
 ## Build:
 
 .PHONY: build
-build: ## Build the gohead binary into dist/ (cgo on, for SQLite)
-	$Q CGO_ENABLED=1 $(go) build -trimpath -ldflags '$(LDFLAGS)' -o dist/gohead ./main
+build: ## Build the gohead binary into dist/ (pure Go; run `make ui` first to embed the admin UI)
+	$Q CGO_ENABLED=0 $(go) build -trimpath -ldflags '$(LDFLAGS)' -o dist/gohead ./main
+
+.PHONY: ui
+ui: ## Build the admin UI into internal/webui/static, to embed it in the binary
+	$Q cd gui && npm ci --no-audit --no-fund && npm run build
+	$Q find internal/webui/static -mindepth 1 ! -name .keep -exec rm -rf {} +
+	$Q cp -R gui/dist/. internal/webui/static/
+	$Q rm -f internal/webui/static/config.js
+	$Q find internal/webui/static -type f \( -name '*.js' -o -name '*.css' -o -name '*.html' -o -name '*.svg' \) -size +1k -exec gzip -9 -k -f {} \;
+
+.PHONY: standalone
+standalone: ui build ## Build the binary with the admin UI, then run `gohead standalone` (data in ./data)
+	$Q ./dist/gohead standalone --data data
 
 .PHONY: run
 run: build ## Build and start the API with config.yaml

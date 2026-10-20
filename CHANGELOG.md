@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - `docker compose` no longer depends on MinIO images, which MinIO stopped publishing: uploads are kept on local disk (the `gohead-data` volume) by default, and any S3-compatible bucket can be set with `GOHEAD_MEDIA_*` variables.
 
 ### Added
+- **`gohead standalone`**: the API, the admin UI and the background jobs (worker, dispatcher, scheduler) in one process, with no Redis and no separate admin container. The SQLite database, uploads and a generated JWT secret go to a data directory (`--data`, default `data`) unless configured. About 45 MB of memory and near-zero idle CPU: made for small servers and Raspberry Pis. See the [standalone guide](https://gohead-cms.github.io/gohead/operations/standalone/).
+- **Database job queue** (`queue.driver: database`): content events, agent runs and webhook deliveries can be queued in GoHead's own database instead of Redis, with retries, backoff, deduplication and recovery of jobs whose process stopped. `redis` stays the default of the separate processes; `queue.concurrency` and `queue.poll_interval` tune it. Migration `0006_jobs`.
+- **Admin UI in the binary**: release binaries and the `gohead` image serve the admin UI at `/` (`ui.enabled`, on by default), calling the API on the same origin. `make ui` builds it into a source build.
+- **Raspberry Pi and ARM builds**: release binaries for Linux ARMv7 and ARMv6, in addition to ARM64.
 - **JavaScript client** `@gohead-cms/client` (npm): typed reads and writes for collections, singletons, media, locales and GraphQL, filters and sorts checked against your model, pagination helpers, Next.js-friendly fetch options, `GoHeadError`, and webhook signature verification. No dependencies; Node 20+, browsers and edge runtimes.
 - **`gohead-client` CLI**: TypeScript types from the content model (`types`), content models as code (`model pull`, `model push`, with a JSON Schema for editors), sample content with references and translations (`seed`), API tokens (`token create`).
 - **Starter templates**: `npm create @gohead-cms@latest` creates a Next.js blog (App Router, English and French, typed client, revalidation from signed webhooks) with its content model and sample content, ready with `npm run gohead:setup`.
@@ -22,6 +26,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 - An agent is no longer triggered by content events caused by its own changes.
+- **SQLite is pure Go** (no cgo): release binaries can use SQLite, and the image is static. Existing databases keep working (same time format); they are switched to WAL mode on first open, with a busy timeout and transactions that wait for the write lock (no more `database is locked` errors under concurrent writes). Settings of the old driver in `sqlite://` URLs (`_busy_timeout`, `_foreign_keys`, `_loc`…) are ignored: use `_pragma=busy_timeout(5000)`-style parameters.
+- `gohead start` serves the admin UI at `/` when the binary includes it: other `GET` paths outside the API (`/api`, `/admin`, `/auth`, `/uploads`) now return the UI instead of `404`. Set `ui.enabled: false` (`GOHEAD_UI_ENABLED=false`) to keep an API-only host.
+- The container image is built without cgo on `distroless/static`, cross-compiled for each platform.
 
 ## [0.5.0] - 2026-10-19
 

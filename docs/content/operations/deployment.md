@@ -7,7 +7,9 @@ GoHead ships as two container images, both multi-arch (`amd64`, `arm64`) and sig
 | `ghcr.io/gohead-cms/gohead` | `start`, `worker`, `dispatcher`, `scheduler` (one image, four commands) |
 | `ghcr.io/gohead-cms/gohead-admin` | the admin UI (nginx, port 8080) |
 
-You need PostgreSQL (recommended) or MySQL, and Redis if you use agents.
+You need PostgreSQL (recommended) or MySQL, and Redis if you use agents or webhooks (or the
+[database job queue](standalone.md#how-the-job-queue-works-without-redis) with a single API
+process). For one machine, [standalone](standalone.md) is simpler.
 
 ## Checklist
 

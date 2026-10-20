@@ -7,9 +7,9 @@ import (
 	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
 
+	"github.com/ncruces/go-sqlite3/gormlite"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -23,7 +23,7 @@ func init() {
 
 // SetupTestDB initializes a test database using SQLite.
 func SetupTestDB() *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(gormlite.Open(database.SQLiteDSN(":memory:")), &gorm.Config{})
 	if err != nil {
 		panic("failed to connect to test database")
 	}

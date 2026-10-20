@@ -250,7 +250,7 @@ func setPublishedTx(tx *gorm.DB, item *models.Item, publish bool) (events.EventT
 
 func publishEvent(db *gorm.DB, actor Actor, eventType events.EventType, item *models.Item) {
 	// 1. Safety Check: If the event system (Asynq) isn't configured, do nothing.
-	if asynqClient == nil {
+	if queueClient == nil {
 		return
 	}
 
@@ -276,7 +276,7 @@ func publishEvent(db *gorm.DB, actor Actor, eventType events.EventType, item *mo
 	}
 
 	// 4. Enqueue Event: Send the event to the dispatcher via the Asynq message queue.
-	if err := events.EnqueueCollectionEvent(context.Background(), asynqClient, payload); err != nil {
+	if err := events.EnqueueCollectionEvent(context.Background(), queueClient, payload); err != nil {
 		logger.Log.WithError(err).Error("Failed to enqueue event")
 	} else {
 		logger.Log.WithField("event_type", eventType).WithField("item_id", item.ID).Info("Successfully enqueued event")
