@@ -73,6 +73,10 @@ migrations are explicit, reviewed steps; contributors add them in `pkg/migration
 Migration `0004_agent_reviews` adds the `proposals` table and two columns (`agents.require_approval`,
 `agent_runs.dry_run`). Existing agents keep writing directly. Nothing to do.
 
+Migration `0005_public_role` makes room for [public access](../guides/users-and-roles.md#public-access):
+a custom role you named `public` is renamed `public-legacy` (its users and API tokens keep
+it). Public access itself is off until you grant something to the new `public` role.
+
 ### 0.5.0
 
 !!! warning "Breaking changes"

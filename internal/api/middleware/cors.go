@@ -14,6 +14,9 @@ import (
 func CORSMiddleware(cfg config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
+		// The answer depends on the Origin: caches must not reuse it for
+		// another one.
+		c.Writer.Header().Add("Vary", "Origin")
 		// Check if the origin is allowed
 		allowed := false
 		for _, o := range cfg.CORS.AllowedOrigins {

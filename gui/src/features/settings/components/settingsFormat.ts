@@ -5,6 +5,8 @@ export const roleColor: Record<string, string> = {
   admin: "purple",
   editor: "blue",
   viewer: "gray",
+  // The role of anonymous requests (see roles.ts).
+  public: "orange",
 };
 
 /** Custom roles share one color. */

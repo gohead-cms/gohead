@@ -1,7 +1,8 @@
 # REST API
 
-Content lives under `/api/collections/{collection}`. All calls need
-`Authorization: Bearer <token>` (a user JWT, or a long-lived [API token](integrations.md#api-tokens));
+Content lives under `/api/collections/{collection}`. Calls send
+`Authorization: Bearer <token>` (a user JWT, or a long-lived [API token](integrations.md#api-tokens)),
+except reads of the types opened to anonymous visitors with [public access](users-and-roles.md#public-access);
 writes need the `create`, `update` or `delete` permission of your [role](users-and-roles.md).
 The whole API is described at `/api/openapi.json`, browsable at
 [`/api/docs`](integrations.md#openapi-and-swagger-ui).

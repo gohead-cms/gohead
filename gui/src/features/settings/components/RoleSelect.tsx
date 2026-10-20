@@ -1,7 +1,10 @@
 import { FormControl, FormHelperText, FormLabel, Select } from "@chakra-ui/react";
-import { BUILTIN_ROLE_HELP, roleHelp, useRoles } from "./roles";
+import { BUILTIN_ROLE_HELP, isPublicRole, roleHelp, useRoles } from "./roles";
 
-/** Role picker (built-in and custom roles) with a one-line explanation of the chosen role. */
+/**
+ * Role picker (built-in and custom roles) with a one-line explanation of the
+ * chosen role. The public role, for anonymous requests, is never offered.
+ */
 export function RoleSelect({
   value,
   onChange,
@@ -14,7 +17,7 @@ export function RoleSelect({
   disabledReason?: string;
 }) {
   const { data, error } = useRoles();
-  const roles = data ?? [];
+  const roles = (data ?? []).filter((r) => !isPublicRole(r));
   // Until the list arrives (or if it fails), the built-in roles and the
   // current value stay selectable.
   const names = roles.length ? roles.map((r) => r.name) : Object.keys(BUILTIN_ROLE_HELP);

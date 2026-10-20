@@ -20,7 +20,7 @@ import {
   Tooltip,
   Tr,
 } from "@chakra-ui/react";
-import { FiEdit2, FiEye, FiPlus, FiShield, FiTrash2 } from "react-icons/fi";
+import { FiEdit2, FiEye, FiGlobe, FiPlus, FiShield, FiTrash2 } from "react-icons/fi";
 import { api, ApiError } from "../../services/api";
 import { useNotify } from "../../shared/hooks/useNotify";
 import { ConfirmButton } from "../../shared/ui/ConfirmButton";
@@ -28,7 +28,7 @@ import { EmptyState } from "../../shared/ui/EmptyState";
 import { Page, PageHeader } from "../../shared/ui/PageHeader";
 import { RoleBadge } from "./components/RoleBadge";
 import { RoleFormDrawer } from "./components/RoleFormDrawer";
-import { permissionSummary, type Role, roleHelp, useRoles } from "./components/roles";
+import { isPublicRole, permissionSummary, publicAccessSummary, type Role, roleHelp, useRoles } from "./components/roles";
 
 /** Editing state: closed, creating (null) or showing/editing a role. */
 type Editing = { role: Role | null; n: number } | undefined;
@@ -52,7 +52,10 @@ export function RolesPage() {
   const notify = useNotify();
   const [editing, setEditing] = useState<Editing>(undefined);
   const { data, loading, error, refetch } = useRoles();
-  const roles = data ?? [];
+  const all = data ?? [];
+  // The public role (anonymous requests) has its own section.
+  const roles = all.filter((r) => !isPublicRole(r));
+  const publicRole = all.find(isPublicRole);
   const custom = roles.filter((r) => !r.builtin);
 
   const open = (role: Role | null) => setEditing((e) => ({ role, n: (e?.n ?? 0) + 1 }));
@@ -170,6 +173,7 @@ export function RolesPage() {
               Create a role to give someone access to some content types only, or to let them write drafts without publishing.
             </EmptyState>
           )}
+          {publicRole && <PublicAccess role={publicRole} onEdit={() => open(publicRole)} />}
         </Stack>
       ) : null}
 
@@ -187,5 +191,53 @@ export function RolesPage() {
         />
       )}
     </Page>
+  );
+}
+
+/** The public role: what anonymous requests (no token) may read. */
+function PublicAccess({ role, onEdit }: { role: Role; onEdit: () => void }) {
+  const readable = publicAccessSummary(role.permissions);
+  const closed = readable === null;
+  return (
+    <Box bg="white" borderWidth="1px" borderRadius="lg" p={4} data-testid="public-role">
+      <HStack spacing={4} align="flex-start">
+        <Box color="orange.500" pt={1}>
+          <FiGlobe />
+        </Box>
+        <Box flex="1" minW={0}>
+          <HStack spacing={2} flexWrap="wrap">
+            <Text fontWeight="semibold">Public (anonymous visitors)</Text>
+            <RoleBadge role={role.name} />
+            <Badge variant="outline" colorScheme={closed ? "gray" : "orange"} fontSize="2xs">
+              {closed ? "closed" : "open to anyone"}
+            </Badge>
+          </HStack>
+          <Text fontSize="xs" color="gray.500" mt={1}>
+            {roleHelp(role)}. It cannot be given to users or API tokens.
+          </Text>
+          <Text fontSize="sm" color="gray.700" mt={2}>
+            {closed ? (
+              <>
+                <Text as="span" fontWeight="semibold">
+                  No access
+                </Text>
+                : API calls without a token are refused.
+              </>
+            ) : (
+              <>
+                Anyone, without a token, can read the published content of{" "}
+                <Text as="span" fontWeight="semibold">
+                  {readable}
+                </Text>
+                . Drafts stay private.
+              </>
+            )}
+          </Text>
+        </Box>
+        <Tooltip label="Edit public access" hasArrow>
+          <IconButton aria-label={`Edit ${role.name}`} icon={<FiEdit2 />} size="sm" variant="ghost" onClick={onEdit} />
+        </Tooltip>
+      </HStack>
+    </Box>
   );
 }

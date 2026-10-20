@@ -20,7 +20,14 @@ const (
 	RoleAdmin  = "admin"
 	RoleEditor = "editor"
 	RoleViewer = "viewer"
+	// RolePublic is what anonymous requests (no Authorization header) may
+	// do. It is stored like a custom role, grants read actions only, and
+	// cannot be given to accounts or tokens.
+	RolePublic = "public"
 )
+
+// PublicActions are the actions the public role may grant.
+var PublicActions = []string{ActionRead}
 
 // Resources other than content types.
 const (
@@ -88,6 +95,9 @@ func IsBuiltinRole(name string) bool {
 	return ok
 }
 
+// IsPublicRole reports whether name is the role of anonymous requests.
+func IsPublicRole(name string) bool { return name == RolePublic }
+
 // RoleLookup returns a custom role's permissions (false: no such role).
 type RoleLookup func(role string) (Permissions, bool)
 
@@ -105,10 +115,38 @@ func PermissionsOf(role string) Permissions {
 	}
 	if lookup != nil {
 		if p, ok := lookup(role); ok {
+			if IsPublicRole(role) {
+				return p.readOnly()
+			}
 			return p
 		}
 	}
 	return Permissions{}
+}
+
+// readOnly keeps read actions only (what the public role may hold, whatever
+// was stored).
+func (p Permissions) readOnly() Permissions {
+	out := Permissions{Content: map[string][]string{}, Media: []string{}}
+	for k, actions := range p.Content {
+		if slices.Contains(actions, ActionRead) {
+			out.Content[k] = []string{ActionRead}
+		}
+	}
+	if slices.Contains(p.Media, ActionRead) {
+		out.Media = []string{ActionRead}
+	}
+	return out
+}
+
+// Empty reports whether the permissions grant nothing.
+func (p Permissions) Empty() bool {
+	for _, actions := range p.Content {
+		if len(actions) > 0 {
+			return false
+		}
+	}
+	return len(p.Media) == 0
 }
 
 // Can reports whether role may perform action on resource: a collection
@@ -120,6 +158,9 @@ func Can(role, action, resource string) bool {
 // CanSeeDrafts reports whether role sees draft content of a type: roles
 // that can edit or publish it.
 func CanSeeDrafts(role, resource string) bool {
+	if IsPublicRole(role) {
+		return false
+	}
 	p := PermissionsOf(role)
 	return p.Allows(ActionUpdate, resource) || p.Allows(ActionPublish, resource)
 }

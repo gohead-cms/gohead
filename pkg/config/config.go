@@ -45,6 +45,10 @@ type RateLimitConfig struct {
 	// client IP within LoginWindow before further attempts get 429.
 	LoginFailures int           `mapstructure:"login_failures" yaml:"login_failures"`
 	LoginWindow   time.Duration `mapstructure:"login_window" yaml:"login_window"`
+	// PublicPerMinute is the number of anonymous /api requests allowed per
+	// client IP per minute when the public role grants access (0 disables
+	// it).
+	PublicPerMinute int `mapstructure:"public_per_minute" yaml:"public_per_minute"`
 }
 
 // MediaConfig configures uploads (POST /api/media) and where files are stored.
@@ -219,6 +223,7 @@ func LoadConfig(configPath string) (Config, error) {
 	viper.SetDefault("rate_limit.auth_per_minute", 20)
 	viper.SetDefault("rate_limit.login_failures", 5)
 	viper.SetDefault("rate_limit.login_window", "15m")
+	viper.SetDefault("rate_limit.public_per_minute", 600)
 	viper.SetDefault("trusted_proxies", []string{})
 
 	// Media uploads: local directory by default, S3-compatible optional.

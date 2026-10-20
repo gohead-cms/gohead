@@ -22,6 +22,7 @@ import { FiChevronDown } from "react-icons/fi";
 import {
   ANY_TYPE,
   COLLECTION_ACTIONS,
+  type ContentAction,
   MEDIA_ACTIONS,
   SINGLETON_ACTIONS,
   singletonResource,
@@ -52,15 +53,17 @@ const ACTION_LABELS: Record<string, string> = {
   publish: "Publish",
 };
 
-function applicable(kind: RowKind | "media"): readonly string[] {
-  if (kind === "media") return MEDIA_ACTIONS;
-  return kind === "singleton" ? SINGLETON_ACTIONS : COLLECTION_ACTIONS;
+function applicable(kind: RowKind | "media", columns: readonly string[]): readonly string[] {
+  const all: readonly string[] = kind === "media" ? MEDIA_ACTIONS : kind === "singleton" ? SINGLETON_ACTIONS : COLLECTION_ACTIONS;
+  return all.filter((a) => columns.includes(a));
 }
 
 /**
  * Edits a role's permissions: a row per content type (plus "all other
  * types" and the media library), a column per action. A type without its
  * own row uses "all other types" until one of its boxes is changed.
+ * actions limits the columns (and presets) to some actions, e.g. read only
+ * for the public role.
  */
 export function PermissionMatrix({
   value,
@@ -68,14 +71,23 @@ export function PermissionMatrix({
   collections,
   singletons,
   isReadOnly,
+  actions: columns = COLLECTION_ACTIONS,
+  explicitOnly = false,
 }: {
   value: MatrixValue;
   onChange: (v: MatrixValue) => void;
   collections: string[];
   singletons: string[];
   isReadOnly?: boolean;
+  actions?: readonly ContentAction[];
+  /** Only per-type rows: no "all other types" row and no media library (the public role). */
+  explicitOnly?: boolean;
 }) {
-  const anyActions = value.content[ANY_TYPE] ?? [];
+  const fits = (actions: readonly string[]) => actions.every((a) => (columns as readonly string[]).includes(a));
+  const presets = PRESETS.filter((p) => fits(p.collection) && fits(p.singleton));
+  const mediaPresets = MEDIA_PRESETS.filter((p) => fits(p.actions));
+  const mediaActions = applicable("media", columns);
+  const anyActions = explicitOnly ? [] : (value.content[ANY_TYPE] ?? []);
   const rows: Row[] = [
     ...collections.map((c): Row => ({ key: c, label: c, kind: "collection" })),
     ...singletons.map((s): Row => ({ key: singletonResource(s), label: s, kind: "singleton" })),
@@ -85,7 +97,7 @@ export function PermissionMatrix({
   const effective = (row: Row): string[] => {
     const own = value.content[row.key];
     const actions = own ?? anyActions;
-    const allowed = applicable(row.kind);
+    const allowed = applicable(row.kind, columns);
     return actions.filter((a) => allowed.includes(a));
   };
   const inherited = (row: Row) => row.kind !== "any" && !(row.key in value.content);
@@ -102,7 +114,7 @@ export function PermissionMatrix({
   const renderRow = (row: Row) => {
     const actions = row.kind === "any" ? anyActions : effective(row);
     const isInherited = inherited(row);
-    const allowed = applicable(row.kind);
+    const allowed = applicable(row.kind, columns);
     return (
       <Tr key={row.key} data-testid={`perm-row-${row.key}`}>
         <Td>
@@ -127,7 +139,7 @@ export function PermissionMatrix({
             )
           )}
         </Td>
-        {COLLECTION_ACTIONS.map((a) => (
+        {columns.map((a) => (
           <Td key={a} textAlign="center">
             {allowed.includes(a) ? (
               <Checkbox
@@ -152,7 +164,7 @@ export function PermissionMatrix({
                 Preset
               </MenuButton>
               <MenuList fontSize="sm">
-                {PRESETS.map((p) => (
+                {presets.map((p) => (
                   <MenuItem key={p.label} onClick={() => setRow(row.key, row.kind === "singleton" ? p.singleton : p.collection)}>
                     {p.label}
                   </MenuItem>
@@ -160,7 +172,7 @@ export function PermissionMatrix({
                 {row.kind !== "any" && (
                   <>
                     <MenuDivider />
-                    <MenuItem isDisabled={isInherited} onClick={() => setRow(row.key, undefined)}>
+                    <MenuItem isDisabled={isInherited || explicitOnly} onClick={() => setRow(row.key, undefined)}>
                       Same as all other types
                     </MenuItem>
                   </>
@@ -175,7 +187,7 @@ export function PermissionMatrix({
 
   const section = (title: string, hint?: string) => (
     <Tr bg="gray.50">
-      <Td colSpan={COLLECTION_ACTIONS.length + (isReadOnly ? 1 : 2)} py={2}>
+      <Td colSpan={columns.length + (isReadOnly ? 1 : 2)} py={2}>
         <HStack spacing={2}>
           <Text fontSize="xs" fontWeight="bold" textTransform="uppercase" letterSpacing="wide" color="gray.600">
             {title}
@@ -200,7 +212,7 @@ export function PermissionMatrix({
           <Thead>
             <Tr>
               <Th>Type</Th>
-              {COLLECTION_ACTIONS.map((a) => (
+              {columns.map((a) => (
                 <Th key={a} textAlign="center" px={2}>
                   {ACTION_LABELS[a]}
                 </Th>
@@ -209,22 +221,24 @@ export function PermissionMatrix({
             </Tr>
           </Thead>
           <Tbody>
-            {renderRow(anyRow)}
+            {!explicitOnly && renderRow(anyRow)}
             {collectionRows.length > 0 && section("Collections")}
             {collectionRows.map(renderRow)}
             {singletonRows.length > 0 && section("Single types", "read and update only")}
             {singletonRows.map(renderRow)}
+            {!explicitOnly && (
+              <>
             {section("Media library")}
             <Tr data-testid="perm-row-media">
               <Td>
                 <Text fontWeight="medium">Media</Text>
                 <Text fontSize="xs" color="gray.500">
-                  Browse, upload, edit and delete files
+                  {mediaActions.length === MEDIA_ACTIONS.length ? "Browse, upload, edit and delete files" : "Browse files"}
                 </Text>
               </Td>
-              {COLLECTION_ACTIONS.map((a) => (
+              {columns.map((a) => (
                 <Td key={a} textAlign="center">
-                  {MEDIA_ACTIONS.includes(a as (typeof MEDIA_ACTIONS)[number]) ? (
+                  {mediaActions.includes(a) ? (
                     <Checkbox
                       colorScheme="purple"
                       aria-label={`${ACTION_LABELS[a]} media`}
@@ -246,7 +260,7 @@ export function PermissionMatrix({
                       Preset
                     </MenuButton>
                     <MenuList fontSize="sm">
-                      {MEDIA_PRESETS.map((p) => (
+                      {mediaPresets.map((p) => (
                         <MenuItem key={p.label} onClick={() => onChange({ ...value, media: [...p.actions] })}>
                           {p.label}
                         </MenuItem>
@@ -256,6 +270,8 @@ export function PermissionMatrix({
                 </Td>
               )}
             </Tr>
+              </>
+            )}
           </Tbody>
         </Table>
       </TableContainer>
@@ -265,7 +281,8 @@ export function PermissionMatrix({
             Tip
           </Badge>
           <Text fontSize="xs" color="gray.500">
-            Any action includes read: checking one checks Read, unchecking Read clears the row. Faded rows follow “All other types”.
+            {columns.length > 1 && "Any action includes read: checking one checks Read, unchecking Read clears the row. "}
+            Faded rows follow “All other types”.
           </Text>
         </HStack>
       )}

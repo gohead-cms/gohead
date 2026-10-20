@@ -168,3 +168,90 @@ test("roles: built-in roles are read-only and a role in use cannot be deleted", 
     await request.delete(`${apiURL}/admin/roles/${roleName}`, { headers });
   }
 });
+
+// The public role: what requests without a token may read. An admin grants
+// read on one collection on the Roles page; anonymous requests then get its
+// published entries (never drafts) and are still refused everything else.
+test("roles: the public role opens one collection to anonymous requests", async ({ page, request }) => {
+  const errors = trackErrors(page);
+  const headers = await adminHeaders(request);
+  const suffix = `${Date.now().toString(36)}${test.info().retry}`;
+  const open = `news${suffix}`;
+  const closed = `notes${suffix}`;
+  const published = `Public news ${suffix}`;
+  const draft = `Draft news ${suffix}`;
+  // Restored at the end: other tests expect anonymous requests to be refused.
+  const before = await request.get(`${apiURL}/admin/roles/public`, { headers });
+  expect(before.ok(), await before.text()).toBeTruthy();
+  const original = (await before.json()).data as { description: string };
+
+  for (const name of [open, closed]) {
+    const res = await request.post(`${apiURL}/admin/collections`, {
+      headers,
+      data: { name, kind: "collection", draft_and_publish: true, attributes: { title: { type: "string", required: true } } },
+    });
+    expect(res.ok(), await res.text()).toBeTruthy();
+  }
+  for (const title of [published, draft]) {
+    const res = await request.post(`${apiURL}/api/collections/${open}`, { headers, data: { data: { title } } });
+    expect(res.ok(), await res.text()).toBeTruthy();
+    if (title === published) {
+      const id = (await res.json()).data.id as number;
+      const pub = await request.post(`${apiURL}/api/collections/${open}/${id}/publish`, { headers });
+      expect(pub.ok(), await pub.text()).toBeTruthy();
+    }
+  }
+
+  try {
+    // Closed by default: anonymous requests are refused.
+    expect((await request.get(`${apiURL}/api/collections/${open}`)).status()).toBe(401);
+
+    await login(page);
+    await page.goto("/settings/roles");
+    const section = page.getByTestId("public-role");
+    await expect(section).toContainText("Public (anonymous visitors)");
+    await expect(section).toContainText("API calls without a token are refused");
+    // It has its own section, not a row of the table, and cannot be deleted.
+    await expect(page.getByRole("row").filter({ hasText: /^public/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Delete public" })).toHaveCount(0);
+
+    await section.getByRole("button", { name: "Edit public" }).click();
+    const drawer = page.getByRole("dialog");
+    await expect(drawer).toContainText("readable by anyone on the internet");
+    await expect(drawer.getByRole("textbox", { name: /^Name/ })).toHaveAttribute("readonly", "");
+    // Read only: no other action can be granted.
+    const read = drawer.getByRole("checkbox", { name: `Read ${open}`, exact: true });
+    await expect(read).not.toBeChecked();
+    await expect(drawer.getByRole("checkbox", { name: `Create ${open}`, exact: true })).toHaveCount(0);
+    await expect(drawer.getByRole("checkbox", { name: "Create media", exact: true })).toHaveCount(0);
+    await drawer.getByRole("button", { name: `Presets for ${open}` }).click();
+    await expect(page.getByRole("menuitem", { name: "Read only" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Editor" })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await read.evaluate((el) => (el as HTMLInputElement).click());
+    await expect(read).toBeChecked();
+    await drawer.getByRole("button", { name: "Save changes" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(section).toContainText(`can read the published content of ${open}`);
+
+    // Without a token: the collection's published entries, nothing else.
+    const listed = await request.get(`${apiURL}/api/collections/${open}`);
+    expect(listed.status(), await listed.text()).toBe(200);
+    const titles = ((await listed.json()).data as { title: string }[]).map((i) => i.title);
+    expect(titles).toContain(published);
+    expect(titles).not.toContain(draft);
+    expect((await request.get(`${apiURL}/api/collections/${closed}`)).status()).toBe(401);
+    expect((await request.post(`${apiURL}/api/collections/${open}`, { data: { data: { title: "x" } } })).status()).toBe(401);
+
+    // Users and API tokens cannot be given the public role.
+    await page.goto("/settings/users");
+    await page.getByRole("button", { name: "New user" }).first().click();
+    const roleSelect = page.getByRole("dialog").getByLabel("Role");
+    await expect(roleSelect.locator("option", { hasText: "editor" })).toHaveCount(1);
+    await expect(roleSelect.locator("option", { hasText: "public" })).toHaveCount(0);
+    expect(errors).toEqual([]);
+  } finally {
+    await request.put(`${apiURL}/admin/roles/public`, { headers, data: { description: original.description, permissions: { content: {}, media: [] } } });
+    for (const name of [open, closed]) await request.delete(`${apiURL}/admin/collections/${name}`, { headers });
+  }
+});

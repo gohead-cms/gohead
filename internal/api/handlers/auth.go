@@ -69,7 +69,7 @@ func Register(c *gin.Context) {
 	}
 
 	roleName := DefaultRegistrationRole
-	role, err := storage.GetRoleByName(roleName)
+	role, err := storage.AssignableRole(roleName)
 	if err != nil {
 		// Roles are seeded at startup, so a missing one is a server-side problem.
 		logger.Log.WithError(err).Error("Register: Failed to fetch role")

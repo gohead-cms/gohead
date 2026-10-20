@@ -18,6 +18,7 @@ import (
 //
 // This mimics the "single type" behavior in Strapi (one record per name).
 func SaveOrUpdateSingleton(st *models.Singleton) error {
+	defer invalidateRoles() // the public role depends on the model (password attributes)
 	if strings.TrimSpace(st.Name) == "" {
 		return errors.New("single type name is required")
 	}
@@ -135,6 +136,7 @@ func GetSingletonByName(name string) (*models.Singleton, error) {
 // DeleteSingleton permanently deletes a single type by its ID (including attributes).
 // Note: Strapi typically doesn't expose DELETE for single types, but you can implement it if needed.
 func DeleteSingleton(SingletonID uint) error {
+	defer invalidateRoles() // the public role depends on the model (password attributes)
 	tx := database.DB.Begin()
 	logger.Log.WithField("single_type_id", SingletonID).Info("DeleteSingleton: start deletion")
 

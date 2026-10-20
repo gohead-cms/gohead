@@ -87,6 +87,7 @@ rate_limit:
   auth_per_minute: 20  # requests per client IP
   login_failures: 5    # failed logins per username and IP before lockout (0 = off)
   login_window: 15m
+  public_per_minute: 600  # anonymous /api requests per client IP (public access)
 
 # IPs/CIDRs of the load balancer or ingress allowed to set X-Forwarded-For.
 # Empty: the header is ignored and the connection's address is the client IP.

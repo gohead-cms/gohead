@@ -45,7 +45,10 @@ func CreateAPIToken(in NewAPITokenInput) (*models.APIToken, string, error) {
 	if in.Name == "" {
 		return nil, "", fmt.Errorf("name is required")
 	}
-	if _, err := GetRoleByName(in.Role); err != nil {
+	if _, err := AssignableRole(in.Role); err != nil {
+		if errors.Is(err, ErrPublicRole) {
+			return nil, "", err
+		}
 		return nil, "", fmt.Errorf("unknown role '%s'", in.Role)
 	}
 	if in.ExpiresAt != nil && !in.ExpiresAt.After(time.Now()) {

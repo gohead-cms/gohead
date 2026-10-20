@@ -59,6 +59,12 @@ var All = []Migration{
 		Up:          agentsV2Up,
 		Down:        agentsV2Down,
 	},
+	{
+		ID:          "0005_public_role",
+		Description: "Rename a custom role named public, now the role of anonymous visitors",
+		Up:          publicRoleUp,
+		Down:        publicRoleDown,
+	},
 }
 
 // baseline creates or updates every table from the models, as GoHead did at

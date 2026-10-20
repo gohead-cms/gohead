@@ -3,6 +3,7 @@ package middleware
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gohead-cms/gohead/internal/models"
@@ -30,6 +31,80 @@ func UserSessionOnly() gin.HandlerFunc {
 	}
 }
 
+// AnonymousKey is set in the context of requests without credentials that
+// act with the public role.
+const AnonymousKey = "anonymous"
+
+// PublicOrAuth authenticates like AuthMiddleware, except that a request
+// without an Authorization header acts with the public role when that role
+// grants anything. Anonymous requests go through limit (per client IP), and
+// a 403 they get becomes a 401 so clients know signing in may help.
+func PublicOrAuth(limit gin.HandlerFunc) gin.HandlerFunc {
+	authenticated := AuthMiddleware()
+	return func(c *gin.Context) {
+		if c.GetHeader("Authorization") != "" || !storage.PublicAccessEnabled() {
+			authenticated(c)
+			return
+		}
+		if limit != nil {
+			limit(c)
+			if c.IsAborted() {
+				return
+			}
+		}
+		c.Set("username", "")
+		c.Set("role", auth.RolePublic)
+		c.Set(AnonymousKey, true)
+		c.Writer.Header().Add("Vary", "Authorization")
+		capLevel(c)
+		c.Next()
+		status := c.GetInt("status")
+		// Forbidden, or a type that does not exist: the same answer, so
+		// visitors cannot list the content model.
+		unknownType := status == http.StatusNotFound && typeNotFound[c.GetString("response")]
+		if status == http.StatusForbidden || unknownType {
+			c.Set("status", http.StatusUnauthorized)
+			c.Set("response", "Authentication required")
+			c.Set("details", "anonymous visitors cannot do this: send a token")
+		}
+	}
+}
+
+// SignedInOnly refuses anonymous requests (public role) with 401, for
+// routes only accounts and tokens may use whatever the public role grants.
+func SignedInOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if IsAnonymous(c) {
+			abortWithError(c, http.StatusUnauthorized, "", "Authorization header required")
+			return
+		}
+		c.Next()
+	}
+}
+
+// MaxAnonymousLevel is the deepest relation population anonymous requests
+// get: each level multiplies the work.
+const MaxAnonymousLevel = 2
+
+// typeNotFound are the answers for unknown collections and singletons.
+var typeNotFound = map[string]bool{"Collection not found": true, "Singleton not found": true, "Single type not found": true}
+
+// capLevel lowers ?level= to MaxAnonymousLevel.
+func capLevel(c *gin.Context) {
+	q := c.Request.URL.Query()
+	v := q.Get("level")
+	if v == "" {
+		return
+	}
+	if n, err := strconv.Atoi(v); err == nil && n > MaxAnonymousLevel {
+		q.Set("level", strconv.Itoa(MaxAnonymousLevel))
+		c.Request.URL.RawQuery = q.Encode()
+	}
+}
+
+// IsAnonymous reports whether the request acts with the public role.
+func IsAnonymous(c *gin.Context) bool { return c.GetBool(AnonymousKey) }
+
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Extract the Authorization header
@@ -53,7 +128,7 @@ func AuthMiddleware() gin.HandlerFunc {
 				abortWithError(c, http.StatusUnauthorized, "InvalidTokenError", "Invalid or revoked API token")
 				return
 			}
-			if _, err := storage.GetRoleByName(tok.Role); err != nil {
+			if _, err := storage.AssignableRole(tok.Role); err != nil {
 				abortWithError(c, http.StatusForbidden, "", "Invalid role")
 				return
 			}
@@ -78,7 +153,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		if user, err := storage.GetUserByUsername(claims.Username); err == nil && user.Role.Name != "" {
 			roleName = user.Role.Name
 		}
-		role, err := storage.GetRoleByName(roleName)
+		role, err := storage.AssignableRole(roleName)
 		if err != nil {
 			logger.Log.Warnf("Role '%s' not found", roleName)
 			abortWithError(c, http.StatusForbidden, "", "Invalid role")

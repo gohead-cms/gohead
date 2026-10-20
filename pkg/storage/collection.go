@@ -18,6 +18,7 @@ import (
 
 // SaveCollection persists a Collection to the database, handling both new and soft-deleted records.
 func SaveCollection(ct *models.Collection) error {
+	defer invalidateRoles() // the public role depends on the model (password attributes)
 	var existing models.Collection
 
 	logger.Log.WithField("collection", ct.Name).Info("Attempting to save collection")
@@ -216,6 +217,7 @@ func GetAllCollections(filters map[string]any, sortValues []string, rangeValues 
 
 // UpdateCollectionByID updates an existing Collection in the database by its ID.
 func UpdateCollection(id uint, updated *models.Collection) error {
+	defer invalidateRoles() // the public role depends on the model (password attributes)
 	var existing models.Collection
 
 	logger.Log.WithField("collection input", updated).Info("Attempting to update collection in database")
@@ -368,6 +370,7 @@ func updateAssociatedFields(tx *gorm.DB, collectionID *uint, updatedAttributes [
 
 // DeleteCollection deletes a collection and all associated data by its ID.
 func DeleteCollection(collectionID uint) error {
+	defer invalidateRoles() // the public role depends on the model (password attributes)
 	// Begin a transaction for cascading deletion
 	tx := database.DB.Begin()
 	logger.Log.WithField("collection_id", collectionID).Info("DeleteCollection: start to delete collection")

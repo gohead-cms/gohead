@@ -1,6 +1,7 @@
 # GraphQL
 
-`POST /api/graphql` with a bearer token. The schema is generated from your collections and
+`POST /api/graphql` with a bearer token, or without one for the types opened with
+[public access](users-and-roles.md#public-access) (queries only, within limits). The schema is generated from your collections and
 rebuilt automatically when a collection changes.
 
 ```bash

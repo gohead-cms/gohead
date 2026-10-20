@@ -63,6 +63,52 @@ Built-in roles can't be changed or deleted. Assign a custom role like any other:
 
 `GET /auth/me` returns the caller's `permissions` in this format. The built-in roles are expanded into it, so a client can show or hide actions.
 
+### Public access
+
+Requests **without a token** act with the `public` role. It grants nothing at first, so
+anonymous requests get `401`. Grant it `read` on the types your website or app shows, and
+browsers, mobile apps and static site builds can read them without a token:
+
+```bash
+curl -X PUT $GOHEAD/admin/roles/public -H "$JSON" -H "$AUTH" -d '{
+  "description": "Website visitors",
+  "permissions": {
+    "content": { "articles": ["read"], "categories": ["read"], "singleton:homepage": ["read"] }
+  }
+}'
+
+curl $GOHEAD/api/collections/articles   # no Authorization header
+```
+
+In the admin UI: **Settings → Roles → Public**.
+
+- **Read only, published only.** The role only holds `read`, type by type; visitors never
+  see drafts, history or proposals, and never write.
+- **Listed types only.** `*` is refused, so a type created later stays private until you add
+  it. Types with `password` attributes (or components that have one) can't be public; a type
+  that gains one is closed again.
+- **Files** used by public content are returned with it (their URLs are public anyway).
+  Browsing the media library (`/api/media`) is not available to visitors.
+- **What stays private:** related entries of types the role can't read are left out, as for
+  any role. The content model (`/api/schema/*`, `/api/openapi.json` unless
+  `openapi.public` is on), GraphQL introspection and the admin area need a token. A missing
+  type and a type that isn't public answer the same `401`, so visitors can't list your types.
+- **Limits:** relations are populated at most 2 levels deep (`level` is capped). GraphQL
+  queries are limited to 4 levels and 200 fields, mutations need a token, and error messages
+  don't name types. Anonymous requests are rate limited per client IP
+  ([`rate_limit.public_per_minute`](../getting-started/configuration.md#rate-limiting), 600 a minute).
+  Behind a load balancer or CDN, set [`trusted_proxies`](../getting-started/configuration.md#rate-limiting)
+  so each visitor is counted separately, and give static site builds an
+  [API token](integrations.md#api-tokens), which is not limited this way.
+- A request that sends a token always acts as that token, even with public access on, and
+  a forbidden anonymous request gets `401`, so a client knows a token may help.
+- The `public` role can't be deleted or given to users and API tokens. A custom role named
+  `public` from an earlier version is renamed `public-legacy` when upgrading, with its users
+  and tokens.
+
+Anything granted here is readable by anyone on the internet. For content that only your
+own servers should read, keep public access off and use an [API token](integrations.md#api-tokens).
+
 ## Registration and the first admin
 
 The first administrator never comes from the public API. Create it either way:
