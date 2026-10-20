@@ -26,6 +26,8 @@ export interface AttributeDef {
   multiple?: boolean;
   /** media: MIME patterns, e.g. image/* */
   allowed_types?: string[];
+  /** Custom validation messages, by rule. */
+  custom_errors?: Record<string, string>;
 }
 
 export type Attributes = Record<string, AttributeDef>;
@@ -64,7 +66,7 @@ export interface Model {
 
 const ATTR_KEYS: (keyof AttributeDef)[] = [
   "type", "required", "unique", "localized", "options", "min", "max", "pattern",
-  "target", "relation", "component", "repeatable", "multiple", "allowed_types",
+  "target", "relation", "component", "repeatable", "multiple", "allowed_types", "custom_errors",
 ];
 
 /** Normalizes an attribute as the server returns it (both list and map forms). */
@@ -73,6 +75,7 @@ export function normalizeAttribute(raw: Record<string, unknown>): AttributeDef {
   for (const k of ATTR_KEYS) {
     let v = raw[k];
     if (v === undefined || v === null || v === false || v === "" || (Array.isArray(v) && v.length === 0)) continue;
+    if (typeof v === "object" && !Array.isArray(v) && Object.keys(v).length === 0) continue;
     if (k === "target" && typeof v === "string") v = v.replace(/^api::([^.]+)\..*$/, "$1");
     out[k] = v;
   }
@@ -96,16 +99,21 @@ function sortKeys<T>(obj: Record<string, T>): Record<string, T> {
   return Object.fromEntries(Object.entries(obj).sort(([a], [b]) => a.localeCompare(b)));
 }
 
+/** Every type of a schema list (some lists page, others return everything). */
 async function listAll(client: GoHeadClient, path: string): Promise<Record<string, unknown>[]> {
-  const out: Record<string, unknown>[] = [];
+  const out = new Map<string, Record<string, unknown>>();
+  const keyOf = (x: Record<string, unknown>) =>
+    String(x.name ?? (x.schema as { collectionName?: unknown } | undefined)?.collectionName ?? x.id ?? JSON.stringify(x));
   for (let page = 1; page < 1000; page++) {
     const res = await client.request<Record<string, unknown>[]>("GET", path, { query: `?page=${page}&pageSize=100` });
     const list = res.data ?? [];
-    out.push(...list);
-    const total = Number((res.meta as { total?: unknown } | undefined)?.total ?? NaN);
-    if (list.length < 100 || (Number.isFinite(total) && out.length >= total)) break;
+    const before = out.size;
+    for (const x of list) out.set(keyOf(x), x);
+    const meta = (res.meta ?? {}) as { total?: unknown; pagination?: { total?: unknown } };
+    const total = Number(meta.pagination?.total ?? meta.total ?? NaN);
+    if (list.length < 100 || out.size === before || (Number.isFinite(total) && out.size >= total)) break;
   }
-  return out;
+  return [...out.values()];
 }
 
 /** Reads the content model of an instance. */
@@ -152,8 +160,13 @@ function withDescription<T extends { attributes: Attributes; description?: strin
 
 export interface PushOptions {
   dryRun?: boolean;
-  /** Allow removing attributes that exist on the server but not in the model. */
+  /**
+   * Allow removing attributes that exist on the server but not in the model,
+   * and types from public access.
+   */
   allowRemovals?: boolean;
+  /** Allow turning off draft and publish (which publishes every draft). */
+  allowPublishDrafts?: boolean;
   log?: (line: string) => void;
 }
 
@@ -225,6 +238,7 @@ export async function pushModel(client: GoHeadClient, model: Model, opts: PushOp
     else if ((l.name && l.name !== cur.name) || (l.default && !cur.default)) plan.push({ kind: "locale", name: l.code, action: "update" });
   }
   // Types
+  const draftsPublished: string[] = [];
   const typeSteps = (kind: "component" | "collection" | "singleton", wanted: Record<string, { attributes: Attributes; description?: string; draftAndPublish?: boolean }> | undefined, existing: Record<string, { attributes: Attributes; description?: string; draftAndPublish?: boolean }> | undefined) => {
     for (const [name, def] of Object.entries(wanted ?? {})) {
       const cur = existing?.[name];
@@ -233,7 +247,12 @@ export async function pushModel(client: GoHeadClient, model: Model, opts: PushOp
         continue;
       }
       const d = diffAttributes(cur.attributes, def.attributes ?? {});
-      const meta = (def.description ?? "") !== (cur.description ?? "") || (kind === "collection" && !!def.draftAndPublish !== !!cur.draftAndPublish);
+      const dp = kind === "collection" && !!def.draftAndPublish !== !!cur.draftAndPublish;
+      if (dp) {
+        d.changed!.push(def.draftAndPublish ? "draftAndPublish (on)" : "draftAndPublish (off: drafts get published)");
+        if (!def.draftAndPublish) draftsPublished.push(name);
+      }
+      const meta = (def.description ?? "") !== (cur.description ?? "");
       const changed = d.added!.length + d.removed!.length + d.changed!.length > 0 || meta;
       plan.push({ kind, name, action: changed ? "update" : "unchanged", ...d });
     }
@@ -241,8 +260,21 @@ export async function pushModel(client: GoHeadClient, model: Model, opts: PushOp
   typeSteps("component", model.components, current.components);
   typeSteps("collection", model.collections, current.collections);
   typeSteps("singleton", model.singletons, current.singletons);
-  if (model.public && !same(model.public, current.public ?? { content: {}, media: [] })) {
-    plan.push({ kind: "public", name: "public", action: "update" });
+  // Public access: the model's grants are added; grants the model does not
+  // list are removals.
+  let publicContent: Record<string, string[]> | undefined;
+  if (model.public) {
+    const cur = current.public?.content ?? {};
+    const wanted = model.public.content ?? {};
+    const removed = Object.keys(cur).filter((k) => !(k in wanted) && (cur[k] ?? []).length > 0);
+    const added = Object.keys(wanted).filter((k) => !same(cur[k] ?? [], wanted[k]));
+    publicContent = opts.allowRemovals ? { ...wanted } : { ...cur, ...wanted };
+    if (added.length || (removed.length && opts.allowRemovals)) {
+      plan.push({ kind: "public", name: "public", action: "update", added, removed: opts.allowRemovals ? removed : [] });
+    }
+    if (removed.length && !opts.allowRemovals) {
+      log(`keep public access to ${removed.join(", ")} (not in the model; --allow-removals would close it)`);
+    }
   }
 
   const removals = plan.filter((s) => (s.removed ?? []).length > 0);
@@ -250,6 +282,12 @@ export async function pushModel(client: GoHeadClient, model: Model, opts: PushOp
     if (s.action === "unchanged") continue;
     const parts = [s.added?.length ? `+${s.added.join(", +")}` : "", s.changed?.length ? `~${s.changed.join(", ~")}` : "", s.removed?.length ? `-${s.removed.join(", -")}` : ""].filter(Boolean);
     log(`${s.action === "create" ? "create" : "update"} ${s.kind === "public" ? "public access" : `${s.kind} ${s.name}`}${parts.length ? ` (${parts.join(" ")})` : ""}`);
+  }
+  if (draftsPublished.length > 0 && !opts.allowPublishDrafts) {
+    throw new Error(
+      `the model turns draft and publish off for ${draftsPublished.join(", ")}: every draft would be published. ` +
+        "Add \"draftAndPublish\": true to keep it, or pass --allow-publish-drafts.",
+    );
   }
   if (removals.length > 0 && !opts.allowRemovals) {
     throw new Error(
@@ -289,7 +327,9 @@ export async function pushModel(client: GoHeadClient, model: Model, opts: PushOp
     for (let i = 0; i < pending.length; i++) {
       const [name, def] = pending[i]!;
       const attrs = Object.fromEntries(
-        Object.entries(def.attributes).filter(([, a]) => a.type !== "relation" || exists.has(a.target!) || a.target === name),
+        // Relations to collections not created yet (itself included) come
+        // with the full definition below.
+        Object.entries(def.attributes).filter(([, a]) => a.type !== "relation" || exists.has(a.target!)),
       );
       await client.request("POST", "/admin/collections", { body: collectionBody(name, { ...def, attributes: attrs }) });
       exists.add(name);
@@ -300,7 +340,7 @@ export async function pushModel(client: GoHeadClient, model: Model, opts: PushOp
   }
   for (const [name, def] of collections) {
     const step = plan.find((s) => s.kind === "collection" && s.name === name);
-    const createdPartially = step?.action === "create" && relationTargets(def).some((t) => t !== name);
+    const createdPartially = step?.action === "create" && relationTargets(def).length > 0;
     if (step?.action === "update" || createdPartially) {
       await client.request("PUT", `/admin/collections/${encodeURIComponent(name)}`, { body: collectionBody(name, def) });
     }
@@ -314,7 +354,7 @@ export async function pushModel(client: GoHeadClient, model: Model, opts: PushOp
   }
   if (plan.some((s) => s.kind === "public")) {
     await client.request("PUT", "/admin/roles/public", {
-      body: { description: "Anonymous visitors (requests without a token)", permissions: { content: model.public!.content ?? {}, media: model.public!.media ?? [] } },
+      body: { description: "Anonymous visitors (requests without a token)", permissions: { content: publicContent ?? {}, media: [] } },
     });
   }
   return plan;

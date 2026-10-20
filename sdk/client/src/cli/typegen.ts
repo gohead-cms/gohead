@@ -83,8 +83,9 @@ function fieldType(a: AttributeDef, names: Names, input: boolean): string {
         const one = target ? `number | ${target}Input` : "number | Record<string, unknown>";
         return many ? `Array<${one}>` : one;
       }
-      const one = target ? `Entry<${target}>` : "Entry";
-      return many ? `${one}[]` : one;
+      // Populated down to the read's level, an ID below it.
+      const one = target ? `Entry<${target}> | number` : "Entry | number";
+      return many ? `Array<${one}>` : one;
     }
     case "component": {
       const c = a.component ? names.components.get(a.component) : undefined;
@@ -93,7 +94,8 @@ function fieldType(a: AttributeDef, names: Names, input: boolean): string {
     }
     case "media":
       if (input) return a.multiple ? "number[]" : "number";
-      return a.multiple ? "Media[]" : "Media";
+      // Files are returned with the entry, as IDs only at level 0.
+      return a.multiple ? "Array<Media | number>" : "Media | number";
     default:
       return scalarType(a);
   }

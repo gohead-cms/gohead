@@ -10,7 +10,7 @@ import "server-only";
 
 import { PHASE_PRODUCTION_BUILD } from "next/constants";
 import { cache } from "react";
-import { createClient, isGoHeadError, type Entry, type JsonValue, type Media } from "@gohead-cms/client";
+import { createClient, isGoHeadError, populated, type Entry, type JsonValue, type Media } from "@gohead-cms/client";
 
 import type { Article, Author, Category, Homepage, Seo } from "@/gohead";
 import type { Locale } from "@/i18n";
@@ -202,17 +202,20 @@ export async function getSlugs(type: "articles" | "categories" | "authors"): Pro
 // ---- Helpers ----
 
 /** An absolute URL for a GoHead file (local uploads are served by GoHead). */
-export function mediaUrl(media: Pick<Media, "url"> | string | null | undefined): string | undefined {
-  return gohead.media.url(media);
+export function mediaUrl(media: Pick<Media, "url"> | string | number | null | undefined): string | undefined {
+  return publicMedia.media.url(media);
 }
+
+/**
+ * Links to files use GoHead's public address (GOHEAD_PUBLIC_URL) when the
+ * site reaches it through an internal one (a Docker service name…), so
+ * Open Graph images and images in articles work for visitors.
+ */
+const publicMedia = process.env.GOHEAD_PUBLIC_URL ? gohead.with({ url: process.env.GOHEAD_PUBLIC_URL }) : gohead;
 
 /** A populated relation, or null (relations are plain IDs below `level`). */
-function populated<T extends object>(value: T | number | null | undefined): T | null {
-  return value !== null && typeof value === "object" ? value : null;
-}
-
-export const authorOf = (a: ArticleEntry) => populated<AuthorEntry>(a.author);
-export const categoryOf = (a: ArticleEntry) => populated<CategoryEntry>(a.category);
+export const authorOf = (a: ArticleEntry): AuthorEntry | null => populated(a.author) ?? null;
+export const categoryOf = (a: ArticleEntry): CategoryEntry | null => populated(a.category) ?? null;
 
 /** The `tags` JSON attribute as a list of strings. */
 export function tagsOf(a: ArticleEntry): string[] {

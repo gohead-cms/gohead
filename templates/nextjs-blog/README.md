@@ -64,6 +64,7 @@ The `gohead:*` scripts use the `gohead-client` CLI of `@gohead-cms/client`, whic
 | `GOHEAD_TOKEN` | site | Optional API token, for a GoHead whose content isn’t public. Server side only |
 | `GOHEAD_WEBHOOK_SECRET` | site | Signing secret of the revalidation webhook |
 | `GOHEAD_REVALIDATE` | site | Seconds a GoHead read stays cached (default `60`; `false`: until a webhook says otherwise) |
+| `GOHEAD_PUBLIC_URL` | site | GoHead’s public address when `GOHEAD_URL` is internal (a Docker service name…): links to files use it |
 | `GOHEAD_MEDIA_URL` | site | Public URL of uploads when GoHead stores them in S3 or behind a CDN |
 | `NEXT_PUBLIC_SITE_URL` | site | This site’s public URL, for canonical links, Open Graph, the sitemap and RSS. On Vercel it defaults to the production domain |
 | `GOHEAD_USERNAME`, `GOHEAD_PASSWORD` | scripts | An admin account, for `gohead:push` and `gohead:seed` |
@@ -96,7 +97,7 @@ Category and author pages filter the list of all articles in Next.js, because Go
 
 ## Publishing and revalidation
 
-Pages are built statically and cached. Every GoHead read is tagged `gohead` and `gohead:<collection>`, and refetched after `GOHEAD_REVALIDATE` seconds (60 by default). With a webhook, a change shows up on the next visit instead:
+Article, category and author pages are built statically; the home page renders on request (it reads `?page=`). Everything is cached. Every GoHead read is tagged `gohead` and `gohead:<collection>`, and refetched after `GOHEAD_REVALIDATE` seconds (60 by default). With a webhook, a change shows up on the next visit instead:
 
 1. In the GoHead admin, open **Settings → Webhooks** and create a webhook:
    - URL: `https://your-site.example.com/api/revalidate`

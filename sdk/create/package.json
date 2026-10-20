@@ -7,7 +7,7 @@
   "repository": { "type": "git", "url": "git+https://github.com/gohead-cms/gohead.git", "directory": "sdk/create" },
   "homepage": "https://gohead-cms.github.io/gohead/frontend/templates/",
   "keywords": ["gohead", "headless-cms", "starter", "template", "nextjs", "create"],
-  "engines": { "node": ">=18.17" },
+  "engines": { "node": ">=20.9" },
   "bin": { "create-gohead": "./dist/index.js" },
   "files": ["dist", "templates", "README.md", "LICENSE.md"],
   "scripts": {

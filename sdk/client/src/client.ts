@@ -78,7 +78,12 @@ function mergeInit(a: RequestInit | undefined, b: RequestInit | undefined): Requ
   const out: RequestInit & { next?: unknown } = { ...a, ...b };
   const an = (a as { next?: Record<string, unknown> }).next;
   const bn = (b as { next?: Record<string, unknown> }).next;
-  if (an || bn) out.next = { ...an, ...bn };
+  if (an || bn) {
+    const next: Record<string, unknown> = { ...an, ...bn };
+    const tags = [...((an?.tags as string[] | undefined) ?? []), ...((bn?.tags as string[] | undefined) ?? [])];
+    if (tags.length) next.tags = [...new Set(tags)];
+    out.next = next;
+  }
   return out;
 }
 
@@ -149,7 +154,15 @@ export class GoHeadClient {
     options: { operationName?: string; init?: RequestInit } = {},
   ): Promise<T> {
     const body = { query, variables, operationName: options.operationName };
-    return (await this.request<T>("POST", "/api/graphql", { body, init: options.init })).data;
+    try {
+      return (await this.request<T>("POST", "/api/graphql", { body, init: options.init })).data;
+    } catch (err) {
+      // GoHead puts the GraphQL error itself in details.
+      if (err instanceof GoHeadError && typeof err.details === "string" && err.details) {
+        throw new GoHeadError({ status: err.status, code: err.code, message: err.details, details: err.details, request: err.request, cause: err });
+      }
+      throw err;
+    }
   }
 
   /** Signs in with a username and password; returns a session token to pass as `token`. */
@@ -169,7 +182,11 @@ export class GoHeadClient {
    */
   async request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<Envelope<T>> {
     const label = `${method} ${path}`;
+    const init = mergeInit(this.options.init, opts.init);
     const headers = new Headers(this.options.headers);
+    for (const extra of [this.options.init?.headers, opts.init?.headers]) {
+      if (extra) new Headers(extra).forEach((v, k) => headers.set(k, v));
+    }
     headers.set("Accept", "application/json");
     let body: BodyInit | undefined;
     if (opts.form) {
@@ -183,21 +200,23 @@ export class GoHeadClient {
       const token = typeof t === "function" ? await t() : t;
       if (token) headers.set("Authorization", `Bearer ${token}`);
     }
-    const init = mergeInit(this.options.init, opts.init);
     const timeout = this.options.timeoutMs ?? 30_000;
-    let signal = init.signal ?? undefined;
+    const callerSignal = init.signal ?? undefined;
+    let signal = callerSignal;
+    let timer: AbortSignal | undefined;
     if (timeout > 0 && typeof AbortSignal !== "undefined" && "timeout" in AbortSignal) {
-      const t = AbortSignal.timeout(timeout);
-      signal = signal && "any" in AbortSignal ? AbortSignal.any([signal, t]) : (signal ?? t);
+      timer = AbortSignal.timeout(timeout);
+      signal = callerSignal && "any" in AbortSignal ? AbortSignal.any([callerSignal, timer]) : (callerSignal ?? timer);
     }
     const doFetch = this.options.fetch ?? globalThis.fetch;
-    if (!doFetch) throw new Error("No fetch available: pass `fetch` to createClient (Node 18+ has one)");
+    if (!doFetch) throw new Error("No fetch available: pass `fetch` to createClient");
 
     let res: Response;
     try {
       res = await doFetch(this.url + path + (opts.query ?? ""), { ...init, method, headers, body, signal });
     } catch (cause) {
-      const timedOut = cause instanceof Error && (cause.name === "TimeoutError" || cause.name === "AbortError");
+      if (callerSignal?.aborted) throw cause; // the caller cancelled: their AbortError
+      const timedOut = !!timer?.aborted || (cause instanceof Error && cause.name === "TimeoutError");
       throw new GoHeadError({
         status: 0,
         code: timedOut ? "TimeoutError" : "NetworkError",
@@ -207,7 +226,13 @@ export class GoHeadClient {
       });
     }
 
-    const text = await res.text();
+    let text: string;
+    try {
+      text = await res.text();
+    } catch (cause) {
+      if (callerSignal?.aborted) throw cause;
+      throw new GoHeadError({ status: res.status, code: "NetworkError", message: `${label}: the answer was cut off`, request: label, cause });
+    }
     let json: unknown = undefined;
     if (text) {
       try {
@@ -314,7 +339,9 @@ export class CollectionClient<T extends object, I extends object = Partial<T>> {
    * Replaces an entry's data (send every attribute to keep). With `locale`,
    * writes that locale's localized values (a translation).
    */
-  async update(id: number | string, data: I, options: WriteOptions = {}): Promise<Entry<T>> {
+  async update(id: number | string, data: Partial<I>, options: WriteOptions & { locale: string }): Promise<Entry<T>>;
+  async update(id: number | string, data: I, options?: WriteOptions): Promise<Entry<T>>;
+  async update(id: number | string, data: I | Partial<I>, options: WriteOptions = {}): Promise<Entry<T>> {
     const q = new URLSearchParams();
     if (options.level !== undefined) q.set("level", String(options.level));
     if (options.locale) q.set("locale", options.locale);
@@ -366,7 +393,9 @@ export class SingletonClient<T extends object, I extends object = Partial<T>> {
   }
 
   /** Replaces the content (or, with `locale`, that locale's localized values). */
-  async update(data: I, options: Pick<WriteOptions, "locale" | "level"> = {}): Promise<Entry<T>> {
+  async update(data: Partial<I>, options: Pick<WriteOptions, "level"> & { locale: string }): Promise<Entry<T>>;
+  async update(data: I, options?: Pick<WriteOptions, "locale" | "level">): Promise<Entry<T>>;
+  async update(data: I | Partial<I>, options: Pick<WriteOptions, "locale" | "level"> = {}): Promise<Entry<T>> {
     const q = new URLSearchParams();
     if (options.level !== undefined) q.set("level", String(options.level));
     if (options.locale) q.set("locale", options.locale);
@@ -432,12 +461,25 @@ export class MediaClient {
    * /uploads/…; S3/CDN URLs are returned as is). Accepts a Media object, a
    * URL or path, or null.
    */
-  url(media: Pick<Media, "url"> | string | null | undefined): string | undefined {
+  url(media: Pick<Media, "url"> | string | number | null | undefined): string | undefined {
+    if (typeof media === "number") return undefined; // an unpopulated ID (level 0)
     const u = typeof media === "string" ? media : media?.url;
     if (!u) return undefined;
     if (/^[a-z][a-z0-9+.-]*:/i.test(u) || u.startsWith("//")) return u;
     return this.client.url + (u.startsWith("/") ? u : `/${u}`);
   }
+}
+
+/**
+ * A relation or media value as populated content, or undefined when it is
+ * an ID (deeper than the read's level), null or missing.
+ *
+ * ```ts
+ * const author = populated(article.author); // Entry<Author> | undefined
+ * ```
+ */
+export function populated<T extends object>(value: T | number | null | undefined): T | undefined {
+  return value !== null && typeof value === "object" ? value : undefined;
 }
 
 /** Creates a GoHead client. */

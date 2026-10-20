@@ -9,6 +9,7 @@ type RemotePattern = NonNullable<NonNullable<NextConfig["images"]>["remotePatter
  */
 const goheadUrl = process.env.GOHEAD_URL || "http://localhost:8080";
 const mediaUrl = process.env.GOHEAD_MEDIA_URL;
+const publicUrl = process.env.GOHEAD_PUBLIC_URL;
 
 function pattern(base: string, path: string): RemotePattern {
   const url = new URL(base);
@@ -23,6 +24,7 @@ function pattern(base: string, path: string): RemotePattern {
 
 const remotePatterns: RemotePattern[] = [pattern(goheadUrl, "/uploads")];
 if (mediaUrl) remotePatterns.push(pattern(mediaUrl, ""));
+if (publicUrl) remotePatterns.push(pattern(publicUrl, "/uploads"));
 
 /**
  * Next.js refuses to optimize images whose host resolves to a private or

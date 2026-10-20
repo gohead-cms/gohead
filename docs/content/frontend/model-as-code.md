@@ -11,7 +11,7 @@ npx @gohead-cms/client <command>
 |---------|------|
 | `types [--out gohead.d.ts] [--model <file>]` | TypeScript types of the content model, from the instance or a model file |
 | `model pull [--out gohead/model.json]` | Writes the instance's content model to a file |
-| `model push [<file>] [--dry-run] [--allow-removals]` | Applies a model file (default `gohead/model.json`) |
+| `model push [<file>] [--dry-run] [--allow-removals] [--allow-publish-drafts]` | Applies a model file (default `gohead/model.json`) |
 | `seed [<file>] [--force]` | Uploads media and creates sample entries (default `gohead/seed.json`) |
 | `token create --name <name> [--role viewer] [--days <n>]` | Creates an API token and prints it |
 
@@ -83,6 +83,11 @@ Done (5 changes).
 - Types that exist only on the server are **never deleted**.
 - Removing an attribute from a type is refused unless you pass `--allow-removals`: its
   values stay in the database but leave the API.
+- Public access is **added to**: types the server opens that the model doesn't list stay
+  open (the plan says so) unless you pass `--allow-removals`.
+- Turning `draftAndPublish` off publishes every draft of the collection, so it is refused
+  unless you pass `--allow-publish-drafts`. A collection without `draftAndPublish` in the
+  file has it off.
 - Pushing the same file again changes nothing, so it fits CI and deployment scripts.
 
 ### Pulling
@@ -106,8 +111,8 @@ export interface Article {
   title: string;                        // required
   slug: string;
   body?: string | null;
-  cover?: Media | null;
-  author?: Entry<Author> | null;        // a relation, populated at level ≥ 1
+  cover?: Media | number | null;        // a file (an ID at level 0)
+  author?: Entry<Author> | number | null; // a relation: populated, or an ID below the read's level
   seo?: Seo | null;
 }
 
@@ -125,8 +130,8 @@ declare module "@gohead-cms/client" {
 | `bool` | `boolean` | `boolean` |
 | `enum` | a union of its options | the same |
 | `json` | `JsonValue` | `JsonValue` |
-| `media` | `Media` (`Media[]` if `multiple`) | file ID(s) |
-| `relation` | `Entry<Target>` (a list for `manyToMany`) | ID(s) or objects to create |
+| `media` | `Media \| number` (a list if `multiple`) | file ID(s) |
+| `relation` | `Entry<Target> \| number` (a list for `manyToMany`) | ID(s) or objects to create |
 | `component` | the component's interface (a list if `repeatable`) | the same |
 | `password` | not returned | `string` |
 
@@ -168,7 +173,9 @@ A seed file creates entries in order, with references between them:
 | `$translations` | localized values per locale |
 
 Collections that already have entries, and singletons that have content, are skipped, so
-running it twice doesn't duplicate anything; `--force` seeds them anyway.
+running it twice doesn't duplicate anything; `--force` seeds them anyway. References to
+entries of a skipped collection are found by their `slug`. Every reference is checked
+before anything is uploaded or created.
 
 ## In CI
 

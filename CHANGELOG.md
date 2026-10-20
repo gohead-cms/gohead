@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ## [Unreleased]
 
 ### Added
-- **JavaScript client** `@gohead-cms/client` (npm): typed reads and writes for collections, singletons, media, locales and GraphQL, filters and sorts checked against your model, pagination helpers, Next.js-friendly fetch options, `GoHeadError`, and webhook signature verification. No dependencies; Node 18+, browsers and edge runtimes.
+- **JavaScript client** `@gohead-cms/client` (npm): typed reads and writes for collections, singletons, media, locales and GraphQL, filters and sorts checked against your model, pagination helpers, Next.js-friendly fetch options, `GoHeadError`, and webhook signature verification. No dependencies; Node 20+, browsers and edge runtimes.
 - **`gohead-client` CLI**: TypeScript types from the content model (`types`), content models as code (`model pull`, `model push`, with a JSON Schema for editors), sample content with references and translations (`seed`), API tokens (`token create`).
 - **Starter templates**: `npm create @gohead-cms@latest` creates a Next.js blog (App Router, English and French, typed client, revalidation from signed webhooks) with its content model and sample content, ready with `npm run gohead:setup`.
 - **Webhook events for single types**: `singleton:updated` and `singleton:deleted`, with `collection` set to `singleton:<name>`, so sites can rebuild when settings or a homepage change. Webhooks subscribed to all events receive them.

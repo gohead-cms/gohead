@@ -82,10 +82,11 @@ Options:
   }
   const run = pm === "npm" ? "npm run" : pm;
   const hasCompose = existsSync(join(resolve(directory), "docker-compose.yml"));
+  const cd = /^[\w./-]+$/.test(directory) ? directory : JSON.stringify(directory);
   const steps = [
-    `cd ${directory}`,
+    `cd ${cd}`,
     ...(install ? [] : [`${pm} install`]),
-    ...(hasCompose && url.includes("localhost") ? ["docker compose up -d        # GoHead on http://localhost:8080"] : []),
+    ...(hasCompose && /^http:\/\/(localhost|127\.0\.0\.1):8080\/?$/.test(url) ? ["docker compose up -d        # GoHead on http://localhost:8080"] : []),
     `${run} gohead:setup     # content model, sample content, types (admin username/password in .env.local)`,
     `${run} dev`,
   ];

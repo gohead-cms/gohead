@@ -1,13 +1,13 @@
 // Compile-time checks of the public types (npm run typecheck); not executed.
-import { createClient, type Entry, type Media } from "@gohead-cms/client";
+import { createClient, populated, type Entry, type Media } from "@gohead-cms/client";
 
 interface Article {
   title: string;
   slug?: string | null;
   views?: number | null;
   category?: "tech" | "life" | null;
-  cover?: Media | null;
-  author?: Entry<{ name: string }> | null;
+  cover?: Media | number | null;
+  author?: Entry<{ name: string }> | number | null;
 }
 interface ArticleInput {
   title: string;
@@ -36,10 +36,13 @@ export async function checks(): Promise<void> {
   if (first) {
     const title: string = first.title;
     const id: number = first.id;
-    const name: string | undefined = first.author?.name;
+    const name: string | undefined = populated(first.author)?.name;
     void [title, id, name];
   }
   await articles.create({ title: "x", author: 1 });
+  await articles.update(1, { title: "Bonjour" }, { locale: "fr" }); // translations are partial
+  // @ts-expect-error a full update needs the required fields
+  await articles.update(1, { slug: "x" });
   // @ts-expect-error title is required
   await articles.create({ slug: "x" });
   // @ts-expect-error unknown field

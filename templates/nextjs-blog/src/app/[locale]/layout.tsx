@@ -1,3 +1,4 @@
+import { populated } from "@gohead-cms/client";
 import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 
@@ -35,7 +36,7 @@ export async function generateMetadata({ params }: LayoutProps<"/[locale]">): Pr
       siteName: site.name,
       locale,
       type: "website",
-      images: shareImage ? [{ url: shareImage, alt: site.seo?.share_image?.alt || site.name }] : undefined,
+      images: shareImage ? [{ url: shareImage, alt: populated(site.seo?.share_image)?.alt || site.name }] : undefined,
     },
     twitter: { card: shareImage ? "summary_large_image" : "summary" },
     alternates: {

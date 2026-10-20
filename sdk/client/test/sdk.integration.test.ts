@@ -62,10 +62,28 @@ describe.skipIf(!username || !password)("GoHead SDK against a live server", () =
     expect(generateTypes(pulled)).toContain(`${posts}: { attributes:`);
   });
 
-  it("refuses to drop attributes unless allowed", async () => {
+  it("refuses to drop attributes or publish drafts unless allowed, and adds to public access", async () => {
     const smaller = structuredClone(model);
     delete smaller.collections![posts]!.attributes.views;
     await expect(pushModel(admin, smaller, { dryRun: true })).rejects.toThrow(/removes attributes/);
+
+    const noDrafts = structuredClone(model);
+    delete noDrafts.collections![posts]!.draftAndPublish;
+    await expect(pushModel(admin, noDrafts, { dryRun: true })).rejects.toThrow(/every draft would be published/);
+
+    // A model that opens less keeps what the server opens.
+    const lessPublic = structuredClone(model);
+    lessPublic.public = { content: { [`singleton:${settings}`]: ["read"] } };
+    const plan = await pushModel(admin, lessPublic);
+    expect(plan.find((s) => s.kind === "public")).toBeUndefined();
+    expect((await pullModel(admin)).public?.content?.[posts]).toEqual(["read"]);
+  });
+
+  it("creates a collection that relates to itself", async () => {
+    const tree = `tree_${suffix}`;
+    await pushModel(admin, { collections: { [tree]: { attributes: { name: { type: "string" }, parent: { type: "relation", relation: "oneToOne", target: tree } } } } });
+    const pulled = await pullModel(admin);
+    expect(pulled.collections?.[tree]?.attributes.parent).toEqual({ type: "relation", relation: "oneToOne", target: tree });
   });
 
   it("seeds with references and translations", async () => {
@@ -87,6 +105,17 @@ describe.skipIf(!username || !password)("GoHead SDK against a live server", () =
     expect(res).toMatchObject({ entries: 4, singletons: 1 });
     const again = await seed(admin, { collections: { [posts]: [{ title: "x" }] } }, { baseDir: "." });
     expect(again.skipped).toEqual([posts]);
+    // References into skipped collections are found by slug; unknown ones fail before writing.
+    await expect(
+      seed(admin, { collections: { [people]: [{ name: "B", best: `@ref:${posts}/zzz` }] } }, { baseDir: ".", force: true }),
+    ).rejects.toThrow(/cannot resolve @ref:/);
+    expect(await admin.collection(people).count()).toBe(1); // nothing was written
+    const linked = await seed(
+      admin,
+      { collections: { [posts]: [{ $id: "a", slug: `alpha-${suffix}`, title: "A" }], [people]: [{ name: "C", best: `@ref:${posts}/a` }] } },
+      { baseDir: ".", force: false },
+    );
+    expect(linked.skipped).toContain(posts);
   });
 
   it("reads anonymously what the public role grants", async () => {

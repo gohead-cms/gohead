@@ -29,7 +29,15 @@ export interface CreatedApiToken extends ApiToken {
 }
 
 /** Events an outbound webhook can subscribe to. */
-export const WEBHOOK_EVENTS = ["item:created", "item:updated", "item:deleted", "item:published", "item:unpublished"] as const;
+export const WEBHOOK_EVENTS = [
+  "item:created",
+  "item:updated",
+  "item:deleted",
+  "item:published",
+  "item:unpublished",
+  "singleton:updated",
+  "singleton:deleted",
+] as const;
 
 export type WebhookFormat = "json" | "slack";
 

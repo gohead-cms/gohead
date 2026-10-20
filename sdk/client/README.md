@@ -4,13 +4,15 @@ The JavaScript and TypeScript client for [GoHead](https://github.com/gohead-cms/
 
 - **Typed content**: generate types from your content model and get autocompletion for collections, fields, filters and sorts.
 - **Everything the content API does**: entries, drafts and publishing, singletons, locales, media, GraphQL.
-- **Runs anywhere `fetch` does**: Node 18+, browsers, Next.js (server components, route handlers, edge), Remix, Astro, Bun, Deno, Workers. No dependencies.
+- **Runs anywhere `fetch` does**: Node 20+, browsers, Next.js (server components, route handlers, edge), Remix, Astro, Bun, Deno, Workers. No dependencies.
 - **A CLI** for type generation, content models as code and sample content.
 - **Webhook verification** for on-demand revalidation.
 
 ```bash
 npm install @gohead-cms/client
 ```
+
+It is an ES module (`import`); `require()` works on Node 20.19+ and 22.12+.
 
 ## Quick start
 
@@ -46,8 +48,8 @@ The file declares one interface per collection, singleton and component, and tea
 
 ```ts
 const { data } = await gohead.collection("articles").find({ filters: { featured: true } });
-data[0].title;          // string
-data[0].author?.name;   // string | undefined (author is a relation)
+data[0].title;                    // string
+populated(data[0].author)?.name;  // string | undefined: a relation, an ID when not populated
 
 gohead.collection("articles").find({ filters: { nope: 1 } }); // compile error: unknown field
 ```

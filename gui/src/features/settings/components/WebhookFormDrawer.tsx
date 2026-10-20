@@ -38,13 +38,20 @@ import { HeadersEditor } from "./HeadersEditor";
 import { headerRowsError, headersFromRows, isHttpUrl, newHeaderRow } from "./settingsFormat";
 import { type HeaderRow, WEBHOOK_EVENTS, type Webhook, type WebhookFormat, type WebhookInput } from "./types";
 
+/** Collection names, then single types as "singleton:<name>" (as webhook events name them). */
 function useCollectionNames() {
-  return useApiQuery("/admin/collections", async () => {
-    const res = await getJSON<{ schema?: Schema }[]>("/admin/collections", "Failed to load collections");
-    const list = Array.isArray(res.data) ? res.data : [];
-    return list.map((c) => c.schema?.collectionName ?? "").filter(Boolean);
+  return useApiQuery("/admin/collections?pageSize=100", async () => {
+    const [cols, singles] = await Promise.all([
+      getJSON<{ schema?: Schema }[]>("/admin/collections?pageSize=100", "Failed to load collections"),
+      getJSON<{ name?: string }[]>("/admin/singletons", "Failed to load single types"),
+    ]);
+    const names = (Array.isArray(cols.data) ? cols.data : []).map((c) => c.schema?.collectionName ?? "").filter(Boolean);
+    const single = (Array.isArray(singles.data) ? singles.data : []).map((s) => (s.name ? `singleton:${s.name}` : "")).filter(Boolean);
+    return [...names, ...single];
   });
 }
+
+const optionLabel = (key: string) => (key.startsWith("singleton:") ? `${key.slice(10)} (single type)` : key);
 
 /** "*" (all) is shown as nothing selected. */
 function selection(list: string[] | undefined): string[] {
@@ -162,7 +169,7 @@ export function WebhookFormDrawer({
               </FormControl>
 
               <FormControl as="fieldset">
-                <FormLabel as="legend">Collections</FormLabel>
+                <FormLabel as="legend">Collections and single types</FormLabel>
                 {cols.loading && !cols.data ? (
                   <Spinner size="sm" />
                 ) : cols.error ? (
@@ -178,14 +185,16 @@ export function WebhookFormDrawer({
                     <Wrap spacingX={4} spacingY={1}>
                       {collectionOptions.map((c) => (
                         <WrapItem key={c}>
-                          <Checkbox value={c}>{c}</Checkbox>
+                          <Checkbox value={c}>{optionLabel(c)}</Checkbox>
                         </WrapItem>
                       ))}
                     </Wrap>
                   </CheckboxGroup>
                 )}
                 <FormHelperText>
-                  {collections.length === 0 ? "None selected: events from every collection are sent." : `Only ${collections.join(", ")}.`}
+                  {collections.length === 0
+                    ? "None selected: events from every collection and single type are sent."
+                    : `Only ${collections.map(optionLabel).join(", ")}.`}
                 </FormHelperText>
               </FormControl>
 

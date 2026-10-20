@@ -27,9 +27,11 @@ Usage:
       Default output: gohead.d.ts
   gohead-client model pull [--out <file>]
       Write the instance's content model to a file (default: gohead/model.json).
-  gohead-client model push [<file>] [--dry-run] [--allow-removals]
+  gohead-client model push [<file>] [--dry-run] [--allow-removals] [--allow-publish-drafts]
       Create or update locales, components, collections, singletons and public
       access from a model file (default: gohead/model.json). Never deletes types.
+      Removing attributes or public access needs --allow-removals; turning draft
+      and publish off (which publishes drafts) needs --allow-publish-drafts.
   gohead-client seed [<file>] [--force]
       Upload media and create sample entries (default: gohead/seed.json).
       Collections that already have entries are skipped unless --force.
@@ -109,6 +111,7 @@ async function main(argv: string[]): Promise<number> {
       model: { type: "string" },
       "dry-run": { type: "boolean" },
       "allow-removals": { type: "boolean" },
+      "allow-publish-drafts": { type: "boolean" },
       force: { type: "boolean" },
       name: { type: "string" },
       role: { type: "string" },
@@ -155,7 +158,12 @@ async function main(argv: string[]): Promise<number> {
         const model = await readModel(file);
         const client = await connect(conn, true);
         console.log(`${values["dry-run"] ? "Would apply" : "Applying"} ${file} to ${client.url}:`);
-        const plan = await pushModel(client, model, { dryRun: values["dry-run"], allowRemovals: values["allow-removals"], log });
+        const plan = await pushModel(client, model, {
+          dryRun: values["dry-run"],
+          allowRemovals: values["allow-removals"],
+          allowPublishDrafts: values["allow-publish-drafts"],
+          log,
+        });
         const changes = plan.filter((s) => s.action !== "unchanged").length;
         console.log(changes ? `${values["dry-run"] ? "Nothing applied" : "Done"} (${changes} change${changes > 1 ? "s" : ""}).` : "  nothing to change.");
         return 0;
@@ -172,10 +180,16 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
     case "token": {
-      if (sub !== "create" || !values.name) break;
+      if (sub !== "create") break;
+      if (!values.name) throw new Error("token create needs --name <name>");
+      let days: number | undefined;
+      if (values.days !== undefined) {
+        days = Number(values.days);
+        if (!Number.isInteger(days) || days < 1 || days > 3650) throw new Error("--days must be a whole number of days between 1 and 3650");
+      }
       const client = await connect(conn, true);
       const body: Record<string, unknown> = { name: values.name, role: values.role ?? "viewer" };
-      if (values.days) body.expires_in_days = Number(values.days);
+      if (days !== undefined) body.expires_in_days = days;
       const res = await client.request<{ token: string }>("POST", "/admin/tokens", { body });
       console.log(res.data.token);
       return 0;

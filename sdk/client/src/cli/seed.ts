@@ -80,6 +80,56 @@ export async function seed(client: GoHeadClient, file: SeedFile, opts: SeedOptio
     singletons.push([name, values]);
   }
 
+  // References: to entries this run creates, or to entries of skipped
+  // collections that already exist (found by their slug). Everything is
+  // checked before anything is uploaded or created.
+  const produced = new Set<string>();
+  for (const [name, entries] of todo) for (const e of entries) if (typeof e.$id === "string") produced.add(`${name}/${e.$id}`);
+  const wanted = new Set<string>();
+  const scanRefs = (v: unknown): void => {
+    if (typeof v === "string" && v.startsWith("@ref:")) wanted.add(v.slice(5));
+    else if (Array.isArray(v)) v.forEach(scanRefs);
+    else if (v && typeof v === "object") Object.values(v).forEach(scanRefs);
+  };
+  todo.forEach(([, e]) => scanRefs(e));
+  singletons.forEach(([, v]) => scanRefs(v));
+  const missing: string[] = [];
+  for (const ref of wanted) {
+    if (produced.has(ref)) continue;
+    const slash = ref.indexOf("/");
+    const [collection, id] = [ref.slice(0, slash), ref.slice(slash + 1)];
+    const source = (file.collections?.[collection] ?? []).find((e) => e.$id === id);
+    const slug = typeof source?.slug === "string" ? source.slug : undefined;
+    const existing = slug && result.skipped.includes(collection)
+      ? await client.collection(collection).findFirst({ filters: { slug }, status: "all", level: 0 })
+      : null;
+    if (existing) refs.set(ref, existing.id);
+    else missing.push(`@ref:${ref}`);
+  }
+  // Entries can only reference entries created before them.
+  const soFar = new Set<string>();
+  for (const [name, entries] of todo) {
+    for (const [i, e] of entries.entries()) {
+      const refsHere = new Set<string>();
+      const collect = (v: unknown): void => {
+        if (typeof v === "string" && v.startsWith("@ref:")) refsHere.add(v.slice(5));
+        else if (Array.isArray(v)) v.forEach(collect);
+        else if (v && typeof v === "object") Object.values(v).forEach(collect);
+      };
+      collect(e);
+      for (const r of refsHere) {
+        if (produced.has(r) && !soFar.has(r)) missing.push(`@ref:${r} (used by ${name}[${i}] before it is created)`);
+      }
+      if (typeof e.$id === "string") soFar.add(`${name}/${e.$id}`);
+    }
+  }
+  if (missing.length) {
+    throw new Error(
+      `cannot resolve ${missing.join(", ")}: reference entries of the file (with "$id"), listed before; ` +
+        "an entry of a collection that already has entries is found by its slug",
+    );
+  }
+
   // Media used by what will be seeded.
   const usedMedia = new Set<string>();
   const scan = (v: unknown): void => {

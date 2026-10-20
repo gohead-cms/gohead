@@ -9,7 +9,17 @@
 export interface WebhookEvent<T = Record<string, unknown>> {
   /** Delivery ID (also X-Gohead-Delivery), stable across retries. */
   id: string;
-  event: "item:created" | "item:updated" | "item:deleted" | "item:published" | "item:unpublished" | "webhook:test" | (string & {});
+  event:
+    | "item:created"
+    | "item:updated"
+    | "item:deleted"
+    | "item:published"
+    | "item:unpublished"
+    | "singleton:updated"
+    | "singleton:deleted"
+    | "webhook:test"
+    | (string & {});
+  /** The collection, or `singleton:<name>` for singleton events. */
   collection: string;
   occurredAt: string;
   data: T & { id?: number };
@@ -46,7 +56,7 @@ function timingSafeEqual(a: string, b: string): boolean {
 
 /**
  * Verifies a delivery's signature and age. Works wherever Web Crypto is
- * available (Node 18+, Deno, Bun, edge runtimes, browsers).
+ * available (Node 20+, Deno, Bun, edge runtimes, browsers).
  */
 export async function verifyWebhook(opts: VerifyOptions): Promise<boolean> {
   const { signature, timestamp, secret } = opts;

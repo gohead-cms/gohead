@@ -1,7 +1,7 @@
 # JavaScript client
 
 `@gohead-cms/client` is GoHead's client for JavaScript and TypeScript. It has no
-dependencies and runs wherever `fetch` does: Node 18+, browsers, Next.js (server
+dependencies and runs wherever `fetch` does: Node 20+, browsers, Next.js (server
 components, route handlers, edge), Astro, Remix, Bun, Deno and Workers.
 
 ```bash
@@ -143,13 +143,20 @@ try {
 knows your collections:
 
 ```ts
+import { populated } from "@gohead-cms/client";
+
 const { data } = await gohead.collection("articles").find({ filters: { featured: true } });
-data[0].title;          // string
-data[0].author?.name;   // string | undefined
+data[0].title;                     // string
+populated(data[0].author)?.name;   // string | undefined
 
 gohead.collection("articles").find({ filters: { cover: 1 } });   // error: media can't be filtered
 gohead.collection("articles").create({ slug: "x" });            // error: title is required
 ```
+
+Relations are populated down to the read's `level` and IDs below it (media are IDs at
+level 0), so they are typed `Entry<Author> | number`: `populated(value)` returns the
+entry, or `undefined` for an ID. A translation (`update(id, data, { locale })`) takes only
+the attributes it changes.
 
 Without generated types, entries are `Record<string, unknown>`; you can also pass your own
 types: `gohead.collection<Article, ArticleInput>("articles")`.
@@ -167,7 +174,8 @@ export async function POST(request: Request) {
   const event = await parseWebhook(request, process.env.GOHEAD_WEBHOOK_SECRET!);
   if (!event) return new Response("invalid signature", { status: 401 });
   // event.event: item:created | item:updated | item:deleted | item:published | item:unpublished
-  // event.collection, event.data (the entry)
+  //              | singleton:updated | singleton:deleted
+  // event.collection (singleton:<name> for singletons), event.data (the entry)
   return Response.json({ ok: true });
 }
 ```

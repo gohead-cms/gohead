@@ -68,11 +68,24 @@ describe("client", () => {
     expect(new Headers(m.calls[1]!.init.headers).get("authorization")).toBe("Bearer t1");
   });
 
-  it("merges Next.js fetch options", async () => {
+  it("merges fetch options: Next.js tags and headers", async () => {
     const m = mockFetch([page([])]);
-    const gohead = createClient({ url: "http://x", fetch: m.fetch, init: { next: { revalidate: 60 } } as RequestInit });
-    await gohead.collection("a").find({}, { next: { tags: ["a"] } } as RequestInit);
-    expect((m.calls[0]!.init as { next?: unknown }).next).toEqual({ revalidate: 60, tags: ["a"] });
+    const gohead = createClient({ url: "http://x", fetch: m.fetch, init: { next: { revalidate: 60, tags: ["all"] }, headers: { "X-A": "1" } } as RequestInit });
+    await gohead.collection("a").find({}, { next: { tags: ["a"] }, headers: { "X-B": "2" } } as RequestInit);
+    expect((m.calls[0]!.init as { next?: unknown }).next).toEqual({ revalidate: 60, tags: ["all", "a"] });
+    const h = new Headers(m.calls[0]!.init.headers);
+    expect([h.get("x-a"), h.get("x-b"), h.get("accept")]).toEqual(["1", "2", "application/json"]);
+  });
+
+  it("lets the caller's abort through, and reports timeouts", async () => {
+    const hang = (async (_u: unknown, init?: RequestInit) =>
+      new Promise((_, reject) => init?.signal?.addEventListener("abort", () => reject(init.signal!.reason)))) as unknown as typeof fetch;
+    const ctl = new AbortController();
+    const p = createClient({ url: "http://x", fetch: hang }).locales({ signal: ctl.signal });
+    ctl.abort();
+    await expect(p).rejects.toMatchObject({ name: "AbortError" });
+    const slow = (await createClient({ url: "http://x", fetch: hang, timeoutMs: 20 }).locales().catch((e: unknown) => e)) as GoHeadError;
+    expect(slow.code).toBe("TimeoutError");
   });
 
   it("writes", async () => {
@@ -145,6 +158,7 @@ describe("client", () => {
     expect(gohead.media.url({ url: "/uploads/a.png" })).toBe("https://cms.example.com/uploads/a.png");
     expect(gohead.media.url("https://cdn.example.com/a.png")).toBe("https://cdn.example.com/a.png");
     expect(gohead.media.url(null)).toBeUndefined();
+    expect(gohead.media.url(4)).toBeUndefined();
   });
 
   it("uploads files as multipart", async () => {
@@ -155,6 +169,12 @@ describe("client", () => {
     expect((form.get("files") as File).name).toBe("a.txt");
     expect(form.get("alt")).toBe("A");
     expect(new Headers(m.calls[0]!.init.headers).has("content-type")).toBe(false);
+  });
+
+  it("surfaces GraphQL errors", async () => {
+    const m = mockFetch([{ status: 400, body: { error: { status: 400, name: "ValidationError", message: "GraphQL request failed", details: 'Cannot query field "x"' } } }]);
+    const err = (await createClient({ url: "http://x", fetch: m.fetch }).graphql("{ x }").catch((e: unknown) => e)) as GoHeadError;
+    expect(err.message).toBe('Cannot query field "x"');
   });
 
   it("runs GraphQL and signs in", async () => {

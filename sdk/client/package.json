@@ -7,7 +7,7 @@
   "repository": { "type": "git", "url": "git+https://github.com/gohead-cms/gohead.git", "directory": "sdk/client" },
   "homepage": "https://gohead-cms.github.io/gohead/frontend/sdk/",
   "keywords": ["gohead", "headless-cms", "cms", "sdk", "client", "typescript", "nextjs"],
-  "engines": { "node": ">=18.17" },
+  "engines": { "node": ">=20.12" },
   "sideEffects": false,
   "exports": {
     ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },

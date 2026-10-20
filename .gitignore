@@ -71,3 +71,4 @@ templates/*/.next/
 templates/*/next-env.d.ts
 templates/*/.env.local
 *.tsbuildinfo
+sdk/create/templates/

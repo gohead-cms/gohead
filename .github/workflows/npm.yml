@@ -1,8 +1,10 @@
 name: npm packages
 
 # Publishes @gohead-cms/client and @gohead-cms/create with the version of the
-# GoHead release tag (vX.Y.Z → X.Y.Z), with npm provenance. Needs the
-# NPM_TOKEN secret (an npm automation token of the gohead-cms organization).
+# GoHead release tag (vX.Y.Z → X.Y.Z), with provenance. Publishing is on when
+# the repository variable NPM_PUBLISH is "true"; it then authenticates with
+# npm trusted publishing (OIDC, configured on npmjs.com for each package), or
+# with the NPM_TOKEN secret if set (needed for the very first publish).
 on:
   push:
     tags: ["v*.*.*"]
@@ -41,6 +43,8 @@ jobs:
           # Pre-releases (0.6.0-rc.1) go to the "next" dist-tag.
           case "$v" in *-*) echo "tag=next" >> "$GITHUB_OUTPUT" ;; *) echo "tag=latest" >> "$GITHUB_OUTPUT" ;; esac
 
+      # Trusted publishing needs npm 11.5.1 or later.
+      - run: npm install -g npm@11
       - run: npm ci
       - name: Set the versions
         run: |
@@ -51,22 +55,13 @@ jobs:
           done
       - run: npm test --workspace @gohead-cms/client --workspace @gohead-cms/create
 
-      - name: Check the token
-        id: token
-        run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "::warning title=npm::NPM_TOKEN is not set: packages are packed but not published."
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
       - name: Publish
         run: |
+          publish=false
+          if [ "${{ vars.NPM_PUBLISH }}" = "true" ] && [ "${{ inputs.dry_run }}" != "true" ]; then publish=true; fi
+          [ "$publish" = "true" ] || echo "::warning title=npm::Packing only: set the repository variable NPM_PUBLISH=true to publish."
           for ws in @gohead-cms/client @gohead-cms/create; do
-            if [ "${{ steps.token.outputs.publish }}" = "true" ] && [ "${{ inputs.dry_run }}" != "true" ]; then
+            if [ "$publish" = "true" ]; then
               npm publish --workspace "$ws" --access public --provenance --tag "${{ steps.version.outputs.tag }}"
             else
               npm publish --workspace "$ws" --access public --dry-run --tag "${{ steps.version.outputs.tag }}"

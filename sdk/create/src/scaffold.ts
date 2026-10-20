@@ -15,7 +15,8 @@ export interface TemplateInfo {
 
 /** Templates bundled in the package, or the repository's when run from a checkout. */
 export async function findTemplates(): Promise<TemplateInfo[]> {
-  for (const dir of [resolve(here, "../templates"), resolve(here, "../../../templates")]) {
+  // A checkout's templates first (the package's copy may be stale there).
+  for (const dir of [resolve(here, "../../../templates"), resolve(here, "../templates")]) {
     if (!existsSync(dir)) continue;
     const out: TemplateInfo[] = [];
     for (const name of (await readdir(dir)).sort()) {

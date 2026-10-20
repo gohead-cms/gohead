@@ -1,5 +1,5 @@
 import Image from "next/image";
-import type { Media } from "@gohead-cms/client";
+import { populated, type Media } from "@gohead-cms/client";
 
 import { mediaUrl } from "@/lib/gohead";
 
@@ -15,7 +15,8 @@ export function Cover({
   preload = false,
   className = "",
 }: {
-  media: Media | null | undefined;
+  /** A file, or its ID when the read did not populate it. */
+  media: Media | number | null | undefined;
   alt?: string;
   ratio?: string;
   sizes: string;
@@ -28,7 +29,7 @@ export function Cover({
     <div className={`relative overflow-hidden rounded-[3px] bg-rule ${className}`} style={{ aspectRatio: ratio }}>
       <Image
         src={src}
-        alt={alt ?? media?.alt ?? ""}
+        alt={alt ?? populated(media)?.alt ?? ""}
         fill
         sizes={sizes}
         preload={preload}
@@ -39,7 +40,7 @@ export function Cover({
 }
 
 /** A round avatar. */
-export function Avatar({ media, name, size = 40 }: { media: Media | null | undefined; name: string; size?: number }) {
+export function Avatar({ media, name, size = 40 }: { media: Media | number | null | undefined; name: string; size?: number }) {
   const src = mediaUrl(media);
   if (!src) {
     return (

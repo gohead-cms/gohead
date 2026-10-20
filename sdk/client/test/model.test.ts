@@ -36,11 +36,11 @@ describe("type generation", () => {
     expect(ts).toContain('  category?: "tech" | "life" | null;');
     expect(ts).toContain("  views?: number | null;");
     expect(ts).toContain("  published?: boolean | null;");
-    expect(ts).toContain("  author?: Entry<Author> | null;");
-    expect(ts).toContain("  related?: Entry<Article>[];");
+    expect(ts).toContain("  author?: Entry<Author> | number | null;");
+    expect(ts).toContain("  related?: Array<Entry<Article> | number>;");
     expect(ts).toContain("  seo?: Seo | null;");
     expect(ts).toContain("  blocks?: Seo[];");
-    expect(ts).toContain("  gallery?: Media[];");
+    expect(ts).toContain("  gallery?: Array<Media | number>;");
     expect(ts).toContain("  data?: JsonValue | null;");
     expect(ts).toContain('  "odd-name"?: string | null;');
   });

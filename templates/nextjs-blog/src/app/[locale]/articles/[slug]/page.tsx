@@ -1,3 +1,4 @@
+import { populated } from "@gohead-cms/client";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -37,7 +38,7 @@ export async function generateMetadata({ params }: PageProps<"/[locale]/articles
   const title = seo?.meta_title || article.title;
   const description = seo?.meta_description || article.excerpt || undefined;
   const site = await getSite(locale);
-  const image = article.seo?.share_image ?? article.cover ?? site.seo?.share_image;
+  const image = populated(article.seo?.share_image) ?? populated(article.cover) ?? populated(site.seo?.share_image);
   const imageUrl = mediaUrl(image);
 
   return {

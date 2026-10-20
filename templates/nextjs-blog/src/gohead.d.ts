@@ -9,7 +9,7 @@ import type { Entry, JsonValue, Media } from "@gohead-cms/client";
 export interface Seo {
   meta_title?: string | null;
   meta_description?: string | null;
-  share_image?: Media | null;
+  share_image?: Media | number | null;
 }
 
 /** Values written to component "seo" */
@@ -30,7 +30,7 @@ export interface Author {
   role?: string | null;
   /** localized */
   bio?: string | null;
-  avatar?: Media | null;
+  avatar?: Media | number | null;
 }
 
 /** Values written to entries of the "authors" collection */
@@ -75,11 +75,11 @@ export interface Article {
   excerpt?: string | null;
   /** localized, rich text */
   body?: string | null;
-  cover?: Media | null;
+  cover?: Media | number | null;
   /** relation (oneToOne): populated when read at a deep enough level, an ID otherwise */
-  author?: Entry<Author> | null;
+  author?: Entry<Author> | number | null;
   /** relation (oneToOne): populated when read at a deep enough level, an ID otherwise */
-  category?: Entry<Category> | null;
+  category?: Entry<Category> | number | null;
   tags?: JsonValue | null;
   featured?: boolean | null;
   reading_minutes?: number | null;
@@ -140,7 +140,7 @@ export interface Homepage {
   /** localized */
   hero_text?: string | null;
   /** relation (manyToMany): populated when read at a deep enough level, an ID otherwise */
-  featured?: Entry<Article>[];
+  featured?: Array<Entry<Article> | number>;
 }
 
 /** Values written to the "homepage" singleton */
