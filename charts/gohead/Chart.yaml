@@ -4,9 +4,9 @@ description: GoHead, a headless CMS with built-in AI agents (API, agent workers 
 type: application
 # Released together with GoHead: the release workflow sets both versions to
 # the tag being released.
-version: 0.5.0
+version: 0.6.0
 # GoHead version the chart deploys by default (image tag).
-appVersion: "0.5.0"
+appVersion: "0.6.0"
 home: https://gohead-cms.github.io/gohead/
 sources:
   - https://github.com/gohead-cms/gohead
