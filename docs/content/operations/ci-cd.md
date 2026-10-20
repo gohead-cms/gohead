@@ -4,9 +4,10 @@ All automation lives in `.github/workflows`.
 
 | Workflow | Trigger | Does |
 |----------|---------|------|
-| `ci.yml` | push to `master`, pull requests | gofmt, `go mod tidy` check, `go vet`, build, tests with `-race` + coverage, database tests on PostgreSQL 17 and MySQL 8.4, `govulncheck`, admin UI lint (no warnings allowed) and build, Playwright smoke test of the admin UI against the branch's API, Helm chart lint + kubeconform + install on kind with `helm test`, docs build (`--strict`) |
+| `ci.yml` | push to `master`, pull requests | gofmt, `go mod tidy` check, `go vet`, build, tests with `-race` + coverage, database tests on PostgreSQL 17 and MySQL 8.4, `govulncheck`, admin UI lint (no warnings allowed) and build, Playwright smoke test of the admin UI against the branch's API, JavaScript client unit tests and tests against the branch's API, the Next.js starter set up, linted and built against it, Helm chart lint + kubeconform + install on kind with `helm test`, docs build (`--strict`) |
 | `images.yml` | push to `master`, tags `v*.*.*`, PRs touching code | Builds `gohead` and `gohead-admin` images; pushes, signs (cosign keyless) and attests (SBOM + provenance) on `master` and tags; PRs build `amd64` only, without pushing |
 | `release.yml` | tags `v*.*.*` | GoReleaser: binaries for Linux/macOS/Windows, archives, checksums, SBOMs, changelog, optional Homebrew cask; build provenance attestation; Helm chart pushed to `oci://ghcr.io/gohead-cms/charts/gohead` with the same version |
+| `npm.yml` | tags `v*.*.*`, manual | Publishes `@gohead-cms/client` and `@gohead-cms/create` to npm with the tag's version and provenance (`next` dist-tag for pre-releases); packs without publishing when `NPM_TOKEN` is missing |
 | `docs.yml` | push to `master` touching docs | Builds this handbook and deploys it to GitHub Pages |
 | `codeql.yml` | push, PRs, weekly | CodeQL for Go and TypeScript |
 
@@ -40,7 +41,8 @@ production. See [deployment](deployment.md#how-releases-flow).
     ```
 
 5. `release.yml` publishes the GitHub release and the Helm chart; `images.yml` publishes
-   the images `0.5.0`, `0.5` and `latest`, and warns if they cannot be pulled anonymously.
+   the images `0.5.0`, `0.5` and `latest`, and warns if they cannot be pulled anonymously;
+   `npm.yml` publishes the npm packages with the same version.
 6. Install the release from scratch (Compose or Helm) and upgrade a copy of a previous
    install before announcing it.
 7. Flux promotes production on its next image scan.
@@ -72,6 +74,7 @@ Release notes are generated from commit messages: use conventional commits
 | **Settings → Actions → General → Workflow permissions: read and write** *(or keep read-only; workflows request what they need)* | |
 | Package visibility for `gohead`, `gohead-admin` and `charts/gohead` on GHCR: **public** | anonymous `docker pull` and `helm install` |
 | Secret `HOMEBREW_TAP_TOKEN` *(optional)* + repository `gohead-cms/homebrew-tap` | publishes `brew install gohead-cms/tap/gohead` |
+| npm organization `gohead-cms` + secret `NPM_TOKEN` (an automation token) | publishes `@gohead-cms/client` and `@gohead-cms/create` |
 | Branch protection on `master` requiring the CI jobs | keeps `master` deployable |
 
 ## Running the checks locally
@@ -84,4 +87,5 @@ cd gui && npm run lint
 make test-e2e        # admin UI smoke tests (API on :8080, empty database)
 make helm-lint       # Helm chart
 make docs            # serve the handbook on :8000
+npm ci && npm test   # JavaScript client and create package (repository root)
 ```

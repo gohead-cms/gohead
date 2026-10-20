@@ -40,12 +40,30 @@ permissions as a human.
 | ⚡ **Schema in, API out** | Define collections over HTTP. REST endpoints and a GraphQL schema appear immediately, no codegen, no restart. |
 | 🤖 **Agents built in** | LLM agents triggered by content events, webhooks or cron, with OpenAI, Anthropic or Ollama, and typed functions to read and write content. |
 | 📝 **Editorial workflow** | Draft and publish per collection, reusable (and repeatable) components, one flat JSON shape for every item. |
+| 🧑‍💻 **Front-end ready** | A typed [JavaScript client](sdk/client), generated TypeScript types, content models as code, public read access, and a [Next.js starter](templates/nextjs-blog): `npm create @gohead-cms@latest`. |
 | 🔌 **Integrations** | Long-lived scoped API tokens, an OpenAPI 3.1 spec with Swagger UI for typed clients, and signed outbound webhooks for Slack, Zapier or site rebuilds. |
 | 🖼️ **Media built in** | Upload images, video and documents; store them on disk or in any S3-compatible bucket (S3, MinIO, R2); reference them from content. |
 | 🔎 **Real querying** | Filters (`$eq $ne $lt $gte $contains`…), multi-key sort, pagination, relation population, batch writes in one transaction. |
 | 🔐 **Secure by default** | Roles enforced identically in REST and GraphQL, schema-validated writes, masked secrets, signed images, distroless containers. |
 | 🪶 **One binary** | API, worker, dispatcher and scheduler in one Go binary. SQLite on your laptop, PostgreSQL or MySQL in production. |
 | 🚢 **Ships anywhere** | Multi-arch images, a Helm chart, Kubernetes manifests and Flux image automation included. Tested on SQLite, PostgreSQL and MySQL. |
+
+## Build a site in ten minutes
+
+```bash
+npm create @gohead-cms@latest my-site      # Next.js blog with its content model
+cd my-site && docker compose up -d         # GoHead on :8080
+npm run gohead:setup && npm run dev        # model, sample content, types → http://localhost:3000
+```
+
+```ts
+import { createClient } from "@gohead-cms/client";
+
+const gohead = createClient({ url: "https://cms.example.com" });
+const { data } = await gohead.collection("articles").find({ sort: "publishedAt:desc", pageSize: 5, locale: "fr" });
+```
+
+See [Build a website](https://gohead-cms.github.io/gohead/frontend/).
 
 ## 60-second start
 
@@ -149,6 +167,7 @@ Configuration is a YAML file or `GOHEAD_*` environment variables, see
 
 The **[GoHead Handbook](https://gohead-cms.github.io/gohead/)** covers everything:
 
+- [Build a website](https://gohead-cms.github.io/gohead/frontend/) · [JavaScript client](https://gohead-cms.github.io/gohead/frontend/sdk/) · [Content models as code](https://gohead-cms.github.io/gohead/frontend/model-as-code/) · [Next.js starter](https://gohead-cms.github.io/gohead/frontend/nextjs/)
 - [Content modeling](https://gohead-cms.github.io/gohead/guides/content-modeling/) · [REST API](https://gohead-cms.github.io/gohead/guides/rest-api/) · [GraphQL](https://gohead-cms.github.io/gohead/guides/graphql/) · [Users & roles](https://gohead-cms.github.io/gohead/guides/users-and-roles/)
 - [Agents](https://gohead-cms.github.io/gohead/agents/) · [Triggers](https://gohead-cms.github.io/gohead/agents/triggers/) · [Functions](https://gohead-cms.github.io/gohead/agents/functions/) · [LLM providers](https://gohead-cms.github.io/gohead/agents/llm-providers/)
 - [Deployment](https://gohead-cms.github.io/gohead/operations/deployment/) · [CI/CD & releases](https://gohead-cms.github.io/gohead/operations/ci-cd/) · [Security](https://gohead-cms.github.io/gohead/operations/security/) · [Troubleshooting](https://gohead-cms.github.io/gohead/operations/troubleshooting/)

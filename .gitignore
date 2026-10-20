@@ -63,3 +63,11 @@ tree
 /site/
 docs/site/
 gui/*.tsbuildinfo
+
+# JavaScript packages and templates
+node_modules/
+sdk/*/dist/
+templates/*/.next/
+templates/*/next-env.d.ts
+templates/*/.env.local
+*.tsbuildinfo

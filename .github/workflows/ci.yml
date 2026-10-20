@@ -291,6 +291,70 @@ jobs:
             api.log
           retention-days: 7
 
+  js:
+    name: JavaScript client and starter
+    runs-on: ubuntu-latest
+    env:
+      GOHEAD_URL: http://localhost:8080
+      GOHEAD_USERNAME: admin
+      GOHEAD_PASSWORD: ci-admin-password-123
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27.x"
+          check-latest: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+
+      - name: Client (build, types, unit tests)
+        run: |
+          npm run build --workspace @gohead-cms/client
+          npm run typecheck --workspace @gohead-cms/client
+          npm test --workspace @gohead-cms/client
+          npm test --workspace @gohead-cms/create
+      - name: Pack the packages
+        run: |
+          npm pack --workspace @gohead-cms/client --dry-run
+          npm pack --workspace @gohead-cms/create --dry-run
+
+      - name: Start GoHead (SQLite, empty database)
+        run: |
+          go build -o gohead ./main
+          ./gohead start > api.log 2>&1 &
+          for i in $(seq 1 60); do curl -fs http://localhost:8080/_health && exit 0; sleep 1; done
+          cat api.log; exit 1
+        env:
+          GOHEAD_DATABASE_URL: sqlite://js.db
+          GOHEAD_JWT_SECRET: js-only-secret-not-used-anywhere-else
+          GOHEAD_RATE_LIMIT_ENABLED: "false"
+          GOHEAD_MEDIA_LOCAL_PATH: ./js-uploads
+          GOHEAD_ADMIN_USERNAME: admin
+          GOHEAD_ADMIN_EMAIL: admin@example.com
+          GOHEAD_ADMIN_PASSWORD: ci-admin-password-123
+
+      - name: Client against GoHead
+        run: npm run test:integration --workspace @gohead-cms/client
+
+      - name: Next.js starter (setup, types up to date, lint, build)
+        working-directory: templates/nextjs-blog
+        run: |
+          npm run gohead:push
+          npm run gohead:seed
+          npm run gohead:types
+          git diff --exit-code src/gohead.d.ts || { echo "::error::templates/nextjs-blog/src/gohead.d.ts is out of date: run npm run gohead:types"; exit 1; }
+          npm run lint
+          npm run typecheck
+          npm run build
+
+      - name: API log
+        if: failure()
+        run: tail -100 api.log
+
   helm:
     name: Helm chart
     runs-on: ubuntu-latest

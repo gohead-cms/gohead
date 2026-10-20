@@ -21,6 +21,11 @@
 │   ├── storage           # data access, item queries, events
 │   └── testutils         # test database helpers
 ├── gui/                  # admin UI (React, Vite, Chakra UI)
+├── sdk/
+│   ├── client/           # @gohead-cms/client: JavaScript client and gohead-client CLI
+│   └── create/           # @gohead-cms/create: npm create @gohead-cms
+├── templates/            # starter sites (nextjs-blog), copied by @gohead-cms/create
+├── package.json          # npm workspaces of sdk/ and templates/
 ├── deploy/               # Kubernetes (kustomize) and Flux image automation
 ├── docs/                 # this handbook (MkDocs Material)
 ├── Dockerfile            # API image

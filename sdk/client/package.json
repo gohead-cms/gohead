@@ -1,0 +1,32 @@
+{
+  "name": "@gohead-cms/client",
+  "version": "0.6.0",
+  "description": "Typed JavaScript/TypeScript client for the GoHead headless CMS: content, singletons, media, locales, GraphQL, webhooks, plus a CLI for type generation and content models as code.",
+  "license": "MIT",
+  "type": "module",
+  "repository": { "type": "git", "url": "git+https://github.com/gohead-cms/gohead.git", "directory": "sdk/client" },
+  "homepage": "https://gohead-cms.github.io/gohead/frontend/sdk/",
+  "keywords": ["gohead", "headless-cms", "cms", "sdk", "client", "typescript", "nextjs"],
+  "engines": { "node": ">=18.17" },
+  "sideEffects": false,
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": { "gohead-client": "./dist/cli/main.js" },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && chmod +x dist/cli/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "~5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
