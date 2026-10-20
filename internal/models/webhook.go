@@ -14,7 +14,7 @@ const (
 )
 
 // WebhookEvents are the events a webhook can subscribe to ("*" means all).
-var WebhookEvents = []string{"item:created", "item:updated", "item:deleted", "item:published", "item:unpublished"}
+var WebhookEvents = []string{"item:created", "item:updated", "item:deleted", "item:published", "item:unpublished", "singleton:updated", "singleton:deleted"}
 
 // Webhook sends content events to an external URL: an integration such as
 // Slack or Zapier, or a static-site rebuild hook.

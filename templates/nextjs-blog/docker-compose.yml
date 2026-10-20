@@ -1,0 +1,96 @@
+# GoHead for local development: the API on http://localhost:8080 and the
+# admin UI on http://localhost:3001 (Next.js keeps port 3000).
+#
+#   docker compose up -d
+#   npm run gohead:setup     # content model, sample content, types
+#   npm run dev
+#
+# The worker and dispatcher deliver webhooks (on-demand revalidation).
+# For production, see https://gohead-cms.github.io/gohead/operations/deployment/
+
+x-gohead-env: &gohead-env
+  GOHEAD_DATABASE_URL: postgres://gohead:gohead@postgres:5432/gohead?sslmode=disable
+  GOHEAD_REDIS_ADDRESS: redis:6379
+  GOHEAD_JWT_SECRET: ${GOHEAD_JWT_SECRET:-local-development-only-0123456789abcdef}
+  # The first administrator, created on an empty database. The defaults match
+  # GOHEAD_USERNAME / GOHEAD_PASSWORD in .env.example, which the setup scripts
+  # sign in with. Ports are published on localhost only.
+  GOHEAD_ADMIN_USERNAME: ${GOHEAD_USERNAME:-admin}
+  GOHEAD_ADMIN_EMAIL: ${GOHEAD_ADMIN_EMAIL:-admin@example.com}
+  GOHEAD_ADMIN_PASSWORD: ${GOHEAD_PASSWORD:-gohead-local-password}
+  # Uploads are stored in the gohead-data volume and served under /uploads.
+  GOHEAD_MEDIA_DRIVER: local
+  GOHEAD_MEDIA_LOCAL_PATH: /data/uploads
+  # Let webhooks reach your machine (http://host.docker.internal:3000/…).
+  # Development only: leave it off in production.
+  GOHEAD_WEBHOOKS_ALLOW_PRIVATE_NETWORKS: "true"
+
+x-gohead: &gohead
+  image: ghcr.io/gohead-cms/gohead:${GOHEAD_VERSION:-latest}
+  environment: *gohead-env
+  restart: unless-stopped
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  api:
+    <<: *gohead
+    command: ["start"]
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - gohead-data:/data
+
+  worker:
+    <<: *gohead
+    command: ["worker"]
+
+  dispatcher:
+    <<: *gohead
+    command: ["dispatcher"]
+
+  admin:
+    image: ghcr.io/gohead-cms/gohead-admin:${GOHEAD_VERSION:-latest}
+    environment:
+      GOHEAD_API_URL: http://localhost:8080
+    ports:
+      - "127.0.0.1:3001:8080"
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: gohead
+      POSTGRES_PASSWORD: gohead
+      POSTGRES_DB: gohead
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gohead -d gohead"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  gohead-data:
+  postgres-data:
+  redis-data:

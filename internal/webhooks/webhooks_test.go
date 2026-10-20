@@ -150,6 +150,10 @@ func TestSlackFormat(t *testing.T) {
 	require.NoError(t, json.Unmarshal(got()[0].body, &body))
 	assert.Equal(t, `GoHead: "Launch day" (#3) published in articles`, body["text"])
 	assert.Empty(t, got()[0].headers.Get("X-Gohead-Signature"), "no secret, no signature")
+
+	Send(context.Background(), w, Delivery{WebhookID: w.ID, Event: "singleton:updated", Collection: "singleton:homepage"}, 1)
+	require.NoError(t, json.Unmarshal(got()[1].body, &body))
+	assert.Equal(t, "GoHead: single type homepage updated", body["text"])
 }
 
 func TestAddressGuard(t *testing.T) {
@@ -245,6 +249,16 @@ func TestFanout(t *testing.T) {
 	require.NoError(t, Fanout(ctx, client, schema))
 	tasks, _ = inspector.ListPendingTasks(Queue)
 	assert.Len(t, tasks, 3, "internal events are never delivered, even to 'all events' webhooks")
+
+	settings := models.Singleton{Name: "settings", Attributes: []models.Attribute{{Name: "name", Type: "string"}, {Name: "key", Type: "password"}}}
+	require.NoError(t, storage.SaveOrUpdateSingleton(&settings))
+	single := events.CollectionEventPayload{EventType: "singleton:updated", CollectionName: "singleton:settings", ItemData: map[string]any{"name": "Site", "key": "s3cret"}}
+	require.NoError(t, Fanout(ctx, client, single))
+	tasks, _ = inspector.ListPendingTasks(Queue)
+	assert.Len(t, tasks, 4, "singleton content changes reach 'all events' webhooks, not collection-filtered ones")
+	for _, task := range tasks {
+		assert.NotContains(t, string(task.Payload), "s3cret", "singleton passwords are never sent")
+	}
 
 	var d Delivery
 	require.NoError(t, json.Unmarshal(tasks[0].Payload, &d))

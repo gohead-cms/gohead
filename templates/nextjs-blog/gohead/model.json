@@ -1,0 +1,84 @@
+{
+  "$schema": "https://gohead-cms.github.io/gohead/schemas/model.json",
+  "locales": [
+    { "code": "en", "name": "English", "default": true },
+    { "code": "fr", "name": "Français" }
+  ],
+  "components": {
+    "seo": {
+      "description": "Search and social sharing",
+      "attributes": {
+        "meta_title": { "type": "string" },
+        "meta_description": { "type": "text" },
+        "share_image": { "type": "media", "allowed_types": ["image/*"] }
+      }
+    }
+  },
+  "collections": {
+    "authors": {
+      "description": "People who write articles",
+      "attributes": {
+        "name": { "type": "string", "required": true },
+        "slug": { "type": "uid", "required": true, "unique": true },
+        "role": { "type": "string", "localized": true },
+        "bio": { "type": "text", "localized": true },
+        "avatar": { "type": "media", "allowed_types": ["image/*"] }
+      }
+    },
+    "categories": {
+      "description": "Sections of the blog",
+      "attributes": {
+        "name": { "type": "string", "required": true, "localized": true },
+        "slug": { "type": "uid", "required": true, "unique": true },
+        "description": { "type": "text", "localized": true }
+      }
+    },
+    "articles": {
+      "description": "Blog posts",
+      "draftAndPublish": true,
+      "attributes": {
+        "title": { "type": "string", "required": true, "localized": true },
+        "slug": { "type": "uid", "required": true, "unique": true },
+        "excerpt": { "type": "text", "localized": true },
+        "body": { "type": "richtext", "localized": true },
+        "cover": { "type": "media", "allowed_types": ["image/*"] },
+        "author": { "type": "relation", "relation": "oneToOne", "target": "authors" },
+        "category": { "type": "relation", "relation": "oneToOne", "target": "categories" },
+        "tags": { "type": "json" },
+        "featured": { "type": "bool" },
+        "reading_minutes": { "type": "int", "min": 1 },
+        "seo": { "type": "component", "component": "seo" }
+      }
+    }
+  },
+  "singletons": {
+    "site": {
+      "description": "Name, tagline and links shown on every page",
+      "attributes": {
+        "name": { "type": "string", "required": true },
+        "tagline": { "type": "string", "localized": true },
+        "description": { "type": "text", "localized": true },
+        "footer": { "type": "text", "localized": true },
+        "links": { "type": "json" },
+        "seo": { "type": "component", "component": "seo" }
+      }
+    },
+    "homepage": {
+      "description": "The home page",
+      "attributes": {
+        "hero_title": { "type": "string", "localized": true },
+        "hero_text": { "type": "text", "localized": true },
+        "featured": { "type": "relation", "relation": "manyToMany", "target": "articles" }
+      }
+    }
+  },
+  "public": {
+    "content": {
+      "articles": ["read"],
+      "authors": ["read"],
+      "categories": ["read"],
+      "singleton:site": ["read"],
+      "singleton:homepage": ["read"]
+    }
+  }
+}

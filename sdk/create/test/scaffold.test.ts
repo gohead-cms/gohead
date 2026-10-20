@@ -31,7 +31,7 @@ describe("create", () => {
     expect(pkg.dependencies["@gohead-cms/client"]).toBe("^9.9.9");
     const env = await readFile(join(target, ".env.local"), "utf8");
     expect(env).toMatch(/^GOHEAD_URL=https:\/\/cms\.example\.com$/m);
-    expect(env).toMatch(/^GOHEAD_WEBHOOK_SECRET=whsec_[0-9a-f]{48}$/m);
+    expect(env).toMatch(/^GOHEAD_WEBHOOK_SECRET=$/m);
     expect(existsSync(join(target, "gohead", "model.json"))).toBe(true);
     expect(existsSync(join(target, "node_modules"))).toBe(false);
     expect(existsSync(join(target, ".next"))).toBe(false);

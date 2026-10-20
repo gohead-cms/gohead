@@ -1,0 +1,351 @@
+{
+  "media": {
+    "cover-1": {
+      "file": "media/cover-1.jpg",
+      "alt": "Abstract gradient"
+    },
+    "cover-2": {
+      "file": "media/cover-2.jpg",
+      "alt": "Abstract gradient"
+    },
+    "cover-3": {
+      "file": "media/cover-3.jpg",
+      "alt": "Abstract gradient"
+    },
+    "cover-4": {
+      "file": "media/cover-4.jpg",
+      "alt": "Abstract gradient"
+    },
+    "cover-5": {
+      "file": "media/cover-5.jpg",
+      "alt": "Abstract gradient"
+    },
+    "cover-6": {
+      "file": "media/cover-6.jpg",
+      "alt": "Abstract gradient"
+    },
+    "avatar-ada": {
+      "file": "media/avatar-ada.jpg",
+      "alt": "Ada's avatar"
+    },
+    "avatar-linus": {
+      "file": "media/avatar-linus.jpg",
+      "alt": "Linus's avatar"
+    },
+    "share": {
+      "file": "media/share.jpg",
+      "alt": "Site preview"
+    }
+  },
+  "collections": {
+    "authors": [
+      {
+        "$id": "ada",
+        "name": "Ada Lindqvist",
+        "slug": "ada-lindqvist",
+        "role": "Editor in chief",
+        "bio": "Writes about publishing workflows and the people behind them.",
+        "avatar": "@media:avatar-ada",
+        "$translations": {
+          "fr": {
+            "role": "Rédactrice en chef",
+            "bio": "Écrit sur les flux de publication et les personnes qui les font vivre."
+          }
+        }
+      },
+      {
+        "$id": "linus",
+        "name": "Linus Okafor",
+        "slug": "linus-okafor",
+        "role": "Engineer",
+        "bio": "Builds front-ends on top of APIs and likes his types strict.",
+        "avatar": "@media:avatar-linus",
+        "$translations": {
+          "fr": {
+            "role": "Ingénieur",
+            "bio": "Construit des front-ends au-dessus d'API et aime les types stricts."
+          }
+        }
+      }
+    ],
+    "categories": [
+      {
+        "$id": "news",
+        "name": "News",
+        "slug": "news",
+        "description": "What's new on the blog.",
+        "$translations": {
+          "fr": {
+            "name": "Actualités",
+            "description": "Les nouveautés du blog."
+          }
+        }
+      },
+      {
+        "$id": "engineering",
+        "name": "Engineering",
+        "slug": "engineering",
+        "description": "Code, APIs and tooling.",
+        "$translations": {
+          "fr": {
+            "name": "Technique",
+            "description": "Code, API et outils."
+          }
+        }
+      },
+      {
+        "$id": "product",
+        "name": "Product",
+        "slug": "product",
+        "description": "Features and how to use them.",
+        "$translations": {
+          "fr": {
+            "name": "Produit",
+            "description": "Les fonctionnalités et leur usage."
+          }
+        }
+      }
+    ],
+    "articles": [
+      {
+        "$id": "hello-gohead",
+        "$status": "published",
+        "slug": "hello-gohead",
+        "cover": "@media:cover-1",
+        "author": "@ref:authors/ada",
+        "category": "@ref:categories/news",
+        "featured": true,
+        "reading_minutes": 3,
+        "tags": [
+          "gohead",
+          "getting-started"
+        ],
+        "title": "Hello, GoHead",
+        "excerpt": "This site is a Next.js starter wired to a GoHead backend. Here is what it gives you and where to go next.",
+        "body": "Welcome! Everything you see on this site comes from **GoHead**, a headless CMS written in Go, and is rendered by **Next.js**.\n\n## What's in the box\n\n- **Articles, authors and categories** as collections, with drafts and publishing.\n- A **site** singleton for the name, tagline and footer, and a **homepage** singleton for the hero and featured posts.\n- **English and French** content, switchable from the header.\n- Pages that **rebuild themselves** when you publish: GoHead calls a webhook, Next.js revalidates.\n\n## Edit something\n\nOpen the GoHead admin, change this article's title, and save. Refresh this page: the new title is here (or within a minute without the webhook).\n\n## Next steps\n\n1. Change the content model in `gohead/model.json` and run `npm run gohead:push`.\n2. Regenerate types with `npm run gohead:types`.\n3. Build your own pages with the typed client in `src/lib/gohead.ts`.\n",
+        "seo": {
+          "meta_title": "Hello, GoHead",
+          "meta_description": "This site is a Next.js starter wired to a GoHead backend. Here is what it gives you and where to go next."
+        },
+        "$translations": {
+          "fr": {
+            "title": "Bonjour, GoHead",
+            "excerpt": "Ce site est un starter Next.js branché sur GoHead. Voici ce qu'il contient et par où continuer.",
+            "body": "Bienvenue ! Tout ce que vous voyez ici vient de **GoHead**, un CMS headless écrit en Go, et est affiché par **Next.js**.\n\n## Ce qu'il contient\n\n- Des **articles, auteurs et catégories**, avec brouillons et publication.\n- Un singleton **site** pour le nom, l'accroche et le pied de page, et un singleton **homepage** pour l'en-tête et les articles mis en avant.\n- Du contenu en **anglais et en français**, au choix dans l'en-tête.\n- Des pages qui **se reconstruisent** à la publication : GoHead appelle un webhook, Next.js revalide.\n\n## Modifiez quelque chose\n\nOuvrez l'admin de GoHead, changez le titre de cet article et enregistrez. Rechargez cette page : le nouveau titre est là.\n"
+          }
+        }
+      },
+      {
+        "$id": "content-models-as-code",
+        "$status": "published",
+        "slug": "content-models-as-code",
+        "cover": "@media:cover-2",
+        "author": "@ref:authors/linus",
+        "category": "@ref:categories/engineering",
+        "featured": true,
+        "reading_minutes": 5,
+        "tags": [
+          "content-model",
+          "workflow"
+        ],
+        "title": "Content models as code",
+        "excerpt": "Keep your collections, singletons and public access in a JSON file next to your front-end, and push it like a migration.",
+        "body": "The content model of this starter lives in `gohead/model.json`. It describes locales, components, collections, singletons and what anonymous visitors may read.\n\n```json\n{\n  \"collections\": {\n    \"articles\": {\n      \"draftAndPublish\": true,\n      \"attributes\": {\n        \"title\": { \"type\": \"string\", \"required\": true, \"localized\": true },\n        \"slug\": { \"type\": \"uid\", \"required\": true, \"unique\": true }\n      }\n    }\n  }\n}\n```\n\n## Push it\n\n```bash\nnpm run gohead:push\n```\n\nThe CLI shows what changes, creates what is missing and updates what differs. It never deletes a collection, and it refuses to remove attributes unless you pass `--allow-removals`.\n\n## Pull it\n\nChanged the model in the admin UI? Bring it back into the repository:\n\n```bash\nnpx @gohead-cms/client model pull\n```\n\nReview the diff, commit, and every environment can be set up the same way.\n",
+        "seo": {
+          "meta_title": "Content models as code",
+          "meta_description": "Keep your collections, singletons and public access in a JSON file next to your front-end, and push it like a migration."
+        },
+        "$translations": {
+          "fr": {
+            "title": "Le modèle de contenu dans le code",
+            "excerpt": "Gardez collections, singletons et accès public dans un fichier JSON à côté du front-end, et poussez-le comme une migration.",
+            "body": "Le modèle de contenu de ce starter est dans `gohead/model.json`. Il décrit les langues, composants, collections, singletons et ce que les visiteurs anonymes peuvent lire.\n\n## Le pousser\n\n```bash\nnpm run gohead:push\n```\n\nLa CLI affiche les changements, crée ce qui manque et met à jour ce qui diffère. Elle ne supprime jamais une collection.\n\n## Le récupérer\n\n```bash\nnpx @gohead-cms/client model pull\n```\n"
+          }
+        }
+      },
+      {
+        "$id": "typed-client",
+        "$status": "published",
+        "slug": "typed-client",
+        "cover": "@media:cover-3",
+        "author": "@ref:authors/linus",
+        "category": "@ref:categories/engineering",
+        "featured": false,
+        "reading_minutes": 4,
+        "tags": [
+          "typescript",
+          "sdk"
+        ],
+        "title": "A typed client for your content",
+        "excerpt": "Generate TypeScript types from your content model and let the editor catch typos in filters, sorts and fields.",
+        "body": "`@gohead-cms/client` works without types, but it shines with them:\n\n```bash\nnpm run gohead:types\n```\n\nThis writes `src/gohead.d.ts`, which teaches the client about your collections:\n\n```ts\nconst { data } = await gohead.collection(\"articles\").find({\n  filters: { featured: true },\n  sort: \"publishedAt:desc\",\n  pageSize: 3,\n});\n\ndata[0].title;          // string\ndata[0].author?.name;   // string | undefined\n```\n\nFiltering on a field that doesn't exist, sorting on a relation or misspelling an enum value are now compile errors.\n",
+        "seo": {
+          "meta_title": "A typed client for your content",
+          "meta_description": "Generate TypeScript types from your content model and let the editor catch typos in filters, sorts and fields."
+        },
+        "$translations": {
+          "fr": {
+            "title": "Un client typé pour votre contenu",
+            "excerpt": "Générez les types TypeScript depuis votre modèle et laissez l'éditeur repérer les fautes dans les filtres, tris et champs.",
+            "body": "`@gohead-cms/client` fonctionne sans types, mais il est bien meilleur avec :\n\n```bash\nnpm run gohead:types\n```\n\nCela écrit `src/gohead.d.ts`, qui décrit vos collections au client. Filtrer sur un champ inexistant ou se tromper de valeur d'énumération devient une erreur de compilation.\n"
+          }
+        }
+      },
+      {
+        "$id": "publish-and-revalidate",
+        "$status": "published",
+        "slug": "publish-and-revalidate",
+        "cover": "@media:cover-4",
+        "author": "@ref:authors/ada",
+        "category": "@ref:categories/engineering",
+        "featured": false,
+        "reading_minutes": 4,
+        "tags": [
+          "nextjs",
+          "webhooks"
+        ],
+        "title": "Publish in GoHead, update in Next.js",
+        "excerpt": "How the starter keeps static pages fresh: cache tags, a signed webhook and on-demand revalidation.",
+        "body": "Pages are rendered once and cached. When content changes, GoHead sends a **signed webhook** to `/api/revalidate`, which checks the signature and revalidates the matching cache tags.\n\n```ts\nconst event = await parseWebhook(request, process.env.GOHEAD_WEBHOOK_SECRET!);\nif (!event) return new Response(\"invalid signature\", { status: 401 });\nrevalidateTag(`gohead:${event.collection}`);\n```\n\nWithout the webhook, pages still refresh: every request to GoHead is cached for a minute (`GOHEAD_REVALIDATE`).\n",
+        "seo": {
+          "meta_title": "Publish in GoHead, update in Next.js",
+          "meta_description": "How the starter keeps static pages fresh: cache tags, a signed webhook and on-demand revalidation."
+        },
+        "$translations": {
+          "fr": {
+            "title": "Publier dans GoHead, mettre à jour Next.js",
+            "excerpt": "Comment le starter garde des pages statiques à jour : tags de cache, webhook signé et revalidation à la demande.",
+            "body": "Les pages sont rendues une fois puis mises en cache. Quand le contenu change, GoHead envoie un **webhook signé** à `/api/revalidate`, qui vérifie la signature et revalide les tags concernés.\n"
+          }
+        }
+      },
+      {
+        "$id": "localized-content",
+        "$status": "published",
+        "slug": "localized-content",
+        "cover": "@media:cover-5",
+        "author": "@ref:authors/ada",
+        "category": "@ref:categories/product",
+        "featured": false,
+        "reading_minutes": 3,
+        "tags": [
+          "i18n"
+        ],
+        "title": "One site, several languages",
+        "excerpt": "Localized attributes keep a value per locale while everything else is shared. Here is how the starter reads them.",
+        "body": "Attributes marked `\"localized\": true` keep one value per locale. The starter reads them with the client's `locale` option:\n\n```ts\nconst gohead = client.with({ locale: \"fr\" });\nconst article = await gohead.collection(\"articles\").findFirst({ filters: { slug } });\n```\n\nMissing translations fall back to the default locale, so a half-translated site still works. Switch the language in the header to see it.\n",
+        "seo": {
+          "meta_title": "One site, several languages",
+          "meta_description": "Localized attributes keep a value per locale while everything else is shared. Here is how the starter reads them."
+        },
+        "$translations": {
+          "fr": {
+            "title": "Un site, plusieurs langues",
+            "excerpt": "Les attributs localisés gardent une valeur par langue, le reste est partagé. Voici comment le starter les lit.",
+            "body": "Les attributs marqués `\"localized\": true` gardent une valeur par langue. Le starter les lit avec l'option `locale` du client. Les traductions manquantes reprennent la langue par défaut.\n"
+          }
+        }
+      },
+      {
+        "$id": "agents-that-draft",
+        "$status": "published",
+        "slug": "agents-that-draft",
+        "cover": "@media:cover-6",
+        "author": "@ref:authors/linus",
+        "category": "@ref:categories/product",
+        "featured": true,
+        "reading_minutes": 4,
+        "tags": [
+          "agents",
+          "ai"
+        ],
+        "title": "Agents that draft, editors that decide",
+        "excerpt": "Let a GoHead agent summarize, tag or translate new articles, and approve each change before it goes live.",
+        "body": "GoHead agents react to content events. Start from a template (summarizer, tagger, moderator or translator) in the admin, point it at the `articles` collection, and turn on **Require approval**: every change it proposes waits in **Approvals** until an editor accepts it.\n\nBecause published pages revalidate on webhooks, an approved summary shows up on this site within seconds.\n",
+        "seo": {
+          "meta_title": "Agents that draft, editors that decide",
+          "meta_description": "Let a GoHead agent summarize, tag or translate new articles, and approve each change before it goes live."
+        },
+        "$translations": {
+          "fr": {
+            "title": "Des agents qui rédigent, des éditeurs qui décident",
+            "excerpt": "Laissez un agent GoHead résumer, taguer ou traduire les nouveaux articles, et validez chaque changement avant publication.",
+            "body": "Les agents GoHead réagissent aux événements de contenu. Partez d'un modèle (résumé, tags, modération ou traduction), activez **Validation requise** : chaque proposition attend dans **Approbations** qu'un éditeur l'accepte.\n"
+          }
+        }
+      },
+      {
+        "$id": "draft-preview",
+        "$status": "draft",
+        "slug": "draft-preview",
+        "cover": "@media:cover-2",
+        "author": "@ref:authors/ada",
+        "category": "@ref:categories/news",
+        "featured": false,
+        "reading_minutes": 2,
+        "tags": [
+          "drafts"
+        ],
+        "title": "This article is a draft",
+        "excerpt": "Drafts never reach anonymous visitors: you only see this one in GoHead's admin.",
+        "body": "Publish it from the admin to see it appear on the site.\n",
+        "seo": {
+          "meta_title": "This article is a draft",
+          "meta_description": "Drafts never reach anonymous visitors: you only see this one in GoHead's admin."
+        },
+        "$translations": {
+          "fr": {
+            "title": "Cet article est un brouillon",
+            "excerpt": "Les brouillons n'atteignent jamais les visiteurs anonymes.",
+            "body": "Publiez-le depuis l'admin pour le voir apparaître sur le site.\n"
+          }
+        }
+      }
+    ]
+  },
+  "singletons": {
+    "site": {
+      "name": "GoHead Blog",
+      "tagline": "A Next.js starter for GoHead",
+      "description": "Articles about building websites on a Go headless CMS.",
+      "footer": "Built with GoHead and Next.js.",
+      "links": [
+        {
+          "label": "GoHead",
+          "url": "https://github.com/gohead-cms/gohead"
+        },
+        {
+          "label": "Docs",
+          "url": "https://gohead-cms.github.io/gohead/"
+        }
+      ],
+      "seo": {
+        "meta_title": "GoHead Blog",
+        "meta_description": "A Next.js starter for GoHead.",
+        "share_image": "@media:share"
+      },
+      "$translations": {
+        "fr": {
+          "tagline": "Un starter Next.js pour GoHead",
+          "description": "Des articles sur la création de sites avec un CMS headless en Go.",
+          "footer": "Construit avec GoHead et Next.js."
+        }
+      }
+    },
+    "homepage": {
+      "hero_title": "Stories from the content layer",
+      "hero_text": "A starter blog powered by GoHead: typed content, instant previews and sites that rebuild when you publish.",
+      "featured": [
+        "@ref:articles/hello-gohead",
+        "@ref:articles/content-models-as-code",
+        "@ref:articles/agents-that-draft"
+      ],
+      "$translations": {
+        "fr": {
+          "hero_title": "Histoires de la couche contenu",
+          "hero_text": "Un blog d'exemple propulsé par GoHead : contenu typé et sites qui se reconstruisent à la publication."
+        }
+      }
+    }
+  }
+}

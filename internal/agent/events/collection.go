@@ -26,6 +26,11 @@ const (
 	// or was withdrawn.
 	EventTypeItemPublished   EventType = "item:published"
 	EventTypeItemUnpublished EventType = "item:unpublished"
+
+	// Singleton content events. Their CollectionName is
+	// "singleton:<name>", like the singleton's permission key.
+	EventTypeSingletonUpdated EventType = "singleton:updated"
+	EventTypeSingletonDeleted EventType = "singleton:deleted"
 )
 
 // CollectionEventPayload is the generic data structure for a collection event.

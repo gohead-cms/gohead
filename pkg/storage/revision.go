@@ -537,6 +537,9 @@ func RestoreSingletonRevision(actor Actor, st *models.Singleton, version uint) (
 	if txErr != nil {
 		return nil, nil, txErr
 	}
+	if !res.Unchanged {
+		publishSingletonEvent(actor, events.EventTypeSingletonUpdated, st.Name, &item)
+	}
 	return &item, res, nil
 }
 

@@ -1,5 +1,4 @@
 /** Copies starter templates into new projects. */
-import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { cp, readdir, readFile, rename, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve } from "node:path";
@@ -58,13 +57,11 @@ export async function scaffold(opts: CreateOptions): Promise<void> {
   if (pkg.dependencies?.["@gohead-cms/client"] && opts.clientRange) pkg.dependencies["@gohead-cms/client"] = opts.clientRange;
   await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
 
-  // .env.local from .env.example: the GoHead URL and a webhook secret.
+  // .env.local from .env.example, with the GoHead URL. (The webhook
+  // secret comes from GoHead when the webhook is created.)
   const example = join(target, ".env.example");
   if (existsSync(example)) {
-    let env = await readFile(example, "utf8");
-    const secret = "whsec_" + randomBytes(24).toString("hex");
-    env = setEnv(env, "GOHEAD_URL", opts.url);
-    env = setEnv(env, "GOHEAD_WEBHOOK_SECRET", secret);
+    const env = setEnv(await readFile(example, "utf8"), "GOHEAD_URL", opts.url);
     await writeFile(join(target, ".env.local"), env);
   }
 }
