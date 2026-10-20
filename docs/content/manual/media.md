@@ -78,19 +78,25 @@ Files reach entries through their **media fields**, such as an article's cover o
 author's avatar (see [Editing content](editing-content.md#fill-in-the-fields)):
 
 1. Open the entry in the [content editor](editing-content.md).
-2. In the media field, click **Upload a file** (or **Add files**) and choose the file on
-   your computer.
+2. In the media field, click **Upload a file** (or **Upload files**) and choose the file
+   on your computer, or click **Choose from library** to use a file already in the
+   library.
 3. Save the entry.
 
-The file is uploaded to the media library at the same time, and the field shows its
-preview and name. To take it off the entry, click × next to it and save.
+An uploaded file goes to the media library at the same time. The field shows the file's
+preview and name; to take it off the entry, click × next to it and save.
 
 ![The avatar field of an author, holding avatar-ada.jpg](../assets/manual/media-entry-field.png)
 
-!!! note
-    A media field uploads a new file: it doesn't let you pick a file already in the
-    library. To use the same image elsewhere (in a rich-text field, for example), open it
-    in the media library and copy its **URL**.
+**Choose from library** opens the library in a window: search by file name, then click a
+file (in a field that takes several, click each one, then **Add**). Files the field doesn't
+accept, and those already in it, are greyed out.
+
+![The library window: a search box and a grid of images to choose from](../assets/manual/media-library-picker.png)
+
+!!! tip
+    To use an image in a rich-text field, open it in the media library and copy its
+    **URL**.
 
 How media fields are defined and how the API returns files is described in
 [Media attributes](../guides/media.md#media-attributes).

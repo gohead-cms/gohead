@@ -83,22 +83,49 @@ Each type of field has its own input:
 | Boolean | Flip the switch |
 | Date, date and time | Pick the date (and time) |
 | Enumeration | Choose a value in the list |
-| Media | Upload a file (see below) |
-| Component | Shown read-only, as data: *Component fields are edited through the API* |
-| JSON (such as an article's tags) | Set through the API; leave the field as it is |
+| Media | Upload a file, or choose one from the library (see below) |
+| Relation (an article's author, the articles featured on the home page) | Choose the entries it points to (see below) |
+| Component (an article's SEO settings, a list of FAQ items) | Fill in its fields, in a box of their own (see below) |
+| JSON (such as an article's tags) | Type JSON, for example `["news", "go"]` (see below) |
 
-To set a **media** field, click **Upload a file** (or **Add files** when the field takes
-several) and choose a file on your computer. It is uploaded to the
-[media library](media.md) and shown in the field with a preview; the × button removes it
-from the entry. The file chooser only offers the kinds of files the field accepts.
+To set a **media** field, click **Upload a file** (or **Upload files** when the field takes
+several) and choose a file on your computer: it is uploaded to the
+[media library](media.md). Or click **Choose from library** to use a file already there:
+search by name, click the file (or several, then **Add**). The field shows each file with a
+preview; the × button removes it from the entry (the file stays in the library). Only the
+kinds of files the field accepts can be chosen.
 
 ![A cover field holding the uploaded image launch-banner.png, with its × button](../assets/manual/editing-content-media-field.png)
 
-!!! note "Relations"
-    Relation fields (an article's author or category, the articles featured on the home
-    page) don't appear in the content editor. They are set through the API, for example
-    by the website's import scripts or by an AI agent. See
-    [Relations](../guides/content-modeling.md#relations).
+A **relation** field shows the entries it points to, by name, with their ID (and a
+*draft* badge for unpublished ones). Its label says which collection it points to, and
+"(several)" when it takes more than one.
+
+![An article's author and category relations, Ada Lindqvist and News, with their Change buttons](../assets/manual/editing-content-relations.png)
+
+- Click **Choose** (or **Change**) to pick the entry: a window lists the collection's
+  entries, newest first; type to search them by name, and click one.
+- In a field that takes several (**Add …**), click each entry you want, then **Add**.
+  Entries already in the field are greyed out.
+- The × button takes an entry off the field (the entry itself is not deleted).
+
+If your role can't read the collection a relation points to, the field shows a warning
+instead: the relation is hidden from you, and saving the entry would clear it, so leave such
+entries to someone who can see the whole entry.
+
+![The window to choose an author: a search box and the authors, the current one greyed out](../assets/manual/editing-content-relation-picker.png)
+
+A **component** groups fields that go together. Its fields appear in a grey box: fill
+them in like the others. An empty component shows an **Add …** button; the bin icon clears
+it. A component that repeats (a list of FAQ items, say) shows one box per item, with
+**Add …** at the bottom and arrows to reorder the items.
+
+![An article's seo component: meta_description, share_image and meta_title in a grey box](../assets/manual/editing-content-component.png)
+
+A **JSON** field takes any JSON value: a list (`["news", "go"]`), an object
+(`{"theme": "dark"}`), a number… While the text is not valid JSON the field is outlined in
+red with the reason, and the entry can't be saved. Leave the field empty (or type `null`)
+to unset it.
 
 ## Publish and unpublish
 

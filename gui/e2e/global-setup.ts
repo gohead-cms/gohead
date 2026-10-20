@@ -21,7 +21,10 @@ export default async function globalSetup() {
 
   const ensure = async (path: string, data: unknown) => {
     const res = await api.post(path, { data, headers });
-    if (!res.ok() && res.status() !== 409) throw new Error(`POST ${path}: ${res.status()} ${await res.text()}`);
+    if (res.ok() || res.status() === 409) return;
+    // Re-running against the same database: what exists is fine.
+    const text = await res.text();
+    if (!/already exist/i.test(text)) throw new Error(`POST ${path}: ${res.status()} ${text}`);
   };
 
   await ensure("/admin/users", { username: editor.username, email: "e2e-editor@example.com", password: editor.password, role_name: "editor" });

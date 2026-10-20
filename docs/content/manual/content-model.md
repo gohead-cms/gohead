@@ -229,9 +229,8 @@ Unlike collections, a component can be renamed, but only while no type uses it. 
 component that is in use can't be deleted either. More in
 [Components](../guides/content-modeling.md#components).
 
-!!! note
-    The content editor shows component values but doesn't edit them: they are set through
-    the API (or by an AI agent).
+In the content editor, a component's fields appear in a box of their own (see
+[Fill in the fields](editing-content.md#fill-in-the-fields)).
 
 ## See the model as a map
 

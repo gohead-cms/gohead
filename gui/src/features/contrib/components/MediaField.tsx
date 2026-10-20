@@ -1,9 +1,10 @@
-import React, { useRef, useState } from "react";
-import { Box, Button, HStack, IconButton, Image, Input, Text, VStack, useToast } from "@chakra-ui/react";
-import { FiUpload, FiX, FiFile } from "react-icons/fi";
+import React, { useEffect, useRef, useState } from "react";
+import { Box, Button, HStack, IconButton, Image, Input, Text, VStack, useDisclosure, useToast } from "@chakra-ui/react";
+import { FiUpload, FiX, FiFile, FiImage } from "react-icons/fi";
 import { API_BASE_URL, apiFetchWithAuth } from "../../../services/api";
 import { useMe } from "../../auth/me";
 import { MEDIA } from "../../auth/permissions";
+import { MediaLibraryPicker } from "./MediaLibraryPicker";
 
 // A media value as the API returns it (populated), or a bare ID / URL.
 export interface MediaFile {
@@ -16,6 +17,8 @@ export type MediaValue = MediaFile | number | string | null | undefined;
 
 interface MediaFieldProps {
   id: string;
+  /** The attribute's name, for accessible names. */
+  name?: string;
   value: MediaValue | MediaValue[];
   multiple?: boolean;
   accept?: string[];
@@ -25,7 +28,7 @@ interface MediaFieldProps {
 // Relative URLs (/uploads/...) point at the API, not at the admin UI.
 const absolute = (url: string) => (url.startsWith("/") ? `${API_BASE_URL}${url}` : url);
 
-function Preview({ value, onRemove }: { value: MediaValue; onRemove: () => void }) {
+function Preview({ value, field, onRemove }: { value: MediaValue; field: string; onRemove: () => void }) {
   if (value === null || value === undefined) return null;
   const file = typeof value === "object" ? value : null;
   const url = file ? file.url : typeof value === "string" ? value : "";
@@ -39,20 +42,28 @@ function Preview({ value, onRemove }: { value: MediaValue; onRemove: () => void 
         <Box as={FiFile} boxSize="24px" color="gray.500" />
       )}
       <Text flex="1" fontSize="sm" noOfLines={1}>{label}</Text>
-      <IconButton aria-label="Remove file" icon={<FiX />} size="xs" variant="ghost" onClick={onRemove} />
+      <IconButton aria-label={`Remove ${label} from ${field}`} icon={<FiX />} size="xs" variant="ghost" onClick={onRemove} />
     </HStack>
   );
 }
 
-// MediaField uploads files to POST /api/media and stores the returned file
-// in the form; EntryFormModal sends its ID when the entry is saved.
-export function MediaField({ id, value, multiple, accept, onChange }: MediaFieldProps) {
+// MediaField uploads files to POST /api/media, or picks files already in the
+// library, and stores them in the form; saving the entry sends their IDs.
+export function MediaField({ id, name = "file", value, multiple, accept, onChange }: MediaFieldProps) {
   const input = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const toast = useToast();
   // Uploading needs media create; files already set can still be removed.
-  const canUpload = useMe().can("create", MEDIA);
+  const me = useMe();
+  const canUpload = me.can("create", MEDIA);
+  const canBrowse = me.can("read", MEDIA);
+  const library = useDisclosure();
   const values: MediaValue[] = multiple ? (Array.isArray(value) ? value : []) : value ? [value as MediaValue] : [];
+  // An upload finishes later: it adds to the field's value at that time.
+  const latest = useRef(values);
+  useEffect(() => {
+    latest.current = values;
+  });
 
   const upload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -64,7 +75,7 @@ export function MediaField({ id, value, multiple, accept, onChange }: MediaField
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message || "Upload failed");
       const uploaded: MediaFile[] = json.data;
-      onChange(multiple ? [...values, ...uploaded] : uploaded[0]);
+      onChange(multiple ? [...latest.current, ...uploaded] : uploaded[0]);
     } catch (err) {
       toast({ title: "Upload failed", description: (err as Error).message, status: "error", duration: 5000, isClosable: true });
     } finally {
@@ -79,25 +90,47 @@ export function MediaField({ id, value, multiple, accept, onChange }: MediaField
   };
 
   return (
-    <VStack align="stretch" spacing={2}>
+    <VStack align="stretch" spacing={2} role="group" aria-labelledby={`${id}-label`}>
       {values.map((v, i) => (
-        <Preview key={i} value={v} onRemove={() => removeAt(i)} />
+        <Preview key={i} value={v} field={name} onRemove={() => removeAt(i)} />
       ))}
-      {!canUpload && values.length === 0 && (
+      {!canUpload && !canBrowse && values.length === 0 && (
         <Text fontSize="sm" color="gray.500">
-          No file. Your role cannot upload files.
+          No file. Your role cannot upload or browse files.
         </Text>
       )}
-      {canUpload && (multiple || values.length === 0) && (
-        <Button
-          leftIcon={<FiUpload />}
-          size="sm"
-          variant="outline"
-          isLoading={uploading}
-          onClick={() => input.current?.click()}
-        >
-          {multiple ? "Add files" : "Upload a file"}
-        </Button>
+      {(multiple || values.length === 0) && (canUpload || canBrowse) && (
+        <HStack spacing={2} wrap="wrap">
+          {canUpload && (
+            <Button
+              leftIcon={<FiUpload />}
+              size="sm"
+              variant="outline"
+              isLoading={uploading}
+              onClick={() => input.current?.click()}
+              aria-label={`Upload ${multiple ? "files" : "a file"} to ${name}`}
+            >
+              {multiple ? "Upload files" : "Upload a file"}
+            </Button>
+          )}
+          {canBrowse && (
+            <Button leftIcon={<FiImage />} size="sm" variant="outline" onClick={library.onOpen} aria-label={`Choose ${name} from the library`}>
+              Choose from library
+            </Button>
+          )}
+        </HStack>
+      )}
+      {library.isOpen && (
+        <MediaLibraryPicker
+          multiple={multiple}
+          accept={accept}
+          selected={values.map((v) => (v && typeof v === "object" ? v.id : typeof v === "number" ? v : -1))}
+          onClose={library.onClose}
+          onPick={(files) => {
+            onChange(multiple ? [...values, ...files] : (files[0] ?? null));
+            library.onClose();
+          }}
+        />
       )}
       <Input
         ref={input}
