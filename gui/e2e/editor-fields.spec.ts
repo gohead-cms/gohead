@@ -24,7 +24,7 @@ test.describe("entry fields", () => {
       attributes: { question: { type: "string", required: true }, answer: { type: "text" } },
     });
     await ensure("/admin/components", { name: "e2e_seo", attributes: { meta_title: { type: "string" } } });
-    const newPeople = await ensure("/admin/collections", {
+    await ensure("/admin/collections", {
       name: "e2e_people",
       kind: "collection",
       attributes: { name: { type: "string", required: true } },
@@ -42,11 +42,14 @@ test.describe("entry fields", () => {
         gallery: { type: "media", multiple: true, allowed_types: ["image/*"] },
       },
     });
-    if (!newPeople) return;
+    // Each person and file once, so a retry completes a partial setup.
+    const people = await (await request.get(`${apiURL}/api/collections/e2e_people?pageSize=100`, { headers })).json();
     for (const name of ["Ada Lovelace", "Grace Hopper", "Alan Turing"]) {
-      await ensure("/api/collections/e2e_people", { data: { name } });
+      if (!people.data.some((p: { name: string }) => p.name === name)) await ensure("/api/collections/e2e_people", { data: { name } });
     }
     for (const name of ["first.png", "second.png"]) {
+      const found = await (await request.get(`${apiURL}/api/media?search=${name}`, { headers })).json();
+      if (found.data.some((m: { name: string }) => m.name === name)) continue;
       const res = await request.post(`${apiURL}/api/media`, {
         headers,
         multipart: { files: { name, mimeType: "image/png", buffer: PNG } },
@@ -57,38 +60,38 @@ test.describe("entry fields", () => {
 
   test("relations, components, json and library media", async ({ page, request }) => {
     const errors = trackErrors(page);
-    const title = `Editor fields #${test.info().retry}`;
+    const title = `Editor fields ${Date.now()}`;
     await login(page);
     await page.goto("/contrib");
     await page.getByRole("button", { name: "e2e_pages" }).click();
     await page.getByRole("button", { name: "Quick Add" }).click();
-    const drawer = page.getByRole("dialog");
-    await drawer.getByLabel("title").fill(title);
+    const drawer = page.getByRole("dialog", { name: /Add New Entry/ });
+    await drawer.getByLabel(/^title\b/).fill(title);
 
     // One-to-one: pick from a searchable list.
-    await drawer.getByRole("button", { name: "Choose e2e_people" }).click();
-    let picker = page.getByRole("dialog", { name: "Choose e2e_people" });
+    await drawer.getByRole("button", { name: "Choose owner (e2e_people)" }).click();
+    let picker = page.getByRole("dialog", { name: "Choose owner (e2e_people)" });
     await picker.getByPlaceholder("Search by name").fill("grace");
     await expect(picker.getByRole("button", { name: /Ada Lovelace/ })).toHaveCount(0);
     await picker.getByRole("button", { name: /Grace Hopper/ }).click();
     await expect(drawer.getByText("Grace Hopper")).toBeVisible();
 
     // Many-to-many: several at once.
-    await drawer.getByRole("button", { name: "Add e2e_people" }).click();
-    picker = page.getByRole("dialog", { name: "Add e2e_people" });
+    await drawer.getByRole("button", { name: "Add people (e2e_people)" }).click();
+    picker = page.getByRole("dialog", { name: "Add people (e2e_people)" });
     await picker.getByRole("button", { name: /Ada Lovelace/ }).click();
     await picker.getByRole("button", { name: /Alan Turing/ }).click();
     await picker.getByRole("button", { name: "Add 2" }).click();
     await expect(drawer.getByText("Alan Turing")).toBeVisible();
 
     // Repeatable component: two instances; single component: one.
-    await drawer.getByRole("button", { name: "Add e2e_faq" }).click();
-    await drawer.getByRole("button", { name: "Add e2e_faq" }).click();
-    await drawer.getByLabel("question").nth(0).fill("Why?");
-    await drawer.getByLabel("question").nth(1).fill("How?");
-    await drawer.getByLabel("answer").nth(1).fill("Like this.");
-    await drawer.getByRole("button", { name: "Add e2e_seo" }).click();
-    await drawer.getByLabel("meta_title").fill("SEO title");
+    await drawer.getByRole("button", { name: "Add an item to faqs" }).click();
+    await drawer.getByRole("button", { name: "Add an item to faqs" }).click();
+    await drawer.getByRole("group", { name: "faqs 1" }).getByLabel("question").fill("Why?");
+    await drawer.getByRole("group", { name: "faqs 2" }).getByLabel("question").fill("How?");
+    await drawer.getByRole("group", { name: "faqs 2" }).getByLabel("answer").fill("Like this.");
+    await drawer.getByRole("button", { name: "Add seo" }).click();
+    await drawer.getByLabel("meta_title", { exact: true }).fill("SEO title");
 
     // JSON: invalid text blocks saving.
     await drawer.getByLabel("settings").fill('{"theme": ');
@@ -98,7 +101,7 @@ test.describe("entry fields", () => {
     await drawer.getByLabel("settings").fill('{"theme": "dark", "columns": 2}');
 
     // Media from the library.
-    await drawer.getByRole("button", { name: "Choose from library" }).click();
+    await drawer.getByRole("button", { name: "Choose gallery from the library" }).click();
     const library = page.getByRole("dialog", { name: "Add files from the library" });
     await library.getByRole("button", { name: "Choose first.png" }).click();
     await library.getByRole("button", { name: "Choose second.png" }).click();
@@ -109,7 +112,7 @@ test.describe("entry fields", () => {
     await expect(page.getByRole("cell", { name: title })).toBeVisible();
 
     // Stored as the API expects.
-    const res = await request.get(`${apiURL}/api/collections/e2e_pages?level=0&filters[title]=${encodeURIComponent(title)}`, { headers });
+    const res = await request.get(`${apiURL}/api/collections/e2e_pages?level=0&sort=id:desc&filters[title]=${encodeURIComponent(title)}`, { headers });
     const [entry] = (await res.json()).data;
     const people = await (await request.get(`${apiURL}/api/collections/e2e_people?sort=id`, { headers })).json();
     const id = (name: string) => people.data.find((p: { name: string }) => p.name === name).id;
@@ -121,12 +124,12 @@ test.describe("entry fields", () => {
     expect(entry.gallery).toHaveLength(2);
 
     // Editing again shows the labels, and keeps everything when saved.
-    await page.getByRole("row", { name: new RegExp(title) }).getByRole("button", { name: /edit/i }).click();
-    const edit = page.getByRole("dialog");
+    await page.getByRole("row", { name: new RegExp(title) }).getByRole("button", { name: "Edit item" }).click();
+    const edit = page.getByRole("dialog", { name: /Edit Entry/ });
     await expect(edit.getByText("Grace Hopper")).toBeVisible();
     await expect(edit.getByText("Alan Turing")).toBeVisible();
-    await expect(edit.getByLabel("question").nth(1)).toHaveValue("How?");
-    await edit.getByRole("button", { name: "Remove e2e_faq 1" }).click();
+    await expect(edit.getByRole("group", { name: "faqs 2" }).getByLabel("question")).toHaveValue("How?");
+    await edit.getByRole("button", { name: "Remove faqs 1" }).click();
     await edit.getByRole("button", { name: "Save Changes" }).click();
     await expect(edit).toBeHidden();
     const after = (await (await request.get(`${apiURL}/api/collections/e2e_pages/${entry.id}?level=0`, { headers })).json()).data;

@@ -13,27 +13,40 @@ const show = (value: unknown) =>
 
 /**
  * Edits a json attribute as text. The form gets the parsed value, nothing
- * when the text is empty, or an InvalidValue (which blocks saving) while the
- * text does not parse.
+ * when the text is empty (or null), or an InvalidValue (which blocks saving)
+ * while the text does not parse. The text is kept as typed.
  */
 export function JsonField({ id, value, onChange }: JsonFieldProps) {
   const [text, setText] = useState(() => show(value));
   const [error, setError] = useState<string | null>(null);
+  // The value this field last sent (or started from): another value comes
+  // from outside (a translation's "Use default") and replaces the text.
+  const [own, setOwn] = useState<unknown>(value);
+  if (value !== own) {
+    setOwn(value);
+    setText(show(value));
+    setError(null);
+  }
 
+  const send = (v: unknown) => {
+    setOwn(v);
+    onChange(v);
+  };
   const edit = (next: string) => {
     setText(next);
     if (next.trim() === "") {
       setError(null);
-      onChange(undefined);
+      send(undefined);
       return;
     }
     try {
-      onChange(JSON.parse(next));
+      const parsed: unknown = JSON.parse(next);
       setError(null);
+      send(parsed);
     } catch (err) {
       const message = err instanceof Error ? err.message : "invalid JSON";
       setError(message);
-      onChange(new InvalidValue(`not valid JSON (${message})`));
+      send(new InvalidValue(`not valid JSON (${message})`));
     }
   };
 
@@ -43,10 +56,6 @@ export function JsonField({ id, value, onChange }: JsonFieldProps) {
         id={id}
         value={text}
         onChange={(e) => edit(e.target.value)}
-        onBlur={() => {
-          // Tidy valid JSON once the field is left.
-          if (!error && text.trim() !== "") setText(show(JSON.parse(text)));
-        }}
         rows={Math.min(16, Math.max(4, text.split("\n").length + 1))}
         fontFamily="mono"
         fontSize="sm"

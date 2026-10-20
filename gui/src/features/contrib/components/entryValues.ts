@@ -28,6 +28,17 @@ export class InvalidValue {
   }
 }
 
+/** Files (objects with an id and a url) inside a component value, as their IDs. */
+export function filesToIDs(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(filesToIDs);
+  if (value && typeof value === "object" && !(value instanceof InvalidValue)) {
+    const o = value as Record<string, unknown>;
+    if ("id" in o && typeof o.url === "string") return o.id;
+    return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, filesToIDs(v)]));
+  }
+  return value;
+}
+
 /** A relation value as the API stores it: an ID or a list of IDs. */
 export function relationIDs(value: unknown): unknown {
   const id = (v: unknown) => (v !== null && typeof v === "object" && "id" in v ? (v as { id: unknown }).id : v);
@@ -108,6 +119,11 @@ export function toItemData(attributes: Record<string, Attribute>, values: Record
     if (attr?.type === "relation") {
       const ids = relationIDs(value);
       if (ids !== undefined) data[key] = ids;
+      continue;
+    }
+    if (attr?.type === "component") {
+      // An untouched component holds files as the API returned them.
+      data[key] = filesToIDs(value);
       continue;
     }
     if (attr?.type === "datetime" && typeof value === "string") {

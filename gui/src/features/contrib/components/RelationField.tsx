@@ -1,9 +1,10 @@
 import { useState } from "react";
 import {
+  Alert,
+  AlertIcon,
   Badge,
   Box,
   Button,
-  Checkbox,
   HStack,
   IconButton,
   Input,
@@ -21,7 +22,8 @@ import {
   VStack,
   useDisclosure,
 } from "@chakra-ui/react";
-import { FiLink, FiSearch, FiX } from "react-icons/fi";
+import { FiCheckSquare, FiLink, FiSearch, FiSquare, FiX } from "react-icons/fi";
+import { useMe } from "../../auth/me";
 import { apiFetchWithAuth } from "../../../services/api";
 import { useApiQuery } from "../../../shared/hooks/useApiQuery";
 import type { Attribute } from "../../../shared/types";
@@ -51,6 +53,8 @@ async function listEntries(collection: string, query: string): Promise<{ items: 
 
 interface RelationFieldProps {
   id: string;
+  /** The attribute's name, for accessible names. */
+  name: string;
   attr: Attribute;
   value: unknown;
   onChange: (value: unknown) => void;
@@ -60,12 +64,15 @@ interface RelationFieldProps {
  * Picks the entries a relation points to. The form keeps populated entries
  * (for their labels) or bare IDs; saving sends the IDs.
  */
-export function RelationField({ id, attr, value, onChange }: RelationFieldProps) {
+export function RelationField({ id, name, attr, value, onChange }: RelationFieldProps) {
   const target = relationTarget(attr.target);
   const many = attr.relation === "manyToMany";
   const { schema } = useCollectionSchema(target || null);
   const field = labelField(schema);
   const picker = useDisclosure();
+  // The API leaves out relations to collections the role cannot read: such
+  // a field looks empty, and saving the entry would clear it.
+  const canRead = useMe().can("read", target);
   const selected = asList(value);
 
   // Labels of the entries the form only has the ID of.
@@ -89,7 +96,13 @@ export function RelationField({ id, attr, value, onChange }: RelationFieldProps)
   };
 
   return (
-    <VStack align="stretch" spacing={2} id={id}>
+    <VStack align="stretch" spacing={2} role="group" aria-labelledby={`${id}-label`}>
+      {!canRead && (
+        <Alert status="warning" borderRadius="md" fontSize="sm">
+          <AlertIcon />
+          Your role cannot read {target}: this relation is not shown, and saving the entry clears it.
+        </Alert>
+      )}
       {selected.map((r) => {
         const entry = resolve(r);
         const missing = typeof r !== "object" && labels.data && !entry;
@@ -109,12 +122,19 @@ export function RelationField({ id, attr, value, onChange }: RelationFieldProps)
             <Text fontSize="xs" color="gray.400">
               #{refID(r)}
             </Text>
-            <IconButton aria-label={`Remove #${refID(r)}`} icon={<FiX />} size="xs" variant="ghost" onClick={() => remove(r)} />
+            <IconButton aria-label={`Remove ${entry ? entryLabel(entry, field) : `#${refID(r)}`} from ${name}`} icon={<FiX />} size="xs" variant="ghost" onClick={() => remove(r)} />
           </HStack>
         );
       })}
       <HStack>
-        <Button size="sm" variant="outline" leftIcon={<FiLink />} onClick={picker.onOpen} isDisabled={!target}>
+        <Button
+          size="sm"
+          variant="outline"
+          leftIcon={<FiLink />}
+          onClick={picker.onOpen}
+          isDisabled={!target || !canRead}
+          aria-label={many ? `Add ${name} (${target})` : `${selected.length ? "Change" : "Choose"} ${name} (${target})`}
+        >
           {many ? `Add ${target}` : selected.length ? `Change ${target}` : `Choose ${target}`}
         </Button>
         {labels.loading && <Spinner size="xs" />}
@@ -122,6 +142,7 @@ export function RelationField({ id, attr, value, onChange }: RelationFieldProps)
       {picker.isOpen && (
         <RelationPicker
           target={target}
+          title={many ? `Add ${name} (${target})` : `Choose ${name} (${target})`}
           many={many}
           field={field}
           selected={selected.map((r) => String(refID(r)))}
@@ -145,6 +166,7 @@ const PAGE_SIZE = 20;
 
 interface RelationPickerProps {
   target: string;
+  title: string;
   many: boolean;
   field: string | null;
   /** IDs already chosen. */
@@ -154,7 +176,7 @@ interface RelationPickerProps {
 }
 
 /** Searches the target collection and returns the entries picked. */
-function RelationPicker({ target, many, field, selected, onClose, onPick }: RelationPickerProps) {
+function RelationPicker({ target, title, many, field, selected, onClose, onPick }: RelationPickerProps) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [picked, setPicked] = useState<RelatedEntry[]>([]);
@@ -162,7 +184,8 @@ function RelationPicker({ target, many, field, selected, onClose, onPick }: Rela
   let filter = "";
   if (term) {
     if (field) filter = `&filters[${encodeURIComponent(field)}][$contains]=${encodeURIComponent(term)}`;
-    else if (/^\d+$/.test(term)) filter = `&filters[id]=${term}`;
+    // Without a text attribute, search is by ID (anything else matches none).
+    else filter = `&filters[id]=${/^\d+$/.test(term) ? term : "0"}`;
   }
   const key = `relation-picker:${target}:${page}:${filter}`;
   const { data, loading, error } = useApiQuery(key, () => listEntries(target, `sort=id:desc&page=${page}&pageSize=${PAGE_SIZE}${filter}`));
@@ -181,7 +204,7 @@ function RelationPicker({ target, many, field, selected, onClose, onPick }: Rela
     <Modal isOpen onClose={onClose} size="lg" scrollBehavior="inside">
       <ModalOverlay />
       <ModalContent>
-        <ModalHeader>{many ? `Add ${target}` : `Choose ${target}`}</ModalHeader>
+        <ModalHeader>{title}</ModalHeader>
         <ModalCloseButton />
         <ModalBody>
           <InputGroup mb={3}>
@@ -230,7 +253,7 @@ function RelationPicker({ target, many, field, selected, onClose, onPick }: Rela
                   onClick={() => choose(e)}
                   aria-pressed={many ? isPicked(e) : undefined}
                 >
-                  {many && <Checkbox isChecked={already || isPicked(e)} isDisabled={already} pointerEvents="none" />}
+                  {many && <Box as={already || isPicked(e) ? FiCheckSquare : FiSquare} color={isPicked(e) ? "purple.500" : "gray.400"} aria-hidden flexShrink={0} />}
                   <Text flex="1" fontSize="sm" noOfLines={1}>
                     {entryLabel(e, field)}
                   </Text>

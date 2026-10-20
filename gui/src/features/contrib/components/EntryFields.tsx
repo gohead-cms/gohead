@@ -39,15 +39,16 @@ function FieldInput({ id, name, attr, value, onChange, placeholder = `Enter ${na
   }
   switch (attr.type) {
     case "component":
-      return <ComponentField id={id} attr={attr} value={value} onChange={(v) => onChange(name, v)} />;
+      return <ComponentField id={id} name={name} attr={attr} value={value} onChange={(v) => onChange(name, v)} />;
     case "relation":
-      return <RelationField id={id} attr={attr} value={value} onChange={(v) => onChange(name, v)} />;
+      return <RelationField id={id} name={name} attr={attr} value={value} onChange={(v) => onChange(name, v)} />;
     case "json":
       return <JsonField id={id} value={value} onChange={(v) => onChange(name, v)} />;
     case "media":
       return (
         <MediaField
           id={id}
+          name={name}
           value={value as MediaValue | MediaValue[]}
           multiple={attr.multiple}
           accept={attr.allowed_types}
@@ -62,6 +63,9 @@ function FieldInput({ id, name, attr, value, onChange, placeholder = `Enter ${na
       return <Input id={id} type={inputType(attr.type)} value={text} onChange={onText} placeholder={placeholder} />;
   }
 }
+
+// Fields made of several controls: their label names a group, not an input.
+const GROUPS = new Set(["relation", "component", "media"]);
 
 interface EntryFieldsProps {
   attributes: Record<string, Attribute>;
@@ -87,7 +91,7 @@ export function EntryFields({ attributes, values, onChange, idPrefix = "field-",
         const id = `${idPrefix}${key}`;
         return (
           <FormControl key={key} isRequired={attr.required}>
-            <FormLabel htmlFor={id}>
+            <FormLabel htmlFor={GROUPS.has(attr.type) ? undefined : id} id={`${id}-label`}>
               {key}
               {attr.type === "relation" && attr.target && (
                 <Text as="span" fontWeight="normal" color="gray.500" fontSize="sm">

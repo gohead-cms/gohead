@@ -109,6 +109,10 @@ A **relation** field shows the entries it points to, by name, with their ID (and
   Entries already in the field are greyed out.
 - The × button takes an entry off the field (the entry itself is not deleted).
 
+If your role can't read the collection a relation points to, the field shows a warning
+instead: the relation is hidden from you, and saving the entry would clear it, so leave such
+entries to someone who can see the whole entry.
+
 ![The window to choose an author: a search box and the authors, the current one greyed out](../assets/manual/editing-content-relation-picker.png)
 
 A **component** groups fields that go together. Its fields appear in a grey box: fill
@@ -120,7 +124,8 @@ it. A component that repeats (a list of FAQ items, say) shows one box per item, 
 
 A **JSON** field takes any JSON value: a list (`["news", "go"]`), an object
 (`{"theme": "dark"}`), a number… While the text is not valid JSON the field is outlined in
-red with the reason, and the entry can't be saved. Leave the field empty to unset it.
+red with the reason, and the entry can't be saved. Leave the field empty (or type `null`)
+to unset it.
 
 ## Publish and unpublish
 

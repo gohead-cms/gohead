@@ -101,11 +101,11 @@ export function MediaLibraryPicker({ multiple, accept, selected, onClose, onPick
                   key={m.id}
                   as="button"
                   type="button"
-                  onClick={() => choose(m)}
-                  disabled={already || !allowed}
+                  onClick={() => !already && allowed && choose(m)}
+                  aria-disabled={already || !allowed}
                   title={!allowed ? `Not allowed in this field (${m.mime})` : already ? "Already in the field" : m.name}
                   aria-pressed={multiple ? on : undefined}
-                  aria-label={`Choose ${m.name}`}
+                  aria-label={`Choose ${m.name}${!allowed ? " (not allowed in this field)" : already ? " (already in the field)" : ""}`}
                   textAlign="left"
                   borderWidth="2px"
                   borderColor={on ? "purple.400" : "transparent"}
