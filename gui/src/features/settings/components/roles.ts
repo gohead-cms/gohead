@@ -15,6 +15,8 @@ export interface Role {
   name: string;
   description: string;
   builtin: boolean;
+  /** The role of anonymous requests (no token): read permissions only. */
+  public?: boolean;
   permissions: Permissions;
 }
 
@@ -24,6 +26,17 @@ export const BUILTIN_ROLE_HELP: Record<string, string> = {
   editor: "Create, edit, publish and delete all content; manage media",
   viewer: "Read-only access to all content",
 };
+
+/** The name of the role of anonymous requests. */
+export const PUBLIC_ROLE = "public";
+
+/** Help shown for the public role when its description is empty. */
+export const PUBLIC_ROLE_HELP = "Anonymous visitors: API calls without a token";
+
+/** Whether a role is the public role, which accounts and tokens cannot have. */
+export function isPublicRole(r: Pick<Role, "public">): boolean {
+  return !!r.public;
+}
 
 /** Mirrors the server's role name rule. */
 export const ROLE_NAME_RE = /^[a-z][a-z0-9_-]{1,31}$/;
@@ -37,10 +50,10 @@ export function roleNameError(name: string): string | null {
 }
 
 export function roleHelp(r: Pick<Role, "name" | "description">): string {
-  return r.description || BUILTIN_ROLE_HELP[r.name] || "Custom role";
+  return r.description || BUILTIN_ROLE_HELP[r.name] || (r.name === PUBLIC_ROLE ? PUBLIC_ROLE_HELP : "Custom role");
 }
 
-/** Every role, built-in ones first. */
+/** Every role: built-in ones first, then the public role, then custom ones. */
 export function useRoles() {
   return useApiQuery("/admin/roles", async () => {
     const res = await getJSON<Role[]>("/admin/roles", "Failed to load roles");
@@ -90,4 +103,16 @@ export function permissionSummary(p: Permissions): string {
   const media = sortActions(p.media ?? [], MEDIA_ACTIONS);
   if (media.length) parts.push(`media: ${media.join(", ")}`);
   return parts.length ? parts.join(" · ") : "No access";
+}
+
+/**
+ * What the public role lets anyone read, e.g. "articles, about (single),
+ * media", or null when it grants nothing.
+ */
+export function publicAccessSummary(p: Permissions): string | null {
+  const content = Object.entries(p.content ?? {}).filter(([, actions]) => (actions ?? []).includes("read"));
+  content.sort(([a], [b]) => (a === ANY_TYPE ? 1 : b === ANY_TYPE ? -1 : a.localeCompare(b)));
+  const parts = content.map(([key]) => keyLabel(key, content.length === 1));
+  if ((p.media ?? []).includes("read")) parts.push("media");
+  return parts.length ? parts.join(", ") : null;
 }

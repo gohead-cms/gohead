@@ -28,10 +28,10 @@ import {
 import { api } from "../../../services/api";
 import { useApiQuery } from "../../../shared/hooks/useApiQuery";
 import { errorMessage } from "../../../shared/utils/errors";
-import { ANY_TYPE, type Permissions, singletonName } from "../../auth/permissions";
+import { ANY_TYPE, type Permissions, PUBLIC_ACTIONS, singletonName } from "../../auth/permissions";
 import { loadSummaries } from "../../model/api";
 import { type MatrixValue, PermissionMatrix } from "./PermissionMatrix";
-import { type Role, roleHelp, roleNameError } from "./roles";
+import { isPublicRole, type Role, roleHelp, roleNameError } from "./roles";
 
 /** The content types a role can be given permissions on. */
 function useContentTypes() {
@@ -49,6 +49,7 @@ function toMatrix(p: Permissions | undefined): MatrixValue {
 
 /**
  * Creates (role = null), edits or shows (built-in roles, read-only) a role.
+ * The public role (anonymous requests) can only be given read permissions.
  * Mount it with a key per role so its fields start from that role.
  */
 export function RoleFormDrawer({
@@ -64,6 +65,7 @@ export function RoleFormDrawer({
 }) {
   const creating = role === null;
   const readOnly = !!role?.builtin;
+  const isPublic = !!role && isPublicRole(role);
   const [name, setName] = useState(role?.name ?? "");
   const [description, setDescription] = useState(role?.description ?? "");
   const [matrix, setMatrix] = useState<MatrixValue>(() =>
@@ -110,7 +112,7 @@ export function RoleFormDrawer({
     }
   };
 
-  const title = creating ? "New role" : readOnly ? `Role ${role.name}` : `Edit ${role.name}`;
+  const title = creating ? "New role" : readOnly ? `Role ${role.name}` : isPublic ? "Edit public access" : `Edit ${role.name}`;
 
   return (
     <Drawer isOpen={isOpen} onClose={onClose} size="xl" closeOnOverlayClick={!saving}>
@@ -122,6 +124,7 @@ export function RoleFormDrawer({
             <HStack spacing={3}>
               <Text>{title}</Text>
               {readOnly && <Badge colorScheme="purple">built-in</Badge>}
+              {isPublic && <Badge colorScheme="orange">anonymous visitors</Badge>}
             </HStack>
           </DrawerHeader>
           <DrawerBody>
@@ -138,6 +141,15 @@ export function RoleFormDrawer({
                   <AlertDescription fontSize="sm">
                     {roleHelp(role)}. Built-in roles cannot be changed or deleted: create a custom role for other needs.
                     {role.name === "admin" && " Admins also manage the content model, agents, users, tokens and settings."}
+                  </AlertDescription>
+                </Alert>
+              )}
+              {isPublic && (
+                <Alert status="warning" borderRadius="md">
+                  <AlertIcon />
+                  <AlertDescription fontSize="sm">
+                    Anything granted here is readable by anyone on the internet, without a token (published content only, never drafts).
+                    With nothing granted, API calls without a token are refused.
                   </AlertDescription>
                 </Alert>
               )}
@@ -159,7 +171,9 @@ export function RoleFormDrawer({
                       <FormHelperText>
                         {creating
                           ? "Lowercase letters, digits, - and _, starting with a letter. It cannot be changed later."
-                          : "Roles cannot be renamed: accounts and API tokens refer to them by name."}
+                          : isPublic
+                            ? "The role of requests without a token. It cannot be renamed, deleted or given to users and API tokens."
+                            : "Roles cannot be renamed: accounts and API tokens refer to them by name."}
                       </FormHelperText>
                     )}
                   </FormControl>
@@ -172,11 +186,17 @@ export function RoleFormDrawer({
 
               <FormControl as="fieldset">
                 <FormLabel as="legend">Permissions</FormLabel>
-                {!readOnly && (
+                {isPublic ? (
                   <Text fontSize="sm" color="gray.500" mb={3}>
-                    What accounts and tokens with this role may do with content. Drafts are visible to roles that can update or publish a
-                    type. The admin area (content model, agents, users, settings) stays admin-only.
+                    What anonymous visitors may read. Only read can be granted; the admin area stays admin-only.
                   </Text>
+                ) : (
+                  !readOnly && (
+                    <Text fontSize="sm" color="gray.500" mb={3}>
+                      What accounts and tokens with this role may do with content. Drafts are visible to roles that can update or publish a
+                      type. The admin area (content model, agents, users, settings) stays admin-only.
+                    </Text>
+                  )
                 )}
                 {types.error && (
                   <Alert status="warning" borderRadius="md" mb={3}>
@@ -217,6 +237,7 @@ export function RoleFormDrawer({
                     collections={types.data?.collections ?? []}
                     singletons={types.data?.singletons ?? []}
                     isReadOnly={readOnly}
+                    actions={isPublic ? PUBLIC_ACTIONS : undefined}
                   />
                 )}
               </FormControl>

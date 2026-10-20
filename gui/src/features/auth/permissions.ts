@@ -11,6 +11,8 @@ export type Action = ContentAction;
 export const COLLECTION_ACTIONS: readonly ContentAction[] = ["read", "create", "update", "delete", "publish"];
 export const SINGLETON_ACTIONS: readonly ContentAction[] = ["read", "update"];
 export const MEDIA_ACTIONS: readonly MediaAction[] = ["read", "create", "update", "delete"];
+/** The only action the public role (anonymous requests) may be given. */
+export const PUBLIC_ACTIONS: readonly ContentAction[] = ["read"];
 
 /** The permission key of every content type without its own entry. */
 export const ANY_TYPE = "*";
