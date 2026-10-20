@@ -50,7 +50,7 @@ func TestCustomRolesAdmin(t *testing.T) {
 	a := rolesFixture(t)
 
 	roles := a.ok("admin", "GET", "/admin/roles", nil).([]any)
-	require.Len(t, roles, 5)
+	require.Len(t, roles, 6, "built-in, public and custom roles")
 	assert.Equal(t, "admin", field(roles[0], "name"), "built-in roles first")
 	assert.Equal(t, true, field(roles[0], "builtin"))
 	var writer map[string]any

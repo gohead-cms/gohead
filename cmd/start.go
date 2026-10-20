@@ -264,8 +264,14 @@ func InitializeServer(cfgPath string) (*gin.Engine, *config.Config, func(), erro
 	if cfg.RateLimit.Enabled {
 		authLimit = middleware.RateLimit(authLimiter, "auth", cfg.RateLimit.AuthPerMinute, time.Minute)
 	}
+	// Requests without a token act with the public role, when it grants
+	// anything; they have their own rate limit.
+	var publicLimit gin.HandlerFunc
+	if cfg.RateLimit.Enabled {
+		publicLimit = middleware.RateLimit(authLimiter, "public", cfg.RateLimit.PublicPerMinute, time.Minute)
+	}
 	handlers.APIVersion = version
-	setupRoutes(router, authLimit, localMedia, cfg.OpenAPI)
+	setupRoutes(router, authLimit, publicLimit, localMedia, cfg.OpenAPI)
 
 	return router, &cfg, cleanup, nil
 }
@@ -312,7 +318,7 @@ func initMediaStore(cfg config.Config) (*media.Local, error) {
 	return local, nil
 }
 
-func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *media.Local, openAPI config.OpenAPIConfig) {
+func setupRoutes(router *gin.Engine, authLimit, publicLimit gin.HandlerFunc, localMedia *media.Local, openAPI config.OpenAPIConfig) {
 	// API description: the spec (public or behind a token) and Swagger UI.
 	if openAPI.Enabled {
 		if openAPI.Public {
@@ -427,21 +433,22 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, localMedia *medi
 
 	// CONTENT routes (actual data/items)
 	content := router.Group("/api")
-	content.Use(middleware.AuthMiddleware())
+	content.Use(middleware.PublicOrAuth(publicLimit))
+	signedIn := middleware.SignedInOnly()
 	{
 		content.POST("/graphql", handlers.GraphQLHandler)
 
 		// The content model, read-only, for every signed-in user (editors
 		// need it to edit content; changing it stays under /admin).
-		content.GET("/schema/collections", handlers.GetCollections)
-		content.GET("/schema/collections/:name", handlers.GetCollection)
-		content.GET("/schema/singletons", handlers.GetSingletons)
-		content.GET("/schema/singletons/:name", handlers.GetSingleton)
-		content.GET("/schema/components", handlers.GetComponents)
-		content.GET("/schema/components/:name", handlers.GetComponent)
+		content.GET("/schema/collections", signedIn, handlers.GetCollections)
+		content.GET("/schema/collections/:name", signedIn, handlers.GetCollection)
+		content.GET("/schema/singletons", signedIn, handlers.GetSingletons)
+		content.GET("/schema/singletons/:name", signedIn, handlers.GetSingleton)
+		content.GET("/schema/components", signedIn, handlers.GetComponents)
+		content.GET("/schema/components/:name", signedIn, handlers.GetComponent)
 		content.GET("/locales", handlers.ListLocales)
 		if openAPI.Enabled && !openAPI.Public {
-			content.GET("/openapi.json", handlers.OpenAPISpec)
+			content.GET("/openapi.json", signedIn, handlers.OpenAPISpec)
 		}
 
 		// Dynamic Handlers

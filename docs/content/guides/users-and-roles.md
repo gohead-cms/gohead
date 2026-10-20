@@ -63,6 +63,41 @@ Built-in roles can't be changed or deleted. Assign a custom role like any other:
 
 `GET /auth/me` returns the caller's `permissions` in this format. The built-in roles are expanded into it, so a client can show or hide actions.
 
+### Public access
+
+Requests **without a token** act with the `public` role. It grants nothing at first, so
+anonymous requests get `401`. Grant it `read` on the types your website or app shows, and
+browsers, mobile apps and static site builds can read them without a token:
+
+```bash
+curl -X PUT $GOHEAD/admin/roles/public -H "$JSON" -H "$AUTH" -d '{
+  "description": "Website visitors",
+  "permissions": {
+    "content": { "articles": ["read"], "categories": ["read"], "singleton:homepage": ["read"] },
+    "media": ["read"]
+  }
+}'
+
+curl $GOHEAD/api/collections/articles   # no Authorization header
+```
+
+In the admin UI: **Settings → Roles → Public**.
+
+- **Read only, published only.** The role can only hold `read`; visitors never see drafts,
+  history or proposals, and never write.
+- **What stays private:** related entries of types the role can't read are left out, as for
+  any role. The content model (`/api/schema/*`, `/api/openapi.json` unless
+  `openapi.public` is on), GraphQL introspection and the admin area need a token. GraphQL
+  queries work anonymously for the granted types.
+- **Rate limit:** anonymous requests are limited per client IP
+  ([`rate_limit.public_per_minute`](../getting-started/configuration.md#rate-limiting), 600 a minute).
+- A request that sends a token always acts as that token, even with public access on, and
+  a forbidden anonymous request gets `401`, so a client knows a token may help.
+- The `public` role can't be deleted or given to users and API tokens.
+
+Anything granted here is readable by anyone on the internet. For content that only your
+own servers should read, keep public access off and use an [API token](integrations.md#api-tokens).
+
 ## Registration and the first admin
 
 The first administrator never comes from the public API. Create it either way:

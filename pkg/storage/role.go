@@ -94,7 +94,32 @@ var (
 	ErrRoleExists = errors.New("a role with this name already exists")
 	// ErrBuiltinRole is returned when changing admin, editor or viewer.
 	ErrBuiltinRole = errors.New("built-in roles (admin, editor, viewer) cannot be changed")
+	// ErrPublicRole is returned when deleting the public role or giving it
+	// to an account or a token.
+	ErrPublicRole = errors.New("the public role is for anonymous requests: it cannot be deleted or given to accounts and tokens")
 )
+
+// AssignableRole returns a role that accounts and tokens may have.
+func AssignableRole(name string) (*models.UserRole, error) {
+	if auth.IsPublicRole(name) {
+		return nil, ErrPublicRole
+	}
+	return GetRoleByName(name)
+}
+
+// EnsurePublicRole creates the public role (granting nothing) when missing.
+func EnsurePublicRole() error {
+	defer invalidateRoles()
+	role := models.UserRole{Name: auth.RolePublic, Description: "Anonymous visitors (requests without a token)",
+		Permissions: permissionsMap(auth.Permissions{Content: map[string][]string{}, Media: []string{}})}
+	return database.DB.Where(models.UserRole{Name: auth.RolePublic}).Attrs(role).FirstOrCreate(&models.UserRole{}).Error
+}
+
+// PublicAccessEnabled reports whether the public role grants anything, so
+// anonymous requests are let in.
+func PublicAccessEnabled() bool {
+	return !auth.PermissionsOf(auth.RolePublic).Empty()
+}
 
 // RoleInUseError is returned when deleting a role that accounts or API
 // tokens still use.
@@ -110,19 +135,26 @@ var roleNameRe = regexp.MustCompile(`^[a-z][a-z0-9_-]{1,31}$`)
 
 // RoleView is a role with its permissions in API form.
 type RoleView struct {
-	ID          uint             `json:"id"`
-	Name        string           `json:"name"`
-	Description string           `json:"description"`
-	Builtin     bool             `json:"builtin"`
+	ID          uint   `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Builtin     bool   `json:"builtin"`
+	// Public: the role of anonymous requests (read permissions only).
+	Public      bool             `json:"public,omitempty"`
 	Permissions auth.Permissions `json:"permissions"`
 }
 
 func roleView(r models.UserRole) RoleView {
-	return RoleView{ID: r.ID, Name: r.Name, Description: r.Description, Builtin: auth.IsBuiltinRole(r.Name), Permissions: auth.PermissionsOf(r.Name)}
+	return RoleView{ID: r.ID, Name: r.Name, Description: r.Description, Builtin: auth.IsBuiltinRole(r.Name),
+		Public: auth.IsPublicRole(r.Name), Permissions: auth.PermissionsOf(r.Name)}
 }
 
-// ListRoleViews lists every role, built-in ones first.
+// ListRoleViews lists every role: built-in ones, the public role, then
+// custom roles.
 func ListRoleViews() ([]RoleView, error) {
+	if err := EnsurePublicRole(); err != nil {
+		return nil, err
+	}
 	roles, err := GetAllRoles()
 	if err != nil {
 		return nil, err
@@ -131,9 +163,18 @@ func ListRoleViews() ([]RoleView, error) {
 	for _, r := range roles {
 		out = append(out, roleView(r))
 	}
+	rank := func(v RoleView) int {
+		switch {
+		case v.Builtin:
+			return 0
+		case v.Public:
+			return 1
+		}
+		return 2
+	}
 	sort.SliceStable(out, func(i, j int) bool {
-		if out[i].Builtin != out[j].Builtin {
-			return out[i].Builtin
+		if rank(out[i]) != rank(out[j]) {
+			return rank(out[i]) < rank(out[j])
 		}
 		return out[i].Name < out[j].Name
 	})
@@ -142,6 +183,11 @@ func ListRoleViews() ([]RoleView, error) {
 
 // GetRoleView returns one role.
 func GetRoleView(name string) (*RoleView, error) {
+	if auth.IsPublicRole(name) {
+		if err := EnsurePublicRole(); err != nil {
+			return nil, err
+		}
+	}
 	var r models.UserRole
 	if err := database.DB.Where("name = ?", name).First(&r).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -212,6 +258,24 @@ func NormalizePermissions(p auth.Permissions) (auth.Permissions, error) {
 	return out, nil
 }
 
+// checkReadOnly refuses anything but read for the public role: anonymous
+// visitors never write, publish or see drafts.
+func checkReadOnly(p auth.Permissions) error {
+	for key, actions := range p.Content {
+		for _, a := range actions {
+			if !slices.Contains(auth.PublicActions, a) {
+				return fmt.Errorf("the public role can only read: '%s' on %s is not allowed", a, key)
+			}
+		}
+	}
+	for _, a := range p.Media {
+		if !slices.Contains(auth.PublicActions, a) {
+			return fmt.Errorf("the public role can only read: '%s' on media is not allowed", a)
+		}
+	}
+	return nil
+}
+
 func permissionsMap(p auth.Permissions) models.JSONMap {
 	b, _ := json.Marshal(p)
 	var m models.JSONMap
@@ -234,7 +298,7 @@ func permissionsFrom(m models.JSONMap) (auth.Permissions, bool) {
 // CreateCustomRole adds a role.
 func CreateCustomRole(name, description string, perms auth.Permissions) (*RoleView, error) {
 	defer invalidateRoles()
-	if auth.IsBuiltinRole(name) {
+	if auth.IsBuiltinRole(name) || auth.IsPublicRole(name) {
 		return nil, ErrRoleExists
 	}
 	if !roleNameRe.MatchString(name) {
@@ -273,6 +337,14 @@ func UpdateCustomRole(name, description string, perms auth.Permissions) (*RoleVi
 	if err != nil {
 		return nil, &ItemValidationError{Err: err}
 	}
+	if auth.IsPublicRole(name) {
+		if err := checkReadOnly(clean); err != nil {
+			return nil, &ItemValidationError{Err: err}
+		}
+		if err := EnsurePublicRole(); err != nil {
+			return nil, err
+		}
+	}
 	var role models.UserRole
 	if err := database.DB.Where("name = ?", name).First(&role).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -292,6 +364,9 @@ func DeleteCustomRole(name string) error {
 	defer invalidateRoles()
 	if auth.IsBuiltinRole(name) {
 		return ErrBuiltinRole
+	}
+	if auth.IsPublicRole(name) {
+		return ErrPublicRole
 	}
 	return database.DB.Transaction(func(tx *gorm.DB) error {
 		var role models.UserRole

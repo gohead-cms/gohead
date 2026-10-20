@@ -34,10 +34,10 @@ func CreateUser(c *gin.Context) {
 		input.RoleName = DefaultRegistrationRole
 	}
 
-	role, err := storage.GetRoleByName(input.RoleName)
+	role, err := storage.AssignableRole(input.RoleName)
 	if err != nil {
 		c.Set("response", "User validation failed")
-		c.Set("details", "unknown role: "+input.RoleName)
+		c.Set("details", roleProblem(err, input.RoleName))
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
@@ -166,10 +166,10 @@ func UpdateUser(c *gin.Context) {
 		updates["password"] = string(hashed)
 	}
 	if roleName != "" {
-		role, err := storage.GetRoleByName(roleName)
+		role, err := storage.AssignableRole(roleName)
 		if err != nil {
 			c.Set("response", "User updates validation failed")
-			c.Set("details", "unknown role: "+roleName)
+			c.Set("details", roleProblem(err, roleName))
 			c.Set("status", http.StatusBadRequest)
 			return
 		}
@@ -269,4 +269,12 @@ func adminCanStepDown(c *gin.Context, id uint) bool {
 		return false
 	}
 	return true
+}
+
+// roleProblem explains why a role cannot be given to an account.
+func roleProblem(err error, name string) string {
+	if errors.Is(err, storage.ErrPublicRole) {
+		return err.Error()
+	}
+	return "unknown role: " + name
 }

@@ -98,7 +98,7 @@ func roleError(c *gin.Context, err error) {
 	case errors.Is(err, storage.ErrRoleExists):
 		c.Set("response", err.Error())
 		c.Set("status", http.StatusConflict)
-	case errors.Is(err, storage.ErrBuiltinRole):
+	case errors.Is(err, storage.ErrBuiltinRole), errors.Is(err, storage.ErrPublicRole):
 		c.Set("response", err.Error())
 		c.Set("status", http.StatusConflict)
 	case errors.As(err, &inUse):

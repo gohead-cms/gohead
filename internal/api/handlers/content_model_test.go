@@ -52,7 +52,8 @@ func newContentAPI(t *testing.T) *contentAPI {
 	admin.GET("/agent-templates", ListAgentTemplates)
 	admin.POST("/agent-templates/:id/render", RenderAgentTemplate)
 
-	api := router.Group("/api", middleware.AuthMiddleware())
+	api := router.Group("/api", middleware.PublicOrAuth(nil))
+	signedIn := middleware.SignedInOnly()
 	api.Any("/collections/:collection", DynamicCollectionHandler)
 	api.Any("/collections/:collection/:id", DynamicCollectionHandler)
 	api.POST("/collections/:collection/:id/publish", PublishItem(true))
@@ -71,9 +72,9 @@ func newContentAPI(t *testing.T) *contentAPI {
 	api.POST("/proposals/:id/approve", ApproveProposal)
 	api.POST("/proposals/:id/reject", RejectProposal)
 	api.GET("/locales", ListLocales)
-	api.GET("/schema/collections", GetCollections)
-	api.GET("/schema/collections/:name", GetCollection)
-	api.GET("/schema/singletons", GetSingletons)
+	api.GET("/schema/collections", signedIn, GetCollections)
+	api.GET("/schema/collections/:name", signedIn, GetCollection)
+	api.GET("/schema/singletons", signedIn, GetSingletons)
 	api.GET("/me", Me)
 	return &contentAPI{t: t, router: router}
 }
@@ -87,9 +88,11 @@ func (a *contentAPI) do(role, method, path string, body any) (int, map[string]an
 	}
 	req := httptest.NewRequest(method, path, &buf)
 	req.Header.Set("Content-Type", "application/json")
-	token, err := auth.GenerateJWT(role+"-user", role)
-	require.NoError(a.t, err)
-	req.Header.Set("Authorization", "Bearer "+token)
+	if role != "" { // "": an anonymous request
+		token, err := auth.GenerateJWT(role+"-user", role)
+		require.NoError(a.t, err)
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 	rr := httptest.NewRecorder()
 	a.router.ServeHTTP(rr, req)
 	var out map[string]any

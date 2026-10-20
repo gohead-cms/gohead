@@ -30,6 +30,55 @@ func UserSessionOnly() gin.HandlerFunc {
 	}
 }
 
+// AnonymousKey is set in the context of requests without credentials that
+// act with the public role.
+const AnonymousKey = "anonymous"
+
+// PublicOrAuth authenticates like AuthMiddleware, except that a request
+// without an Authorization header acts with the public role when that role
+// grants anything. Anonymous requests go through limit (per client IP), and
+// a 403 they get becomes a 401 so clients know signing in may help.
+func PublicOrAuth(limit gin.HandlerFunc) gin.HandlerFunc {
+	authenticated := AuthMiddleware()
+	return func(c *gin.Context) {
+		if c.GetHeader("Authorization") != "" || !storage.PublicAccessEnabled() {
+			authenticated(c)
+			return
+		}
+		if limit != nil {
+			limit(c)
+			if c.IsAborted() {
+				return
+			}
+		}
+		c.Set("username", "")
+		c.Set("role", auth.RolePublic)
+		c.Set(AnonymousKey, true)
+		c.Header("Vary", "Authorization")
+		c.Next()
+		if c.GetInt("status") == http.StatusForbidden {
+			c.Set("status", http.StatusUnauthorized)
+			c.Set("response", "Authentication required")
+			c.Set("details", "anonymous visitors cannot do this: send a token")
+		}
+	}
+}
+
+// SignedInOnly refuses anonymous requests (public role) with 401, for
+// routes only accounts and tokens may use whatever the public role grants.
+func SignedInOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if IsAnonymous(c) {
+			abortWithError(c, http.StatusUnauthorized, "", "Authorization header required")
+			return
+		}
+		c.Next()
+	}
+}
+
+// IsAnonymous reports whether the request acts with the public role.
+func IsAnonymous(c *gin.Context) bool { return c.GetBool(AnonymousKey) }
+
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Extract the Authorization header
@@ -53,7 +102,7 @@ func AuthMiddleware() gin.HandlerFunc {
 				abortWithError(c, http.StatusUnauthorized, "InvalidTokenError", "Invalid or revoked API token")
 				return
 			}
-			if _, err := storage.GetRoleByName(tok.Role); err != nil {
+			if _, err := storage.AssignableRole(tok.Role); err != nil {
 				abortWithError(c, http.StatusForbidden, "", "Invalid role")
 				return
 			}
@@ -78,7 +127,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		if user, err := storage.GetUserByUsername(claims.Username); err == nil && user.Role.Name != "" {
 			roleName = user.Role.Name
 		}
-		role, err := storage.GetRoleByName(roleName)
+		role, err := storage.AssignableRole(roleName)
 		if err != nil {
 			logger.Log.Warnf("Role '%s' not found", roleName)
 			abortWithError(c, http.StatusForbidden, "", "Invalid role")

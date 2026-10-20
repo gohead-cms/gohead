@@ -13,6 +13,8 @@ func SeedRoles() {
 		{Name: "admin", Description: "Administrator with full access", Permissions: models.JSONMap{"manage_users": true, "manage_content": true}},
 		{Name: "editor", Description: "Editor with content management access", Permissions: models.JSONMap{"manage_content": true}},
 		{Name: "viewer", Description: "Viewer with read-only access", Permissions: models.JSONMap{"read_content": true}},
+		// Anonymous visitors: nothing until an admin grants read access.
+		{Name: "public", Description: "Anonymous visitors (requests without a token)", Permissions: models.JSONMap{"content": map[string]any{}, "media": []any{}}},
 	}
 
 	for _, role := range roles {

@@ -34,13 +34,14 @@ func TestSeedRoles(t *testing.T) {
 	var roles []models.UserRole
 	err := db.Find(&roles).Error
 	assert.NoError(t, err, "Failed to retrieve roles")
-	assert.Len(t, roles, 3, "Expected 3 default roles")
+	assert.Len(t, roles, 4, "Expected 3 default roles and the public role")
 
 	// Check specific roles
 	expectedRoles := map[string]string{
 		"admin":  "Administrator with full access",
 		"editor": "Editor with content management access",
 		"viewer": "Viewer with read-only access",
+		"public": "Anonymous visitors (requests without a token)",
 	}
 
 	for _, role := range roles {

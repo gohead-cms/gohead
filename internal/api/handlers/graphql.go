@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"regexp"
 
 	"github.com/gin-gonic/gin"
 	"github.com/graphql-go/graphql"
@@ -27,6 +28,15 @@ func GraphQLHandler(c *gin.Context) {
 		return
 	}
 
+	// The schema lists every type: anonymous callers query what the public
+	// role lets them read, without exploring the model.
+	if c.GetString("role") == auth.RolePublic && introspection.MatchString(request.Query) {
+		c.Set("response", "Authentication required")
+		c.Set("details", "introspection needs a token")
+		c.Set("status", http.StatusUnauthorized)
+		return
+	}
+
 	result := graphql.Do(graphql.Params{
 		Schema:         schema.GetSchema(),
 		RequestString:  request.Query,
@@ -45,3 +55,6 @@ func GraphQLHandler(c *gin.Context) {
 	c.Set("response", result.Data)
 	c.Set("status", http.StatusOK)
 }
+
+// introspection matches the introspection fields (__typename is fine).
+var introspection = regexp.MustCompile(`__(schema|type)\b`)
