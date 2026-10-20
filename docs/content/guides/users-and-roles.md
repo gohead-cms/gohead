@@ -80,7 +80,8 @@ curl -X PUT $GOHEAD/admin/roles/public -H "$JSON" -H "$AUTH" -d '{
 curl $GOHEAD/api/collections/articles   # no Authorization header
 ```
 
-In the admin UI: **Settings → Roles → Public**.
+In the admin UI: **Settings → Roles → Public**. In a [content model file](../frontend/model-as-code.md),
+the `public` key sets it.
 
 - **Read only, published only.** The role only holds `read`, type by type; visitors never
   see drafts, history or proposals, and never write.

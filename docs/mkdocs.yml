@@ -101,6 +101,11 @@ nav:
       - Integrations: guides/integrations.md
       - Users & roles: guides/users-and-roles.md
       - Admin UI: guides/admin-ui.md
+  - Front-end:
+      - Build a website: frontend/index.md
+      - JavaScript client: frontend/sdk.md
+      - Content models as code: frontend/model-as-code.md
+      - Next.js starter: frontend/nextjs.md
   - Agents:
       - Overview: agents/index.md
       - Triggers: agents/triggers.md

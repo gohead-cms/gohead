@@ -200,6 +200,7 @@ func SetSingletonTranslation(actor Actor, st *models.Singleton, locale string, d
 	}
 
 	var item models.SingleItem
+	changed := false
 	err = database.DB.Transaction(func(tx *gorm.DB) error {
 		if err := lockRow(tx).Where("single_type_id = ?", st.ID).First(&item).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -216,6 +217,7 @@ func SetSingletonTranslation(actor Actor, st *models.Singleton, locale string, d
 			return err
 		}
 		item.Translations = translations
+		changed = true
 		_, err := recordRevision(tx, actor, revisionInput{
 			entityType: models.RevisionEntitySingleton, entityID: st.ID, typeName: st.Name,
 			action: models.RevisionUpdate, data: item.Data, translations: item.Translations, before: before,
@@ -224,6 +226,9 @@ func SetSingletonTranslation(actor Actor, st *models.Singleton, locale string, d
 	})
 	if err != nil {
 		return nil, err
+	}
+	if changed {
+		publishSingletonEvent(actor, events.EventTypeSingletonUpdated, st.Name, &item)
 	}
 	return &item, nil
 }

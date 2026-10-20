@@ -1,0 +1,10 @@
+{
+  "name": "gohead-js",
+  "private": true,
+  "description": "JavaScript packages and starter templates of GoHead (the admin UI in gui/ is separate).",
+  "workspaces": ["sdk/client", "sdk/create", "templates/*"],
+  "scripts": {
+    "build": "npm run build -w @gohead-cms/client -w @gohead-cms/create",
+    "test": "npm test -w @gohead-cms/client -w @gohead-cms/create"
+  }
+}

@@ -122,6 +122,10 @@ func parseItemQuery(values url.Values) (storage.ItemQuery, error) {
 	for key, vals := range values {
 		m := filterParamRe.FindStringSubmatch(key)
 		if m == nil {
+			if strings.HasPrefix(key, "filters[") {
+				// e.g. filters[author][name]: ignoring it would return every item.
+				return q, fmt.Errorf("invalid filter '%s': use filters[<field>]=<value> or filters[<field>][$<op>]=<value> (relations and nested fields cannot be filtered)", key)
+			}
 			continue
 		}
 		op := m[2]

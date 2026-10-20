@@ -97,8 +97,8 @@ curl -X POST $GOHEAD/admin/webhooks -H "$JSON" -H "$AUTH" -d '{
 | Field | Meaning |
 |-------|---------|
 | `url` | `http(s)` URL to `POST` to |
-| `events` | any of `item:created`, `item:updated`, `item:deleted`, `item:published`, `item:unpublished`; empty or `["*"]` for all |
-| `collections` | collection names; empty for all |
+| `events` | any of `item:created`, `item:updated`, `item:deleted`, `item:published`, `item:unpublished`, `singleton:updated`, `singleton:deleted`; empty or `["*"]` for all |
+| `collections` | collection names, and `singleton:<name>` for single types; empty for all |
 | `format` | `json` (default) or `slack` |
 | `headers` | extra headers, e.g. `{"Authorization": "Bearer …"}`; values are never shown again |
 | `enabled` | default `true` |
@@ -167,6 +167,9 @@ function verify(req, rawBody, secret) {
   result, to check a URL, headers and signature.
 - Drafts: `item:created` and `item:updated` fire for drafts too. Subscribe to
   `item:published` / `item:unpublished` to react only to what readers see.
+- Single types: `singleton:updated` fires when a singleton's content (or a translation)
+  changes or is restored, `singleton:deleted` when it is cleared. Their `collection` is
+  `singleton:<name>` and `data` holds the content.
 
 ### Network safety
 

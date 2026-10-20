@@ -1,0 +1,217 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gohead-cms.github.io/gohead/schemas/model.json",
+  "title": "GoHead content model",
+  "description": "A content model as code, applied with `npx @gohead-cms/client model push`.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "locales": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "BCP 47 code, e.g. fr or pt-BR"
+          },
+          "name": {
+            "type": "string"
+          },
+          "default": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "components": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "attributes"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "attributes": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/attribute"
+            }
+          }
+        }
+      }
+    },
+    "collections": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "attributes"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "draftAndPublish": {
+            "type": "boolean"
+          },
+          "attributes": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/attribute"
+            }
+          }
+        }
+      }
+    },
+    "singletons": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "attributes"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "attributes": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/attribute"
+            }
+          }
+        }
+      }
+    },
+    "public": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "What anonymous visitors may read (the public role)",
+      "properties": {
+        "content": {
+          "type": "object",
+          "description": "Collection names and singleton:<name>",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "const": "read"
+            }
+          }
+        },
+        "media": {
+          "type": "array",
+          "maxItems": 0
+        }
+      }
+    }
+  },
+  "$defs": {
+    "attribute": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "string",
+            "text",
+            "richtext",
+            "email",
+            "password",
+            "uid",
+            "int",
+            "integer",
+            "float",
+            "decimal",
+            "bool",
+            "boolean",
+            "date",
+            "datetime",
+            "time",
+            "enum",
+            "enumeration",
+            "json",
+            "media",
+            "relation",
+            "component"
+          ],
+          "description": "Attribute type"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "unique": {
+          "type": "boolean"
+        },
+        "localized": {
+          "type": "boolean",
+          "description": "One value per locale"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "enum values"
+        },
+        "min": {
+          "type": "integer"
+        },
+        "max": {
+          "type": "integer"
+        },
+        "pattern": {
+          "type": "string",
+          "description": "Regular expression (text types)"
+        },
+        "target": {
+          "type": "string",
+          "description": "relation: target collection"
+        },
+        "relation": {
+          "enum": [
+            "oneToOne",
+            "oneToMany",
+            "manyToMany"
+          ],
+          "description": "oneToOne and oneToMany hold one ID; manyToMany a list"
+        },
+        "component": {
+          "type": "string",
+          "description": "component: its name"
+        },
+        "repeatable": {
+          "type": "boolean",
+          "description": "component: a list"
+        },
+        "multiple": {
+          "type": "boolean",
+          "description": "media: a list of files"
+        },
+        "allowed_types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "media: MIME patterns, e.g. image/*"
+        }
+      }
+    }
+  }
+}

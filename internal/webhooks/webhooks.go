@@ -97,11 +97,17 @@ func Fanout(ctx context.Context, client *asynq.Client, ev events.CollectionEvent
 	}
 	// Password attributes are stored as given; never send them out.
 	secret := map[string]bool{}
-	if ct, err := storage.GetCollectionByName(ev.CollectionName); err == nil {
-		for _, a := range ct.Attributes {
-			if a.Type == "password" {
-				secret[a.Name] = true
-			}
+	var attrs []models.Attribute
+	if name, ok := strings.CutPrefix(ev.CollectionName, "singleton:"); ok {
+		if st, err := storage.GetSingletonByName(name); err == nil {
+			attrs = st.Attributes
+		}
+	} else if ct, err := storage.GetCollectionByName(ev.CollectionName); err == nil {
+		attrs = ct.Attributes
+	}
+	for _, a := range attrs {
+		if a.Type == "password" {
+			secret[a.Name] = true
 		}
 	}
 	item := map[string]any{}
@@ -289,6 +295,7 @@ func Body(w models.Webhook, d Delivery) ([]byte, error) {
 var slackVerbs = map[string]string{
 	"item:created": "created", "item:updated": "updated", "item:deleted": "deleted",
 	"item:published": "published", "item:unpublished": "unpublished", EventTest: "test",
+	"singleton:updated": "updated", "singleton:deleted": "cleared",
 }
 
 // slackText summarizes an event in one line, naming the item by its
@@ -296,6 +303,13 @@ var slackVerbs = map[string]string{
 func slackText(d Delivery) string {
 	if d.Event == EventTest {
 		return "GoHead: test message from webhook delivery " + d.DeliveryID
+	}
+	if name, ok := strings.CutPrefix(d.Collection, "singleton:"); ok {
+		verb := slackVerbs[d.Event]
+		if verb == "" {
+			verb = d.Event
+		}
+		return fmt.Sprintf("GoHead: single type %s %s", name, verb)
 	}
 	label := fmt.Sprintf("#%d", d.ItemID)
 	for _, k := range []string{"title", "name", "slug", "label"} {

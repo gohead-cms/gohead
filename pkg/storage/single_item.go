@@ -1,9 +1,11 @@
 package storage
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
+	"github.com/gohead-cms/gohead/internal/agent/events"
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
@@ -50,6 +52,7 @@ func CreateSingleItem(actor Actor, st *models.Singleton, itemData map[string]any
 	}
 
 	logger.Log.WithField("Singleton", st.Name).Info("Single item created successfully")
+	publishSingletonEvent(actor, events.EventTypeSingletonUpdated, st.Name, item)
 	return item, nil
 }
 
@@ -92,6 +95,7 @@ func UpdateSingleItem(actor Actor, SingletonName string, newData map[string]any)
 	}
 
 	var item models.SingleItem
+	changed := false
 	err = database.DB.Transaction(func(tx *gorm.DB) error {
 		if err := lockRow(tx).Where("single_type_id = ?", st.ID).First(&item).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -108,6 +112,7 @@ func UpdateSingleItem(actor Actor, SingletonName string, newData map[string]any)
 		if sameData(previous, item.Data) {
 			return nil
 		}
+		changed = true
 		_, err := recordRevision(tx, actor, revisionInput{
 			entityType: models.RevisionEntitySingleton, entityID: st.ID, typeName: st.Name,
 			action: models.RevisionUpdate, data: item.Data, translations: item.Translations, before: before,
@@ -120,6 +125,9 @@ func UpdateSingleItem(actor Actor, SingletonName string, newData map[string]any)
 	}
 
 	logger.Log.WithField("Singleton", SingletonName).Info("Single item updated successfully")
+	if changed {
+		publishSingletonEvent(actor, events.EventTypeSingletonUpdated, st.Name, &item)
+	}
 	return &item, nil
 }
 
@@ -155,6 +163,7 @@ func DeleteSingleItem(actor Actor, SingletonName string) error {
 		return err
 	}
 	logger.Log.WithField("Singleton", SingletonName).Info("Single item deleted successfully")
+	publishSingletonEvent(actor, events.EventTypeSingletonDeleted, st.Name, nil)
 	return nil
 }
 
@@ -167,4 +176,24 @@ func singletonWithAttributes(name string) (*models.Singleton, error) {
 		return nil, fmt.Errorf("failed to retrieve single type: %w", err)
 	}
 	return &st, nil
+}
+
+// publishSingletonEvent sends singleton:updated or singleton:deleted
+// (webhooks), with the content (nil when deleted). The event's collection
+// is "singleton:<name>".
+func publishSingletonEvent(actor Actor, eventType events.EventType, name string, item *models.SingleItem) {
+	if asynqClient == nil {
+		return
+	}
+	payload := events.CollectionEventPayload{
+		EventType: eventType, CollectionName: "singleton:" + name,
+		ActorKind: actor.Kind, ActorName: actor.Name,
+	}
+	if item != nil {
+		payload.ItemData = item.Data
+		payload.ItemTranslations = copyTranslations(item.Translations)
+	}
+	if err := events.EnqueueCollectionEvent(context.Background(), asynqClient, payload); err != nil {
+		logger.Log.WithError(err).WithField("singleton", name).Error("Failed to enqueue a singleton event")
+	}
 }

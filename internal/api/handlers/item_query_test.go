@@ -23,7 +23,7 @@ func TestParseItemQuery(t *testing.T) {
 	}, q.Filters)
 	assert.Equal(t, []storage.ItemSort{{Field: "views", Desc: true}, {Field: "title"}}, q.Sort)
 
-	for _, bad := range []string{"page=0", "pageSize=1000", "page=abc", "sort=title:sideways", "sort=,"} {
+	for _, bad := range []string{"page=0", "pageSize=1000", "page=abc", "sort=title:sideways", "sort=,", "filters[author][name]=x", "filters[title][contains]=x", "filters[a][$eq][b]=1"} {
 		v, _ := url.ParseQuery(bad)
 		_, err := parseItemQuery(v)
 		assert.Error(t, err, bad)

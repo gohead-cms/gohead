@@ -1,0 +1,71 @@
+name: npm packages
+
+# Publishes @gohead-cms/client and @gohead-cms/create with the version of the
+# GoHead release tag (vX.Y.Z → X.Y.Z), with provenance. Publishing is on when
+# the repository variable NPM_PUBLISH is "true"; it then authenticates with
+# npm trusted publishing (OIDC, configured on npmjs.com for each package), or
+# with the NPM_TOKEN secret if set (needed for the very first publish).
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (e.g. 0.6.0); the tag's version on tag pushes"
+        required: true
+      dry_run:
+        description: "Pack without publishing"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write # npm provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Version
+        id: version
+        run: |
+          v="${{ inputs.version }}"
+          [ -z "$v" ] && v="${GITHUB_REF_NAME#v}"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          # Pre-releases (0.6.0-rc.1) go to the "next" dist-tag.
+          case "$v" in *-*) echo "tag=next" >> "$GITHUB_OUTPUT" ;; *) echo "tag=latest" >> "$GITHUB_OUTPUT" ;; esac
+
+      # Trusted publishing needs npm 11.5.1 or later.
+      - run: npm install -g npm@11
+      - run: npm ci
+      - name: Set the versions
+        run: |
+          npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --workspace @gohead-cms/client --workspace @gohead-cms/create
+          # Templates depend on the client released alongside them.
+          for f in templates/*/package.json; do
+            node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync(process.argv[1]));p.dependencies["@gohead-cms/client"]="^"+process.argv[2];fs.writeFileSync(process.argv[1],JSON.stringify(p,null,2)+"\n")' "$f" "${{ steps.version.outputs.version }}"
+          done
+      - run: npm test --workspace @gohead-cms/client --workspace @gohead-cms/create
+
+      - name: Publish
+        run: |
+          publish=false
+          if [ "${{ vars.NPM_PUBLISH }}" = "true" ] && [ "${{ inputs.dry_run }}" != "true" ]; then publish=true; fi
+          [ "$publish" = "true" ] || echo "::warning title=npm::Packing only: set the repository variable NPM_PUBLISH=true to publish."
+          for ws in @gohead-cms/client @gohead-cms/create; do
+            if [ "$publish" = "true" ]; then
+              npm publish --workspace "$ws" --access public --provenance --tag "${{ steps.version.outputs.tag }}"
+            else
+              npm publish --workspace "$ws" --access public --dry-run --tag "${{ steps.version.outputs.tag }}"
+            fi
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
