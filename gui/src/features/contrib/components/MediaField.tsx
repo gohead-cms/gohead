@@ -1,9 +1,10 @@
 import React, { useRef, useState } from "react";
-import { Box, Button, HStack, IconButton, Image, Input, Text, VStack, useToast } from "@chakra-ui/react";
-import { FiUpload, FiX, FiFile } from "react-icons/fi";
+import { Box, Button, HStack, IconButton, Image, Input, Text, VStack, useDisclosure, useToast } from "@chakra-ui/react";
+import { FiUpload, FiX, FiFile, FiImage } from "react-icons/fi";
 import { API_BASE_URL, apiFetchWithAuth } from "../../../services/api";
 import { useMe } from "../../auth/me";
 import { MEDIA } from "../../auth/permissions";
+import { MediaLibraryPicker } from "./MediaLibraryPicker";
 
 // A media value as the API returns it (populated), or a bare ID / URL.
 export interface MediaFile {
@@ -44,14 +45,17 @@ function Preview({ value, onRemove }: { value: MediaValue; onRemove: () => void 
   );
 }
 
-// MediaField uploads files to POST /api/media and stores the returned file
-// in the form; EntryFormModal sends its ID when the entry is saved.
+// MediaField uploads files to POST /api/media, or picks files already in the
+// library, and stores them in the form; saving the entry sends their IDs.
 export function MediaField({ id, value, multiple, accept, onChange }: MediaFieldProps) {
   const input = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const toast = useToast();
   // Uploading needs media create; files already set can still be removed.
-  const canUpload = useMe().can("create", MEDIA);
+  const me = useMe();
+  const canUpload = me.can("create", MEDIA);
+  const canBrowse = me.can("read", MEDIA);
+  const library = useDisclosure();
   const values: MediaValue[] = multiple ? (Array.isArray(value) ? value : []) : value ? [value as MediaValue] : [];
 
   const upload = async (files: FileList | null) => {
@@ -83,21 +87,36 @@ export function MediaField({ id, value, multiple, accept, onChange }: MediaField
       {values.map((v, i) => (
         <Preview key={i} value={v} onRemove={() => removeAt(i)} />
       ))}
-      {!canUpload && values.length === 0 && (
+      {!canUpload && !canBrowse && values.length === 0 && (
         <Text fontSize="sm" color="gray.500">
-          No file. Your role cannot upload files.
+          No file. Your role cannot upload or browse files.
         </Text>
       )}
-      {canUpload && (multiple || values.length === 0) && (
-        <Button
-          leftIcon={<FiUpload />}
-          size="sm"
-          variant="outline"
-          isLoading={uploading}
-          onClick={() => input.current?.click()}
-        >
-          {multiple ? "Add files" : "Upload a file"}
-        </Button>
+      {(multiple || values.length === 0) && (canUpload || canBrowse) && (
+        <HStack spacing={2} wrap="wrap">
+          {canUpload && (
+            <Button leftIcon={<FiUpload />} size="sm" variant="outline" isLoading={uploading} onClick={() => input.current?.click()}>
+              {multiple ? "Upload files" : "Upload a file"}
+            </Button>
+          )}
+          {canBrowse && (
+            <Button leftIcon={<FiImage />} size="sm" variant="outline" onClick={library.onOpen}>
+              Choose from library
+            </Button>
+          )}
+        </HStack>
+      )}
+      {library.isOpen && (
+        <MediaLibraryPicker
+          multiple={multiple}
+          accept={accept}
+          selected={values.map((v) => (v && typeof v === "object" ? v.id : typeof v === "number" ? v : -1))}
+          onClose={library.onClose}
+          onPick={(files) => {
+            onChange(multiple ? [...values, ...files] : (files[0] ?? null));
+            library.onClose();
+          }}
+        />
       )}
       <Input
         ref={input}

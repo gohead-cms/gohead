@@ -47,7 +47,7 @@ An expired or revoked session signs you out.
 | Page | Path | What you can do |
 |------|------|-----------------|
 | Dashboard | `/dashboard` | Counts of content, media, users, agents and webhooks; agent runs and webhook deliveries of the last 24 hours; recent changes; quick actions |
-| Content editor | `/contrib` | Browse, create, edit, publish and delete entries of every collection; edit single types; a full-page editor for long-form content; each entry's [history](content-history.md) with field-by-field diffs and restore; recently deleted entries |
+| Content editor | `/contrib` | Browse, create, edit, publish and delete entries of every collection; edit single types; every attribute type has an input (relations pick entries from a searchable list, components nest their fields and repeat, JSON is checked as you type, media come from an upload or the library); a full-page editor for long-form content; each entry's [history](content-history.md) with field-by-field diffs and restore; recently deleted entries |
 | Media library | `/media` | Upload by button or drag and drop, search and filter, edit name, alt text and caption, copy URLs, delete |
 | Types | `/model` | Create, edit and delete collections, components and single types: attributes of every type with their options (required, unique, enum values, ranges, relations, media, components), draft and publish |
 | Schema designer | `/workspace` | The saved content model as a graph: collections, relations and the agents listening to them |

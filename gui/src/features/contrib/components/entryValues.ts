@@ -17,8 +17,19 @@ export function inputType(type: string): string {
   return "text";
 }
 
+/**
+ * A field value that cannot be saved as it is (JSON that does not parse, a
+ * component with such a field): saving fails with its message.
+ */
+export class InvalidValue {
+  readonly message: string;
+  constructor(message: string) {
+    this.message = message;
+  }
+}
+
 /** A relation value as the API stores it: an ID or a list of IDs. */
-function relationIDs(value: unknown): unknown {
+export function relationIDs(value: unknown): unknown {
   const id = (v: unknown) => (v !== null && typeof v === "object" && "id" in v ? (v as { id: unknown }).id : v);
   if (value === null || value === undefined) return undefined;
   if (Array.isArray(value)) return value.map(id).filter((v) => v !== null && v !== undefined);
@@ -58,9 +69,8 @@ export function initialValues(attributes: Record<string, Attribute>, entry?: Rec
       if (SYSTEM_FIELDS.has(key) && !(key in attributes)) continue;
       const attr = attributes[key];
       if (attr?.type === "relation") {
-        // Lists populate relations as objects; the API takes their IDs back.
-        const ids = relationIDs(value);
-        if (ids !== undefined) values[key] = ids;
+        // Populated entries are kept for their labels; saving sends IDs.
+        if (value !== null && value !== undefined) values[key] = value;
         continue;
       }
       if (attr?.type === "datetime" && typeof value === "string") {
@@ -92,8 +102,14 @@ export function toItemData(attributes: Record<string, Attribute>, values: Record
   const data: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(values)) {
     const attr = attributes[key];
+    if (value instanceof InvalidValue) throw new Error(`${key}: ${value.message}`);
     // Empty means unset: the entry's data is replaced, so the field goes.
     if (value === "" || value === undefined || value === null) continue;
+    if (attr?.type === "relation") {
+      const ids = relationIDs(value);
+      if (ids !== undefined) data[key] = ids;
+      continue;
+    }
     if (attr?.type === "datetime" && typeof value === "string") {
       const d = new Date(value);
       data[key] = Number.isNaN(d.getTime()) ? value : d.toISOString();
@@ -126,7 +142,7 @@ export function toEntryPayload(attributes: Record<string, Attribute>, values: Re
 /** The required, editable fields left empty. */
 export function missingRequired(attributes: Record<string, Attribute>, values: Record<string, unknown>): string[] {
   return Object.entries(attributes)
-    .filter(([, attr]) => attr.required && attr.type !== "relation" && attr.type !== "component" && !isBooleanType(attr.type))
+    .filter(([, attr]) => attr.required && attr.type !== "component" && !isBooleanType(attr.type))
     .filter(([key]) => {
       const v = values[key];
       return v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);

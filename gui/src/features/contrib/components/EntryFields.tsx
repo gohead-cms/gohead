@@ -1,7 +1,11 @@
 import React, { type ReactNode } from "react";
-import { FormControl, FormHelperText, FormLabel, Input, Select, Switch, Textarea, VStack } from "@chakra-ui/react";
+import { FormControl, FormHelperText, FormLabel, Input, Select, Switch, Text, Textarea, VStack } from "@chakra-ui/react";
 import type { Attribute } from "../../../shared/types";
+import { ComponentField } from "./ComponentField";
+import { JsonField } from "./JsonField";
 import { MediaField, type MediaValue } from "./MediaField";
+import { RelationField } from "./RelationField";
+import { relationTarget } from "../../model/schema";
 import { inputType, isBooleanType } from "./entryValues";
 
 type ChangeHandler = (key: string, value: unknown) => void;
@@ -35,9 +39,11 @@ function FieldInput({ id, name, attr, value, onChange, placeholder = `Enter ${na
   }
   switch (attr.type) {
     case "component":
-      return (
-        <Textarea id={id} value={value === undefined || value === null ? "" : JSON.stringify(value, null, 2)} isReadOnly rows={4} fontFamily="mono" fontSize="sm" />
-      );
+      return <ComponentField id={id} attr={attr} value={value} onChange={(v) => onChange(name, v)} />;
+    case "relation":
+      return <RelationField id={id} attr={attr} value={value} onChange={(v) => onChange(name, v)} />;
+    case "json":
+      return <JsonField id={id} value={value} onChange={(v) => onChange(name, v)} />;
     case "media":
       return (
         <MediaField
@@ -70,20 +76,28 @@ interface EntryFieldsProps {
 }
 
 /**
- * One labelled input per attribute of a collection or singleton. Relations
- * are not editable here; component values are shown as they are.
+ * One labelled input per attribute of a collection, singleton or component:
+ * relations pick entries, components nest their fields, json is edited as
+ * text.
  */
 export function EntryFields({ attributes, values, onChange, idPrefix = "field-", hints, placeholders }: EntryFieldsProps) {
   return (
     <VStack spacing={6} align="stretch">
       {Object.entries(attributes).map(([key, attr]) => {
-        if (attr.type === "relation") return null;
         const id = `${idPrefix}${key}`;
         return (
           <FormControl key={key} isRequired={attr.required}>
-            <FormLabel htmlFor={id}>{key}</FormLabel>
+            <FormLabel htmlFor={id}>
+              {key}
+              {attr.type === "relation" && attr.target && (
+                <Text as="span" fontWeight="normal" color="gray.500" fontSize="sm">
+                  {" "}
+                  → {relationTarget(attr.target)}
+                  {attr.relation === "manyToMany" ? " (several)" : ""}
+                </Text>
+              )}
+            </FormLabel>
             <FieldInput id={id} name={key} attr={attr} value={values[key]} onChange={onChange} placeholder={placeholders?.[key]} />
-            {attr.type === "component" && <FormHelperText>Component fields are edited through the API.</FormHelperText>}
             {hints?.[key] && <FormHelperText>{hints[key]}</FormHelperText>}
           </FormControl>
         );

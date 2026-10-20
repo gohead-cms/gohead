@@ -16,6 +16,7 @@ import {
 } from "@chakra-ui/react";
 import { FiClock } from "react-icons/fi";
 import { getJSON, useApiQuery } from "../../../shared/hooks/useApiQuery";
+import { useNotify } from "../../../shared/hooks/useNotify";
 import { type Locale, localeLabel } from "../../../shared/hooks/useLocales";
 import type { Schema } from "../../../shared/types";
 import { PageLoader } from "../../../shared/ui/page-loader";
@@ -205,6 +206,7 @@ function DefaultLocaleEntry(props: DefaultLocaleEntryProps) {
 function DefaultLocaleForm({ schema, item, entry, onSubmit, onClose, draftOnly, start, cancel, onEdit }: DefaultLocaleEntryProps & { entry: ContentItem | null }) {
   const [formData, setFormData] = useState<Record<string, unknown>>(() => initialValues(schema.attributes, entry));
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const notify = useNotify();
 
   const handleChange = (key: string, value: unknown) => {
     onEdit();
@@ -212,9 +214,16 @@ function DefaultLocaleForm({ schema, item, entry, onSubmit, onClose, draftOnly, 
   };
 
   const handleSubmit = async () => {
+    let data: Record<string, unknown>;
+    try {
+      data = toEntryPayload(schema.attributes, formData);
+    } catch (err) {
+      notify.failure(err, "Fix the entry before saving");
+      return;
+    }
     setIsSubmitting(true);
     try {
-      await onSubmit({ data: toEntryPayload(schema.attributes, formData) as Partial<ContentItem> }, item?.id);
+      await onSubmit({ data: data as Partial<ContentItem> }, item?.id);
       onClose();
     } catch {
       // The parent shows the error.
