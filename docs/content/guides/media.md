@@ -172,13 +172,20 @@ permanent: `public_url` + key.
 Objects are stored with their detected `Content-Type`, and types that are not safe to display
 inline get `Content-Disposition: attachment`.
 
-The provided `docker-compose.yml` runs MinIO with a public `gohead` bucket, so uploads work
-out of the box at `http://localhost:9000/gohead/…`.
+The provided `docker-compose.yml` keeps uploads on local disk (the `gohead-data` volume),
+served by the API under `http://localhost:8080/uploads/…`. To use a bucket, set
+`GOHEAD_MEDIA_DRIVER=s3` and the `GOHEAD_MEDIA_S3_*` variables (in a `.env` file next to it).
+
+!!! note "MinIO images"
+    MinIO no longer publishes community images (`minio/minio` and `minio/mc` were removed
+    from Docker Hub in September 2026). For a self-hosted S3-compatible store, use
+    [Garage](https://garagehq.deuxfleurs.fr/), [SeaweedFS](https://github.com/seaweedfs/seaweedfs)
+    or an existing MinIO you already run.
 
 !!! note "Changing driver"
     Records keep their keys. To move from local disk to S3, copy the `uploads` directory
     into the bucket (under `prefix`, if set) with the same paths before switching.
 
 !!! tip "Cloudflare R2 and others"
-    R2: `endpoint: https://<account>.r2.cloudflarestorage.com`, `region: auto`. MinIO,
-    Garage, SeaweedFS and Ceph: set `path_style: true`.
+    R2: `endpoint: https://<account>.r2.cloudflarestorage.com`, `region: auto`. Garage,
+    SeaweedFS, Ceph and MinIO: set `path_style: true`.

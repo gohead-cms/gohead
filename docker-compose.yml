@@ -1,11 +1,12 @@
-# GoHead full stack: API, background workers, admin UI, PostgreSQL, Redis
-# and MinIO (S3-compatible storage for uploads).
+# GoHead full stack: API, background workers, admin UI, PostgreSQL and Redis.
 #
 #   docker compose up -d            # pull published images
 #   docker compose up -d --build    # build from this checkout
 #
 # API: http://localhost:8080   Admin UI: http://localhost:3000
-# Uploaded files: http://localhost:9000/gohead/…  MinIO console: http://localhost:9001
+# Uploaded files are kept in the gohead-data volume and served by the API
+# under http://localhost:8080/uploads/…; to use an S3-compatible bucket
+# instead, set the GOHEAD_MEDIA_* variables (see docs/content/guides/media.md).
 # Set GOHEAD_JWT_SECRET (e.g. in a .env file) before exposing it anywhere.
 
 x-gohead-env: &gohead-env
@@ -18,15 +19,16 @@ x-gohead-env: &gohead-env
   GOHEAD_ADMIN_EMAIL: ${GOHEAD_ADMIN_EMAIL:-admin@example.com}
   GOHEAD_ADMIN_PASSWORD: ${GOHEAD_ADMIN_PASSWORD:-}
   GOHEAD_LOG_LEVEL: ${GOHEAD_LOG_LEVEL:-info}
-  # Uploads go to the MinIO bucket below; files are served from its public URL.
-  GOHEAD_MEDIA_DRIVER: s3
-  GOHEAD_MEDIA_S3_ENDPOINT: http://minio:9000
-  GOHEAD_MEDIA_S3_BUCKET: gohead
-  GOHEAD_MEDIA_S3_REGION: us-east-1
-  GOHEAD_MEDIA_S3_PATH_STYLE: "true"
-  GOHEAD_MEDIA_S3_ACCESS_KEY: ${MINIO_ROOT_USER:-gohead}
-  GOHEAD_MEDIA_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-gohead-minio-secret}
-  GOHEAD_MEDIA_PUBLIC_URL: ${GOHEAD_PUBLIC_MEDIA_URL:-http://localhost:9000/gohead}
+  # Uploads: local disk (the gohead-data volume of the API) unless you
+  # set GOHEAD_MEDIA_DRIVER=s3 and the GOHEAD_MEDIA_S3_* variables.
+  GOHEAD_MEDIA_DRIVER: ${GOHEAD_MEDIA_DRIVER:-local}
+  GOHEAD_MEDIA_S3_ENDPOINT: ${GOHEAD_MEDIA_S3_ENDPOINT:-}
+  GOHEAD_MEDIA_S3_BUCKET: ${GOHEAD_MEDIA_S3_BUCKET:-}
+  GOHEAD_MEDIA_S3_REGION: ${GOHEAD_MEDIA_S3_REGION:-}
+  GOHEAD_MEDIA_S3_PATH_STYLE: ${GOHEAD_MEDIA_S3_PATH_STYLE:-false}
+  GOHEAD_MEDIA_S3_ACCESS_KEY: ${GOHEAD_MEDIA_S3_ACCESS_KEY:-}
+  GOHEAD_MEDIA_S3_SECRET_KEY: ${GOHEAD_MEDIA_S3_SECRET_KEY:-}
+  GOHEAD_MEDIA_PUBLIC_URL: ${GOHEAD_MEDIA_PUBLIC_URL:-}
   # Needed by agents that use OpenAI (or set api_key per agent).
   OPENAI_API_KEY: ${OPENAI_API_KEY:-}
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
@@ -49,13 +51,8 @@ services:
     command: ["start", "--config", "/app/config.yaml"]
     ports:
       - "8080:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      minio-setup:
-        condition: service_completed_successfully
+    volumes:
+      - gohead-data:/data # uploads (local media driver)
 
   worker:
     <<: *gohead
@@ -108,44 +105,7 @@ services:
       retries: 20
     restart: unless-stopped
 
-  minio:
-    image: minio/minio:latest
-    command: ["server", "/data", "--console-address", ":9001"]
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-gohead}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-gohead-minio-secret}
-    # Published on localhost only: the root credentials above are defaults.
-    ports:
-      - "127.0.0.1:9000:9000"
-      - "127.0.0.1:9001:9001"
-    volumes:
-      - minio-data:/data
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-    restart: unless-stopped
-
-  # Creates the bucket and lets anyone download a file whose URL they have
-  # (like media URLs on a CDN), without listing the bucket. Runs once.
-  minio-setup:
-    image: minio/mc:latest
-    depends_on:
-      minio:
-        condition: service_healthy
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-gohead}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-gohead-minio-secret}
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - >
-        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" &&
-        mc mb --ignore-existing local/gohead &&
-        printf '%s' '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":["*"]},"Action":["s3:GetObject"],"Resource":["arn:aws:s3:::gohead/*"]}]}' > /tmp/policy.json &&
-        mc anonymous set-json /tmp/policy.json local/gohead
-
 volumes:
   postgres-data:
   redis-data:
-  minio-data:
+  gohead-data:

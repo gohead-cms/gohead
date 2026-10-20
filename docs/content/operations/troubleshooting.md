@@ -4,6 +4,8 @@
 
 | Log message | Fix |
 |-------------|-----|
+| `docker compose pull`: `Head "https://ghcr.io/v2/gohead-cms/…": unauthorized` | The images are private on GHCR. Maintainers: set the `gohead`, `gohead-admin` and `charts/gohead` packages to public (package settings → *Change visibility*). Meanwhile, build locally: `docker compose up -d --build`. |
+| `pull access denied for minio/minio` | MinIO no longer publishes images. Update `docker-compose.yml` (uploads now use local disk by default), or point `GOHEAD_MEDIA_S3_*` at another S3-compatible store. |
 | `failed to connect to database` | Check `GOHEAD_DATABASE_URL` and that the database accepts connections. |
 | `Binary was compiled with 'CGO_ENABLED=0', go-sqlite3 requires cgo` | You are using a release binary with SQLite. Use PostgreSQL/MySQL, the container image, or `make build`. |
 | `failed to read config file` | The file exists but is invalid YAML. A missing file is fine. |

@@ -42,7 +42,7 @@ permissions as a human.
 | 📝 **Editorial workflow** | Draft and publish per collection, reusable (and repeatable) components, one flat JSON shape for every item. |
 | 🧑‍💻 **Front-end ready** | A typed [JavaScript client](sdk/client), generated TypeScript types, content models as code, public read access, and a [Next.js starter](templates/nextjs-blog): `npm create @gohead-cms@latest`. |
 | 🔌 **Integrations** | Long-lived scoped API tokens, an OpenAPI 3.1 spec with Swagger UI for typed clients, and signed outbound webhooks for Slack, Zapier or site rebuilds. |
-| 🖼️ **Media built in** | Upload images, video and documents; store them on disk or in any S3-compatible bucket (S3, MinIO, R2); reference them from content. |
+| 🖼️ **Media built in** | Upload images, video and documents; store them on disk or in any S3-compatible bucket (S3, R2, Garage…); reference them from content. |
 | 🔎 **Real querying** | Filters (`$eq $ne $lt $gte $contains`…), multi-key sort, pagination, relation population, batch writes in one transaction. |
 | 🔐 **Secure by default** | Roles enforced identically in REST and GraphQL, schema-validated writes, masked secrets, signed images, distroless containers. |
 | 🪶 **One binary** | API, worker, dispatcher and scheduler in one Go binary. SQLite on your laptop, PostgreSQL or MySQL in production. |
@@ -71,7 +71,7 @@ See [Build a website](https://gohead-cms.github.io/gohead/frontend/).
 git clone https://github.com/gohead-cms/gohead.git && cd gohead
 printf 'GOHEAD_JWT_SECRET=%s\nGOHEAD_ADMIN_USERNAME=admin\nGOHEAD_ADMIN_PASSWORD=%s\n' \
   "$(openssl rand -hex 32)" "$(openssl rand -hex 12)" > .env
-docker compose up -d        # API :8080 · admin UI :3000 · Postgres · Redis · MinIO · workers
+docker compose up -d        # API :8080 · admin UI :3000 · Postgres · Redis · workers
 export ADMIN_PASSWORD=$(sed -n 's/^GOHEAD_ADMIN_PASSWORD=//p' .env)
 ```
 
