@@ -32,8 +32,20 @@ func TestPublicRole(t *testing.T) {
 		code, out := a.do("admin", "PUT", "/admin/roles/public", map[string]any{"permissions": map[string]any{"content": map[string]any{"articles": []string{"read", "create"}}}})
 		assert.Equal(t, http.StatusBadRequest, code)
 		assert.Contains(t, a.errMsg(out), "can only read")
-		code, _ = a.do("admin", "PUT", "/admin/roles/public", map[string]any{"permissions": map[string]any{"media": []string{"read", "create"}}})
+		for _, refused := range []map[string]any{
+			{"media": []string{"read"}},
+			{"content": map[string]any{"*": []string{"read"}}},
+		} {
+			code, out = a.do("admin", "PUT", "/admin/roles/public", map[string]any{"permissions": refused})
+			assert.Equal(t, http.StatusBadRequest, code, "%v → %v", refused, out)
+		}
+		a.ok("admin", "POST", "/admin/collections", map[string]any{
+			"name": "accounts", "kind": "collection",
+			"attributes": map[string]any{"login": map[string]any{"type": "string"}, "secret": map[string]any{"type": "password"}},
+		})
+		code, out = a.do("admin", "PUT", "/admin/roles/public", map[string]any{"permissions": map[string]any{"content": map[string]any{"accounts": []string{"read"}}}})
 		assert.Equal(t, http.StatusBadRequest, code)
+		assert.Contains(t, a.errMsg(out), "password")
 		code, _ = a.do("admin", "DELETE", "/admin/roles/public", nil)
 		assert.Equal(t, http.StatusConflict, code)
 		code, _ = a.do("admin", "POST", "/admin/roles", map[string]any{"name": "public"})
@@ -69,6 +81,18 @@ func TestPublicRole(t *testing.T) {
 		a.ok("", "GET", fmt.Sprintf("/api/collections/articles/%v", live["id"]), nil)
 		assert.Equal(t, "Welcome", field(a.ok("", "GET", "/api/singleton/homepage", nil), "headline"))
 		a.ok("", "GET", "/api/locales", nil)
+
+		// Deep population is capped for visitors.
+		deep := a.ok("", "GET", fmt.Sprintf("/api/collections/articles/%v?level=5", live["id"]), nil)
+		assert.NotNil(t, deep)
+	})
+
+	t.Run("a type that gains a password attribute is closed again", func(t *testing.T) {
+		a.ok("admin", "PUT", "/admin/singleton/homepage", map[string]any{
+			"name": "homepage", "attributes": map[string]any{"headline": map[string]any{"type": "string"}, "pin": map[string]any{"type": "password"}},
+		})
+		code, _ := a.do("", "GET", "/api/singleton/homepage", nil)
+		assert.Equal(t, http.StatusUnauthorized, code)
 	})
 
 	t.Run("everything else needs a token", func(t *testing.T) {
@@ -81,11 +105,26 @@ func TestPublicRole(t *testing.T) {
 			{"GET", "/api/schema/collections"},
 			{"GET", "/api/revisions"},
 			{"GET", "/admin/roles"},
+			{"GET", "/api/collections/does-not-exist"},
+			{"GET", "/api/singleton/does-not-exist"},
 		} {
 			code, out := a.do("", r.method, r.path, map[string]any{"data": map[string]any{"title": "x"}})
 			assert.Equal(t, http.StatusUnauthorized, code, "%s %s → %v", r.method, r.path, out)
 		}
 	})
+}
+
+func TestAnonymousQueryShape(t *testing.T) {
+	depth, fields, queries, err := queryShape(`query { articles { title author { name avatar { url } } } }`)
+	require.NoError(t, err)
+	assert.Equal(t, []any{4, 6, true}, []any{depth, fields, queries})
+	depth, _, _, err = queryShape(`{ a { ...F } } fragment F on A { b { ...G } } fragment G on B { c { d } }`)
+	require.NoError(t, err)
+	assert.Equal(t, 4, depth, "fragments count")
+	_, _, _, err = queryShape(`{ a { ...F } } fragment F on A { b { ...F } }`)
+	require.NoError(t, err, "fragment cycles do not loop")
+	_, _, queries, _ = queryShape(`mutation { createarticles(data: {}) { id } }`)
+	assert.False(t, queries)
 }
 
 func TestIntrospectionPattern(t *testing.T) {

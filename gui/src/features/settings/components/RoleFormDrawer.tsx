@@ -188,7 +188,8 @@ export function RoleFormDrawer({
                 <FormLabel as="legend">Permissions</FormLabel>
                 {isPublic ? (
                   <Text fontSize="sm" color="gray.500" mb={3}>
-                    What anonymous visitors may read. Only read can be granted; the admin area stays admin-only.
+                    The types anonymous visitors may read, one by one. Files used by that content are returned with it; the media library
+                    itself, types with password attributes and the admin area stay private.
                   </Text>
                 ) : (
                   !readOnly && (
@@ -238,6 +239,7 @@ export function RoleFormDrawer({
                     singletons={types.data?.singletons ?? []}
                     isReadOnly={readOnly}
                     actions={isPublic ? PUBLIC_ACTIONS : undefined}
+                    explicitOnly={isPublic}
                   />
                 )}
               </FormControl>

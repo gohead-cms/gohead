@@ -72,6 +72,7 @@ export function PermissionMatrix({
   singletons,
   isReadOnly,
   actions: columns = COLLECTION_ACTIONS,
+  explicitOnly = false,
 }: {
   value: MatrixValue;
   onChange: (v: MatrixValue) => void;
@@ -79,12 +80,14 @@ export function PermissionMatrix({
   singletons: string[];
   isReadOnly?: boolean;
   actions?: readonly ContentAction[];
+  /** Only per-type rows: no "all other types" row and no media library (the public role). */
+  explicitOnly?: boolean;
 }) {
   const fits = (actions: readonly string[]) => actions.every((a) => (columns as readonly string[]).includes(a));
   const presets = PRESETS.filter((p) => fits(p.collection) && fits(p.singleton));
   const mediaPresets = MEDIA_PRESETS.filter((p) => fits(p.actions));
   const mediaActions = applicable("media", columns);
-  const anyActions = value.content[ANY_TYPE] ?? [];
+  const anyActions = explicitOnly ? [] : (value.content[ANY_TYPE] ?? []);
   const rows: Row[] = [
     ...collections.map((c): Row => ({ key: c, label: c, kind: "collection" })),
     ...singletons.map((s): Row => ({ key: singletonResource(s), label: s, kind: "singleton" })),
@@ -169,7 +172,7 @@ export function PermissionMatrix({
                 {row.kind !== "any" && (
                   <>
                     <MenuDivider />
-                    <MenuItem isDisabled={isInherited} onClick={() => setRow(row.key, undefined)}>
+                    <MenuItem isDisabled={isInherited || explicitOnly} onClick={() => setRow(row.key, undefined)}>
                       Same as all other types
                     </MenuItem>
                   </>
@@ -218,11 +221,13 @@ export function PermissionMatrix({
             </Tr>
           </Thead>
           <Tbody>
-            {renderRow(anyRow)}
+            {!explicitOnly && renderRow(anyRow)}
             {collectionRows.length > 0 && section("Collections")}
             {collectionRows.map(renderRow)}
             {singletonRows.length > 0 && section("Single types", "read and update only")}
             {singletonRows.map(renderRow)}
+            {!explicitOnly && (
+              <>
             {section("Media library")}
             <Tr data-testid="perm-row-media">
               <Td>
@@ -265,6 +270,8 @@ export function PermissionMatrix({
                 </Td>
               )}
             </Tr>
+              </>
+            )}
           </Tbody>
         </Table>
       </TableContainer>

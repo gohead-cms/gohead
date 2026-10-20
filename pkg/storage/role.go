@@ -258,22 +258,119 @@ func NormalizePermissions(p auth.Permissions) (auth.Permissions, error) {
 	return out, nil
 }
 
-// checkReadOnly refuses anything but read for the public role: anonymous
-// visitors never write, publish or see drafts.
-func checkReadOnly(p auth.Permissions) error {
+// checkPublicPermissions refuses what anonymous visitors may not have:
+// anything but read, "*" (types created later would become public), the
+// media library (files used by readable content are returned with it), and
+// types with password attributes (their values are returned as stored).
+func checkPublicPermissions(p auth.Permissions) error {
+	secret, err := typesWithPasswords()
+	if err != nil {
+		return err
+	}
 	for key, actions := range p.Content {
+		if len(actions) == 0 {
+			continue
+		}
+		if key == auth.AnyType {
+			return errors.New("the public role lists the types it may read: \"*\" would make every type created later public")
+		}
+		if secret[key] {
+			return fmt.Errorf("%s has password attributes: it cannot be public", key)
+		}
 		for _, a := range actions {
 			if !slices.Contains(auth.PublicActions, a) {
 				return fmt.Errorf("the public role can only read: '%s' on %s is not allowed", a, key)
 			}
 		}
 	}
-	for _, a := range p.Media {
-		if !slices.Contains(auth.PublicActions, a) {
-			return fmt.Errorf("the public role can only read: '%s' on media is not allowed", a)
-		}
+	if len(p.Media) > 0 {
+		return errors.New("the public role cannot browse the media library: files used by public content are returned with it")
 	}
 	return nil
+}
+
+// publicView keeps, from the public role's stored permissions, what
+// anonymous visitors may have now (a type that gained a password attribute
+// since it was opened is closed again).
+func publicView(p auth.Permissions) auth.Permissions {
+	secret, err := typesWithPasswords()
+	out := auth.Permissions{Content: map[string][]string{}, Media: []string{}}
+	if err != nil {
+		return out // fail closed
+	}
+	for key, actions := range p.Content {
+		if key == auth.AnyType || secret[key] || !slices.Contains(actions, auth.ActionRead) {
+			continue
+		}
+		out.Content[key] = []string{auth.ActionRead}
+	}
+	return out
+}
+
+type attrRef struct{ Type, ComponentRef string }
+
+func attrRefs(attrs []models.Attribute) []attrRef {
+	out := make([]attrRef, len(attrs))
+	for i, a := range attrs {
+		out[i] = attrRef{a.Type, a.ComponentRef}
+	}
+	return out
+}
+
+func componentRefs(c models.Component) []attrRef {
+	out := make([]attrRef, len(c.Attributes))
+	for i, a := range c.Attributes {
+		out[i] = attrRef{a.Type, a.ComponentRef}
+	}
+	return out
+}
+
+// typesWithPasswords lists the content types (permission keys) with a
+// password attribute, directly or in a component.
+func typesWithPasswords() (map[string]bool, error) {
+	components, err := GetAllComponents()
+	if err != nil {
+		return nil, err
+	}
+	byName := map[string]models.Component{}
+	for _, c := range components {
+		byName[c.Name] = c
+	}
+	var hasPassword func(attrs []attrRef, seen map[string]bool) bool
+	hasPassword = func(attrs []attrRef, seen map[string]bool) bool {
+		for _, a := range attrs {
+			if a.Type == "password" {
+				return true
+			}
+			if a.Type == "component" && !seen[a.ComponentRef] {
+				seen[a.ComponentRef] = true
+				if c, ok := byName[a.ComponentRef]; ok && hasPassword(componentRefs(c), seen) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	out := map[string]bool{}
+	collections, _, err := GetAllCollections(nil, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range collections {
+		if hasPassword(attrRefs(c.Attributes), map[string]bool{}) {
+			out[c.Name] = true
+		}
+	}
+	singletons, err := GetAllSingletons()
+	if err != nil {
+		return nil, err
+	}
+	for _, s := range singletons {
+		if hasPassword(attrRefs(s.Attributes), map[string]bool{}) {
+			out[auth.SingletonResource(s.Name)] = true
+		}
+	}
+	return out, nil
 }
 
 func permissionsMap(p auth.Permissions) models.JSONMap {
@@ -338,7 +435,7 @@ func UpdateCustomRole(name, description string, perms auth.Permissions) (*RoleVi
 		return nil, &ItemValidationError{Err: err}
 	}
 	if auth.IsPublicRole(name) {
-		if err := checkReadOnly(clean); err != nil {
+		if err := checkPublicPermissions(clean); err != nil {
 			return nil, &ItemValidationError{Err: err}
 		}
 		if err := EnsurePublicRole(); err != nil {
@@ -426,6 +523,9 @@ func lookupRole(name string) (auth.Permissions, bool) {
 		snap := &roleSnapshot{db: database.DB, at: time.Now(), roles: map[string]auth.Permissions{}}
 		for _, r := range roles {
 			if p, ok := permissionsFrom(r.Permissions); ok {
+				if auth.IsPublicRole(r.Name) {
+					p = publicView(p)
+				}
 				snap.roles[r.Name] = p
 			}
 		}

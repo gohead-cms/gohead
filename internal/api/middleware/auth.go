@@ -3,6 +3,7 @@ package middleware
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gohead-cms/gohead/internal/models"
@@ -54,9 +55,14 @@ func PublicOrAuth(limit gin.HandlerFunc) gin.HandlerFunc {
 		c.Set("username", "")
 		c.Set("role", auth.RolePublic)
 		c.Set(AnonymousKey, true)
-		c.Header("Vary", "Authorization")
+		c.Writer.Header().Add("Vary", "Authorization")
+		capLevel(c)
 		c.Next()
-		if c.GetInt("status") == http.StatusForbidden {
+		status := c.GetInt("status")
+		// Forbidden, or a type that does not exist: the same answer, so
+		// visitors cannot list the content model.
+		unknownType := status == http.StatusNotFound && typeNotFound[c.GetString("response")]
+		if status == http.StatusForbidden || unknownType {
 			c.Set("status", http.StatusUnauthorized)
 			c.Set("response", "Authentication required")
 			c.Set("details", "anonymous visitors cannot do this: send a token")
@@ -73,6 +79,26 @@ func SignedInOnly() gin.HandlerFunc {
 			return
 		}
 		c.Next()
+	}
+}
+
+// MaxAnonymousLevel is the deepest relation population anonymous requests
+// get: each level multiplies the work.
+const MaxAnonymousLevel = 2
+
+// typeNotFound are the answers for unknown collections and singletons.
+var typeNotFound = map[string]bool{"Collection not found": true, "Singleton not found": true, "Single type not found": true}
+
+// capLevel lowers ?level= to MaxAnonymousLevel.
+func capLevel(c *gin.Context) {
+	q := c.Request.URL.Query()
+	v := q.Get("level")
+	if v == "" {
+		return
+	}
+	if n, err := strconv.Atoi(v); err == nil && n > MaxAnonymousLevel {
+		q.Set("level", strconv.Itoa(MaxAnonymousLevel))
+		c.Request.URL.RawQuery = q.Encode()
 	}
 }
 
