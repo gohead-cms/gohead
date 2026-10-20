@@ -68,7 +68,31 @@ migrations are explicit, reviewed steps; contributors add them in `pkg/migration
 
 ## Version notes
 
-### Unreleased
+### 0.6.0
+
+!!! warning "Breaking changes"
+    - **The admin UI is served by the API.** Binaries and the `gohead` image include it, and
+      `gohead start` serves it at `/`. `GET` requests to other paths outside the API (`/api`,
+      `/admin`, `/auth`, `/uploads`, `/_health`, `/_metrics`) now return the UI instead of
+      `404`. To keep an API-only host (the UI served by `gohead-admin`, say), set
+      `ui.enabled: false` (`GOHEAD_UI_ENABLED=false`).
+    - **SQLite uses a pure-Go driver.** Existing databases open as they are (same time format)
+      and are switched to WAL mode: back up the `-wal` and `-shm` files with the database, or
+      use `sqlite3 gohead.db ".backup …"`. Parameters of the former driver in `sqlite://` URLs
+      (`_busy_timeout`, `_foreign_keys`, `_loc`…) are ignored: use
+      `?_pragma=busy_timeout(5000)`-style parameters.
+
+Migration `0006_jobs` adds the `jobs` table of the [database job queue](standalone.md#how-the-job-queue-works-without-redis).
+Nothing changes for installs on Redis: `redis` stays the default queue of `gohead start`,
+`worker`, `dispatcher` and `scheduler`.
+
+The `gohead` image is now static (`distroless/static`, no cgo); it still runs as user
+`65532` with data in `/data`. An agent is no longer triggered by content events caused by
+its own changes.
+
+To move a small install to [`gohead standalone`](standalone.md): stop the API, worker,
+dispatcher and scheduler, let Redis's queues drain first, then run `gohead standalone` with
+the same configuration and `queue.driver: database`.
 
 Migration `0004_agent_reviews` adds the `proposals` table and two columns (`agents.require_approval`,
 `agent_runs.dry_run`). Existing agents keep writing directly. Nothing to do.

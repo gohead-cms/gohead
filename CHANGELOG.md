@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-20
+
+### Breaking changes
+- `gohead start` serves the admin UI at `/`: `GET` requests outside the API paths return the UI instead of `404` (`ui.enabled: false` turns it off).
+- SQLite URL parameters of the former cgo driver (`_busy_timeout`, `_foreign_keys`, `_loc`…) are ignored; use `_pragma=…` parameters. See the [upgrade guide](https://gohead-cms.github.io/gohead/operations/upgrading/).
+
 ### Fixed
 - `docker compose` no longer depends on MinIO images, which MinIO stopped publishing: uploads are kept on local disk (the `gohead-data` volume) by default, and any S3-compatible bucket can be set with `GOHEAD_MEDIA_*` variables.
 
@@ -28,7 +34,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ### Changed
 - An agent is no longer triggered by content events caused by its own changes.
 - **SQLite is pure Go** (no cgo): release binaries can use SQLite, and the image is static. Existing databases keep working (same time format); they are switched to WAL mode on first open, with a busy timeout and transactions that wait for the write lock (no more `database is locked` errors under concurrent writes). Settings of the old driver in `sqlite://` URLs (`_busy_timeout`, `_foreign_keys`, `_loc`…) are ignored: use `_pragma=busy_timeout(5000)`-style parameters.
-- `gohead start` serves the admin UI at `/` when the binary includes it: other `GET` paths outside the API (`/api`, `/admin`, `/auth`, `/uploads`) now return the UI instead of `404`. Set `ui.enabled: false` (`GOHEAD_UI_ENABLED=false`) to keep an API-only host.
 - The container image is built without cgo on `distroless/static`, cross-compiled for each platform.
 
 ## [0.5.0] - 2026-10-19
