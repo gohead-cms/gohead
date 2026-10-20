@@ -69,7 +69,9 @@ type Attr<S> = S extends { attributes: infer A extends object } ? A : Record<str
 type In<S> = S extends { input: infer I extends object } ? I : Record<string, unknown>;
 
 function trimSlash(url: string): string {
-  return url.replace(/\/+$/, "");
+  let end = url.length;
+  while (end > 0 && url[end - 1] === "/") end--;
+  return url.slice(0, end);
 }
 
 function mergeInit(a: RequestInit | undefined, b: RequestInit | undefined): RequestInit {

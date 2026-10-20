@@ -314,6 +314,7 @@ jobs:
       - name: Client (build, types, unit tests)
         run: |
           npm run build --workspace @gohead-cms/client
+          npm rebuild @gohead-cms/client # link the gohead-client bin, built just now
           npm run typecheck --workspace @gohead-cms/client
           npm test --workspace @gohead-cms/client
           npm test --workspace @gohead-cms/create
