@@ -112,7 +112,7 @@ Article, category and author pages are built statically; the home page renders o
 Good to know:
 
 - Singleton changes (`site`, `homepage`) arrive as `singleton:updated` events, for the `singleton:<name>` cache tags.
-- Webhooks are delivered by GoHead’s `worker` and `dispatcher` processes, which need Redis. The provided `docker-compose.yml` runs both.
+- Webhooks are delivered by GoHead’s `worker` and `dispatcher` processes. The provided `docker-compose.yml` runs both; `gohead standalone` runs them in the API process, without Redis.
 - GoHead refuses webhook URLs on private and loopback addresses unless `webhooks.allow_private_networks` is on (`GOHEAD_WEBHOOKS_ALLOW_PRIVATE_NETWORKS=true`). The provided `docker-compose.yml` turns it on, so in development you can point a webhook at `http://host.docker.internal:3000/api/revalidate`. Keep it off in production.
 - `npm run dev` never caches, so revalidation is only visible with `npm run build && npm start`.
 

@@ -37,7 +37,7 @@ flowchart TB
 | Worker | stateless, 10 concurrent jobs per process | horizontal |
 | Scheduler | in-memory schedule | **one replica** |
 | Database | all content, schema, users, agents, agent history | your database's HA |
-| Redis | queues (events, agent jobs), schema-change broadcast, rate-limit counters | Redis HA / managed Redis |
+| Redis | queues (events, agent jobs, webhook deliveries), schema-change broadcast, rate-limit counters | Redis HA / managed Redis |
 | Media store | uploaded files (local directory or S3-compatible bucket) | your object store's HA |
 
 ## Request path
@@ -46,13 +46,24 @@ flowchart TB
    role check, response envelope.
 2. Handlers validate input against the collection schema and write through the storage layer
    (GORM), inside transactions where several rows change.
-3. After commit, the storage layer publishes an event to Redis.
+3. After commit, the storage layer queues an event (in Redis, or in the `jobs` table with
+   the database queue).
+
+## Standalone
+
+`gohead standalone` runs the four roles in one process and queues jobs in the database
+(`queue.driver: database`), so the only dependency is the database, SQLite by default. The
+queue interface (`pkg/queue`) has two drivers, Redis (asynq) and database; the dispatcher,
+worker and scheduler code is the same with both. See
+[Standalone and Raspberry Pi](standalone.md).
 
 ## Code map
 
 | Path | Contents |
 |------|----------|
-| `main/`, `cmd/` | Entry point and the four commands |
+| `main/`, `cmd/` | Entry point and the commands |
+| `pkg/queue` | Job queue: Redis (asynq) and database drivers |
+| `internal/webui` | Admin UI embedded in the binary (built by `make ui`) |
 | `internal/api` | HTTP handlers and middleware |
 | `internal/graphql` | Schema generation, resolvers, mutations |
 | `internal/models` | Collections, attributes, items, users, validation |

@@ -182,7 +182,7 @@ func singletonWithAttributes(name string) (*models.Singleton, error) {
 // (webhooks), with the content (nil when deleted). The event's collection
 // is "singleton:<name>".
 func publishSingletonEvent(actor Actor, eventType events.EventType, name string, item *models.SingleItem) {
-	if asynqClient == nil {
+	if queueClient == nil {
 		return
 	}
 	payload := events.CollectionEventPayload{
@@ -193,7 +193,7 @@ func publishSingletonEvent(actor Actor, eventType events.EventType, name string,
 		payload.ItemData = item.Data
 		payload.ItemTranslations = copyTranslations(item.Translations)
 	}
-	if err := events.EnqueueCollectionEvent(context.Background(), asynqClient, payload); err != nil {
+	if err := events.EnqueueCollectionEvent(context.Background(), queueClient, payload); err != nil {
 		logger.Log.WithError(err).WithField("singleton", name).Error("Failed to enqueue a singleton event")
 	}
 }

@@ -27,12 +27,25 @@ jwt_secret: ""
 # standard OTEL_EXPORTER_OTLP_ENDPOINT variable (default localhost:4317).
 telemetry_enabled: false
 
-# Redis backs the job queues used by the worker, dispatcher and scheduler, and
-# lets API replicas share GraphQL schema changes and rate-limit counters.
+# Background jobs (content events, agent runs, webhook deliveries).
+#   redis:    in Redis (default of gohead start/worker/dispatcher/scheduler)
+#   database: in GoHead's database, no Redis (default of gohead standalone)
+queue:
+  driver: ""             # empty: the command's default
+  concurrency: 0         # jobs at once per process; 0: 4 standalone, 10 worker, 5 dispatcher
+  poll_interval: 1s      # database driver: how often to look for other processes' jobs
+
+# Redis backs the redis job queue, and lets API replicas share GraphQL schema
+# changes and rate-limit counters. With the database queue it is used only
+# when an address is set here or in GOHEAD_REDIS_ADDRESS.
 redis:
-  address: localhost:6379
+  # address: localhost:6379   (default)
   password: ""
   db: 0
+
+# Admin UI embedded in the binary, served at /.
+ui:
+  enabled: true
 
 # Uploads (POST /api/media). Files go to a local directory by default, or to
 # any S3-compatible bucket (AWS S3, MinIO, Cloudflare R2, Garage...).

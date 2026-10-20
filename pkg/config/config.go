@@ -107,6 +107,27 @@ type RedisConfig struct {
 	DB       int    `mapstructure:"db" yaml:"db"`
 }
 
+// QueueConfig selects how background jobs (collection events, agent runs,
+// webhook deliveries) are queued.
+type QueueConfig struct {
+	// Driver: "redis" (asynq on Redis; several processes and replicas) or
+	// "database" (a jobs table in GoHead's database; no Redis). Empty:
+	// "database" for gohead standalone, "redis" otherwise.
+	Driver string `mapstructure:"driver" yaml:"driver"`
+	// Concurrency is the number of jobs a process runs at once (standalone;
+	// worker and dispatcher keep their own defaults when 0).
+	Concurrency int `mapstructure:"concurrency" yaml:"concurrency"`
+	// PollInterval: how often the database driver looks for jobs queued by
+	// other processes, and for retries that became due.
+	PollInterval time.Duration `mapstructure:"poll_interval" yaml:"poll_interval"`
+}
+
+// UIConfig controls the admin UI embedded in the binary.
+type UIConfig struct {
+	// Enabled serves the admin UI at / when the binary includes it.
+	Enabled bool `mapstructure:"enabled" yaml:"enabled"`
+}
+
 // Config holds all application settings.
 type Config struct {
 	LogLevel          string `mapstructure:"log_level"`
@@ -119,6 +140,12 @@ type Config struct {
 
 	// Redis settings
 	Redis RedisConfig `mapstructure:"redis"`
+
+	// Background job queue
+	Queue QueueConfig `mapstructure:"queue" yaml:"queue"`
+
+	// Embedded admin UI
+	UI UIConfig `mapstructure:"ui" yaml:"ui"`
 
 	// CORS settings
 	CORS CORSConfig `mapstructure:"cors"`
@@ -250,6 +277,12 @@ func LoadConfig(configPath string) (Config, error) {
 	viper.SetDefault("webhooks.max_retries", 8)
 	viper.SetDefault("openapi.enabled", true)
 	viper.SetDefault("openapi.public", false)
+
+	// Job queue and embedded admin UI
+	viper.SetDefault("queue.driver", "")
+	viper.SetDefault("queue.concurrency", 0)
+	viper.SetDefault("queue.poll_interval", "1s")
+	viper.SetDefault("ui.enabled", true)
 
 	// Redis default values
 	viper.SetDefault("redis.address", "localhost:6379")

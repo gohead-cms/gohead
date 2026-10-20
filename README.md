@@ -45,7 +45,7 @@ permissions as a human.
 | 🖼️ **Media built in** | Upload images, video and documents; store them on disk or in any S3-compatible bucket (S3, R2, Garage…); reference them from content. |
 | 🔎 **Real querying** | Filters (`$eq $ne $lt $gte $contains`…), multi-key sort, pagination, relation population, batch writes in one transaction. |
 | 🔐 **Secure by default** | Roles enforced identically in REST and GraphQL, schema-validated writes, masked secrets, signed images, distroless containers. |
-| 🪶 **One binary** | API, worker, dispatcher and scheduler in one Go binary. SQLite on your laptop, PostgreSQL or MySQL in production. |
+| 🪶 **One binary** | API, admin UI, worker, dispatcher and scheduler in one pure-Go binary. `gohead standalone` runs it all in one process with SQLite and no Redis, in about 45 MB of memory: a Raspberry Pi is enough. PostgreSQL or MySQL and separate processes to scale out. |
 | 🚢 **Ships anywhere** | Multi-arch images, a Helm chart, Kubernetes manifests and Flux image automation included. Tested on SQLite, PostgreSQL and MySQL. |
 
 ## Build a site in ten minutes
@@ -157,8 +157,8 @@ flowchart LR
 | **Container** | `docker run -p 8080:8080 -e GOHEAD_JWT_SECRET=… ghcr.io/gohead-cms/gohead` |
 | **Helm** | `helm install gohead oci://ghcr.io/gohead-cms/charts/gohead --set database.url=postgres://…` |
 | **Kubernetes (GitOps)** | `kubectl apply -k deploy/kubernetes/overlays/production` (or let Flux do it) |
-| **Binary** | [Releases](https://github.com/gohead-cms/gohead/releases) for Linux, macOS, Windows (PostgreSQL/MySQL) |
-| **Source** | `make build` (Go 1.26+, cgo for SQLite) |
+| **Binary** | [Releases](https://github.com/gohead-cms/gohead/releases) for Linux, macOS, Windows, Raspberry Pi: `./gohead standalone`, then open <http://localhost:8080> ([guide](https://gohead-cms.github.io/gohead/operations/standalone/)) |
+| **Source** | `make ui build` (Go 1.26+, Node 22) |
 
 Configuration is a YAML file or `GOHEAD_*` environment variables, see
 [configuration](https://gohead-cms.github.io/gohead/getting-started/configuration/).

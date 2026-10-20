@@ -10,9 +10,8 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
+	"sync"
 	"time"
 
 	"github.com/gohead-cms/gohead/internal/accounts"
@@ -21,6 +20,7 @@ import (
 	"github.com/gohead-cms/gohead/internal/api/middleware"
 	"github.com/gohead-cms/gohead/internal/graphql"
 	"github.com/gohead-cms/gohead/internal/webhooks"
+	"github.com/gohead-cms/gohead/internal/webui"
 	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/cluster"
 	"github.com/gohead-cms/gohead/pkg/config"
@@ -29,19 +29,19 @@ import (
 	"github.com/gohead-cms/gohead/pkg/media"
 	"github.com/gohead-cms/gohead/pkg/metrics"
 	"github.com/gohead-cms/gohead/pkg/migrations"
+	"github.com/gohead-cms/gohead/pkg/queue"
 	"github.com/gohead-cms/gohead/pkg/ratelimit"
 	"github.com/gohead-cms/gohead/pkg/seed"
 	"github.com/gohead-cms/gohead/pkg/storage"
 	"github.com/gohead-cms/gohead/pkg/tracing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hibiken/asynq"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/cobra"
 	ginlogrus "github.com/toorop/gin-logrus"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
-	gormlogger "gorm.io/gorm/logger"
+	"gorm.io/gorm"
 )
 
 func init() {
@@ -51,42 +51,79 @@ func init() {
 var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start GoHead API server",
+	Long: `Starts the API (and the admin UI, when the binary includes it). Background
+jobs run in separate processes: gohead worker, dispatcher and scheduler. To run
+everything in one process, use gohead standalone.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		configPath, _ := cmd.Flags().GetString("config")
-
-		router, cfg, cleanup, err := InitializeServer(configPath)
-		if err != nil {
-			if logger.Log != nil {
-				logger.Log.Fatalf("Cannot initialize server: %v", err)
-			}
-			log.Fatalf("Cannot initialize server: %v", err)
-		}
-		defer cleanup()
-
-		srv := &http.Server{
-			Addr:              ":" + cfg.ServerPort,
-			Handler:           router,
-			ReadHeaderTimeout: 10 * time.Second,
-		}
-
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-		defer stop()
-
-		go func() {
-			logger.Log.Infof("Starting server on port %s", cfg.ServerPort)
-			if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				logger.Log.Fatalf("Cannot start server: %v", err)
-			}
-		}()
-
-		<-ctx.Done()
-		logger.Log.Info("Shutting down server...")
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer cancel()
-		if err := srv.Shutdown(shutdownCtx); err != nil {
-			logger.Log.WithError(err).Error("Server forced to shut down")
-		}
+		runServer(configPath, ServerOptions{})
 	},
+}
+
+// ServerOptions changes how the server runs.
+type ServerOptions struct {
+	// Standalone runs the worker, dispatcher and scheduler in the API
+	// process, with the database job queue unless configured otherwise.
+	Standalone bool
+	// DataDir holds the SQLite database, the uploads and a generated JWT
+	// secret, unless they are configured otherwise.
+	DataDir string
+}
+
+// Server is an initialized GoHead.
+type Server struct {
+	Router *gin.Engine
+	Config *config.Config
+	// Queue driver and client of background jobs.
+	QueueDriver string
+	Queue       queue.Client
+	DB          *gorm.DB
+}
+
+// runServer serves the API until SIGINT or SIGTERM.
+func runServer(configPath string, opts ServerOptions) {
+	app, cleanup, err := InitializeServer(configPath, opts)
+	if err != nil {
+		if logger.Log != nil {
+			logger.Log.Fatalf("Cannot initialize server: %v", err)
+		}
+		log.Fatalf("Cannot initialize server: %v", err)
+	}
+	defer cleanup()
+	cfg := app.Config
+
+	srv := &http.Server{
+		Addr:              ":" + cfg.ServerPort,
+		Handler:           app.Router,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	ctx, stop := signalContext()
+	defer stop()
+
+	// Standalone: background jobs in this process.
+	bgCtx, stopBackground := context.WithCancel(context.Background())
+	var background sync.WaitGroup
+	if opts.Standalone {
+		startBackground(bgCtx, &background, app)
+	}
+
+	go func() {
+		logger.Log.Infof("Starting server on port %s", cfg.ServerPort)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Log.Fatalf("Cannot start server: %v", err)
+		}
+	}()
+
+	<-ctx.Done()
+	logger.Log.Info("Shutting down server...")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		logger.Log.WithError(err).Error("Server forced to shut down")
+	}
+	stopBackground()
+	background.Wait()
 }
 
 func init() {
@@ -96,7 +133,7 @@ func init() {
 // InitializeServer builds the router and its dependencies. The returned
 // cleanup function releases long-lived resources (queue client, tracer) and
 // must be called when the server stops.
-func InitializeServer(cfgPath string) (*gin.Engine, *config.Config, func(), error) {
+func InitializeServer(cfgPath string, opts ServerOptions) (*Server, func(), error) {
 	var closers []func()
 	cleanup := func() {
 		for i := len(closers) - 1; i >= 0; i-- {
@@ -107,9 +144,14 @@ func InitializeServer(cfgPath string) (*gin.Engine, *config.Config, func(), erro
 	cfg, err := config.LoadConfig(cfgPath)
 	if err != nil {
 		cleanup()
-		return nil, nil, func() {}, err
+		return nil, func() {}, err
 	}
 	logger.InitLogger(cfg.LogLevel)
+	jwtSecretFile, err := applyDataDir(&cfg, opts.DataDir)
+	if err != nil {
+		cleanup()
+		return nil, func() {}, err
+	}
 	llm.SetDefaultConfig(cfg.LLM)
 	webhooks.Configure(webhooks.Config{
 		AllowPrivateNetworks: cfg.Webhooks.AllowPrivateNetworks,
@@ -117,75 +159,75 @@ func InitializeServer(cfgPath string) (*gin.Engine, *config.Config, func(), erro
 		MaxRetries:           cfg.Webhooks.MaxRetries,
 	})
 
-	var gormLogLevel gormlogger.LogLevel
-	switch cfg.LogLevel {
-	case "debug":
-		gormLogLevel = gormlogger.Info
-	case "info", "warn", "warning":
-		gormLogLevel = gormlogger.Warn
-	case "error":
-		gormLogLevel = gormlogger.Error
-	default:
-		gormLogLevel = gormlogger.Silent
-	}
-
-	db, err := database.InitDatabase(cfg.DatabaseURL, gormLogLevel)
+	driver, err := queueDriver(cfg, opts.Standalone)
 	if err != nil {
 		cleanup()
-		return nil, nil, func() {}, err
+		return nil, func() {}, err
+	}
+
+	db, err := database.InitDatabase(cfg.DatabaseURL, gormLogLevel(cfg.LogLevel))
+	if err != nil {
+		cleanup()
+		return nil, func() {}, err
 	}
 	storage.RevisionLimit = max(cfg.Content.RevisionsKept, 0)
 	if cfg.AutoMigrate {
 		if _, err := migrations.Up(db); err != nil {
 			cleanup()
-			return nil, nil, func() {}, err
+			return nil, func() {}, err
 		}
 	} else if err := migrations.Check(db); err != nil {
 		cleanup()
-		return nil, nil, func() {}, err
+		return nil, func() {}, err
 	}
 	if err := storage.EnsureDefaultLocale(cfg.I18n.DefaultLocale); err != nil {
 		cleanup()
-		return nil, nil, func() {}, err
+		return nil, func() {}, err
 	}
 
 	// --- Media storage ---
 	localMedia, err := initMediaStore(cfg)
 	if err != nil {
 		cleanup()
-		return nil, nil, func() {}, err
+		return nil, func() {}, err
 	}
 
 	// Initialize the GraphQL Schema
 	if err := graphql.InitializeGraphQLSchema(); err != nil {
 		logger.Log.WithError(err).Error("Failed to initialize GraphQL schema")
 		cleanup()
-		return nil, nil, func() {}, err
+		return nil, func() {}, err
 	}
 
 	// --- Application Services ---
 	seed.SeedRoles()
 	if err := setupAccounts(cfg); err != nil {
 		cleanup()
-		return nil, nil, func() {}, err
+		return nil, func() {}, err
 	}
-	auth.InitializeJWT(resolveJWTSecret(cfg.JWTSecret))
+	auth.InitializeJWT(resolveJWTSecret(cfg.JWTSecret, jwtSecretFile))
 	metrics.InitMetrics()
 
-	// --- Asynq Client Initialization for Producers ---
-	// The API server acts as a producer, enqueuing jobs for workers.
-	asynqClient := asynq.NewClient(cfg.RedisClientOpt())
-	storage.InitAsynqClient(asynqClient)
-	triggers.InitAsynqClient(asynqClient)
-	handlers.InitAsynqClient(asynqClient) // used by the agent webhook endpoint
+	// --- Job queue ---
+	// The API queues jobs (collection events, agent runs) for the workers.
+	queueClient := openQueueClient(cfg, driver, db)
+	storage.InitQueue(queueClient)
+	triggers.InitQueue(queueClient)
+	handlers.InitQueue(queueClient) // agent webhook endpoint and manual runs
 	closers = append(closers, func() {
-		if err := asynqClient.Close(); err != nil {
+		if err := queueClient.Close(); err != nil {
 			logger.Log.WithError(err).Warn("Error closing queue client")
 		}
 	})
+	logger.Log.WithField("driver", driver).Info("Job queue ready")
 
 	// --- Shared state across replicas (Redis) ---
-	rdb := connectRedis(cfg)
+	var rdb *redis.Client
+	if useRedis(cfg, driver) {
+		rdb = connectRedis(cfg)
+	} else {
+		logger.Log.Info("Redis is not used: rate limits are kept in memory and schema changes are not shared, so run a single API process")
+	}
 	if rdb != nil {
 		closers = append(closers, func() { _ = rdb.Close() })
 	}
@@ -217,7 +259,7 @@ func InitializeServer(cfgPath string) (*gin.Engine, *config.Config, func(), erro
 		tracerProvider, err := tracing.InitTracer()
 		if err != nil {
 			cleanup()
-			return nil, nil, func() {}, err
+			return nil, func() {}, err
 		}
 		// Shut down (and flush spans) when the server stops, not when this
 		// function returns.
@@ -251,7 +293,7 @@ func InitializeServer(cfgPath string) (*gin.Engine, *config.Config, func(), erro
 	}
 	if err := router.SetTrustedProxies(trusted); err != nil {
 		cleanup()
-		return nil, nil, func() {}, fmt.Errorf("invalid trusted_proxies: %w", err)
+		return nil, func() {}, fmt.Errorf("invalid trusted_proxies: %w", err)
 	}
 	router.Use(ginlogrus.Logger(logger.Log), gin.Recovery())
 	router.Use(middleware.CORSMiddleware(cfg))
@@ -272,8 +314,13 @@ func InitializeServer(cfgPath string) (*gin.Engine, *config.Config, func(), erro
 	}
 	handlers.APIVersion = version
 	setupRoutes(router, authLimit, publicLimit, localMedia, cfg.OpenAPI)
+	if cfg.UI.Enabled {
+		if webui.Register(router) {
+			logger.Log.Info("Admin UI served at /")
+		}
+	}
 
-	return router, &cfg, cleanup, nil
+	return &Server{Router: router, Config: &cfg, QueueDriver: driver, Queue: queueClient, DB: db}, cleanup, nil
 }
 
 // initMediaStore configures uploads. A misconfigured S3 store stops the
@@ -492,20 +539,34 @@ var insecureJWTSecrets = map[string]bool{
 // configured value is missing or a published default. A random secret keeps
 // quick-start setups working without being forgeable, at the cost of
 // invalidating tokens on restart.
-func resolveJWTSecret(configured string) string {
+func resolveJWTSecret(configured, persistFile string) string {
 	if !insecureJWTSecrets[configured] {
 		if len(configured) < 32 {
 			logger.Log.Warn("jwt_secret is shorter than 32 characters; use a long random value")
 		}
 		return configured
 	}
+	if persistFile != "" {
+		if b, err := os.ReadFile(persistFile); err == nil && len(strings.TrimSpace(string(b))) >= 32 {
+			return strings.TrimSpace(string(b))
+		}
+	}
 	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {
 		logger.Log.Fatalf("Cannot generate a JWT secret: %v", err)
 	}
+	secret := hex.EncodeToString(buf)
+	if persistFile != "" {
+		if err := os.WriteFile(persistFile, []byte(secret+"\n"), 0o600); err == nil {
+			logger.Log.WithField("file", persistFile).Info("jwt_secret is not set: generated one and saved it, so sessions survive restarts")
+			return secret
+		} else {
+			logger.Log.WithError(err).Warn("Could not save the generated JWT secret")
+		}
+	}
 	logger.Log.Warn("jwt_secret is not set (or uses the sample default): using a random secret for this run. " +
 		"Tokens will not survive a restart; set jwt_secret (or GOHEAD_JWT_SECRET) to a long random value.")
-	return hex.EncodeToString(buf)
+	return secret
 }
 
 // connectRedis returns a client for the configured Redis, or nil when it is

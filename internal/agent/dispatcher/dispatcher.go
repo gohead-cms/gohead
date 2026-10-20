@@ -14,28 +14,27 @@ import (
 	"github.com/gohead-cms/gohead/internal/agent/triggers"
 	"github.com/gohead-cms/gohead/internal/webhooks"
 	"github.com/gohead-cms/gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/queue"
 	"github.com/gohead-cms/gohead/pkg/storage"
-	"github.com/hibiken/asynq"
 )
 
 // EventDispatcher listens for generic collection events and dispatches
 // specific agent jobs to the appropriate queue.
 type EventDispatcher struct {
-	asynqClient *asynq.Client
+	queue queue.Client
 }
 
 // NewEventDispatcher creates a new dispatcher instance.
-// It requires an Asynq client to enqueue the final agent:run jobs.
-func NewEventDispatcher(client *asynq.Client) *EventDispatcher {
-	return &EventDispatcher{
-		asynqClient: client,
-	}
+// It requires a queue client to enqueue the agent:run jobs and webhook
+// deliveries.
+func NewEventDispatcher(client queue.Client) *EventDispatcher {
+	return &EventDispatcher{queue: client}
 }
 
 // HandleCollectionEvent is the entry point for processing generic collection events.
-func (d *EventDispatcher) HandleCollectionEvent(ctx context.Context, t *asynq.Task) error {
+func (d *EventDispatcher) HandleCollectionEvent(ctx context.Context, data []byte) error {
 	var payload events.CollectionEventPayload
-	if err := json.Unmarshal(t.Payload(), &payload); err != nil {
+	if err := json.Unmarshal(data, &payload); err != nil {
 		logger.Log.WithError(err).Error("Failed to unmarshal collection event payload")
 		return fmt.Errorf("could not unmarshal event payload: %w", err)
 	}
@@ -53,7 +52,7 @@ func (d *EventDispatcher) HandleCollectionEvent(ctx context.Context, t *asynq.Ta
 
 	// 0. Outbound webhooks: one queued delivery per subscribed webhook. A
 	// failure retries the whole event; deliveries are deduplicated by ID.
-	if err := webhooks.Fanout(ctx, d.asynqClient, payload); err != nil {
+	if err := webhooks.Fanout(ctx, d.queue, payload); err != nil {
 		logger.Log.WithError(err).Error("Failed to enqueue webhook deliveries")
 		return err
 	}
@@ -110,7 +109,7 @@ func (d *EventDispatcher) HandleCollectionEvent(ctx context.Context, t *asynq.Ta
 			"item_id":    payload.ItemID,
 		}).Info("Enqueuing agent job with structured trigger event")
 
-		if err := jobs.EnqueueAgentJob(ctx, d.asynqClient, agentJobPayload); err != nil {
+		if err := jobs.EnqueueAgentJob(ctx, d.queue, agentJobPayload); err != nil {
 			logger.Log.
 				WithError(err).
 				WithField("agent_id", agent.ID).

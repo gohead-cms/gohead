@@ -4,9 +4,9 @@ package storage_test
 import (
 	"testing"
 
+	"github.com/ncruces/go-sqlite3/gormlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
 	"github.com/gohead-cms/gohead/internal/models"
@@ -17,7 +17,7 @@ import (
 
 // setupTestDB initializes an in-memory SQLite database for testing Singleton storage.
 func setupTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(gormlite.Open(database.SQLiteDSN(":memory:")), &gorm.Config{})
 	require.NoError(t, err, "Failed to connect to in-memory database")
 	// ":memory:" is per-connection: pin the pool to a single connection.
 	sqlDB, err := db.DB()

@@ -130,6 +130,7 @@ nav:
   - Operations:
       - Architecture: operations/architecture.md
       - Deployment: operations/deployment.md
+      - Standalone & Raspberry Pi: operations/standalone.md
       - Upgrading: operations/upgrading.md
       - CI/CD & releases: operations/ci-cd.md
       - Observability: operations/observability.md

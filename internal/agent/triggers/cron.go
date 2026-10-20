@@ -75,7 +75,7 @@ func StartJob(agentID uint) {
 		},
 		CreatedAt: now,
 	}
-	if err := jobs.EnqueueAgentJob(context.Background(), asynqClient, payload); err != nil {
+	if err := jobs.EnqueueAgentJob(context.Background(), queueClient, payload); err != nil {
 		logger.Log.WithError(err).WithField("agent_name", agent.Name).Error("Failed to enqueue scheduled agent run")
 		return
 	}

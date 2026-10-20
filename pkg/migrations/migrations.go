@@ -65,6 +65,12 @@ var All = []Migration{
 		Up:          publicRoleUp,
 		Down:        publicRoleDown,
 	},
+	{
+		ID:          "0006_jobs",
+		Description: "Jobs table of the database job queue (GoHead without Redis)",
+		Up:          jobsUp,
+		Down:        jobsDown,
+	},
 }
 
 // baseline creates or updates every table from the models, as GoHead did at

@@ -9,10 +9,10 @@ import (
 	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
 
+	"github.com/ncruces/go-sqlite3/gormlite"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -25,7 +25,7 @@ func init() {
 }
 
 func setupDatabase(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(gormlite.Open(database.SQLiteDSN(":memory:")), &gorm.Config{})
 	require.NoError(t, err, "failed to connect to in-memory database")
 	database.DB = db
 	err = db.AutoMigrate(&Collection{}, &Item{}, &Singleton{}, &SingleItem{}, &Attribute{})

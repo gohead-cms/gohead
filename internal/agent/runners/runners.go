@@ -14,8 +14,8 @@ import (
 	agentModels "github.com/gohead-cms/gohead/internal/models/agents"
 	"github.com/gohead-cms/gohead/pkg/llm"
 	"github.com/gohead-cms/gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/queue"
 	"github.com/gohead-cms/gohead/pkg/storage"
-	"github.com/hibiken/asynq"
 	"github.com/tmc/langchaingo/llms"
 )
 
@@ -43,13 +43,13 @@ func NewAgentRunner() *AgentRunner {
 }
 
 // HandleAgentJob is the entry point for processing jobs from the 'agents' queue.
-func (r *AgentRunner) HandleAgentJob(ctx context.Context, t *asynq.Task) error {
+func (r *AgentRunner) HandleAgentJob(ctx context.Context, data []byte) error {
 	var payload jobs.AgentJobPayload
-	if err := json.Unmarshal(t.Payload(), &payload); err != nil {
+	if err := json.Unmarshal(data, &payload); err != nil {
 		logger.Log.WithError(err).Error("Failed to unmarshal agent job payload")
 		return fmt.Errorf("could not unmarshal payload: %w", err)
 	}
-	attempt, _ := asynq.GetRetryCount(ctx)
+	attempt, _ := queue.GetRetryCount(ctx)
 	return r.Run(ctx, payload, attempt+1)
 }
 

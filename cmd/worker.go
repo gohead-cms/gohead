@@ -1,98 +1,49 @@
 package cmd
 
 import (
-	"github.com/gohead-cms/gohead/internal/webhooks"
-	"github.com/gohead-cms/gohead/pkg/llm"
 	"log"
 
-	"github.com/hibiken/asynq"
 	"github.com/spf13/cobra"
-	gormlogger "gorm.io/gorm/logger"
 
-	runner "github.com/gohead-cms/gohead/internal/agent/runners"
-	"github.com/gohead-cms/gohead/pkg/config"
-	"github.com/gohead-cms/gohead/pkg/database"
 	"github.com/gohead-cms/gohead/pkg/logger"
-	"github.com/gohead-cms/gohead/pkg/storage"
+	"github.com/gohead-cms/gohead/pkg/queue"
 )
 
 // workerCmd represents the worker command
 var workerCmd = &cobra.Command{
 	Use:   "worker",
 	Short: "Starts the background worker for processing agent jobs.",
-	Long:  `The worker connects to Redis and listens for asynchronous jobs, such as running agents based on cron schedules or webhooks.`,
+	Long: `The worker runs queued jobs: agent runs and webhook deliveries. Jobs are
+queued in Redis (queue.driver: redis) or in the database (queue.driver: database).`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// Use the default config path, similar to your start command
 		configPath, _ := cmd.Flags().GetString("config")
 		runWorker(configPath)
 	},
 }
 
 func init() {
-	// Add the same config flag as the start command for consistency
 	workerCmd.Flags().StringP("config", "c", "config.yaml", "Path to the configuration file")
 	rootCmd.AddCommand(workerCmd)
 }
 
 func runWorker(cfgPath string) {
-	// 1. Load configuration using your LoadConfig function
-	cfg, err := config.LoadConfig(cfgPath)
+	cfg, driver, db, err := backgroundSetup(cfgPath)
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		log.Fatalf("Cannot start the worker: %v", err)
 	}
-
-	// 2. Initialize logger and database just like in start.go
-	logger.InitLogger(cfg.LogLevel)
-	webhooks.Configure(webhooks.Config{
-		AllowPrivateNetworks: cfg.Webhooks.AllowPrivateNetworks,
-		Timeout:              cfg.Webhooks.Timeout,
-		MaxRetries:           cfg.Webhooks.MaxRetries,
-	})
-	llm.SetDefaultConfig(cfg.LLM)
-
-	var gormLogLevel gormlogger.LogLevel
-	switch cfg.LogLevel {
-	case "debug":
-		gormLogLevel = gormlogger.Info
-	case "info", "warn", "warning":
-		gormLogLevel = gormlogger.Warn
-	case "error":
-		gormLogLevel = gormlogger.Error
-	default:
-		gormLogLevel = gormlogger.Silent
+	mux := queue.NewMux()
+	workerHandlers(cfg, mux)
+	concurrency := cfg.Queue.Concurrency
+	if concurrency <= 0 {
+		concurrency = 10
 	}
+	srv := newQueueServer(cfg, driver, db, concurrency, workerQueues)
 
-	if _, err := database.InitDatabase(cfg.DatabaseURL, gormLogLevel); err != nil {
-		logger.Log.WithError(err).Fatal("Failed to initialize database")
+	ctx, stop := signalContext()
+	defer stop()
+	logger.Log.WithField("queue", driver).Info("Worker is ready and listening for jobs...")
+	if err := srv.Run(ctx, mux); err != nil {
+		logger.Log.WithError(err).Fatal("Could not run the worker")
 	}
-
-	logger.Log.Info("Starting agent worker...")
-
-	// 3. Create the Asynq server for consuming jobs
-	srv := asynq.NewServer(
-		cfg.RedisClientOpt(),
-		asynq.Config{
-			Concurrency: 10,
-			Logger:      &logger.AsynqLoggerAdapter{},
-			Queues:      map[string]int{"agents": 10, webhooks.Queue: 5},
-		},
-	)
-
-	// 4. Create an instance of your agent runner
-	agentRunner := runner.NewAgentRunner()
-	if cfg.Agents.RunsKept > 0 {
-		runner.RunsKept = cfg.Agents.RunsKept
-	}
-	storage.RevisionLimit = max(cfg.Content.RevisionsKept, 0)
-
-	// 5. Create a new ServeMux to map task types to handlers
-	mux := asynq.NewServeMux()
-	mux.HandleFunc("agent:run", agentRunner.HandleAgentJob)
-	mux.HandleFunc(webhooks.TaskTypeDeliver, webhooks.HandleDelivery)
-
-	// 6. Start the server
-	logger.Log.Info("Worker is ready and listening for jobs...")
-	if err := srv.Run(mux); err != nil {
-		logger.Log.WithError(err).Fatal("Could not run asynq server")
-	}
+	logger.Log.Info("Worker stopped")
 }

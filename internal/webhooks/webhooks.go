@@ -27,7 +27,7 @@ import (
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
 
-	"github.com/hibiken/asynq"
+	"github.com/gohead-cms/gohead/pkg/queue"
 )
 
 const (
@@ -86,12 +86,12 @@ type Delivery struct {
 // Fanout enqueues one delivery per webhook subscribed to the event. The
 // task IDs derive from the event task's ID, so a retried event does not
 // deliver twice.
-func Fanout(ctx context.Context, client *asynq.Client, ev events.CollectionEventPayload) error {
+func Fanout(ctx context.Context, client queue.Client, ev events.CollectionEventPayload) error {
 	hooks, err := storage.WebhooksFor(string(ev.EventType), ev.CollectionName)
 	if err != nil || len(hooks) == 0 {
 		return err
 	}
-	eventID, ok := asynq.GetTaskID(ctx)
+	eventID, ok := queue.GetTaskID(ctx)
 	if !ok {
 		eventID = newID()
 	}
@@ -153,10 +153,10 @@ func Fanout(ctx context.Context, client *asynq.Client, ev events.CollectionEvent
 		if err != nil {
 			return err
 		}
-		_, err = client.EnqueueContext(ctx, asynq.NewTask(TaskTypeDeliver, body),
-			asynq.Queue(Queue), asynq.TaskID("wh-"+d.DeliveryID),
-			asynq.MaxRetry(cfg.MaxRetries), asynq.Timeout(cfg.Timeout+5*time.Second), asynq.Retention(retention))
-		if err != nil && !errors.Is(err, asynq.ErrTaskIDConflict) {
+		_, err = client.Enqueue(ctx, TaskTypeDeliver, body,
+			queue.Queue(Queue), queue.TaskID("wh-"+d.DeliveryID),
+			queue.MaxRetry(cfg.MaxRetries), queue.Timeout(cfg.Timeout+5*time.Second), queue.Retention(retention))
+		if err != nil && !errors.Is(err, queue.ErrDuplicateTask) {
 			return fmt.Errorf("enqueue delivery for webhook %d: %w", w.ID, err)
 		}
 	}
@@ -165,10 +165,10 @@ func Fanout(ctx context.Context, client *asynq.Client, ev events.CollectionEvent
 
 // HandleDelivery sends a queued delivery. Network errors, 5xx, 408 and 429
 // are retried with backoff; other 4xx answers are not.
-func HandleDelivery(ctx context.Context, t *asynq.Task) error {
+func HandleDelivery(ctx context.Context, payload []byte) error {
 	var d Delivery
-	if err := json.Unmarshal(t.Payload(), &d); err != nil {
-		return fmt.Errorf("bad delivery payload: %v: %w", err, asynq.SkipRetry)
+	if err := json.Unmarshal(payload, &d); err != nil {
+		return fmt.Errorf("bad delivery payload: %v: %w", err, queue.SkipRetry)
 	}
 	w, err := storage.GetWebhook(d.WebhookID)
 	if errors.Is(err, storage.ErrWebhookNotFound) {
@@ -180,13 +180,13 @@ func HandleDelivery(ctx context.Context, t *asynq.Task) error {
 	if !w.Enabled {
 		return nil
 	}
-	attempt, _ := asynq.GetRetryCount(ctx)
+	attempt, _ := queue.GetRetryCount(ctx)
 	res := Send(ctx, *w, d, attempt+1)
 	if res.Err == nil {
 		return nil
 	}
 	if res.Permanent {
-		return fmt.Errorf("%v: %w", res.Err, asynq.SkipRetry)
+		return fmt.Errorf("%v: %w", res.Err, queue.SkipRetry)
 	}
 	return res.Err
 }

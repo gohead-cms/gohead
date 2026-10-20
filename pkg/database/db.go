@@ -7,9 +7,9 @@ import (
 
 	"github.com/gohead-cms/gohead/pkg/logger"
 
+	"github.com/ncruces/go-sqlite3/gormlite"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 )
@@ -28,15 +28,22 @@ func InitDatabase(databaseURL string, logLevel gormlogger.LogLevel) (*gorm.DB, e
 	case strings.HasPrefix(databaseURL, "sqlite://"):
 		// SQLite configuration
 		dbPath := strings.TrimPrefix(databaseURL, "sqlite://")
-		db, err = gorm.Open(sqlite.Open(dbPath), &gorm.Config{
+		db, err = gorm.Open(gormlite.Open(SQLiteDSN(dbPath)), &gorm.Config{
 			Logger:         gormLogger,
 			TranslateError: true,
 		})
 		// Every new connection to ":memory:" opens a separate, empty
 		// database, so an in-memory DB must be pinned to one connection.
-		if err == nil && strings.Contains(dbPath, ":memory:") {
+		if err == nil {
 			if sqlDB, dbErr := db.DB(); dbErr == nil {
-				sqlDB.SetMaxOpenConns(1)
+				if strings.Contains(dbPath, ":memory:") {
+					sqlDB.SetMaxOpenConns(1)
+				} else {
+					// SQLite writes one at a time, and each connection
+					// holds its own page cache: a few are enough.
+					sqlDB.SetMaxOpenConns(SQLiteMaxConns)
+					sqlDB.SetMaxIdleConns(2)
+				}
 			}
 		}
 
@@ -73,6 +80,43 @@ func InitDatabase(databaseURL string, logLevel gormlogger.LogLevel) (*gorm.DB, e
 	// Assign the initialized database to the global DB
 	DB = db
 	return DB, nil
+}
+
+// SQLiteMaxConns caps the connections to a SQLite file.
+var SQLiteMaxConns = 4
+
+// sqliteTimeFormat is how times are stored in SQLite: the layout of the
+// cgo driver earlier GoHead versions used, so existing databases keep one
+// format (and their times compare as text in SQL).
+const sqliteTimeFormat = "2006-01-02 15:04:05.999999999-07:00"
+
+// SQLiteDSN turns the path of a sqlite:// URL into a DSN of the pure-Go
+// SQLite driver: WAL journal (readers do not wait for the writer), a busy
+// timeout and immediate transactions instead of "database is locked"
+// errors, foreign keys not enforced, and the time format. Parameters
+// already in the URL are kept.
+func SQLiteDSN(path string) string {
+	params := url.Values{}
+	params.Set("_timefmt", sqliteTimeFormat)
+	// Transactions take the write lock when they begin, waiting for it
+	// with the busy timeout: a deferred one that reads, then writes while
+	// another connection wrote, fails at once with SQLITE_BUSY.
+	params.Set("_txlock", "immediate")
+	params.Add("_pragma", "busy_timeout(10000)")
+	// As with the cgo driver of earlier versions (and its SQLite default).
+	params.Add("_pragma", "foreign_keys(0)")
+	if !strings.Contains(path, ":memory:") {
+		params.Add("_pragma", "journal_mode(wal)")
+		params.Add("_pragma", "synchronous(normal)")
+	}
+	file, query, _ := strings.Cut(path, "?")
+	if !strings.HasPrefix(file, "file:") {
+		file = "file:" + strings.NewReplacer("%", "%25", "#", "%23").Replace(file)
+	}
+	if query != "" {
+		return file + "?" + query + "&" + params.Encode()
+	}
+	return file + "?" + params.Encode()
 }
 
 // parsePostgresURL parses a PostgreSQL URL into a DSN string

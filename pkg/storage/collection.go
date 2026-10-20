@@ -71,7 +71,7 @@ func SaveCollection(ct *models.Collection) error {
 		EventType:      events.EventTypeCollectionCreated,
 		CollectionName: ct.Name,
 	}
-	if err := events.EnqueueCollectionEvent(context.Background(), asynqClient, payload); err != nil {
+	if err := events.EnqueueCollectionEvent(context.Background(), queueClient, payload); err != nil {
 		// Log the enqueuing error but don't fail the overall SaveItem operation.
 		logger.Log.WithError(err).Error("Failed to enqueue collection:created event")
 	}
@@ -313,7 +313,7 @@ func UpdateCollection(id uint, updated *models.Collection) error {
 		EventType:      events.EventTypeCollectionUpdated,
 		CollectionName: existing.Name,
 	}
-	if err := events.EnqueueCollectionEvent(context.Background(), asynqClient, payload); err != nil {
+	if err := events.EnqueueCollectionEvent(context.Background(), queueClient, payload); err != nil {
 		// Log the enqueuing error but don't fail the overall SaveItem operation.
 		logger.Log.WithError(err).Error("Failed to enqueue collection:updated event")
 	}
@@ -451,7 +451,7 @@ func DeleteCollection(collectionID uint) error {
 		EventType:      events.EventTypeCollectionDeleted,
 		CollectionName: Collection.Name,
 	}
-	if err := events.EnqueueCollectionEvent(context.Background(), asynqClient, payload); err != nil {
+	if err := events.EnqueueCollectionEvent(context.Background(), queueClient, payload); err != nil {
 		// Log the enqueuing error but don't fail the overall SaveItem operation.
 		logger.Log.WithError(err).Error("Failed to enqueue collection:deleted event")
 	}
