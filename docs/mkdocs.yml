@@ -90,6 +90,19 @@ nav:
       - Installation: getting-started/installation.md
       - Quick start: getting-started/quick-start.md
       - Configuration: getting-started/configuration.md
+  - User manual:
+      - Overview: manual/index.md
+      - Getting started: manual/getting-started.md
+      - Content model: manual/content-model.md
+      - Editing content: manual/editing-content.md
+      - Media library: manual/media.md
+      - Users and roles: manual/users-and-roles.md
+      - API tokens: manual/api-tokens.md
+      - Webhooks: manual/webhooks.md
+      - Locales: manual/locales.md
+      - Agents: manual/agents.md
+      - Approvals: manual/approvals.md
+      - Activity: manual/activity.md
   - Handbook:
       - Concepts: guides/concepts.md
       - Content modeling: guides/content-modeling.md

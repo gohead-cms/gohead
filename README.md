@@ -167,6 +167,7 @@ Configuration is a YAML file or `GOHEAD_*` environment variables, see
 
 The **[GoHead Handbook](https://gohead-cms.github.io/gohead/)** covers everything:
 
+- [User manual](https://gohead-cms.github.io/gohead/manual/): the admin UI step by step, with screenshots
 - [Build a website](https://gohead-cms.github.io/gohead/frontend/) · [JavaScript client](https://gohead-cms.github.io/gohead/frontend/sdk/) · [Content models as code](https://gohead-cms.github.io/gohead/frontend/model-as-code/) · [Next.js starter](https://gohead-cms.github.io/gohead/frontend/nextjs/)
 - [Content modeling](https://gohead-cms.github.io/gohead/guides/content-modeling/) · [REST API](https://gohead-cms.github.io/gohead/guides/rest-api/) · [GraphQL](https://gohead-cms.github.io/gohead/guides/graphql/) · [Users & roles](https://gohead-cms.github.io/gohead/guides/users-and-roles/)
 - [Agents](https://gohead-cms.github.io/gohead/agents/) · [Triggers](https://gohead-cms.github.io/gohead/agents/triggers/) · [Functions](https://gohead-cms.github.io/gohead/agents/functions/) · [LLM providers](https://gohead-cms.github.io/gohead/agents/llm-providers/)
