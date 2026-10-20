@@ -59,14 +59,14 @@ Without `GOHEAD_DATABASE_URL`, the image stores a SQLite database in `/data`. Ta
 
 The image serves the admin UI at `/` too. To serve it separately, the admin UI image is
 `ghcr.io/gohead-cms/gohead-admin`; point it at your API with `GOHEAD_API_URL`. Run
-`… gohead:latest standalone --data /data` for a single container with agents and webhooks
-(no Redis). Images are signed, see [verifying images](../operations/security.md#verify-container-images).
+`… gohead:latest standalone` for a single container with agents and webhooks (no Redis); it
+keeps its data in `/data`. Images are signed, see [verifying images](../operations/security.md#verify-container-images).
 
 ## Release binary
 
 Download an archive for your platform from the
-[releases page](https://github.com/gohead-cms/gohead/releases) (Linux, macOS and Windows on
-x86-64 and ARM64, Linux on ARMv7 and ARMv6), check it against `checksums.txt`, then:
+[releases page](https://github.com/gohead-cms/gohead/releases) (Linux and macOS on x86-64 and
+ARM64, Windows on x86-64, Linux on ARMv7 and ARMv6), check it against `checksums.txt`, then:
 
 ```bash
 tar xzf gohead_*_linux_amd64.tar.gz

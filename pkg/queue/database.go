@@ -104,13 +104,17 @@ func (c *DatabaseClient) Enqueue(ctx context.Context, taskType string, payload [
 		Queue: o.Queue, Type: taskType, Payload: payload, Status: StatusPending, RunAt: t,
 		MaxRetry: o.MaxRetry, TimeoutMS: o.Timeout.Milliseconds(), RetentionMS: o.Retention.Milliseconds(),
 	}
-	if o.TaskID != "" {
-		id := o.TaskID
-		job.TaskID = &id
+	// Every task gets a unique ID: the caller's (deduplicated), or a random
+	// one, so IDs never repeat across databases or restores (webhook
+	// delivery IDs derive from them).
+	id := o.TaskID
+	if id == "" {
+		id = randomID()
 	}
+	job.TaskID = &id
 	db := c.db.WithContext(ctx)
 	err := db.Create(&job).Error
-	if err != nil && job.TaskID != nil && isDuplicate(err) {
+	if err != nil && o.TaskID != "" && isDuplicate(err) {
 		// A finished task past its retention no longer holds its ID, even
 		// when no janitor ran since.
 		res := db.Where("task_id = ? AND status IN ? AND retention_until < ?", *job.TaskID, []string{StatusDone, StatusFailed}, t).Delete(&Job{})
@@ -131,6 +135,12 @@ func (c *DatabaseClient) Enqueue(ctx context.Context, taskType string, payload [
 
 // Close implements Client.
 func (c *DatabaseClient) Close() error { return nil }
+
+func randomID() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
+}
 
 func (j *Job) id() string {
 	if j.TaskID != nil {
@@ -184,44 +194,42 @@ func NewDatabaseServer(db *gorm.DB, cfg DatabaseServerConfig) *DatabaseServer {
 	if cfg.ShutdownTimeout <= 0 {
 		cfg.ShutdownTimeout = 8 * time.Second
 	}
-	b := make([]byte, 8)
-	_, _ = rand.Read(b)
-	return &DatabaseServer{db: db, cfg: cfg, id: hex.EncodeToString(b), lease: time.Minute}
+	return &DatabaseServer{db: db, cfg: cfg, id: randomID(), lease: time.Minute}
 }
 
 // Run implements Server.
 func (s *DatabaseServer) Run(ctx context.Context, mux *Mux) error {
-	queues := s.queueOrder()
-	if len(queues) == 0 {
+	if len(s.cfg.Queues) == 0 {
 		return errors.New("queue: no queues to process")
 	}
 	wake := subscribe()
 	defer unsubscribe(wake)
 
 	// Handlers run under their own context, cancelled ShutdownTimeout
-	// after ctx ends.
+	// after ctx ends (or when their job's lease is lost).
 	runCtx, cancelRun := context.WithCancel(context.WithoutCancel(ctx))
 	defer cancelRun()
 	stopping := make(chan struct{})
 
 	slots := make(chan struct{}, s.cfg.Concurrency)
 	var wg sync.WaitGroup
-	var inflight sync.Map // job ID → struct{}
+	var inflight sync.Map // job ID → context.CancelFunc
 
 	poll := time.NewTicker(s.cfg.PollInterval)
 	defer poll.Stop()
 
 	// Maintenance runs on its own, so leases stay fresh while every slot
-	// is busy with long tasks.
+	// is busy with long tasks, and until the last handler returned.
+	maintCtx, stopMaint := context.WithCancel(context.WithoutCancel(ctx))
 	maintDone := make(chan struct{})
 	go func() {
 		defer close(maintDone)
 		tick := time.NewTicker(s.lease / 3)
 		defer tick.Stop()
 		for {
-			s.maintain(ctx, &inflight)
+			s.maintain(maintCtx, &inflight)
 			select {
-			case <-ctx.Done():
+			case <-maintCtx.Done():
 				return
 			case <-tick.C:
 			}
@@ -235,7 +243,7 @@ func (s *DatabaseServer) Run(ctx context.Context, mux *Mux) error {
 		case <-ctx.Done():
 			goto shutdown
 		}
-		job, err := s.claim(ctx, queues)
+		job, err := s.claim(ctx)
 		if err != nil && ctx.Err() == nil {
 			logger.Log.WithError(err).Warn("Job queue: could not look for tasks")
 		}
@@ -249,13 +257,15 @@ func (s *DatabaseServer) Run(ctx context.Context, mux *Mux) error {
 			}
 			continue
 		}
-		inflight.Store(job.ID, struct{}{})
+		jobCtx, cancelJob := context.WithCancel(runCtx)
+		inflight.Store(job.ID, cancelJob)
 		wg.Add(1)
 		go func(job *Job) {
 			defer wg.Done()
 			defer func() { <-slots }()
 			defer inflight.Delete(job.ID)
-			s.process(runCtx, stopping, mux, job)
+			defer cancelJob()
+			s.process(jobCtx, stopping, mux, job)
 		}(job)
 	}
 
@@ -267,14 +277,77 @@ shutdown:
 	case <-done:
 	case <-time.After(s.cfg.ShutdownTimeout):
 		cancelRun()
-		<-done
+		select {
+		case <-done:
+		case <-time.After(s.cfg.ShutdownTimeout):
+			// Handlers that ignore their context: give their jobs back and
+			// stop waiting (as asynq does).
+			s.requeueInflight(&inflight)
+		}
 	}
+	stopMaint()
 	<-maintDone
 	return nil
 }
 
-// queueOrder returns the queues, highest priority first.
+// requeueInflight queues again the jobs this server is still running.
+func (s *DatabaseServer) requeueInflight(inflight *sync.Map) {
+	var ids []uint64
+	inflight.Range(func(k, _ any) bool { ids = append(ids, k.(uint64)); return true })
+	if len(ids) == 0 {
+		return
+	}
+	err := s.db.Model(&Job{}).Where("id IN ? AND locked_by = ? AND status = ?", ids, s.id, StatusRunning).
+		Updates(map[string]any{"status": StatusPending, "locked_by": "", "locked_until": nil, "updated_at": now()}).Error
+	if err != nil {
+		logger.Log.WithError(err).Error("Job queue: could not queue again the tasks interrupted by shutdown")
+		return
+	}
+	logger.Log.WithField("tasks", len(ids)).Warn("Job queue: tasks did not stop in time on shutdown; queued again")
+}
+
+// queueOrder returns the queues in the order to look for a task: weighted
+// random by priority (as asynq), so a busy queue does not starve the
+// others, or highest priority first with StrictPriority.
 func (s *DatabaseServer) queueOrder() []string {
+	if !s.cfg.StrictPriority {
+		return weightedOrder(s.cfg.Queues)
+	}
+	return s.strictOrder()
+}
+
+// weightedOrder draws the queues without replacement, each with a
+// probability proportional to its priority.
+func weightedOrder(queues map[string]int) []string {
+	left := make(map[string]int, len(queues))
+	total := 0
+	for q, p := range queues {
+		p = max(p, 1)
+		left[q] = p
+		total += p
+	}
+	out := make([]string, 0, len(queues))
+	for len(left) > 0 {
+		r := mrand.IntN(total)
+		names := make([]string, 0, len(left))
+		for q := range left {
+			names = append(names, q)
+		}
+		sort.Strings(names)
+		for _, q := range names {
+			if r < left[q] {
+				out = append(out, q)
+				total -= left[q]
+				delete(left, q)
+				break
+			}
+			r -= left[q]
+		}
+	}
+	return out
+}
+
+func (s *DatabaseServer) strictOrder() []string {
 	qs := make([]string, 0, len(s.cfg.Queues))
 	for q := range s.cfg.Queues {
 		qs = append(qs, q)
@@ -289,9 +362,12 @@ func (s *DatabaseServer) queueOrder() []string {
 	return qs
 }
 
-// claim takes the next due task, highest priority queue first.
-func (s *DatabaseServer) claim(ctx context.Context, queues []string) (*Job, error) {
+// claim takes the next due task.
+func (s *DatabaseServer) claim(ctx context.Context) (*Job, error) {
+	queues := s.queueOrder()
 	db := s.db.WithContext(ctx)
+	// Once claimed, the job must be returned even if ctx ends meanwhile.
+	keep := s.db.WithContext(context.WithoutCancel(ctx))
 	for attempt := 0; attempt < 5; attempt++ {
 		t := now()
 		var cand Job
@@ -311,7 +387,7 @@ func (s *DatabaseServer) claim(ctx context.Context, queues []string) (*Job, erro
 			return nil, nil
 		}
 		until := t.Add(s.lease)
-		res := db.Model(&Job{}).Where("id = ? AND status = ?", cand.ID, StatusPending).
+		res := keep.Model(&Job{}).Where("id = ? AND status = ?", cand.ID, StatusPending).
 			Updates(map[string]any{"status": StatusRunning, "locked_by": s.id, "locked_until": until, "updated_at": t})
 		if res.Error != nil {
 			return nil, res.Error
@@ -320,7 +396,7 @@ func (s *DatabaseServer) claim(ctx context.Context, queues []string) (*Job, erro
 			continue // another worker took it
 		}
 		var job Job
-		if err := db.First(&job, cand.ID).Error; err != nil {
+		if err := keep.First(&job, cand.ID).Error; err != nil {
 			return nil, err
 		}
 		return &job, nil
@@ -413,15 +489,31 @@ func Backoff(n int) time.Duration {
 func (s *DatabaseServer) maintain(ctx context.Context, inflight *sync.Map) {
 	db := s.db.WithContext(ctx)
 	t := now()
-	var ids []uint64
-	inflight.Range(func(k, _ any) bool { ids = append(ids, k.(uint64)); return true })
-	if len(ids) > 0 {
-		db.Model(&Job{}).Where("id IN ? AND locked_by = ? AND status = ?", ids, s.id, StatusRunning).
+	log := logger.Log.WithField("source", "queue")
+	// Leases: one update per running job (a few at most), so a job whose
+	// lease was lost (taken for a stopped worker's) is cancelled here.
+	inflight.Range(func(k, v any) bool {
+		res := db.Model(&Job{}).Where("id = ? AND locked_by = ? AND status = ?", k, s.id, StatusRunning).
 			Updates(map[string]any{"locked_until": t.Add(s.lease)})
-	}
+		switch {
+		case res.Error != nil:
+			if ctx.Err() == nil {
+				log.WithError(res.Error).Warn("Job queue: could not extend a task's lease")
+			}
+		case res.RowsAffected == 0:
+			log.WithField("job", k).Warn("Job queue: a running task's lease was lost (database unreachable for too long, or clocks out of sync); cancelling it")
+			v.(context.CancelFunc)()
+		}
+		return true
+	})
 	// A task whose server died counts as a failed attempt, as with asynq.
 	var stale []Job
-	db.Where("status = ? AND locked_until < ?", StatusRunning, t).Limit(100).Find(&stale)
+	if err := db.Where("status = ? AND locked_until < ?", StatusRunning, t).Limit(100).Find(&stale).Error; err != nil {
+		if ctx.Err() == nil {
+			log.WithError(err).Warn("Job queue: could not look for stopped tasks")
+		}
+		return
+	}
 	for _, j := range stale {
 		upd := map[string]any{"locked_by": "", "locked_until": nil, "updated_at": t, "last_error": "the worker running the task stopped"}
 		if j.Retried >= j.MaxRetry {
@@ -432,9 +524,13 @@ func (s *DatabaseServer) maintain(ctx context.Context, inflight *sync.Map) {
 			upd["retried"] = j.Retried + 1
 			upd["run_at"] = t
 		}
-		db.Model(&Job{}).Where("id = ? AND status = ? AND locked_until < ?", j.ID, StatusRunning, t).Updates(upd)
+		if err := db.Model(&Job{}).Where("id = ? AND status = ? AND locked_until < ?", j.ID, StatusRunning, t).Updates(upd).Error; err != nil {
+			log.WithError(err).Warn("Job queue: could not queue again a stopped task")
+		}
 	}
-	db.Where("status IN ? AND retention_until < ?", []string{StatusDone, StatusFailed}, t).Delete(&Job{})
+	if err := db.Where("status IN ? AND retention_until < ?", []string{StatusDone, StatusFailed}, t).Delete(&Job{}).Error; err != nil && ctx.Err() == nil {
+		log.WithError(err).Warn("Job queue: could not delete finished tasks")
+	}
 }
 
 // Counts returns the number of tasks by status (for health and tests).

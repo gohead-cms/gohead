@@ -57,6 +57,7 @@ func TestServesTheUI(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code, p)
 		assert.Equal(t, "<html>ui</html>", w.Body.String(), p)
 		assert.Equal(t, "no-cache", w.Header().Get("Cache-Control"), p)
+		assert.Equal(t, "DENY", w.Header().Get("X-Frame-Options"), p)
 	}
 
 	w := get(r, http.MethodGet, "/config.js")

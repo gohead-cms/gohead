@@ -94,7 +94,7 @@ With the `database` job queue (the default of `gohead standalone`), Redis is onl
 | Key | Env | Default |
 |-----|-----|---------|
 | `queue.driver` | `GOHEAD_QUEUE_DRIVER` | `redis` for `start`, `worker`, `dispatcher`, `scheduler`; `database` for `standalone` |
-| `queue.concurrency` | `GOHEAD_QUEUE_CONCURRENCY` | jobs run at once per process: `4` (standalone), `10` (worker), `5` (dispatcher) |
+| `queue.concurrency` | `GOHEAD_QUEUE_CONCURRENCY` | jobs run at once per process: `4` (standalone, plus 2 for content events), `10` (worker), `5` (dispatcher) |
 | `queue.poll_interval` | `GOHEAD_QUEUE_POLL_INTERVAL` | `1s` |
 
 `redis` queues background jobs in Redis (asynq). `database` keeps them in the `jobs` table of

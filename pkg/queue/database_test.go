@@ -123,11 +123,13 @@ func TestDatabaseTaskIDDeduplication(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, jobs(t, db), 1)
 
-	// Tasks without an ID never conflict.
-	_, err = c.Enqueue(ctx, "x", nil)
+	// Tasks without an ID never conflict, and get a random one.
+	a, err := c.Enqueue(ctx, "x", nil)
 	require.NoError(t, err)
-	_, err = c.Enqueue(ctx, "x", nil)
+	b, err := c.Enqueue(ctx, "x", nil)
 	require.NoError(t, err)
+	assert.Len(t, a, 32)
+	assert.NotEqual(t, a, b)
 }
 
 func TestDatabaseRetryThenSuccess(t *testing.T) {
@@ -221,18 +223,18 @@ func TestDatabaseQueuePriorityAndFilter(t *testing.T) {
 	_, err = c.Enqueue(ctx, "t", []byte("other"), Queue("other"))
 	require.NoError(t, err)
 
-	srv := NewDatabaseServer(db, DatabaseServerConfig{ServerConfig: ServerConfig{Queues: map[string]int{"low": 1, "high": 10}}})
-	j, err := srv.claim(ctx, srv.queueOrder())
+	srv := NewDatabaseServer(db, DatabaseServerConfig{ServerConfig: ServerConfig{Queues: map[string]int{"low": 1, "high": 10}, StrictPriority: true}})
+	j, err := srv.claim(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, j)
 	assert.Equal(t, "high", string(j.Payload))
 	for i := 0; i < 3; i++ {
-		j, err = srv.claim(ctx, srv.queueOrder())
+		j, err = srv.claim(ctx)
 		require.NoError(t, err)
 		require.NotNil(t, j)
 		assert.Equal(t, "low", string(j.Payload))
 	}
-	j, err = srv.claim(ctx, srv.queueOrder())
+	j, err = srv.claim(ctx)
 	require.NoError(t, err)
 	assert.Nil(t, j, "queues the server does not process are left alone")
 }
@@ -255,7 +257,7 @@ func TestDatabaseConcurrentClaimsTakeEachTaskOnce(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for {
-				j, err := srv.claim(ctx, srv.queueOrder())
+				j, err := srv.claim(ctx)
 				if err != nil {
 					continue // SQLite busy under contention: try again
 				}
@@ -360,4 +362,90 @@ func TestApplyDefaults(t *testing.T) {
 	assert.Equal(t, 0, o.MaxRetry)
 	assert.Equal(t, "q", o.Queue)
 	assert.GreaterOrEqual(t, Backoff(1), 16*time.Second)
+}
+
+func TestWeightedQueueOrder(t *testing.T) {
+	first := map[string]int{}
+	for i := 0; i < 2000; i++ {
+		order := weightedOrder(map[string]int{"agents": 10, "events": 10, "webhooks": 5})
+		require.Len(t, order, 3)
+		first[order[0]]++
+	}
+	// 40 % / 40 % / 20 %: no queue is starved.
+	assert.InDelta(t, 800, first["agents"], 150)
+	assert.InDelta(t, 800, first["events"], 150)
+	assert.InDelta(t, 400, first["webhooks"], 150)
+}
+
+func TestDatabaseLostLeaseCancelsTheTask(t *testing.T) {
+	db := testDB(t)
+	c := NewDatabaseClient(db)
+	started := make(chan struct{})
+	cancelled := make(chan struct{})
+	mux := NewMux()
+	mux.Handle("long", func(ctx context.Context, _ []byte) error {
+		close(started)
+		<-ctx.Done()
+		close(cancelled)
+		return ctx.Err()
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	srv := NewDatabaseServer(db, DatabaseServerConfig{
+		ServerConfig: ServerConfig{Concurrency: 1, Queues: map[string]int{"default": 1}},
+		PollInterval: 20 * time.Millisecond,
+	})
+	srv.lease = 150 * time.Millisecond
+	done := make(chan error, 1)
+	go func() { done <- srv.Run(ctx, mux) }()
+	_, err := c.Enqueue(context.Background(), "long", nil)
+	require.NoError(t, err)
+	<-started
+	// Another worker took the job (this one looked dead).
+	require.NoError(t, db.Model(&Job{}).Where("1 = 1").Update("locked_by", "other").Error)
+	select {
+	case <-cancelled:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the handler was not cancelled")
+	}
+	cancel()
+	require.NoError(t, <-done)
+	js := jobs(t, db)
+	require.Len(t, js, 1)
+	assert.Equal(t, "other", js[0].LockedBy, "the other worker's claim is left alone")
+}
+
+func TestDatabaseShutdownDoesNotWaitForeverForStuckHandlers(t *testing.T) {
+	db := testDB(t)
+	c := NewDatabaseClient(db)
+	started := make(chan struct{})
+	release := make(chan struct{})
+	defer close(release)
+	mux := NewMux()
+	mux.Handle("stuck", func(context.Context, []byte) error {
+		close(started)
+		<-release // ignores its context
+		return nil
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	srv := NewDatabaseServer(db, DatabaseServerConfig{
+		ServerConfig: ServerConfig{Concurrency: 1, Queues: map[string]int{"default": 1}},
+		PollInterval: 20 * time.Millisecond, ShutdownTimeout: 100 * time.Millisecond,
+	})
+	done := make(chan error, 1)
+	go func() { done <- srv.Run(ctx, mux) }()
+	_, err := c.Enqueue(context.Background(), "stuck", nil)
+	require.NoError(t, err)
+	<-started
+	cancel()
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Run did not return")
+	}
+	js := jobs(t, db)
+	require.Len(t, js, 1)
+	assert.Equal(t, StatusPending, js[0].Status, "queued again for another worker")
+	assert.Empty(t, js[0].LockedBy)
 }

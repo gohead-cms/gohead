@@ -103,6 +103,9 @@ func sendFile(c *gin.Context, name string) {
 	}
 	c.Header("Vary", "Accept-Encoding")
 	c.Header("X-Content-Type-Options", "nosniff")
+	// The admin UI is never framed by other sites (clickjacking).
+	c.Header("X-Frame-Options", "DENY")
+	c.Header("Content-Security-Policy", "frame-ancestors 'none'")
 	if strings.Contains(c.GetHeader("Accept-Encoding"), "gzip") {
 		if b, err := fs.ReadFile(files, name+".gz"); err == nil {
 			c.Header("Content-Encoding", "gzip")

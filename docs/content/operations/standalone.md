@@ -33,7 +33,8 @@ Open <http://raspberrypi.local:8080> (or the machine's address) and sign in. The
 same address: `/api/…`, `/admin/…`, `/auth/…`.
 
 The administrator variables are only needed for the first start. Everything else is kept in
-the data directory (`./data`, or `--data <dir>`):
+the data directory (`./data`, or `--data <dir>`, or `GOHEAD_DATA_DIR`). GoHead creates the
+database readable by its user only; keep the directory private too (`chmod 750`):
 
 | File | Contents |
 |------|----------|
@@ -45,13 +46,13 @@ Settings you configure yourself win: `GOHEAD_DATABASE_URL`, `GOHEAD_MEDIA_LOCAL_
 `GOHEAD_JWT_SECRET` (or the same keys in `config.yaml`) replace the defaults above, so
 standalone also runs on PostgreSQL or with S3 media.
 
-With Docker, the image runs standalone too:
+With Docker, the image runs standalone too, with its data in the `/data` volume:
 
 ```bash
 docker run -d --name gohead -p 8080:8080 -v gohead-data:/data \
   -e GOHEAD_ADMIN_USERNAME=admin -e GOHEAD_ADMIN_EMAIL=you@example.com \
   -e GOHEAD_ADMIN_PASSWORD='choose-a-long-password' \
-  ghcr.io/gohead-cms/gohead:latest standalone --data /data
+  ghcr.io/gohead-cms/gohead:latest standalone
 ```
 
 ## Run it as a service
@@ -112,13 +113,16 @@ To use less:
 Collection events, agent runs and webhook deliveries are rows of the `jobs` table. Workers in
 the process claim them with a conditional update, so each job runs once; a job queued by the
 process starts immediately, other processes' jobs are found by polling. Failed jobs are retried
-with the same backoff as with Redis; a job whose process stopped is picked up again after a
-minute. Finished jobs are deleted (webhook deliveries are kept for their retention period to
+with the same backoff as with Redis; a job whose process stopped is picked up again within
+about 80 seconds (its lease is renewed every 20 seconds and lasts one minute). Agent runs
+have their own workers and events theirs, so long agent runs never delay webhooks and event
+dispatching for long. Finished jobs are deleted (webhook deliveries are kept for their retention period to
 avoid duplicates); jobs that failed for good are kept 7 days.
 
 The database queue also works with separate processes: set `queue.driver: database`
 (`GOHEAD_QUEUE_DRIVER=database`) for `gohead start`, `worker`, `dispatcher` and `scheduler`,
-on PostgreSQL or MySQL. Without Redis, rate limits are counted per process and content-model
+on PostgreSQL or MySQL. Leases use each machine's clock: keep the machines synchronized
+(NTP). Without Redis, rate limits are counted per process and content-model
 changes are not broadcast between API processes, so run **one API process** per database.
 Configure `redis.address` to share them: standalone uses Redis for those when it is set,
 while keeping the database queue.

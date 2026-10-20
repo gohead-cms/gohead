@@ -59,8 +59,10 @@ COPY --from=builder --chown=65532:65532 /out/data /data
 
 # Writable location for a SQLite file when no external database is used,
 # and for uploads with the local media driver.
+# `gohead standalone` keeps its data (and generated JWT secret) there too.
 ENV GOHEAD_DATABASE_URL=sqlite:///data/gohead.db \
-    GOHEAD_MEDIA_LOCAL_PATH=/data/uploads
+    GOHEAD_MEDIA_LOCAL_PATH=/data/uploads \
+    GOHEAD_DATA_DIR=/data
 VOLUME ["/data"]
 
 EXPOSE 8080

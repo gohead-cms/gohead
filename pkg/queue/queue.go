@@ -105,8 +105,12 @@ func (m *Mux) Types() []string {
 type ServerConfig struct {
 	// Concurrency is the number of tasks processed at once.
 	Concurrency int
-	// Queues to process, with their priority (higher first).
+	// Queues to process, with their priority: queues are looked at in a
+	// random order weighted by priority, so busy queues do not starve the
+	// others.
 	Queues map[string]int
+	// StrictPriority always empties higher priority queues first.
+	StrictPriority bool
 }
 
 // Server processes tasks until its context ends.

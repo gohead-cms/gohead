@@ -6,7 +6,7 @@ gohead <command> [--config path]
 
 | Command | Description |
 |---------|-------------|
-| `standalone [--data DIR]` | Run everything in one process: the API, the admin UI, the worker, the dispatcher and the scheduler, with the database job queue (no Redis). SQLite database, uploads and a generated JWT secret go to `DIR` (default `data`) unless configured. See [Standalone](../operations/standalone.md). |
+| `standalone [--data DIR]` | Run everything in one process: the API, the admin UI, the worker, the dispatcher and the scheduler, with the database job queue (no Redis). SQLite database, uploads and a generated JWT secret go to `DIR` (default `data`, or `GOHEAD_DATA_DIR`) unless configured. See [Standalone](../operations/standalone.md). |
 | `start` | Run the HTTP API and the embedded admin UI: applies pending migrations (unless `auto_migrate` is false), seeds roles, creates the configured first admin. Graceful shutdown on SIGINT/SIGTERM. |
 | `migrate` | Apply pending [database migrations](../operations/upgrading.md#database-migrations) and exit. |
 | `migrate status` | List migrations and when they ran; exits non-zero if some are pending. |
