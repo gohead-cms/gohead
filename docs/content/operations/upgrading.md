@@ -68,6 +68,12 @@ migrations are explicit, reviewed steps; contributors add them in `pkg/migration
 
 ## Version notes
 
+### 0.6.1
+
+A bug fix release, with no migration and nothing to change: public access works again
+with rate limiting on (the default). On 0.6.0, anonymous reads of public types answered
+`401`; if you turned rate limiting off to work around it, you can turn it back on.
+
 ### 0.6.0
 
 !!! warning "Breaking changes"

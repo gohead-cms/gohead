@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-21
+
 ### Fixed
 - **Public access works with rate limiting on** (the default): anonymous reads of public types answered `401`, because the public rate limiter ran the request before marking it as public. Tests ran with rate limiting off.
 
