@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/tmc/langchaingo/llms"
@@ -181,27 +182,38 @@ func (a *langChainAdapter) Chat(ctx context.Context, messages []Message, opts ..
 		logger.Log.WithField("raw_llm_response", string(rawResponseJSON)).Info("Received raw response from LLM")
 	}
 
-	choice := res.Choices[0]
-	usage := usageFrom(choice.GenerationInfo, a.cfg)
+	// Every choice carries the usage of the whole message: count it once.
+	usage := usageFrom(res.Choices[0].GenerationInfo, a.cfg)
 	if rec := RecorderFrom(ctx); rec != nil {
 		rec.Add(usage)
 	}
+	return responseFrom(res.Choices, usage), nil
+}
 
-	// Modern tool-calling path
-	if len(choice.ToolCalls) > 0 {
-		return &Response{
-			Type:     ResponseTypeToolCall,
-			ToolCall: &choice.ToolCalls[0],
-			Usage:    usage,
-		}, nil
+// responseFrom reads a model's answer. OpenAI returns one choice with the
+// text and the tool calls; langchaingo's Anthropic client returns one choice
+// per content block, so "I'll summarize it." and the tool call it announces
+// arrive as two choices. The text of every choice is kept, and the first tool
+// call, wherever it is, makes the answer a tool call.
+func responseFrom(choices []*llms.ContentChoice, usage Usage) *Response {
+	var texts []string
+	var toolCall *llms.ToolCall
+	for _, c := range choices {
+		if c == nil {
+			continue
+		}
+		if c.Content != "" {
+			texts = append(texts, c.Content)
+		}
+		if toolCall == nil && len(c.ToolCalls) > 0 {
+			toolCall = &c.ToolCalls[0]
+		}
 	}
-
-	// Plain text response
-	return &Response{
-		Type:    ResponseTypeText,
-		Content: choice.Content,
-		Usage:   usage,
-	}, nil
+	content := strings.Join(texts, "\n\n")
+	if toolCall != nil {
+		return &Response{Type: ResponseTypeToolCall, Content: content, ToolCall: toolCall, Usage: usage}
+	}
+	return &Response{Type: ResponseTypeText, Content: content, Usage: usage}
 }
 
 // Helper function to map our roles to LangChainGo roles.

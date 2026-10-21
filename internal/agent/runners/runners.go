@@ -304,7 +304,12 @@ func (r *AgentRunner) runConversation(ctx context.Context, agent *agentModels.Ag
 		}
 		llmStep.InputTokens, llmStep.OutputTokens, llmStep.CostUSD = response.Usage.InputTokens, response.Usage.OutputTokens, response.Usage.CostUSD
 		if response.Type == llm.ResponseTypeToolCall {
-			llmStep.Result = truncate("→ "+response.ToolCall.FunctionCall.Name+"("+response.ToolCall.FunctionCall.Arguments+")", maxStoredText)
+			call := "→ " + response.ToolCall.FunctionCall.Name + "(" + response.ToolCall.FunctionCall.Arguments + ")"
+			if response.Content != "" {
+				// What the model said before calling (Anthropic models often do).
+				call = response.Content + "\n" + call
+			}
+			llmStep.Result = truncate(call, maxStoredText)
 		} else {
 			llmStep.Result = truncate(response.Content, maxStoredText)
 		}
