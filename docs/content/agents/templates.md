@@ -16,7 +16,7 @@ In the admin UI: **Agents → New agent → Start from a template**.
 Each template's agent:
 
 - is triggered by [collection events](triggers.md) of the collection you pick;
-- writes with `collections.patch_item`, [scoped](functions.md#limiting-functions-to-collections)
+- writes with `content.update`, [scoped](functions.md#limiting-tools-to-collections)
   to that collection, so it only changes the fields it is about;
 - uses the instance's default model (`llm.provider`, `llm.model`), at most 60 runs an hour;
 - can [require approval](approvals.md): on by default for the translator, off for the

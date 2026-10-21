@@ -148,7 +148,7 @@ export function RunsPanel({ agentName, initialRun }: { agentName: string; initia
                 <Table.ColumnHeader>Started</Table.ColumnHeader>
                 <Table.ColumnHeader>Status</Table.ColumnHeader>
                 <Table.ColumnHeader>Trigger</Table.ColumnHeader>
-                <Table.ColumnHeader textAlign="end" title="Model calls / function calls">
+                <Table.ColumnHeader textAlign="end" title="Model calls / tool calls">
                   Turns
                 </Table.ColumnHeader>
                 <Table.ColumnHeader textAlign="end">Tokens</Table.ColumnHeader>

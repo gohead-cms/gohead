@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gohead-cms/gohead/internal/agent/functions"
+	"github.com/gohead-cms/gohead/internal/agent/tools"
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/llm"
 	"github.com/gohead-cms/gohead/pkg/storage"
@@ -295,16 +295,12 @@ func checkType(p Param, val any) error {
 
 // fn is a function spec using a built-in implementation, scoped to the
 // template's collection.
-func fn(name, description, implKey string, collection string) map[string]any {
-	params := map[string]any{"type": "object", "properties": map[string]any{}}
-	for _, info := range functions.Catalog() {
-		if info.ImplKey == implKey {
-			params = info.Parameters
-		}
-	}
-	spec := map[string]any{"name": name, "description": description, "impl_key": implKey, "parameters": params}
+// fn is a tool of a template, in the short form: the catalog provides its
+// parameters. The name is kept because the prompt refers to it.
+func fn(name, description, use string, collection string) map[string]any {
+	spec := map[string]any{"use": tools.Use(tools.ImplKey(use)), "name": name, "description": description}
 	if collection != "" {
-		spec["collections"] = []string{collection}
+		spec["on"] = []string{collection}
 	}
 	return spec
 }
@@ -344,8 +340,8 @@ The message describes an event on an item and gives its data.
 Never change any other field.`, ct, source, target, words)
 	return map[string]any{
 		"system_prompt": prompt, "max_turns": 3,
-		"trigger":   eventTrigger(ct, "item:created", "item:updated"),
-		"functions": []any{fn("save_summary", "Save the summary into the item", "collections.patch_item", ct)},
+		"trigger": eventTrigger(ct, "item:created", "item:updated"),
+		"tools":   []any{fn("save_summary", "Save the summary into the item", "content.update", ct)},
 	}, nil
 }
 
@@ -382,8 +378,8 @@ The message describes an event on an item and gives its data.
 Never change any other field.`, ct, quoted(sources), choice, max, target, format)
 	return map[string]any{
 		"system_prompt": prompt, "max_turns": 3,
-		"trigger":   eventTrigger(ct, "item:created", "item:updated"),
-		"functions": []any{fn("save_tags", "Save the tags into the item", "collections.patch_item", ct)},
+		"trigger": eventTrigger(ct, "item:created", "item:updated"),
+		"tools":   []any{fn("save_tags", "Save the tags into the item", "content.update", ct)},
 	}, nil
 }
 
@@ -422,8 +418,8 @@ The message describes an event on an item and gives its data.
 Never change any other field. Do not rewrite or delete content.`, ct, quoted(sources), flag, flagged, ok, reasonStep)
 	return map[string]any{
 		"system_prompt": prompt, "max_turns": 3,
-		"trigger":   eventTrigger(ct, "item:created", "item:updated"),
-		"functions": []any{fn("save_moderation", "Save the moderation decision into the item", "collections.patch_item", ct)},
+		"trigger": eventTrigger(ct, "item:created", "item:updated"),
+		"tools":   []any{fn("save_moderation", "Save the moderation decision into the item", "content.update", ct)},
 	}, nil
 }
 
@@ -460,9 +456,9 @@ Keep the meaning, tone and formatting (Markdown, HTML, line breaks). Do not tran
 	return map[string]any{
 		"system_prompt": prompt, "max_turns": 6,
 		"trigger": eventTrigger(ct, events...),
-		"functions": []any{
-			fn("list_locales", "List the content locales", "collections.list_locales", ""),
-			fn("save_translation", "Save an item's values in one locale", "collections.patch_item", ct),
+		"tools": []any{
+			fn("list_locales", "List the content locales", "content.locales", ""),
+			fn("save_translation", "Save an item's values in one locale", "content.update", ct),
 		},
 	}, nil
 }

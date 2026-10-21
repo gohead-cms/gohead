@@ -276,8 +276,12 @@ func FormatAgentSchema(agent *agents.Agent) map[string]any {
 			"llmConfig":    llmCfg,
 			"memory":       agent.Memory,
 			"trigger":      trigger,
-			"functions":    agent.Functions,
-			"limits":       agent.Limits,
+			// tools: as written, only what differs from the catalog.
+			// functions: every tool as the model gets it (names,
+			// descriptions and parameters filled in).
+			"tools":     agent.Functions.Tools(),
+			"functions": agent.Functions.Resolved(),
+			"limits":    agent.Limits,
 			// requireApproval: writes become proposals editors approve.
 			"requireApproval": agent.RequireApproval,
 		},

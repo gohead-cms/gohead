@@ -61,7 +61,7 @@ function Step({ step }: { step: AgentRunStep }) {
           #{step.seq}
         </Text>
         <Badge colorPalette={step.type === "llm" ? "purple" : "teal"}>
-          {step.type === "llm" ? "model" : "function"}
+          {step.type === "llm" ? "model" : "tool"}
         </Badge>
         <Text fontWeight="semibold" fontSize="sm">
           {step.name}
@@ -90,7 +90,7 @@ function Step({ step }: { step: AgentRunStep }) {
   );
 }
 
-/** Shows one run: what triggered it, every model and function call, and how it ended. */
+/** Shows one run: what triggered it, every model and tool call, and how it ended. */
 export function RunDetailDrawer({ agentName, runId, onClose }: RunDetailDrawerProps) {
   const { run, loading, error, inProgress } = useAgentRun(agentName, runId);
 
@@ -138,7 +138,7 @@ export function RunDetailDrawer({ agentName, runId, onClose }: RunDetailDrawerPr
               )}
               {run.dryRun && (
                 <Notice status="info" variant="subtle" borderStartWidth="4px" borderStartColor="colorPalette.solid" borderRadius="md">
-                  Test run: the agent ran for real, but content functions only reported what they would change (“would_update”…). Nothing
+                  Test run: the agent ran for real, but content tools only reported what they would change (“would_update”…). Nothing
                   was written.
                 </Notice>
               )}

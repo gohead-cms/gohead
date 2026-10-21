@@ -37,7 +37,7 @@ llm:
 - An agent whose `provider` matches the default inherits the missing `model`, `api_key` and
   `base_url`, and the default prices if it also uses the default model.
 - An agent on another provider inherits nothing, so keys never leak across providers.
-- The `llm.*` [helper functions](functions.md#llm-helper-functions) always use these defaults.
+- The [AI helper tools](functions.md#ai-helpers) (`ai.*`) always use these defaults.
 
 ## Ollama example
 

@@ -1,4 +1,4 @@
-import { type AgentDefinition, type AgentFunctionInfo, type AgentLimits, type AgentNodeData } from "../../../shared/types";
+import { type AgentDefinition, type AgentFunction, type AgentFunctionInfo, type AgentLimits, type AgentNodeData, type AgentTool } from "../../../shared/types";
 
 /** The value the API returns in place of a stored secret; sending it back keeps the secret. */
 export const SECRET_MASK = "********";
@@ -20,9 +20,6 @@ export const EVENTS: { value: string; label: string; draftOnly?: boolean }[] = [
   { value: "item:unpublished", label: "Unpublished", draftOnly: true },
 ];
 
-/** Functions that change content: they should always be scoped. */
-export const WRITE_FUNCTIONS = ["collections.upsert_item", "collections.delete_item"];
-
 export const LIMIT_FIELDS: { key: keyof AgentLimits; label: string; help: string; decimal?: boolean }[] = [
   { key: "max_runs_per_hour", label: "Max runs per hour", help: "Runs started in the last 60 minutes." },
   { key: "max_runs_per_day", label: "Max runs per day", help: "Runs started in the last 24 hours." },
@@ -31,14 +28,19 @@ export const LIMIT_FIELDS: { key: keyof AgentLimits; label: string; help: string
   { key: "max_cost_per_day", label: "Max cost per day (USD)", help: "Needs input/output prices.", decimal: true },
 ];
 
-export interface FunctionDraft {
+/**
+ * A tool in the form: which one and where, plus optional overrides. Empty
+ * overrides use the catalog's name, description and parameters.
+ */
+export interface ToolDraft {
   /** Local key for React lists; never sent. */
   uid: string;
+  /** "content.update" (or an implementation key the catalog doesn't list). */
+  use: string;
+  on: string[];
   name: string;
   description: string;
-  impl_key: string;
-  collections: string[];
-  /** JSON text of the parameters schema. */
+  /** JSON text of a parameters schema ("" = the tool's own). */
   parameters: string;
 }
 
@@ -67,7 +69,7 @@ export interface AgentDraft {
   memory_type: string;
   session_scope: string;
   limits: Record<keyof AgentLimits, string>;
-  functions: FunctionDraft[];
+  tools: ToolDraft[];
   /** Content writes become proposals an editor approves. */
   require_approval: boolean;
 }
@@ -87,8 +89,35 @@ export function generateToken(): string {
 
 const num = (n: number | undefined) => (n ? String(n) : "");
 
-export function emptyFunction(): FunctionDraft {
-  return { uid: newUid(), name: "", description: "", impl_key: "", collections: [], parameters: "{}" };
+/** A new tool from the catalog; content tools start on the trigger's collection, if any. */
+export function newTool(info: AgentFunctionInfo, collection = ""): ToolDraft {
+  return { uid: newUid(), use: info.use, on: info.scoped && collection ? [collection] : [], name: "", description: "", parameters: "" };
+}
+
+/** The tool's catalog entry, by use name or implementation key. */
+export function toolInfo(catalog: AgentFunctionInfo[], use: string): AgentFunctionInfo | undefined {
+  return catalog.find((c) => c.use === use || c.impl_key === use);
+}
+
+/** The name the model sees: the override, else the catalog's. */
+export function toolName(t: ToolDraft, catalog: AgentFunctionInfo[]): string {
+  return t.name.trim() || toolInfo(catalog, t.use)?.name || t.use.replaceAll(".", "_");
+}
+
+function draftTool(t: AgentTool): ToolDraft {
+  return {
+    uid: newUid(),
+    use: t.use,
+    on: t.on ?? [],
+    name: t.name ?? "",
+    description: t.description ?? "",
+    parameters: t.parameters && Object.keys(t.parameters).length > 0 ? JSON.stringify(t.parameters, null, 2) : "",
+  };
+}
+
+/** Long-form functions (older API responses, old definitions) as tools. */
+function toolOfFunction(f: AgentFunction): AgentTool {
+  return { use: f.impl_key ?? "", on: f.collections, name: f.name, description: f.description, parameters: f.parameters };
 }
 
 /** The form state for an existing agent, or defaults for a new one. */
@@ -124,14 +153,7 @@ export function draftFromAgent(agent: AgentNodeData | null): AgentDraft {
       max_tokens_per_day: num(l.max_tokens_per_day),
       max_cost_per_day: num(l.max_cost_per_day),
     },
-    functions: (s?.functions ?? []).map((f) => ({
-      uid: newUid(),
-      name: f.name,
-      description: f.description ?? "",
-      impl_key: f.impl_key ?? "",
-      collections: f.collections ?? [],
-      parameters: JSON.stringify(f.parameters ?? {}, null, 2),
-    })),
+    tools: (s?.tools ?? (s?.functions ?? []).map(toolOfFunction)).map(draftTool),
     require_approval: Boolean(s?.requireApproval ?? s?.require_approval),
   };
 }
@@ -149,6 +171,7 @@ export function draftFromDefinition(def: AgentDefinition): AgentDraft {
       maxTurns: def.max_turns,
       memory: def.memory,
       functions: def.functions ?? [],
+      tools: def.tools,
       llmConfig: { ...def.llm_config, provider: def.llm_config?.provider ?? "", model: def.llm_config?.model ?? "" },
       trigger: def.trigger ?? { type: "manual" },
       limits: def.limits,
@@ -166,31 +189,9 @@ export function draftFromDefinition(def: AgentDefinition): AgentDraft {
   };
 }
 
-/** Applies a catalog entry to a function: fills what is empty or still the previous default. */
-export function applyCatalog(fn: FunctionDraft, info: AgentFunctionInfo | undefined, previous: AgentFunctionInfo | undefined): FunctionDraft {
-  if (!info) return { ...fn, impl_key: "" };
-  const prevParams = previous ? JSON.stringify(previous.parameters ?? {}, null, 2) : "";
-  const paramsUntouched = fn.parameters.trim() === "" || fn.parameters.trim() === "{}" || fn.parameters === prevParams;
-  const descUntouched = fn.description.trim() === "" || fn.description === previous?.description;
-  const prevName = previous ? defaultName(previous.impl_key) : "";
-  return {
-    ...fn,
-    impl_key: info.impl_key,
-    name: fn.name.trim() === "" || fn.name === prevName ? defaultName(info.impl_key) : fn.name,
-    description: descUntouched ? info.description : fn.description,
-    parameters: paramsUntouched ? JSON.stringify(info.parameters ?? {}, null, 2) : fn.parameters,
-    collections: info.scoped ? fn.collections : [],
-  };
-}
-
-/** "collections.upsert_item" → "upsert_item". */
-export function defaultName(implKey: string): string {
-  return implKey.split(".").pop() ?? implKey;
-}
-
-/** Parses a parameters textarea: the schema object, or an error message. */
+/** Parses a parameters override: the schema object ("" = none), or an error message. */
 export function parseParameters(text: string): { value?: Record<string, unknown>; error?: string } {
-  if (text.trim() === "") return { error: "Parameters are required; use {} for none." };
+  if (text.trim() === "") return {};
   try {
     const v: unknown = JSON.parse(text);
     if (typeof v !== "object" || v === null || Array.isArray(v)) return { error: "Parameters must be a JSON object (a JSON schema)." };
@@ -214,9 +215,9 @@ export type DraftErrors = Record<string, string>;
 
 /**
  * Client-side validation mirroring ValidateAgentSchema. Keys: field names, or
- * `fn.<uid>.<field>` for functions.
+ * `tool.<uid>.<field>` for tools.
  */
-export function validateDraft(d: AgentDraft, takenNames: string[]): DraftErrors {
+export function validateDraft(d: AgentDraft, takenNames: string[], catalog: AgentFunctionInfo[] = []): DraftErrors {
   const e: DraftErrors = {};
   const name = d.name.trim();
   if (!name) e.name = "A name is required.";
@@ -254,26 +255,23 @@ export function validateDraft(d: AgentDraft, takenNames: string[]): DraftErrors 
   }
 
   const names = new Map<string, number>();
-  for (const f of d.functions) {
-    names.set(f.name.trim(), (names.get(f.name.trim()) ?? 0) + 1);
-  }
-  for (const f of d.functions) {
-    const p = `fn.${f.uid}`;
-    const n = f.name.trim();
-    if (!n) e[`${p}.name`] = "A name is required.";
-    else if (!/^[a-zA-Z0-9_-]{1,64}$/.test(n)) e[`${p}.name`] = "Letters, digits, _ or - (max 64), as LLM providers require.";
-    else if ((names.get(n) ?? 0) > 1) e[`${p}.name`] = "Two functions have this name.";
-    if (!f.impl_key) e[`${p}.impl_key`] = "Choose an implementation.";
-    const parsed = parseParameters(f.parameters);
+  for (const t of d.tools) names.set(toolName(t, catalog), (names.get(toolName(t, catalog)) ?? 0) + 1);
+  for (const t of d.tools) {
+    const p = `tool.${t.uid}`;
+    const n = toolName(t, catalog);
+    if (!t.use) e[`${p}.use`] = "Choose a tool.";
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(n)) e[`${p}.name`] = "Letters, digits, _ or - (max 64), as model providers require.";
+    else if ((names.get(n) ?? 0) > 1) e[`${p}.name`] = `Two tools are named ${n}: give this one its own name.`;
+    const parsed = parseParameters(t.parameters);
     if (parsed.error) e[`${p}.parameters`] = parsed.error;
   }
   return e;
 }
 
 /** Warnings that do not block saving. */
-export function functionWarning(f: FunctionDraft): string | null {
-  if (WRITE_FUNCTIONS.includes(f.impl_key) && f.collections.length === 0) {
-    return "This function can change items in every collection. Restrict it to the collections it needs.";
+export function toolWarning(t: ToolDraft, catalog: AgentFunctionInfo[]): string | null {
+  if (toolInfo(catalog, t.use)?.writes && t.on.length === 0) {
+    return "This tool can change items in every collection. Choose the collections it needs.";
   }
   return null;
 }
@@ -309,13 +307,15 @@ export function buildPayload(d: AgentDraft): Record<string, unknown> {
     },
     memory: { type: d.memory_type.trim(), session_scope: d.session_scope.trim() },
     trigger,
-    functions: d.functions.map((f) => ({
-      name: f.name.trim(),
-      description: f.description.trim(),
-      impl_key: f.impl_key,
-      parameters: parseParameters(f.parameters).value ?? {},
-      ...(f.collections.length > 0 ? { collections: f.collections } : {}),
-    })),
+    tools: d.tools.map((t) => {
+      const tool: AgentTool = { use: t.use };
+      if (t.on.length > 0) tool.on = t.on;
+      if (t.name.trim()) tool.name = t.name.trim();
+      if (t.description.trim()) tool.description = t.description.trim();
+      const params = parseParameters(t.parameters).value;
+      if (params) tool.parameters = params;
+      return tool;
+    }),
     limits,
     require_approval: d.require_approval,
   };

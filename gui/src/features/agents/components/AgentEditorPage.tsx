@@ -40,7 +40,7 @@ export function AgentEditorPage() {
     <Page maxW="5xl">
       <PageHeader
         title={editing ? `Edit ${editing}` : "New agent"}
-        description="An LLM with a system prompt, the functions it may call, and the trigger that starts it."
+        description="An LLM with a system prompt, the tools it may use, and the trigger that starts it."
         actions={
           <Button asChild variant="ghost" size="xs">
             <RouterLink to={backTo}>Back to agents</RouterLink>
@@ -68,7 +68,7 @@ export function AgentEditorPage() {
               <Alert.Indicator />
               <Alert.Description flex="1" fontSize="sm">
                 {start?.template
-                  ? `Prepared from the ${start.template} template. Review it (model, functions, limits), then create the agent.`
+                  ? `Prepared from the ${start.template} template. Review it (model, tools, limits), then create the agent.`
                   : "A blank agent: fill in each section."}
               </Alert.Description>
               <Box>

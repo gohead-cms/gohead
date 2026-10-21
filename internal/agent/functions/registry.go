@@ -61,7 +61,10 @@ func NewRegistry(agentFuncs agentModels.FunctionSpecs) *Registry {
 	registeredFunctions := make([]string, 0, len(agentFuncs))
 	failedFunctions := make([]string, 0)
 
-	for i, spec := range agentFuncs {
+	// Names, descriptions and parameters the agent leaves out come from
+	// the catalog.
+	for i, raw := range agentFuncs {
+		spec := raw.ForModel()
 		logger.Log.WithFields(map[string]any{
 			"spec_index": i,
 			"spec_name":  spec.Name,

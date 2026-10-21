@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+- **Agent tools in a short form**: `"tools": [{"use": "content.update", "on": ["articles"]}]`. The catalog provides each tool's name, description and arguments; `name`, `description` and `parameters` only override them. Readable names for every built-in tool (`content.save`, `content.update`, `ai.summarize`, `ai.tags`…), the implementation keys still work. The agent editor picks tools from the catalog, grouped and described, with collection scopes and the overrides folded under **Customize**.
+
+### Changed
+- Agent responses return `tools` (as written) next to `functions` (every tool as the model gets it). Agents in the long `functions` form keep working; a function with an empty `parameters` schema now gets the tool's own, so the model knows its arguments. Unknown tools are refused when an agent is saved.
+
 ## [0.6.3] - 2026-10-21
 
 ### Added

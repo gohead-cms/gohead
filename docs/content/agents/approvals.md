@@ -21,13 +21,13 @@ Every write made by the built-in content functions:
 
 | Function | Proposal |
 |----------|----------|
-| `collections.upsert_item` without `item_id` | `create`, with the new item's values |
-| `collections.upsert_item` with `item_id`, `collections.patch_item` | `update`, with the item's values after the change |
+| `content.save` without `item_id` | `create`, with the new item's values |
+| `content.save` with `item_id`, `content.update` | `update`, with the item's values after the change |
 | the same with a `locale` other than the default | `update` of that translation |
-| `collections.delete_item` | `delete` |
+| `content.delete` | `delete` |
 
 The change is validated when the agent proposes it (required fields, types, unique values,
-the function's [collection scope](functions.md#limiting-functions-to-collections)): an
+the function's [collection scope](functions.md#limiting-tools-to-collections)): an
 invalid change is refused right away and the agent sees the error, as it would without
 approval. The function returns `{"status": "pending_approval", "proposal_id": …}`, so the
 agent knows nothing was written yet. Functions can pass a `reason`, shown to the reviewer.

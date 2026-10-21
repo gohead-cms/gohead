@@ -134,8 +134,12 @@ test("agents: create an agent from a template that needs approval", async ({ pag
     const body = (await saved).postDataJSON();
     expect(body.require_approval).toBe(true);
     expect(body.trigger).toEqual({ type: "collection_event", event_trigger: { collection, events: ["item:created", "item:updated"] } });
-    expect(body.functions.map((f: { impl_key: string }) => f.impl_key)).toEqual(["collections.patch_item"]);
-    expect(body.functions[0].collections).toEqual([collection]);
+    // Tools in the short form: which one, on which collection; the name is
+    // the template's, because its prompt refers to it.
+    expect(body.tools.map((t: { use: string }) => t.use)).toEqual(["content.update"]);
+    expect(body.tools[0].on).toEqual([collection]);
+    expect(body.tools[0].name).toBe("save_summary");
+    expect(body.functions).toBeUndefined();
 
     await expect(page).toHaveURL(new RegExp(`/agents\\?name=${agentName}$`));
     await expect(page.getByRole("heading", { name: agentName })).toBeVisible();
@@ -226,5 +230,52 @@ test("agents: a test run of a collection-event agent", async ({ page, request })
     expect(errors).toEqual([]);
   } finally {
     await request.delete(`${apiURL}/admin/agents/${agent}`, { headers });
+  }
+});
+
+test("agents: tools are picked from the catalog and saved in the short form", async ({ page, request }) => {
+  const errors = trackErrors(page);
+  const headers = await adminHeaders(request);
+  const agentName = `tools-${Date.now().toString(36)}${test.info().retry}`;
+
+  try {
+    await login(page);
+    await page.goto("/agents/new");
+    await page.getByRole("article", { name: "Blank agent" }).getByRole("button", { name: "Start blank" }).click();
+    await page.getByRole("textbox", { name: /^Name/ }).fill(agentName);
+    await page.getByRole("textbox", { name: /^System prompt/ }).fill("Summarize new articles and save the summary.");
+
+    // The picker lists the catalog by group, with what each tool does.
+    await page.getByRole("button", { name: "Add a tool" }).click();
+    const picker = page.getByRole("dialog", { name: "Add a tool" });
+    await expect(picker.getByRole("region", { name: "Content" })).toBeVisible();
+    await picker.getByRole("button", { name: /^Update fields of an item/ }).click();
+    await expect(picker).toBeHidden();
+
+    // A content tool that writes warns until it is scoped.
+    const update = page.getByTestId("tool-content.update");
+    await expect(update.getByText("called update_item by the model")).toBeVisible();
+    await expect(update.getByText(/can change items in every collection/)).toBeVisible();
+    await clickInput(page, "articles", update);
+    await expect(update.getByText(/can change items in every collection/)).toBeHidden();
+
+    await page.getByRole("button", { name: "Add a tool" }).click();
+    await picker.getByRole("button", { name: /^Summarize a text/ }).click();
+    await expect(page.getByTestId("tool-ai.summarize")).toBeVisible();
+
+    const saved = page.waitForRequest((r) => r.method() === "POST" && new URL(r.url()).pathname === "/admin/agents");
+    await page.getByRole("button", { name: "Create agent" }).click();
+    expect((await saved).postDataJSON().tools).toEqual([{ use: "content.update", on: ["articles"] }, { use: "ai.summarize" }]);
+    await expect(page).toHaveURL(new RegExp(`/agents\\?name=${agentName}$`));
+
+    // The API fills in what the model gets.
+    const res = await request.get(`${apiURL}/admin/agents/${agentName}`, { headers });
+    const schema = (await res.json()).data.schema;
+    expect(schema.tools).toEqual([{ use: "content.update", on: ["articles"] }, { use: "ai.summarize" }]);
+    expect(schema.functions.map((f: { name: string }) => f.name)).toEqual(["update_item", "summarize_text"]);
+    expect(schema.functions[0].parameters.required).toEqual(["collection_name", "item_id", "data"]);
+    expect(errors).toEqual([]);
+  } finally {
+    await request.delete(`${apiURL}/admin/agents/${agentName}`, { headers });
   }
 });

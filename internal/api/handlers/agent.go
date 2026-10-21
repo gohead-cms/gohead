@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gohead-cms/gohead/internal/agent/functions"
 	agents "github.com/gohead-cms/gohead/internal/models/agents"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
@@ -142,6 +143,11 @@ func CreateAgent(c *gin.Context) {
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
+	if err := functions.CheckTools(agent.Functions); err != nil {
+		c.Set("response", err.Error())
+		c.Set("status", http.StatusBadRequest)
+		return
+	}
 
 	// Check if agent with same name already exists
 	existing, err := storage.GetAgentByName(agent.Name)
@@ -193,6 +199,11 @@ func UpdateAgent(c *gin.Context) {
 
 	if err := agents.ValidateAgentSchema(agent); err != nil {
 		logger.Log.WithError(err).Warn("UpdateAgent: Validation failed")
+		c.Set("response", err.Error())
+		c.Set("status", http.StatusBadRequest)
+		return
+	}
+	if err := functions.CheckTools(agent.Functions); err != nil {
 		c.Set("response", err.Error())
 		c.Set("status", http.StatusBadRequest)
 		return

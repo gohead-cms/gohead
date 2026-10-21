@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/gohead-cms/gohead/internal/agent/tools"
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/robfig/cron"
 
@@ -149,13 +150,15 @@ func (t *TriggerConfig) Scan(value any) error {
 	return json.Unmarshal(bytes, t)
 }
 
-// FunctionSpec describes a tool the agent can call.
-// FunctionSpec represents a tool or function the agent can use.
+// FunctionSpec is a tool of an agent, as stored. Name, Description and
+// Parameters are optional: empty, they come from the tool catalog (see
+// Resolved). Agents written with the short form ("tools") store only what
+// they override.
 type FunctionSpec struct {
-	Name        string         `json:"name"`        // The name of the function
-	Description string         `json:"description"` // A description for the LLM
-	Parameters  models.JSONMap `json:"parameters"`  // JSON schema for the function's parameters
-	ImplKey     string         `json:"impl_key"`    // Key used to look up the actual implementation
+	Name        string         `json:"name"`        // The name the model sees
+	Description string         `json:"description"` // What the model is told about it
+	Parameters  models.JSONMap `json:"parameters"`  // JSON schema of its arguments
+	ImplKey     string         `json:"impl_key"`    // The built-in implementation
 	// Collections restricts the collections.* functions to these
 	// collections. Empty: every collection (not recommended for writes).
 	Collections []string `json:"collections,omitempty"`
@@ -230,6 +233,20 @@ func ParseAgentInput(input map[string]any) (Agent, error) {
 	}
 	if err := json.Unmarshal(b, &agent); err != nil {
 		return agent, fmt.Errorf("invalid agent input format: %w", err)
+	}
+	// "tools" (the short form) wins over "functions" when both are given,
+	// as when a client sends back what it read.
+	if specs, ok, err := toolsInput(input); err != nil {
+		return agent, err
+	} else if ok {
+		if _, both := input["functions"]; both && !sameTools(specs, agent.Functions) {
+			return agent, errors.New("'tools' and 'functions' describe different tools: send one of them ('tools' is the short form)")
+		}
+		agent.Functions = specs
+	}
+	for i := range agent.Functions {
+		// The long form may name tools by their short name too.
+		agent.Functions[i].ImplKey = tools.ImplKey(strings.TrimSpace(agent.Functions[i].ImplKey))
 	}
 
 	if err := ValidateAgentSchema(agent); err != nil {
@@ -311,48 +328,38 @@ func ValidateAgentSchema(agent Agent) error {
 	return nil
 }
 
-// validateFunctionSpecs detects duplicates first, then validates required fields.
+// validateFunctionSpecs checks an agent's tools: each names an
+// implementation, the names the model sees are unique and valid, and only
+// content tools have collections. Names, descriptions and parameters left
+// out come from the catalog.
 func validateFunctionSpecs(funcs []FunctionSpec) error {
-	// ---- First pass: duplicate detection
-	seenName := make(map[string]struct{})
-
-	for _, f := range funcs {
-		// Check for duplicate function names
-		if f.Name != "" {
-			if _, ok := seenName[f.Name]; ok {
-				return fmt.Errorf("duplicate function name detected: %s", f.Name)
+	seen := make(map[string]struct{})
+	for i, f := range funcs {
+		if strings.TrimSpace(f.ImplKey) == "" {
+			return fmt.Errorf("tool %d: say which tool with 'use' (e.g. \"content.update\")", i+1)
+		}
+		r := f.Resolved()
+		if !toolName.MatchString(r.Name) {
+			return fmt.Errorf("tool '%s': names may only use letters, digits, '_' and '-' (64 at most)", r.Name)
+		}
+		if _, dup := seen[r.Name]; dup {
+			return fmt.Errorf("two tools are named '%s': give one of them its own 'name'", r.Name)
+		}
+		seen[r.Name] = struct{}{}
+		if f.Parameters != nil {
+			// Sent to the model as a JSON schema: it must serialize.
+			if _, err := json.Marshal(f.Parameters); err != nil {
+				return fmt.Errorf("tool '%s' has invalid parameters: %v", r.Name, err)
 			}
-			seenName[f.Name] = struct{}{}
-		} else {
-			return errors.New("function must have a non-empty 'name'")
 		}
-
-		// Several functions may share an implementation (e.g. the same
-		// collections.* function with different collection scopes).
-		if f.ImplKey == "" {
-			return errors.New("function must have a non-empty 'impl_key'")
-		}
-	}
-
-	// ---- Second pass: individual function validation (e.g., parameters)
-	for _, f := range funcs {
-		if f.Parameters == nil {
-			return fmt.Errorf("function '%s' must have 'parameters' defined, even if empty (e.g., {})", f.Name)
-		}
-		// Parameters are sent to the LLM as a JSON schema, so they must
-		// serialize cleanly.
-		if _, err := json.Marshal(f.Parameters); err != nil {
-			return fmt.Errorf("function '%s' has invalid parameters: %v", f.Name, err)
-		}
-		if len(f.Collections) > 0 && !strings.HasPrefix(f.ImplKey, "collections.") {
-			return fmt.Errorf("function '%s': 'collections' only applies to collections.* functions", f.Name)
+		if _, known := tools.Lookup(r.ImplKey); known && len(f.Collections) > 0 && !tools.Scoped(r.ImplKey) {
+			return fmt.Errorf("tool '%s': 'on' (collections) only applies to content tools", r.Name)
 		}
 		for _, c := range f.Collections {
 			if strings.TrimSpace(c) == "" {
-				return fmt.Errorf("function '%s': empty collection name in 'collections'", f.Name)
+				return fmt.Errorf("tool '%s': empty collection name in 'on'", r.Name)
 			}
 		}
 	}
-
 	return nil
 }

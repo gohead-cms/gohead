@@ -126,9 +126,9 @@ mutation {
 - **History:** every revision keeps the translations. Diffs name translated values `<attribute>@<locale>`, for example `title@fr`, and restoring a version restores its translations too. See [content history](content-history.md).
 - **Webhooks:** webhook payloads add a `translations` object (`{"fr": {"title": "…"}}`) next to `data`. `password` attributes are left out, as in `data`.
 - **Agents:**
-    - `collections.upsert_item` takes a `locale`: with `item_id`, it writes that locale's translation. The values given are merged over that locale's existing values, and `null` removes one. That makes it easy to build a translation agent, for example one triggered on `item:created` that translates new articles into every locale.
-    - `collections.list_locales` lists the locales.
-    - `collections.list_items` returns each item's `translations`.
+    - `content.save` takes a `locale`: with `item_id`, it writes that locale's translation. The values given are merged over that locale's existing values, and `null` removes one. That makes it easy to build a translation agent, for example one triggered on `item:created` that translates new articles into every locale.
+    - `content.locales` lists the locales.
+    - `content.list` returns each item's `translations`.
 
 ```json
 {
@@ -140,29 +140,9 @@ mutation {
     "type": "collection_event",
     "event_trigger": { "collection": "articles", "events": ["item:created"] }
   },
-  "functions": [
-    {
-      "name": "list_locales",
-      "description": "List the content locales",
-      "impl_key": "collections.list_locales",
-      "parameters": { "type": "object", "properties": {} }
-    },
-    {
-      "name": "save_translation",
-      "description": "Save an article's values in one locale",
-      "impl_key": "collections.upsert_item",
-      "collections": ["articles"],
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "collection_name": { "type": "string" },
-          "item_id": { "type": "string" },
-          "locale": { "type": "string" },
-          "data": { "type": "object" }
-        },
-        "required": ["collection_name", "item_id", "locale", "data"]
-      }
-    }
+  "tools": [
+    { "use": "content.locales" },
+    { "use": "content.update", "on": ["articles"], "name": "save_translation" }
   ]
 }
 ```
