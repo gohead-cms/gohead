@@ -2,12 +2,14 @@ package models
 
 import (
 	"bytes"
+	"maps"
 	"testing"
 
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Initialize logger for testing
@@ -164,16 +166,16 @@ func TestValidateAgentSchema(t *testing.T) {
 			errMsg:   "webhook trigger requires a 'webhook_token'",
 		},
 		{
-			name:     "Function with Empty Name",
-			agent:    Agent{Name: "test", SystemPrompt: "...", MaxTurns: 1, LLMConfig: LLMConfig{Provider: "p"}, Memory: MemoryConfig{Type: "in-memory", SessionScope: "user"}, Trigger: TriggerConfig{Type: "manual"}, Functions: FunctionSpecs{{Name: ""}}},
+			name:     "Tool with an invalid name",
+			agent:    Agent{Name: "test", SystemPrompt: "...", MaxTurns: 1, LLMConfig: LLMConfig{Provider: "p"}, Memory: MemoryConfig{Type: "in-memory", SessionScope: "user"}, Trigger: TriggerConfig{Type: "manual"}, Functions: FunctionSpecs{{Name: "save summary", ImplKey: "collections.patch_item"}}},
 			hasError: true,
-			errMsg:   "function must have a non-empty 'name'",
+			errMsg:   "names may only use letters",
 		},
 		{
 			name:     "Function with Empty ImplKey",
 			agent:    Agent{Name: "test", SystemPrompt: "...", MaxTurns: 1, LLMConfig: LLMConfig{Provider: "p"}, Memory: MemoryConfig{Type: "in-memory", SessionScope: "user"}, Trigger: TriggerConfig{Type: "manual"}, Functions: FunctionSpecs{{Name: "test_func"}}},
 			hasError: true,
-			errMsg:   "function must have a non-empty 'impl_key'",
+			errMsg:   "say which tool with 'use'",
 		},
 		{
 			name:     "Function with Invalid Parameters JSON",
@@ -291,7 +293,92 @@ func TestValidateLimitsAndScopes(t *testing.T) {
 	a.Functions = FunctionSpecs{{Name: "rm", ImplKey: "collections.delete_item", Parameters: models.JSONMap{}, Collections: []string{"drafts"}}}
 	assert.NoError(t, ValidateAgentSchema(a))
 	a.Functions = FunctionSpecs{{Name: "sum", ImplKey: "llm.summarize", Parameters: models.JSONMap{}, Collections: []string{"drafts"}}}
-	assert.ErrorContains(t, ValidateAgentSchema(a), "only applies to collections")
+	assert.ErrorContains(t, ValidateAgentSchema(a), "only applies to content tools")
 	a.Functions = FunctionSpecs{{Name: "rm", ImplKey: "collections.delete_item", Parameters: models.JSONMap{}, Collections: []string{" "}}}
 	assert.Error(t, ValidateAgentSchema(a))
+}
+
+// The short form: {"use", "on"} with everything else from the catalog.
+func TestToolsShortForm(t *testing.T) {
+	base := map[string]any{
+		"name": "summarizer", "system_prompt": "Summarize.", "max_turns": 3,
+		"llm_config": map[string]any{"provider": "openai"},
+		"memory":     map[string]any{"type": "in-memory", "session_scope": "agent"},
+		"trigger":    map[string]any{"type": "manual"},
+	}
+
+	in := maps.Clone(base)
+	in["tools"] = []any{
+		map[string]any{"use": "content.update", "on": []any{"articles"}},
+		map[string]any{"use": "ai.summarize"},
+		map[string]any{"use": "collections.list_items", "name": "list_articles", "on": []any{"articles"}},
+	}
+	// "tools" wins over "functions", as when a client sends back what it read.
+	in["functions"] = []any{map[string]any{"name": "ignored", "impl_key": "system.log", "parameters": map[string]any{}}}
+	agent, err := ParseAgentInput(in)
+	require.NoError(t, err)
+	require.Len(t, agent.Functions, 3)
+
+	// Stored: only what the agent says.
+	assert.Equal(t, FunctionSpec{ImplKey: "collections.patch_item", Collections: []string{"articles"}}, agent.Functions[0])
+	assert.Equal(t, "llm.summarize_text", agent.Functions[1].ImplKey)
+	assert.Equal(t, "list_articles", agent.Functions[2].Name)
+
+	// Resolved for the model: the catalog's name, description and schema.
+	r := agent.Functions.Resolved()
+	assert.Equal(t, "update_item", r[0].Name)
+	assert.Equal(t, "Change some attributes of an item and keep the others, validated like API writes. Only in: articles", r[0].Description)
+	assert.Equal(t, []any{"collection_name", "item_id", "data"}, toAny(r[0].Parameters["required"]))
+	assert.Equal(t, "summarize_text", r[1].Name)
+	assert.Equal(t, "list_articles", r[2].Name)
+
+	// Back to the short form: nothing but what was written.
+	assert.Equal(t, []Tool{
+		{Use: "content.update", On: []string{"articles"}},
+		{Use: "ai.summarize"},
+		{Use: "content.list", On: []string{"articles"}, Name: "list_articles"},
+	}, agent.Functions.Tools())
+
+	// Two tools with the same default name need their own.
+	in = maps.Clone(base)
+	in["tools"] = []any{map[string]any{"use": "content.update", "on": []any{"a"}}, map[string]any{"use": "content.update", "on": []any{"b"}}}
+	_, err = ParseAgentInput(in)
+	assert.ErrorContains(t, err, "two tools are named 'update_item'")
+
+	in["tools"] = []any{map[string]any{"use": "ai.summarize", "on": []any{"a"}}}
+	_, err = ParseAgentInput(in)
+	assert.ErrorContains(t, err, "only applies to content tools")
+
+	in["tools"] = []any{map[string]any{"on": []any{"a"}}}
+	_, err = ParseAgentInput(in)
+	assert.ErrorContains(t, err, "say which tool with 'use'")
+}
+
+// Agents written in the long form keep working: what they give is kept, and
+// an empty schema gets the catalog's.
+func TestToolsLongFormStillWorks(t *testing.T) {
+	f := FunctionSpec{Name: "save", Description: "Save an article", ImplKey: "collections.upsert_item", Parameters: models.JSONMap{"type": "object", "properties": map[string]any{}}, Collections: []string{"articles"}}
+	r := f.Resolved()
+	assert.Equal(t, "save", r.Name)
+	assert.Equal(t, "Save an article", r.Description)
+	assert.NotEmpty(t, r.Parameters["properties"], "an empty schema gets the tool's own")
+	assert.Equal(t, Tool{Use: "content.save", On: []string{"articles"}, Name: "save", Description: "Save an article"}, ToolOf(f))
+
+	custom := FunctionSpec{Name: "check_stock", ImplKey: "shop.check_stock"}
+	assert.Equal(t, "check_stock", custom.Resolved().Name, "functions outside the catalog keep their name")
+	assert.Equal(t, Tool{Use: "shop.check_stock", Name: "check_stock"}, ToolOf(custom))
+}
+
+func toAny(v any) []any {
+	switch x := v.(type) {
+	case []string:
+		out := make([]any, len(x))
+		for i, s := range x {
+			out[i] = s
+		}
+		return out
+	case []any:
+		return x
+	}
+	return nil
 }

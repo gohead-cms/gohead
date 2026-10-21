@@ -389,3 +389,67 @@ func TestDeleteAgentHandler(t *testing.T) {
 		})
 	}
 }
+
+// Agents written with the short tool form, read back in both forms; an
+// unknown tool is refused.
+func TestAgentToolsShortForm(t *testing.T) {
+	router, db := testutils.SetupTestServer()
+	router.Use(middleware.ResponseWrapper())
+	defer testutils.CleanupTestDB()
+	assert.NoError(t, db.AutoMigrate(&agents.Agent{}))
+	router.POST("/agents", CreateAgent)
+	router.PUT("/agents/:name", UpdateAgent)
+	router.GET("/agents/:name", GetAgent)
+
+	send := func(method, path string, in map[string]any) *httptest.ResponseRecorder {
+		b, _ := json.Marshal(in)
+		req, _ := http.NewRequest(method, path, bytes.NewBuffer(b))
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		router.ServeHTTP(rr, req)
+		return rr
+	}
+	agent := map[string]any{
+		"name": "tagger", "system_prompt": "Tag articles.", "max_turns": 3,
+		"llm_config": map[string]any{"provider": "openai"},
+		"memory":     map[string]any{"type": "in-memory", "session_scope": "agent"},
+		"trigger":    map[string]any{"type": "manual"},
+		"tools":      []any{map[string]any{"use": "content.update", "on": []any{"articles"}}, map[string]any{"use": "ai.tags"}},
+	}
+	rr := send(http.MethodPost, "/agents", agent)
+	assert.Equal(t, http.StatusCreated, rr.Code, rr.Body.String())
+
+	var got struct {
+		Data struct {
+			Schema struct {
+				Tools     []map[string]any `json:"tools"`
+				Functions []map[string]any `json:"functions"`
+			} `json:"schema"`
+		} `json:"data"`
+	}
+	rr = send(http.MethodGet, "/agents/tagger", nil)
+	assert.NoError(t, json.Unmarshal(rr.Body.Bytes(), &got))
+	assert.Equal(t, []map[string]any{
+		{"use": "content.update", "on": []any{"articles"}},
+		{"use": "ai.tags"},
+	}, got.Data.Schema.Tools, "tools: as written")
+	if assert.Len(t, got.Data.Schema.Functions, 2) {
+		f := got.Data.Schema.Functions[0]
+		assert.Equal(t, "update_item", f["name"], "functions: as the model gets them")
+		assert.Equal(t, "collections.patch_item", f["impl_key"])
+		assert.Equal(t, []any{"articles"}, f["collections"])
+		assert.NotEmpty(t, f["parameters"].(map[string]any)["properties"])
+	}
+
+	// Sending back what was read (tools and functions) keeps the short form.
+	agent["functions"] = got.Data.Schema.Functions
+	agent["tools"] = []any{map[string]any{"use": "content.update", "on": []any{"articles", "pages"}}}
+	rr = send(http.MethodPut, "/agents/tagger", agent)
+	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	assert.Contains(t, rr.Body.String(), `"tools":[{"use":"content.update","on":["articles","pages"]}]`)
+
+	agent["tools"] = []any{map[string]any{"use": "gmail.send"}}
+	rr = send(http.MethodPut, "/agents/tagger", agent)
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Contains(t, rr.Body.String(), "unknown tool 'gmail.send'")
+}

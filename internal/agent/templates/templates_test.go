@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/gohead-cms/gohead/internal/agent/functions"
+	"github.com/gohead-cms/gohead/internal/agent/tools"
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/testutils"
 
@@ -32,10 +33,10 @@ func fixture(t *testing.T) {
 func functionsOf(t *testing.T, def map[string]any) map[string]map[string]any {
 	t.Helper()
 	out := map[string]map[string]any{}
-	for _, f := range def["functions"].([]any) {
+	for _, f := range def["tools"].([]any) {
 		spec := f.(map[string]any)
 		out[spec["name"].(string)] = spec
-		assert.True(t, functions.IsImplementationAvailable(spec["impl_key"].(string)), spec["impl_key"])
+		assert.True(t, functions.IsImplementationAvailable(tools.ImplKey(spec["use"].(string))), spec["use"])
 	}
 	return out
 }
@@ -50,8 +51,8 @@ func TestRenderTemplates(t *testing.T) {
 	assert.Contains(t, def["system_prompt"], "at most 25 words")
 	assert.Equal(t, false, def["require_approval"])
 	fns := functionsOf(t, def)
-	assert.Equal(t, []string{"posts"}, fns["save_summary"]["collections"], "scoped to the collection")
-	assert.Equal(t, "collections.patch_item", fns["save_summary"]["impl_key"])
+	assert.Equal(t, []string{"posts"}, fns["save_summary"]["on"], "scoped to the collection")
+	assert.Equal(t, "content.update", fns["save_summary"]["use"])
 	trigger := def["trigger"].(map[string]any)["event_trigger"].(map[string]any)
 	assert.Equal(t, []string{"item:created", "item:updated"}, trigger["events"])
 
