@@ -19,25 +19,38 @@ import (
 // The client IP comes from gin's ClientIP, which only trusts forwarding
 // headers from configured trusted proxies (see trusted_proxies).
 func RateLimit(counter ratelimit.Counter, name string, limit int, window time.Duration) gin.HandlerFunc {
+	allow := RateLimitAllow(counter, name, limit, window)
 	return func(c *gin.Context) {
-		if limit <= 0 || counter == nil {
+		if allow(c) {
 			c.Next()
-			return
+		}
+	}
+}
+
+// Limiter counts a request and reports whether it may go on; when it may
+// not, it has answered 429. Unlike a gin middleware it does not run the
+// rest of the chain, so another middleware can call it inline.
+type Limiter func(c *gin.Context) bool
+
+// RateLimitAllow is RateLimit as a Limiter.
+func RateLimitAllow(counter ratelimit.Counter, name string, limit int, window time.Duration) Limiter {
+	return func(c *gin.Context) bool {
+		if limit <= 0 || counter == nil {
+			return true
 		}
 		count, reset, err := counter.Hit(c.Request.Context(), name+":ip:"+c.ClientIP(), window)
 		if err != nil {
 			// Fail open: never lock everyone out because the limiter broke.
 			logger.Log.WithError(err).Warn("Rate limiter error; request allowed")
-			c.Next()
-			return
+			return true
 		}
 		c.Header("RateLimit-Limit", strconv.Itoa(limit))
 		c.Header("RateLimit-Remaining", strconv.FormatInt(max(int64(limit)-count, 0), 10))
 		if count > int64(limit) {
 			TooManyRequests(c, reset, "Too many requests, please retry later")
-			return
+			return false
 		}
-		c.Next()
+		return true
 	}
 }
 
