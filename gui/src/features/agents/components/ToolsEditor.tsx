@@ -193,7 +193,9 @@ function ToolCard({
   errors,
   onChange,
   onRemove,
+  requireApproval,
 }: {
+  requireApproval: boolean;
   tool: ToolDraft;
   catalog: AgentFunctionInfo[];
   collections: CollectionChoice[];
@@ -292,7 +294,9 @@ function ToolCard({
               {info?.writes
                 ? waits
                   ? "This tool may change something in the app: calls go to Approvals first."
-                  : "Calls are made right away, without review."
+                  : requireApproval
+                    ? "This agent requires approval, so its calls still go to Approvals."
+                    : "Calls are made right away, without review."
                 : "This tool only reads, so it runs without approval by default."}
             </Text>
           </Box>
@@ -399,7 +403,10 @@ export function ToolsEditor({
   collections,
   triggerCollection,
   errors,
+  requireApproval = false,
 }: {
+  /** The agent requires approval: write calls always wait. */
+  requireApproval?: boolean;
   tools: ToolDraft[];
   onChange: (tools: ToolDraft[]) => void;
   catalog: AgentFunctionInfo[];
@@ -458,6 +465,7 @@ export function ToolsEditor({
               errors={errors}
               onChange={(next) => onChange(tools.map((x) => (x.uid === t.uid ? next : x)))}
               onRemove={() => onChange(tools.filter((x) => x.uid !== t.uid))}
+              requireApproval={requireApproval}
             />
           ))}
         </VStack>

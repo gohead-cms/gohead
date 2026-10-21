@@ -100,6 +100,9 @@ func isAppTool(implKey string) bool {
 	return ok && !strings.HasPrefix(implKey, "collections.") && !strings.HasPrefix(implKey, "llm.")
 }
 
+// IsAppTool reports whether a tool is a connected app's.
+func IsAppTool(implKey string) bool { return isAppTool(implKey) }
+
 // needsApproval reports whether calls of the tool wait for an admin.
 func needsApproval(spec agentModels.FunctionSpec, info tools.Info, mode WriteMode) bool {
 	if spec.Approval != nil && *spec.Approval {

@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -37,12 +38,44 @@ type Config struct {
 
 var cfg = Config{Timeout: 30 * time.Second}
 
+// maxTimeout keeps a call shorter than the claim on a proposal being
+// approved (2 minutes), so another reviewer can never make it again while
+// it runs.
+const maxTimeout = 90 * time.Second
+
 // Configure sets the connection settings (call at startup).
 func Configure(c Config) {
 	if c.Timeout <= 0 {
 		c.Timeout = 30 * time.Second
 	}
+	if c.Timeout > maxTimeout {
+		c.Timeout = maxTimeout
+	}
 	cfg = c
+}
+
+// maxResponse caps a server's response: a bigger one is an error.
+const maxResponse = 8 << 20
+
+// ErrResponseTooLarge is returned for a response over maxResponse.
+var ErrResponseTooLarge = errors.New("the server's response is too large")
+
+// limitedBody fails reads past maxResponse.
+type limitedBody struct {
+	io.ReadCloser
+	left int64
+}
+
+func (b *limitedBody) Read(p []byte) (int, error) {
+	if b.left <= 0 {
+		return 0, ErrResponseTooLarge
+	}
+	if int64(len(p)) > b.left {
+		p = p[:b.left]
+	}
+	n, err := b.ReadCloser.Read(p)
+	b.left -= int64(n)
+	return n, err
 }
 
 // maxResult caps what a tool call returns to the model.
@@ -85,7 +118,11 @@ func (t authTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 			r.Header.Set(t.ep.HeaderName, t.ep.Token)
 		}
 	}
-	return t.base.RoundTrip(r)
+	resp, err := t.base.RoundTrip(r)
+	if err == nil && resp.Body != nil {
+		resp.Body = &limitedBody{ReadCloser: resp.Body, left: maxResponse}
+	}
+	return resp, err
 }
 
 // httpClient checks every address it connects to, once resolved, so DNS
@@ -125,7 +162,7 @@ func httpClient(ep Endpoint) *http.Client {
 // connect opens a session with the server.
 func connect(ctx context.Context, ep Endpoint) (*mcp.ClientSession, func(), error) {
 	hc := httpClient(ep)
-	client := mcp.NewClient(&mcp.Implementation{Name: "gohead", Title: "GoHead"}, nil)
+	client := mcp.NewClient(&mcp.Implementation{Name: "gohead", Title: "GoHead", Version: "1"}, nil)
 	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{
 		Endpoint: ep.URL, HTTPClient: hc, DisableStandaloneSSE: true,
 	}, nil)
@@ -145,13 +182,18 @@ func friendlyError(err error) error {
 	if errors.Is(err, ErrBlockedAddress) || strings.Contains(msg, ErrBlockedAddress.Error()) {
 		return ErrBlockedAddress
 	}
+	if strings.Contains(msg, ErrResponseTooLarge.Error()) {
+		return ErrResponseTooLarge
+	}
+	// The SDK reports HTTP errors by their status text ("sending
+	// \"initialize\": Unauthorized").
 	switch {
-	case strings.Contains(msg, "401"), strings.Contains(strings.ToLower(msg), "unauthorized"):
+	case strings.HasSuffix(msg, ": Unauthorized"):
 		return fmt.Errorf("the server refused the token (401 Unauthorized): %w", err)
-	case strings.Contains(msg, "403"), strings.Contains(strings.ToLower(msg), "forbidden"):
+	case strings.HasSuffix(msg, ": Forbidden"):
 		return fmt.Errorf("the server refused access (403 Forbidden): %w", err)
-	case strings.Contains(msg, "404"):
-		return fmt.Errorf("no MCP server at this URL (404): %w", err)
+	case strings.HasSuffix(msg, ": Not Found"):
+		return fmt.Errorf("no MCP server at this URL (404 Not Found): %w", err)
 	}
 	return err
 }

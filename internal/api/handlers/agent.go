@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gohead-cms/gohead/internal/agent/functions"
+	"github.com/gohead-cms/gohead/internal/api/middleware"
 	agents "github.com/gohead-cms/gohead/internal/models/agents"
 	"github.com/gohead-cms/gohead/pkg/logger"
 	"github.com/gohead-cms/gohead/pkg/storage"
@@ -148,6 +149,9 @@ func CreateAgent(c *gin.Context) {
 		c.Set("status", http.StatusBadRequest)
 		return
 	}
+	if !appCallsAllowed(c, agent.Functions) {
+		return
+	}
 
 	// Check if agent with same name already exists
 	existing, err := storage.GetAgentByName(agent.Name)
@@ -206,6 +210,9 @@ func UpdateAgent(c *gin.Context) {
 	if err := functions.CheckTools(agent.Functions); err != nil {
 		c.Set("response", err.Error())
 		c.Set("status", http.StatusBadRequest)
+		return
+	}
+	if !appCallsAllowed(c, agent.Functions) {
 		return
 	}
 
@@ -280,4 +287,22 @@ func DeleteAgent(c *gin.Context) {
 		"message": "Agent deleted successfully",
 	})
 	c.Set("status", http.StatusOK)
+}
+
+// appCallsAllowed refuses, from an API token, connected apps' tools that
+// skip approval: they would act with the app's token without anyone in a
+// user session agreeing.
+func appCallsAllowed(c *gin.Context, specs agents.FunctionSpecs) bool {
+	if _, isToken := c.Get(middleware.APITokenIDKey); !isToken {
+		return true
+	}
+	for _, s := range specs {
+		if s.Approval != nil && !*s.Approval && functions.IsAppTool(s.ImplKey) {
+			c.Set("response", "Access denied")
+			c.Set("details", "only a user session can let a connected app's tool skip approval (\"approval\": false)")
+			c.Set("status", http.StatusForbidden)
+			return false
+		}
+	}
+	return true
 }

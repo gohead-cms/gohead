@@ -69,6 +69,7 @@ export function AgentForm({ initial, originalName, agentId, takenNames, catalog,
           collections={collections}
           triggerCollection={draft.trigger_type === "collection_event" ? draft.collection : ""}
           errors={errors}
+          requireApproval={draft.require_approval}
         />
         <ApprovalSection {...sectionProps} />
         <LimitsSection {...sectionProps} />

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/gohead-cms/gohead/internal/agent/functions"
@@ -54,7 +55,8 @@ func (in connectionInput) apply(c *models.Connection, creating bool) error {
 	if in.Label != nil {
 		c.Label = *in.Label
 	}
-	if in.URL != nil {
+	// A URL sent back as the API shows it (query values hidden) is kept.
+	if in.URL != nil && (creating || *in.URL != shownURL(c.URL)) {
 		c.URL = *in.URL
 	}
 	if in.AuthType != nil {
@@ -95,7 +97,7 @@ func connectionJSON(c models.Connection) gin.H {
 		tools = models.ConnectionTools{}
 	}
 	return gin.H{
-		"id": c.ID, "name": c.Name, "label": c.Label, "preset": c.Preset, "url": c.URL,
+		"id": c.ID, "name": c.Name, "label": c.Label, "preset": c.Preset, "url": shownURL(c.URL),
 		"authType": c.AuthType, "headerName": c.HeaderName, "hasToken": c.HasSecret(),
 		"tools": tools, "toolsUpdatedAt": c.ToolsUpdatedAt, "lastError": c.LastError,
 		"createdAt": c.CreatedAt, "updatedAt": c.UpdatedAt,
@@ -236,4 +238,19 @@ func DeleteConnection(c *gin.Context) {
 	}
 	c.Set("response", gin.H{"deleted": c.Param("name")})
 	c.Set("status", http.StatusOK)
+}
+
+// shownURL hides the values of a URL's query string, where some servers
+// take a secret.
+func shownURL(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.RawQuery == "" {
+		return raw
+	}
+	q := u.Query()
+	for k := range q {
+		q[k] = []string{"hidden"}
+	}
+	u.RawQuery = q.Encode()
+	return u.String()
 }

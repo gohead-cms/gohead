@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
 	"strconv"
 
+	"github.com/gohead-cms/gohead/internal/api/middleware"
 	"github.com/gohead-cms/gohead/internal/apps"
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/auth"
@@ -110,7 +112,8 @@ func ListProposals(c *gin.Context) {
 		return
 	}
 	// Calls to connected apps are reviewed by admins only.
-	q.NoCalls = role != auth.RoleAdmin
+	_, isToken := c.Get(middleware.APITokenIDKey)
+	q.NoCalls = role != auth.RoleAdmin || isToken
 	scope, err := reviewScope(role)
 	if err != nil {
 		c.Set("response", "Failed to list proposals")
@@ -156,7 +159,9 @@ func loadProposal(c *gin.Context) (*models.Proposal, *models.Collection, bool) {
 		return nil, nil, false
 	}
 	if p.Action == models.ProposalCall {
-		if c.GetString("role") != auth.RoleAdmin {
+		// Calls act with a connected app's token: like the connections
+		// themselves, only admins in a user session (not API tokens) see them.
+		if _, isToken := c.Get(middleware.APITokenIDKey); isToken || c.GetString("role") != auth.RoleAdmin {
 			c.Set("response", "Proposal not found")
 			c.Set("status", http.StatusNotFound)
 			return nil, nil, false
@@ -370,7 +375,9 @@ func approveCall(c *gin.Context, p *models.Proposal) {
 	if !bindOptional(c, &body) {
 		return
 	}
-	proposal, res, err := apps.ApproveCall(c.Request.Context(), p.ID, actorFrom(c).Name, body.Arguments)
+	// The call goes on if the reviewer leaves: once sent, the app may act on
+	// it, and the proposal must say how it ended.
+	proposal, res, err := apps.ApproveCall(context.WithoutCancel(c.Request.Context()), p.ID, actorFrom(c).Name, body.Arguments)
 	if err != nil {
 		switch {
 		case errors.Is(err, storage.ErrProposalDecided):

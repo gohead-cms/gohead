@@ -81,8 +81,9 @@ corrected arguments; **Reject** discards it. A call that fails (the app refused 
 connection is gone) marks the proposal `failed` with the error. Only admins see and review
 calls: editors review content changes only.
 
-In a [test run](runs-and-limits.md#test-runs), tools that may write are never called: they
-return `{"status": "success", "dry_run": true, "action": "would_call", …}`. Tools that only
+In a [test run](runs-and-limits.md#test-runs), tools that may write, and tools set to
+`"approval": true`, are never called: they return
+`{"status": "success", "dry_run": true, "action": "would_call", …}`. Other tools that only
 read are called, so the run sees real data.
 
 !!! warning "What a token can do, an agent can do"
@@ -95,7 +96,9 @@ read are called, so the run sees real data.
 
 - **Tokens are write-only.** The API never returns them (`"hasToken": true`). Changing a
   connection's URL or how the token is sent needs the token again, so a stored token never
-  goes anywhere else.
+  goes anywhere else. Some servers take a secret in the URL's query string instead: the API
+  hides its values, but they are not encrypted, so prefer a token when the server accepts
+  one.
 - **Encrypted at rest** (AES-256-GCM) with a key derived from `jwt_secret`. Set
   `jwt_secret` (`GOHEAD_JWT_SECRET`) to the same value in every process; without it, each
   process would use a different key, so tokens are stored unencrypted and the admin UI says
@@ -106,13 +109,15 @@ read are called, so the run sees real data.
   connection cannot reach `127.0.0.1`, `10.0.0.0/8` and other private ranges unless
   `connections.allow_private_networks` is on, and never cloud metadata addresses. Redirects
   are not followed.
-- Only admins manage connections, and only from a signed-in session: an API token cannot
-  create one.
+- Only admins manage connections and review calls, and only from a signed-in session.
+  [API tokens](../guides/api-tokens.md), even with the admin role, cannot manage
+  connections, see or approve calls, or save an agent whose app tool has
+  `"approval": false`; they can still give agents app tools that wait for approval.
 
 | Key | Env | Default |
 |-----|-----|---------|
 | `connections.allow_private_networks` | `GOHEAD_CONNECTIONS_ALLOW_PRIVATE_NETWORKS` | `false` |
-| `connections.timeout` | `GOHEAD_CONNECTIONS_TIMEOUT` | `30s` (one listing or call) |
+| `connections.timeout` | `GOHEAD_CONNECTIONS_TIMEOUT` | `30s` (one listing or call, at most `90s`) |
 
 ## API
 

@@ -85,6 +85,18 @@ func TestConnections(t *testing.T) {
 		assert.Equal(t, true, out["hasToken"])
 	})
 
+	t.Run("query values are hidden", func(t *testing.T) {
+		out := a.ok("admin", "POST", "/admin/connections", map[string]any{
+			"name": "keyed", "url": srv.URL + "/?key=s3cret", "authType": "none",
+		}).(map[string]any)
+		assert.NotContains(t, out["url"], "s3cret")
+		a.ok("admin", "PUT", "/admin/connections/keyed", map[string]any{"url": out["url"], "label": "Keyed"})
+		stored, err := storage.GetConnection("keyed")
+		require.NoError(t, err)
+		assert.Contains(t, stored.URL, "s3cret", "the URL as shown keeps the real one")
+		a.ok("admin", "DELETE", "/admin/connections/keyed", nil)
+	})
+
 	t.Run("app tools are in the catalog and agents can use them", func(t *testing.T) {
 		catalog := a.ok("admin", "GET", "/admin/agent-functions", nil).([]any)
 		var found map[string]any

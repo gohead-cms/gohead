@@ -44,7 +44,8 @@ When you change what a service offers (for Zapier, after adding or removing acti
    the agent when to use it.
 4. Check **Wait for an admin's approval before each call**. It is on for tools that may
    write, so you see each email or issue before it is sent; turn it off only for agents you
-   trust with that tool.
+   trust with that tool. If the agent has **Require approval** on, its calls that may write
+   wait for approval anyway.
 5. Click **Save**.
 
 Try the agent with a [test run](agents.md#try-an-agent-with-a-test-run) first: tools that
