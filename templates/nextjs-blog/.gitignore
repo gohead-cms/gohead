@@ -16,3 +16,6 @@ next-env.d.ts
 *.pem
 npm-debug.log*
 .vercel
+
+# GoHead's data when it runs with `gohead standalone --data .gohead`
+/.gohead/

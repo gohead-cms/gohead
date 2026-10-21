@@ -15,7 +15,7 @@ Stack: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4.
 
 ## Quick start
 
-You need Node.js 20.9 or later, and Docker to run GoHead locally.
+You need Node.js 20.9 or later, and Docker to run GoHead locally (on a Mac, [Homebrew works too](#without-docker-on-a-mac)).
 
 ```bash
 npm create @gohead-cms@latest my-blog
@@ -36,6 +36,19 @@ npm install
 Sign in to the admin at <http://localhost:3001> with `admin` / `gohead-local-password` (the defaults of `docker-compose.yml` and `.env.example`; they are for your machine only, and the ports are published on localhost).
 
 If the site can’t reach GoHead, or GoHead doesn’t have the content model yet, `npm run dev` shows a setup page that says what to run.
+
+### Without Docker, on a Mac
+
+Instead of `docker compose up -d`, install GoHead with Homebrew and run it in a second terminal, from the blog's folder:
+
+```bash
+brew install gohead-cms/tap/gohead
+GOHEAD_ADMIN_USERNAME=admin GOHEAD_ADMIN_EMAIL=admin@example.com \
+GOHEAD_ADMIN_PASSWORD=gohead-local-password GOHEAD_WEBHOOKS_ALLOW_PRIVATE_NETWORKS=true \
+  gohead standalone --data .gohead
+```
+
+`gohead standalone` runs everything in one process on SQLite, with the admin UI on <http://localhost:8080> (not 3001). The account is the one `.env.local` signs in with, and the data stays in `.gohead/`, which git ignores. Then `npm run gohead:setup` and `npm run dev` as above. For the revalidation webhook, use `http://localhost:3000/api/revalidate`: GoHead runs on your machine, so `host.docker.internal` is not needed.
 
 ### Using a GoHead you already run
 
