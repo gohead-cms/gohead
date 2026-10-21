@@ -11,10 +11,31 @@ GoHead is a single binary (`gohead`), the admin UI included. It runs in one of t
 
 | Method                         | Best for                          |
 |--------------------------------|-----------------------------------|
+| [Homebrew](#homebrew)               | Trying GoHead on a Mac, local development |
 | [Release binary](#release-binary)   | Standalone, small servers, Raspberry Pi |
 | [Docker Compose](#docker-compose) | Trying the full stack locally  |
 | [Container image](#container-image) | Servers, Kubernetes          |
 | [From source](#from-source)         | Development                  |
+
+## Homebrew
+
+On macOS, the quickest start: one binary, SQLite, no Docker.
+
+```bash
+brew install gohead-cms/tap/gohead
+mkdir my-cms && cd my-cms
+GOHEAD_ADMIN_USERNAME=admin GOHEAD_ADMIN_EMAIL=you@example.com \
+GOHEAD_ADMIN_PASSWORD='choose-a-long-password' gohead standalone
+```
+
+Open <http://localhost:8080>: the admin UI and the API share the address. Data goes to
+`./data` (or `--data <dir>`); the administrator variables are only needed for the first
+start. `brew upgrade gohead` updates it. This runs
+[standalone](../operations/standalone.md): the API, the admin UI, agents and webhooks in one
+process.
+
+The cask also covers Linux (amd64 and arm64), where Homebrew's cask support is still
+preliminary; the [release binary](#release-binary) works everywhere.
 
 ## Docker Compose
 

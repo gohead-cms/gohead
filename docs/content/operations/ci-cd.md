@@ -73,7 +73,7 @@ Release notes are generated from commit messages: use conventional commits
 | **Settings → Pages → Source: GitHub Actions** | lets `docs.yml` publish the handbook |
 | **Settings → Actions → General → Workflow permissions: read and write** *(or keep read-only; workflows request what they need)* | |
 | Package visibility for `gohead`, `gohead-admin` and `charts/gohead` on GHCR: **public** | anonymous `docker pull` and `helm install` |
-| Secret `HOMEBREW_TAP_TOKEN` *(optional)* + repository `gohead-cms/homebrew-tap` | publishes `brew install gohead-cms/tap/gohead` |
+| Repository `gohead-cms/homebrew-tap` (public, with a first commit) and secret `HOMEBREW_TAP_TOKEN`: a fine-grained token with *Contents: read and write* on that repository only | each release writes `Casks/gohead.rb` there, for `brew install gohead-cms/tap/gohead`. Without the secret, the cask is skipped |
 | npm organization `gohead-cms`, variable `NPM_PUBLISH=true`, and trusted publishing (npmjs.com → each package → *Trusted publisher*: GitHub Actions, `gohead-cms/gohead`, workflow `npm.yml`) | publishes `@gohead-cms/client` and `@gohead-cms/create`. The first publish of a package needs a granular token in the `NPM_TOKEN` secret, since trusted publishing is set per existing package; remove it afterwards |
 | Branch protection on `master` requiring the CI jobs | keeps `master` deployable |
 

@@ -16,7 +16,8 @@ sites, personal projects, home servers and single-board computers such as a Rasp
 
 ## Run it
 
-Download the archive for your platform from the
+On a Mac: `brew install gohead-cms/tap/gohead`, then run `gohead standalone` as below
+(without `./`). Elsewhere, download the archive for your platform from the
 [releases page](https://github.com/gohead-cms/gohead/releases) (on a Raspberry Pi:
 `linux_arm64` with a 64-bit OS, `linux_armv7` with a 32-bit OS, `linux_armv6` on a Pi Zero or
 Pi 1), then:
