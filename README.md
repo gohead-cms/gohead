@@ -165,6 +165,7 @@ flowchart LR
 | | |
 |---|---|
 | **Homebrew** (macOS) | `brew install gohead-cms/tap/gohead`, then `gohead standalone` |
+| **Render** | [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/gohead-cms/gohead): one service and a disk, about $7 a month ([guide](https://gohead-cms.github.io/gohead/operations/render/)) |
 | **Docker Compose** | `docker compose up -d` (everything, as above) |
 | **Container** | `docker run -p 8080:8080 -e GOHEAD_JWT_SECRET=… ghcr.io/gohead-cms/gohead` |
 | **Helm** | `helm install gohead oci://ghcr.io/gohead-cms/charts/gohead --set database.url=postgres://…` |

@@ -1,0 +1,39 @@
+# Deploy to Render: https://render.com/deploy?repo=https://github.com/gohead-cms/gohead
+#
+# One web service runs `gohead standalone` (API, admin UI, agents, webhooks
+# and scheduled triggers, on SQLite) with a persistent disk for the
+# database, the uploads and the generated secrets. About $7.25 a month: the
+# smallest paid instance (disks need one) and 1 GB of disk.
+# Guide: https://gohead-cms.github.io/gohead/operations/render/
+services:
+  - type: web
+    name: gohead
+    runtime: docker
+    dockerfilePath: ./deploy/render/Dockerfile
+    dockerContext: ./deploy/render
+    # Rebuild only when you ask for it, not on every commit to GoHead.
+    autoDeployTrigger: "off"
+    plan: 0.5c-512mb
+    healthCheckPath: /_health
+    disk:
+      name: gohead-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      # Render forwards traffic to $PORT; GoHead listens on 8080.
+      - key: PORT
+        value: "8080"
+      # The first administrator, created on the first start (the password
+      # needs 12 characters or more). Not used afterwards.
+      - key: GOHEAD_ADMIN_USERNAME
+        value: admin
+      - key: GOHEAD_ADMIN_EMAIL
+        sync: false
+      - key: GOHEAD_ADMIN_PASSWORD
+        sync: false
+      - key: GOHEAD_JWT_SECRET
+        generateValue: true
+      # Requests reach GoHead through Render's proxy: trust its private
+      # addresses so rate limits see the visitors' IPs.
+      - key: GOHEAD_TRUSTED_PROXIES
+        value: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10

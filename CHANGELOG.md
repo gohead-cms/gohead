@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+- **Deploy to Render**: a button, `render.yaml` and a guide run GoHead in your Render account in one click: `gohead standalone` with a persistent disk, about $7 a month.
+
 ## [0.6.2] - 2026-10-21
 
 ### Added

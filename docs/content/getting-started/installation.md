@@ -12,6 +12,7 @@ GoHead is a single binary (`gohead`), the admin UI included. It runs in one of t
 | Method                         | Best for                          |
 |--------------------------------|-----------------------------------|
 | [Homebrew](#homebrew)               | Trying GoHead on a Mac, local development |
+| [Render](../operations/render.md)   | A GoHead in the cloud in one click, about $7 a month |
 | [Release binary](#release-binary)   | Standalone, small servers, Raspberry Pi |
 | [Docker Compose](#docker-compose) | Trying the full stack locally  |
 | [Container image](#container-image) | Servers, Kubernetes          |
