@@ -1,13 +1,6 @@
 import { useCallback, useRef, useState } from "react";
-import {
-  AlertDialog,
-  AlertDialogBody,
-  AlertDialogContent,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogOverlay,
-  Button,
-} from "@chakra-ui/react";
+import { Button } from "@chakra-ui/react";
+import { DialogBody, DialogContent, DialogFooter, DialogHeader, DialogRoot, DialogTitle } from "@/components/ui/dialog";
 
 /**
  * Switching the locale of an editor replaces its form: with unsaved edits,
@@ -43,26 +36,33 @@ export function useLocaleGuard(onSwitch: (code: string) => void) {
   };
 
   const dialog = (
-    <AlertDialog isOpen={pending !== null} leastDestructiveRef={cancelRef} onClose={() => setPending(null)}>
-      <AlertDialogOverlay>
-        <AlertDialogContent>
-          <AlertDialogHeader fontSize="lg" fontWeight="bold">
+    <DialogRoot
+      role="alertdialog"
+      open={pending !== null}
+      initialFocusEl={() => cancelRef.current}
+      onOpenChange={(e) => {
+        if (!e.open) setPending(null);
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle fontSize="lg" fontWeight="bold">
             Discard unsaved changes?
-          </AlertDialogHeader>
-          <AlertDialogBody>
-            The changes made in this locale are not saved. Switching to {pending} loses them; stay to save them first.
-          </AlertDialogBody>
-          <AlertDialogFooter>
-            <Button ref={cancelRef} onClick={() => setPending(null)}>
-              Keep editing
-            </Button>
-            <Button colorScheme="red" onClick={discard} ml={3}>
-              Discard and switch
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialogOverlay>
-    </AlertDialog>
+          </DialogTitle>
+        </DialogHeader>
+        <DialogBody>
+          The changes made in this locale are not saved. Switching to {pending} loses them; stay to save them first.
+        </DialogBody>
+        <DialogFooter>
+          <Button ref={cancelRef} variant="subtle" onClick={() => setPending(null)}>
+            Keep editing
+          </Button>
+          <Button colorPalette="red" onClick={discard} ml={3}>
+            Discard and switch
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </DialogRoot>
   );
 
   return { request, markDirty, markClean, dialog };

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, AlertIcon, Box, Button, HStack, IconButton, Spinner, Text, Tooltip, VStack } from "@chakra-ui/react";
+import { Alert, Box, Button, HStack, IconButton, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Tooltip } from "@/components/ui/tooltip";
 import { FiArrowDown, FiArrowUp, FiPlus, FiTrash2 } from "react-icons/fi";
 import { getJSON, useApiQuery } from "../../../shared/hooks/useApiQuery";
 import type { Attribute } from "../../../shared/types";
@@ -60,10 +61,10 @@ export function ComponentField(props: ComponentFieldProps) {
   const { attributes, error } = useComponentAttributes(props.attr.component);
   if (error) {
     return (
-      <Alert status="error" borderRadius="md">
-        <AlertIcon />
-        {error}
-      </Alert>
+      <Alert.Root status="error" borderRadius="md">
+        <Alert.Indicator />
+        <Alert.Description>{error}</Alert.Description>
+      </Alert.Root>
     );
   }
   if (!attributes) return <Spinner size="sm" />;
@@ -115,7 +116,7 @@ function ComponentEditor({ id, name, attr, value, onChange, attributes }: Compon
 
   const label = attr.component ?? "component";
   return (
-    <VStack align="stretch" spacing={3} role="group" aria-labelledby={`${id}-label`}>
+    <VStack align="stretch" gap={3} role="group" aria-labelledby={`${id}-label`}>
       {items.map((it, index) => (
         <Box key={it.key} borderWidth="1px" borderRadius="md" p={4} bg="gray.50" role="group" aria-label={repeatable ? `${name} ${index + 1}` : name}>
           <HStack mb={3}>
@@ -124,30 +125,36 @@ function ComponentEditor({ id, name, attr, value, onChange, attributes }: Compon
             </Text>
             {repeatable && (
               <>
-                <Tooltip label="Move up">
-                  <IconButton aria-label={`Move ${name} ${index + 1} up`} icon={<FiArrowUp />} size="xs" variant="ghost" isDisabled={index === 0} onClick={() => move(index, -1)} />
+                <Tooltip content="Move up">
+                  <IconButton aria-label={`Move ${name} ${index + 1} up`} size="2xs" variant="ghost" disabled={index === 0} onClick={() => move(index, -1)}>
+                    <FiArrowUp />
+                  </IconButton>
                 </Tooltip>
-                <Tooltip label="Move down">
+                <Tooltip content="Move down">
                   <IconButton
                     aria-label={`Move ${name} ${index + 1} down`}
-                    icon={<FiArrowDown />}
-                    size="xs"
+                    size="2xs"
                     variant="ghost"
-                    isDisabled={index === items.length - 1}
+                    disabled={index === items.length - 1}
                     onClick={() => move(index, 1)}
-                  />
+                  >
+                    <FiArrowDown />
+                  </IconButton>
                 </Tooltip>
               </>
             )}
-            <Tooltip label={repeatable ? "Remove" : "Clear"}>
-              <IconButton aria-label={repeatable ? `Remove ${name} ${index + 1}` : `Clear ${name}`} icon={<FiTrash2 />} size="xs" variant="ghost" onClick={() => remove(it.key)} />
+            <Tooltip content={repeatable ? "Remove" : "Clear"}>
+              <IconButton aria-label={repeatable ? `Remove ${name} ${index + 1}` : `Clear ${name}`} size="2xs" variant="ghost" onClick={() => remove(it.key)}>
+                <FiTrash2 />
+              </IconButton>
             </Tooltip>
           </HStack>
           <EntryFields attributes={attributes} values={it.values} onChange={(field, v) => update(it.key, field, v)} idPrefix={`${id}-${it.key}-`} />
         </Box>
       ))}
       {(repeatable || items.length === 0) && (
-        <Button size="sm" variant="outline" leftIcon={<FiPlus />} onClick={add} alignSelf="flex-start" aria-label={repeatable ? `Add an item to ${name}` : `Add ${name}`}>
+        <Button size="xs" variant="outline" onClick={add} alignSelf="flex-start" aria-label={repeatable ? `Add an item to ${name}` : `Add ${name}`}>
+          <FiPlus />
           Add {label}
         </Button>
       )}

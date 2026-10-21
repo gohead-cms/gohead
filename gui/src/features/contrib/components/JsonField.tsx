@@ -51,7 +51,7 @@ export function JsonField({ id, value, onChange }: JsonFieldProps) {
   };
 
   return (
-    <VStack align="stretch" spacing={1}>
+    <VStack align="stretch" gap={1}>
       <Textarea
         id={id}
         value={text}
@@ -61,7 +61,7 @@ export function JsonField({ id, value, onChange }: JsonFieldProps) {
         fontSize="sm"
         spellCheck={false}
         placeholder='{"key": "value"}'
-        isInvalid={!!error}
+        aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : undefined}
       />
       {error && (

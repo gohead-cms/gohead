@@ -1,4 +1,5 @@
-import { Box, Spinner, Text, VStack, useColorModeValue } from "@chakra-ui/react";
+import { Box, Spinner, Text, VStack, chakra } from "@chakra-ui/react";
+import { useColorModeValue } from "@/components/ui/color-mode";
 import type { Schema } from "../../../shared/types";
 import type { SingletonDef } from "../hooks/useSingletons";
 import type { Selection } from "./selection";
@@ -20,8 +21,7 @@ function SelectorItem({ label, active, onClick }: { label: string; active: boole
   const activeColor = useColorModeValue("purple.700", "white");
   const hoverBg = useColorModeValue("gray.100", "gray.700");
   return (
-    <Box
-      as="button"
+    <chakra.button
       type="button"
       onClick={onClick}
       aria-current={active ? "true" : undefined}
@@ -34,10 +34,10 @@ function SelectorItem({ label, active, onClick }: { label: string; active: boole
       color={active ? activeColor : "inherit"}
       fontWeight={active ? "semibold" : "normal"}
       _hover={{ bg: active ? activeBg : hoverBg }}
-      noOfLines={1}
+      lineClamp={1}
     >
       {label}
-    </Box>
+    </chakra.button>
   );
 }
 
@@ -74,7 +74,7 @@ export function ContentSelector({
           No collections.
         </Text>
       ) : (
-        <VStack spacing={1} align="stretch">
+        <VStack gap={1} align="stretch">
           {collections.map(({ schema }) => {
             const name = schema.collectionName ?? "";
             return (
@@ -103,7 +103,7 @@ export function ContentSelector({
               No single types.
             </Text>
           ) : (
-            <VStack spacing={1} align="stretch">
+            <VStack gap={1} align="stretch">
               {singletons.map((s) => (
                 <SelectorItem
                   key={s.name}

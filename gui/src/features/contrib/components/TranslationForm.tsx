@@ -1,5 +1,5 @@
 import { type ReactNode, useMemo, useState } from "react";
-import { Alert, AlertDescription, AlertIcon, Box, Button, Code, HStack, Icon, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Alert, Button, Code, HStack, Icon, Spacer, Spinner, Text, VStack, chakra } from "@chakra-ui/react";
 import { FiSave, FiTrash2 } from "react-icons/fi";
 import { api } from "../../../services/api";
 import { getJSON, useApiQuery } from "../../../shared/hooks/useApiQuery";
@@ -43,7 +43,7 @@ interface TranslationFormProps {
 const stackLayout: TranslationLayout = (body, actions) => (
   <>
     {body}
-    <HStack mt={6} spacing={3}>
+    <HStack mt={6} gap={3}>
       {actions.start}
       <Spacer />
       {actions.end}
@@ -71,13 +71,13 @@ export function TranslationForm(props: TranslationFormProps) {
 
   if (error) {
     return layout(
-      <Alert status="error" borderRadius="md">
-        <AlertIcon />
-        <AlertDescription flex="1">{error}</AlertDescription>
-        <Button size="sm" onClick={refetch}>
+      <Alert.Root status="error" borderRadius="md" alignItems="center">
+        <Alert.Indicator />
+        <Alert.Description flex="1">{error}</Alert.Description>
+        <Button size="xs" variant="subtle" onClick={refetch}>
           Retry
         </Button>
-      </Alert>,
+      </Alert.Root>,
       { start: null, end: props.extraActions },
     );
   }
@@ -160,16 +160,25 @@ function TranslationFields({
     Object.keys(localized).map((k) => [
       k,
       hasValue(values[k]) ? (
-        <HStack as="span" spacing={2} align="baseline">
-          <Text as="span" noOfLines={2}>
+        <HStack as="span" gap={2} align="baseline">
+          <Text as="span" lineClamp={2}>
             Default ({def}): <Text as="span" color="gray.600">{hintValue(defaults[k])}</Text>
           </Text>
-          <Button size="xs" variant="link" colorScheme="purple" flexShrink={0} title={`Clear the ${locale.code} ${k}: it falls back to the ${def} value`} onClick={() => clearValue(k)}>
+          <Button
+            size="2xs"
+            variant="plain"
+            colorPalette="purple"
+            color="purple.500"
+            px={0}
+            h="auto"
+            minW={0}
+            _hover={{ textDecoration: "underline" }}
+            flexShrink={0} title={`Clear the ${locale.code} ${k}: it falls back to the ${def} value`} onClick={() => clearValue(k)}>
             Use default
           </Button>
         </HStack>
       ) : (
-        <Text as="span" noOfLines={2}>
+        <Text as="span" lineClamp={2}>
           Falls back to the default ({def}): <Text as="span" color="gray.600">{hintValue(defaults[k])}</Text>
         </Text>
       ),
@@ -211,10 +220,10 @@ function TranslationFields({
   };
 
   const body = (
-    <VStack align="stretch" spacing={6}>
-      <Alert status="info" borderRadius="md" alignItems="start">
-        <AlertIcon />
-        <AlertDescription fontSize="sm">
+    <VStack align="stretch" gap={6}>
+      <Alert.Root status="info" borderRadius="md" alignItems="start">
+        <Alert.Indicator />
+        <Alert.Description fontSize="sm">
           <Text>
             Translating into <strong>{localeLabel(locale)}</strong>
             {translated ? "." : ": no translation yet."} A field left empty falls back to the {localeLabel(defaultLocale)} value.
@@ -229,9 +238,9 @@ function TranslationFields({
               ))}) are edited in {def}.
             </Text>
           )}
-        </AlertDescription>
-      </Alert>
-      <Box as="fieldset" disabled={!canWrite || saving} minW={0}>
+        </Alert.Description>
+      </Alert.Root>
+      <chakra.fieldset disabled={!canWrite || saving} minW={0}>
         <EntryFields
           attributes={fields}
           values={values}
@@ -240,7 +249,7 @@ function TranslationFields({
           hints={hints}
           placeholders={placeholders}
         />
-      </Box>
+      </chakra.fieldset>
     </VStack>
   );
 
@@ -251,7 +260,8 @@ function TranslationFields({
           confirmLabel="Remove translation"
           onConfirm={remove}
           trigger={
-            <Button variant="ghost" colorScheme="red" leftIcon={<Icon as={FiTrash2} />} isDisabled={saving}>
+            <Button variant="ghost" colorPalette="red" disabled={saving}>
+              <Icon as={FiTrash2} />
               Remove {locale.code} translation
             </Button>
           }
@@ -261,7 +271,8 @@ function TranslationFields({
     <>
       {extraActions}
       {canWrite && (
-        <Button colorScheme="purple" leftIcon={<Icon as={FiSave} />} onClick={save} isLoading={saving}>
+        <Button colorPalette="purple" onClick={save} loading={saving}>
+          <Icon as={FiSave} />
           Save translation
         </Button>
       )}

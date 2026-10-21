@@ -1,27 +1,7 @@
 import { useState } from "react";
-import {
-  Alert,
-  AlertIcon,
-  Badge,
-  Box,
-  Button,
-  HStack,
-  IconButton,
-  Input,
-  InputGroup,
-  InputLeftElement,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
-  Spinner,
-  Text,
-  VStack,
-  useDisclosure,
-} from "@chakra-ui/react";
+import { Alert, Badge, Box, Button, HStack, IconButton, Input, Spinner, Text, VStack, useDisclosure } from "@chakra-ui/react";
+import { DialogBody, DialogCloseTrigger, DialogContent, DialogFooter, DialogHeader, DialogRoot, DialogTitle } from "@/components/ui/dialog";
+import { InputGroup } from "@/components/ui/input-group";
 import { FiCheckSquare, FiLink, FiSearch, FiSquare, FiX } from "react-icons/fi";
 import { useMe } from "../../auth/me";
 import { apiFetchWithAuth } from "../../../services/api";
@@ -96,20 +76,22 @@ export function RelationField({ id, name, attr, value, onChange }: RelationField
   };
 
   return (
-    <VStack align="stretch" spacing={2} role="group" aria-labelledby={`${id}-label`}>
+    <VStack align="stretch" gap={2} role="group" aria-labelledby={`${id}-label`}>
       {!canRead && (
-        <Alert status="warning" borderRadius="md" fontSize="sm">
-          <AlertIcon />
-          Your role cannot read {target}: this relation is not shown, and saving the entry clears it.
-        </Alert>
+        <Alert.Root status="warning" borderRadius="md" fontSize="sm">
+          <Alert.Indicator />
+          <Alert.Description>Your role cannot read {target}: this relation is not shown, and saving the entry clears it.</Alert.Description>
+        </Alert.Root>
       )}
       {selected.map((r) => {
         const entry = resolve(r);
         const missing = typeof r !== "object" && labels.data && !entry;
         return (
-          <HStack key={String(refID(r))} borderWidth="1px" borderRadius="md" px={3} py={2} spacing={3}>
-            <Box as={FiLink} color="gray.400" flexShrink={0} />
-            <Text flex="1" fontSize="sm" noOfLines={1}>
+          <HStack key={String(refID(r))} borderWidth="1px" borderRadius="md" px={3} py={2} gap={3}>
+            <Box color="gray.400" flexShrink={0} asChild>
+              <FiLink />
+            </Box>
+            <Text flex="1" fontSize="sm" lineClamp={1}>
               {entry ? entryLabel(entry, field) : `#${refID(r)}`}
               {missing && (
                 <Text as="span" color="gray.500">
@@ -118,28 +100,30 @@ export function RelationField({ id, name, attr, value, onChange }: RelationField
                 </Text>
               )}
             </Text>
-            {entry?.status === "draft" && <Badge colorScheme="yellow">draft</Badge>}
+            {entry?.status === "draft" && <Badge colorPalette="yellow">draft</Badge>}
             <Text fontSize="xs" color="gray.400">
               #{refID(r)}
             </Text>
-            <IconButton aria-label={`Remove ${entry ? entryLabel(entry, field) : `#${refID(r)}`} from ${name}`} icon={<FiX />} size="xs" variant="ghost" onClick={() => remove(r)} />
+            <IconButton aria-label={`Remove ${entry ? entryLabel(entry, field) : `#${refID(r)}`} from ${name}`} size="2xs" variant="ghost" onClick={() => remove(r)}>
+              <FiX />
+            </IconButton>
           </HStack>
         );
       })}
       <HStack>
         <Button
-          size="sm"
+          size="xs"
           variant="outline"
-          leftIcon={<FiLink />}
           onClick={picker.onOpen}
-          isDisabled={!target || !canRead}
+          disabled={!target || !canRead}
           aria-label={many ? `Add ${name} (${target})` : `${selected.length ? "Change" : "Choose"} ${name} (${target})`}
         >
+          <FiLink />
           {many ? `Add ${target}` : selected.length ? `Change ${target}` : `Choose ${target}`}
         </Button>
         {labels.loading && <Spinner size="xs" />}
       </HStack>
-      {picker.isOpen && (
+      {picker.open && (
         <RelationPicker
           target={target}
           title={many ? `Add ${name} (${target})` : `Choose ${name} (${target})`}
@@ -201,16 +185,21 @@ function RelationPicker({ target, title, many, field, selected, onClose, onPick 
   };
 
   return (
-    <Modal isOpen onClose={onClose} size="lg" scrollBehavior="inside">
-      <ModalOverlay />
-      <ModalContent>
-        <ModalHeader>{title}</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody>
-          <InputGroup mb={3}>
-            <InputLeftElement pointerEvents="none">
-              <FiSearch />
-            </InputLeftElement>
+    <DialogRoot
+      open
+      onOpenChange={(e) => {
+        if (!e.open) onClose();
+      }}
+      size="lg"
+      scrollBehavior="inside"
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <DialogCloseTrigger />
+        <DialogBody>
+          <InputGroup mb={3} w="full" startElement={<FiSearch />}>
             <Input
               autoFocus
               placeholder={field ? `Search by ${field}` : "Search by ID"}
@@ -232,14 +221,14 @@ function RelationPicker({ target, title, many, field, selected, onClose, onPick 
               {term ? "No entry matches." : `No ${target} yet.`}
             </Text>
           )}
-          <VStack align="stretch" spacing={1}>
+          <VStack align="stretch" gap={1}>
             {data?.items.map((e) => {
               const already = selected.includes(String(e.id));
+              const CheckIcon = already || isPicked(e) ? FiCheckSquare : FiSquare;
               return (
                 <HStack
                   key={String(e.id)}
-                  as="button"
-                  type="button"
+                  asChild
                   textAlign="left"
                   px={3}
                   py={2}
@@ -249,31 +238,34 @@ function RelationPicker({ target, title, many, field, selected, onClose, onPick 
                   bg={isPicked(e) ? "purple.50" : undefined}
                   _hover={{ bg: already ? undefined : "gray.50" }}
                   opacity={already ? 0.5 : 1}
-                  disabled={already}
-                  onClick={() => choose(e)}
-                  aria-pressed={many ? isPicked(e) : undefined}
                 >
-                  {many && <Box as={already || isPicked(e) ? FiCheckSquare : FiSquare} color={isPicked(e) ? "purple.500" : "gray.400"} aria-hidden flexShrink={0} />}
-                  <Text flex="1" fontSize="sm" noOfLines={1}>
-                    {entryLabel(e, field)}
-                  </Text>
-                  {e.status === "draft" && <Badge colorScheme="yellow">draft</Badge>}
-                  <Text fontSize="xs" color="gray.400">
-                    #{String(e.id)}
-                  </Text>
+                  <button type="button" disabled={already} onClick={() => choose(e)} aria-pressed={many ? isPicked(e) : undefined}>
+                    {many && (
+                      <Box color={isPicked(e) ? "purple.500" : "gray.400"} aria-hidden flexShrink={0} asChild>
+                        <CheckIcon />
+                      </Box>
+                    )}
+                    <Text flex="1" fontSize="sm" lineClamp={1}>
+                      {entryLabel(e, field)}
+                    </Text>
+                    {e.status === "draft" && <Badge colorPalette="yellow">draft</Badge>}
+                    <Text fontSize="xs" color="gray.400">
+                      #{String(e.id)}
+                    </Text>
+                  </button>
                 </HStack>
               );
             })}
           </VStack>
-        </ModalBody>
-        <ModalFooter gap={2}>
-          <Button size="sm" variant="ghost" onClick={() => setPage((p) => p - 1)} isDisabled={page <= 1}>
+        </DialogBody>
+        <DialogFooter gap={2}>
+          <Button size="xs" variant="ghost" onClick={() => setPage((p) => p - 1)} disabled={page <= 1}>
             Previous
           </Button>
           <Text fontSize="sm" color="gray.500">
             {page} / {pages}
           </Text>
-          <Button size="sm" variant="ghost" onClick={() => setPage((p) => p + 1)} isDisabled={page >= pages}>
+          <Button size="xs" variant="ghost" onClick={() => setPage((p) => p + 1)} disabled={page >= pages}>
             Next
           </Button>
           <Box flex="1" />
@@ -281,12 +273,12 @@ function RelationPicker({ target, title, many, field, selected, onClose, onPick 
             Cancel
           </Button>
           {many && (
-            <Button colorScheme="purple" onClick={() => onPick(picked)} isDisabled={picked.length === 0}>
+            <Button colorPalette="purple" onClick={() => onPick(picked)} disabled={picked.length === 0}>
               Add {picked.length || ""}
             </Button>
           )}
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
+        </DialogFooter>
+      </DialogContent>
+    </DialogRoot>
   );
 }

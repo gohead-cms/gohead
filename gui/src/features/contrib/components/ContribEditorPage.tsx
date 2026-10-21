@@ -1,26 +1,6 @@
 import { useMemo, useState } from "react";
-import {
-  Accordion,
-  AccordionButton,
-  AccordionIcon,
-  AccordionItem,
-  AccordionPanel,
-  Alert,
-  AlertIcon,
-  Box,
-  Button,
-  Flex,
-  FormControl,
-  Grid,
-  GridItem,
-  Heading,
-  HStack,
-  Icon,
-  Input,
-  Text,
-  Textarea,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Box, Button, Field as ChakraField, Flex, Grid, GridItem, Heading, HStack, Icon, Input, Text, Textarea } from "@chakra-ui/react";
+import { AccordionItem, AccordionItemContent, AccordionItemTrigger, AccordionRoot } from "@/components/ui/accordion";
 import { useNavigate, useParams } from "react-router-dom";
 import { FiSave, FiX } from "react-icons/fi";
 import { api } from "../../../services/api";
@@ -58,20 +38,20 @@ export function ContributionEditorPage() {
   if (!meLoading && collectionName && !can("create", collectionName)) {
     return (
       <Box p={8}>
-        <Alert status="warning" borderRadius="md">
-          <AlertIcon />
-          Your role cannot create entries in “{collectionName}”.
-        </Alert>
+        <Alert.Root status="warning" borderRadius="md">
+          <Alert.Indicator />
+          <Alert.Description>Your role cannot create entries in “{collectionName}”.</Alert.Description>
+        </Alert.Root>
       </Box>
     );
   }
   if (error) {
     return (
       <Box p={8}>
-        <Alert status="error" borderRadius="md">
-          <AlertIcon />
-          {error}
-        </Alert>
+        <Alert.Root status="error" borderRadius="md">
+          <Alert.Indicator />
+          <Alert.Description>{error}</Alert.Description>
+        </Alert.Root>
       </Box>
     );
   }
@@ -117,7 +97,7 @@ function ContributionEditor({ collectionName, schema }: { collectionName: string
     <Box bg="gray.50" minH="calc(100vh - 64px)">
       <Flex as="header" position="sticky" top="64px" zIndex="docked" bg="white" px={8} py={3} borderBottomWidth="1px" justify="space-between" align="center">
         <Box>
-          <Heading size="md">{schema.info?.displayName || collectionName}</Heading>
+          <Heading size="xl" fontWeight="bold">{schema.info?.displayName || collectionName}</Heading>
           <Text fontSize="sm" color="gray.500">
             Creative Editor
           </Text>
@@ -133,64 +113,74 @@ function ContributionEditor({ collectionName, schema }: { collectionName: string
               disabledReason={`New entries are written in ${localeLabel(defaultLocale)}. Once saved, open the entry from the list to translate it.`}
             />
           )}
-          <Button variant="ghost" leftIcon={<Icon as={FiX} />} onClick={() => navigate("/contrib")}>
+          <Button variant="ghost" onClick={() => navigate("/contrib")}>
+            <Icon as={FiX} />
             Cancel
           </Button>
-          <Button colorScheme="purple" leftIcon={<Icon as={FiSave} />} onClick={handleSubmit} isLoading={isSubmitting}>
+          <Button colorPalette="purple" onClick={handleSubmit} loading={isSubmitting}>
+            <Icon as={FiSave} />
             {draftOnly ? "Save draft" : "Save Entry"}
           </Button>
         </HStack>
       </Flex>
       <Grid templateColumns={{ base: "1fr", lg: "minmax(0, 3fr) minmax(0, 1fr)" }} gap={8} maxW="1200px" mx="auto" p={8}>
-        <GridItem as={VStack} spacing={6} align="stretch">
+        <GridItem display="flex" flexDirection="column" gap={6} alignItems="stretch">
           {missing.length > 0 && (
-            <Alert status="warning" borderRadius="md">
-              <AlertIcon />
-              Required: {missing.join(", ")}
-            </Alert>
+            <Alert.Root status="warning" borderRadius="md">
+              <Alert.Indicator />
+              <Alert.Description>Required: {missing.join(", ")}</Alert.Description>
+            </Alert.Root>
           )}
           {titleField && (
-            <FormControl isRequired={titleField.attr.required}>
+            <ChakraField.Root required={titleField.attr.required}>
               <Input
                 aria-label={titleField.key}
                 value={String(formData[titleField.key] ?? "")}
                 onChange={(e) => handleChange(titleField.key, e.target.value)}
                 placeholder="Your post title..."
-                variant="unstyled"
+                unstyled
+                w="full"
+                minW={0}
+                outline={0}
+                bg="transparent"
                 fontSize="4xl"
                 fontWeight="bold"
               />
-            </FormControl>
+            </ChakraField.Root>
           )}
           {mainField && (
-            <FormControl isRequired={mainField.attr.required}>
+            <ChakraField.Root required={mainField.attr.required}>
               <Textarea
                 aria-label={mainField.key}
                 value={String(formData[mainField.key] ?? "")}
                 onChange={(e) => handleChange(mainField.key, e.target.value)}
                 placeholder="Begin writing your content..."
-                variant="unstyled"
+                unstyled
+                w="full"
+                minW={0}
+                outline={0}
+                bg="transparent"
+                resize="vertical"
                 fontSize="lg"
                 rows={20}
               />
-            </FormControl>
+            </ChakraField.Root>
           )}
         </GridItem>
         {Object.keys(sidebarFields).length > 0 && (
-          <GridItem as={VStack} spacing={4} align="stretch" pos="sticky" top="150px" alignSelf="start">
-            <Accordion allowToggle defaultIndex={[0]}>
-              <AccordionItem borderWidth="0" bg="white" borderRadius="lg" boxShadow="sm">
-                <AccordionButton>
+          <GridItem display="flex" flexDirection="column" gap={4} alignItems="stretch" pos="sticky" top="150px" alignSelf="start">
+            <AccordionRoot collapsible defaultValue={["metadata"]}>
+              <AccordionItem value="metadata" borderWidth="0" bg="white" borderRadius="lg" boxShadow="sm">
+                <AccordionItemTrigger px={4} py={2}>
                   <Box flex="1" textAlign="left" fontWeight="semibold">
                     Metadata
                   </Box>
-                  <AccordionIcon />
-                </AccordionButton>
-                <AccordionPanel pb={4}>
+                </AccordionItemTrigger>
+                <AccordionItemContent px={4} pt={2} pb={4}>
                   <EntryFields attributes={sidebarFields} values={formData} onChange={handleChange} idPrefix="editor-" />
-                </AccordionPanel>
+                </AccordionItemContent>
               </AccordionItem>
-            </Accordion>
+            </AccordionRoot>
           </GridItem>
         )}
       </Grid>

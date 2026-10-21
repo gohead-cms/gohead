@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, AlertIcon, Box, Button, Flex, Heading, HStack, Icon, Text, useDisclosure } from "@chakra-ui/react";
+import { Alert, Box, Button, Flex, Heading, HStack, Icon, Text, useDisclosure } from "@chakra-ui/react";
 import { FiPlus } from "react-icons/fi";
 import { FaPenNib } from "react-icons/fa6";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -55,10 +55,10 @@ export function ContributionsPage() {
 
       <Box flex="1" minW={0} p={{ base: 4, lg: 8 }} overflowY="auto">
         {collectionsError && (
-          <Alert status="error" borderRadius="md" mb={6}>
-            <AlertIcon />
-            {collectionsError}
-          </Alert>
+          <Alert.Root status="error" borderRadius="md" mb={6}>
+            <Alert.Indicator />
+            <Alert.Description>{collectionsError}</Alert.Description>
+          </Alert.Root>
         )}
         {schema && selected && <CollectionContent key={selected.name} collectionName={selected.name} schema={schema} />}
         {singleton && <SingletonEditor key={singleton.name} singleton={singleton} />}
@@ -82,7 +82,7 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
   const linkedItem = params.get("item");
   const notify = useNotify();
   const perms = useEntryPermissions(collectionName);
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { open: isOpen, onOpen, onClose } = useDisclosure();
   const localized = hasLocalizedAttributes(schema.attributes);
   const { locales, defaultLocale } = useLocales(localized);
   const translatable = localized && locales.length > 1 && !!defaultLocale;
@@ -190,7 +190,7 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
     <>
       <Flex justify="space-between" align="center" mb={6} gap={4} wrap="wrap">
         <Box>
-          <Heading size="lg">{schema.info?.displayName || schema.collectionName}</Heading>
+          <Heading size="2xl" fontWeight="bold">{schema.info?.displayName || schema.collectionName}</Heading>
           <Text color="gray.500">{loading && content.items.length === 0 ? "Loading entries…" : `${content.total} ${content.total === 1 ? "entry" : "entries"}, newest first`}</Text>
         </Box>
         {(perms.create || perms.update || translatable) && (
@@ -204,10 +204,12 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
           )}
           {perms.create && (
           <>
-          <Button bg="white" variant="outline" size="sm" leftIcon={<Icon as={FiPlus} />} onClick={() => openForm(null)}>
+          <Button bg="white" variant="outline" size="xs" onClick={() => openForm(null)}>
+            <Icon as={FiPlus} />
             Quick Add
           </Button>
-          <Button colorScheme="purple" size="sm" leftIcon={<Icon as={FaPenNib} />} onClick={() => navigate(`/contrib/edit/${encodeURIComponent(collectionName)}`)}>
+          <Button colorPalette="purple" size="xs" onClick={() => navigate(`/contrib/edit/${encodeURIComponent(collectionName)}`)}>
+            <Icon as={FaPenNib} />
             Contrib
           </Button>
           </>
@@ -216,10 +218,10 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
         )}
       </Flex>
       {error && (
-        <Alert status="error" borderRadius="md" mb={6}>
-          <AlertIcon />
-          {error}
-        </Alert>
+        <Alert.Root status="error" borderRadius="md" mb={6}>
+          <Alert.Indicator />
+          <Alert.Description>{error}</Alert.Description>
+        </Alert.Root>
       )}
       {/* While entries reload after a change, the table stays on screen. */}
       {loading && content.items.length === 0 && !error && <PageLoader text="Fetching content..." />}
@@ -239,7 +241,7 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
       )}
       {!error && hasMore && (
         <Flex justify="center" mt={4}>
-          <Button size="sm" variant="outline" bg="white" onClick={loadMore} isLoading={loading}>
+          <Button size="xs" variant="outline" bg="white" onClick={loadMore} loading={loading}>
             Load more ({content.total - content.items.length} older)
           </Button>
         </Flex>

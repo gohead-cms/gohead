@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Box, Button, HStack, IconButton, Image, Input, Text, VStack, useDisclosure, useToast } from "@chakra-ui/react";
+import { Box, Button, HStack, IconButton, Image, Input, Text, VStack, useDisclosure } from "@chakra-ui/react";
 import { FiUpload, FiX, FiFile, FiImage } from "react-icons/fi";
 import { API_BASE_URL, apiFetchWithAuth } from "../../../services/api";
+import { useNotify } from "../../../shared/hooks/useNotify";
 import { useMe } from "../../auth/me";
 import { MEDIA } from "../../auth/permissions";
 import { MediaLibraryPicker } from "./MediaLibraryPicker";
@@ -35,14 +36,18 @@ function Preview({ value, field, onRemove }: { value: MediaValue; field: string;
   const label = file?.name || (typeof value === "number" ? `File #${value}` : url);
   const isImage = file ? file.mime?.startsWith("image/") : /\.(png|jpe?g|gif|webp|avif)$/i.test(url);
   return (
-    <HStack borderWidth="1px" borderRadius="md" p={2} spacing={3} w="100%">
+    <HStack borderWidth="1px" borderRadius="md" p={2} gap={3} w="100%">
       {isImage && url ? (
         <Image src={absolute(url)} alt={label} boxSize="48px" objectFit="cover" borderRadius="sm" />
       ) : (
-        <Box as={FiFile} boxSize="24px" color="gray.500" />
+        <Box boxSize="24px" color="gray.500" asChild>
+          <FiFile />
+        </Box>
       )}
-      <Text flex="1" fontSize="sm" noOfLines={1}>{label}</Text>
-      <IconButton aria-label={`Remove ${label} from ${field}`} icon={<FiX />} size="xs" variant="ghost" onClick={onRemove} />
+      <Text flex="1" fontSize="sm" lineClamp={1}>{label}</Text>
+      <IconButton aria-label={`Remove ${label} from ${field}`} size="2xs" variant="ghost" onClick={onRemove}>
+        <FiX />
+      </IconButton>
     </HStack>
   );
 }
@@ -52,7 +57,7 @@ function Preview({ value, field, onRemove }: { value: MediaValue; field: string;
 export function MediaField({ id, name = "file", value, multiple, accept, onChange }: MediaFieldProps) {
   const input = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const toast = useToast();
+  const notify = useNotify();
   // Uploading needs media create; files already set can still be removed.
   const me = useMe();
   const canUpload = me.can("create", MEDIA);
@@ -77,7 +82,7 @@ export function MediaField({ id, name = "file", value, multiple, accept, onChang
       const uploaded: MediaFile[] = json.data;
       onChange(multiple ? [...latest.current, ...uploaded] : uploaded[0]);
     } catch (err) {
-      toast({ title: "Upload failed", description: (err as Error).message, status: "error", duration: 5000, isClosable: true });
+      notify.failure(err, "Upload failed");
     } finally {
       setUploading(false);
       if (input.current) input.current.value = "";
@@ -90,7 +95,7 @@ export function MediaField({ id, name = "file", value, multiple, accept, onChang
   };
 
   return (
-    <VStack align="stretch" spacing={2} role="group" aria-labelledby={`${id}-label`}>
+    <VStack align="stretch" gap={2} role="group" aria-labelledby={`${id}-label`}>
       {values.map((v, i) => (
         <Preview key={i} value={v} field={name} onRemove={() => removeAt(i)} />
       ))}
@@ -100,27 +105,28 @@ export function MediaField({ id, name = "file", value, multiple, accept, onChang
         </Text>
       )}
       {(multiple || values.length === 0) && (canUpload || canBrowse) && (
-        <HStack spacing={2} wrap="wrap">
+        <HStack gap={2} wrap="wrap">
           {canUpload && (
             <Button
-              leftIcon={<FiUpload />}
-              size="sm"
+              size="xs"
               variant="outline"
-              isLoading={uploading}
+              loading={uploading}
               onClick={() => input.current?.click()}
               aria-label={`Upload ${multiple ? "files" : "a file"} to ${name}`}
             >
+              <FiUpload />
               {multiple ? "Upload files" : "Upload a file"}
             </Button>
           )}
           {canBrowse && (
-            <Button leftIcon={<FiImage />} size="sm" variant="outline" onClick={library.onOpen} aria-label={`Choose ${name} from the library`}>
+            <Button size="xs" variant="outline" onClick={library.onOpen} aria-label={`Choose ${name} from the library`}>
+              <FiImage />
               Choose from library
             </Button>
           )}
         </HStack>
       )}
-      {library.isOpen && (
+      {library.open && (
         <MediaLibraryPicker
           multiple={multiple}
           accept={accept}
