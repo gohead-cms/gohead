@@ -32,6 +32,11 @@ invalid change is refused right away and the agent sees the error, as it would w
 approval. The function returns `{"status": "pending_approval", "proposal_id": …}`, so the
 agent knows nothing was written yet. Functions can pass a `reason`, shown to the reviewer.
 
+Calls to [connected apps](connected-apps.md) can need approval too: by default, every call
+of a tool that may change something in the app (send an email, open an issue) becomes a
+`call` proposal, whether or not the agent requires approval. Admins review those; see
+[Connected apps → Approvals](connected-apps.md#approvals).
+
 ## Reviewing
 
 **Approvals** in the admin UI lists pending proposals, with a count in the sidebar. Open one

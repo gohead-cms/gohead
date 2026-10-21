@@ -35,9 +35,9 @@ var Presets = []Preset{
 		Description: "Gmail, Google Drive, Sheets, Slack, Notion and thousands of other apps, through the actions you enable in Zapier MCP.",
 		URL:         "https://mcp.zapier.com/api/v1/connect", AuthType: models.ConnectionAuthBearer,
 		TokenLabel: "Zapier MCP token",
-		TokenHelp:  "Create an MCP server at mcp.zapier.com, choose its apps and actions, then copy its token from the Connect tab (\"Other\" client).",
+		TokenHelp:  "At mcp.zapier.com, click Add MCP server and choose \"Other\" as the AI agent, add the actions agents may use, then in Settings → API token click Generate token. It is shown once.",
 		TokenURL:   "https://mcp.zapier.com/",
-		DocsURL:    "https://zapier.com/mcp",
+		DocsURL:    "https://docs.zapier.com/mcp/get-started/connect/other",
 	},
 }
 

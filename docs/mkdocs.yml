@@ -101,6 +101,7 @@ nav:
       - Webhooks: manual/webhooks.md
       - Locales: manual/locales.md
       - Agents: manual/agents.md
+      - Connected apps: manual/connected-apps.md
       - Approvals: manual/approvals.md
       - Activity: manual/activity.md
   - Handbook:
@@ -124,6 +125,7 @@ nav:
       - Overview: agents/index.md
       - Triggers: agents/triggers.md
       - Tools: agents/functions.md
+      - Connected apps: agents/connected-apps.md
       - Runs and limits: agents/runs-and-limits.md
       - Approvals: agents/approvals.md
       - Templates: agents/templates.md

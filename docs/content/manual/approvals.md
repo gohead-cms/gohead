@@ -14,7 +14,9 @@ The **Pending** tab lists them, newest first: when the agent proposed the change
 agent, the kind of change (**update**, **create**, **delete**, or **translate** with the
 locale), the entry, and the agent's reason. **changed since** warns that the entry was
 modified after the agent proposed the change (see
-[Stale proposals](#when-the-entry-changed-since)).
+[Stale proposals](#when-the-entry-changed-since)). Admins also see **call** proposals: calls
+of a [connected app](connected-apps.md#approve-a-call)'s tool, such as sending an email,
+that wait for their approval.
 
 ![The Approvals page with three pending proposals and a badge of 3 in the sidebar](../assets/manual/approvals-list.png)
 

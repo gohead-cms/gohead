@@ -66,7 +66,7 @@ Create an article and, a moment later, the summary appears in `summaries`.
 | `llm_config` | yes | `provider` (required), `model`, `api_key`, `base_url`, and optional `input_cost_per_million` / `output_cost_per_million` (USD) to track cost. See [LLM providers](llm-providers.md). |
 | `memory` | yes | `type` and `session_scope` (e.g. `in-memory` / `user`). |
 | `trigger` | yes | See [Triggers](triggers.md). |
-| `tools` | no | What the agent may do: `[{"use": "content.update", "on": ["articles"]}]`. See [Tools](functions.md). (`functions`, the long form of earlier versions, is still accepted.) |
+| `tools` | no | What the agent may do: `[{"use": "content.update", "on": ["articles"]}]`. See [Tools](functions.md) and [Connected apps](connected-apps.md). (`functions`, the long form of earlier versions, is still accepted.) |
 | `limits` | no | Rate, token and cost limits. See [Runs and limits](runs-and-limits.md#limits). |
 
 ## How a run works
@@ -107,3 +107,5 @@ Responses mask `llm_config.api_key`, `api_secret` and `trigger.webhook_token` as
 - Set [`limits`](runs-and-limits.md#limits) on event-driven agents before pointing them at a
   busy collection.
 - Scope content tools (`on`) to the collections the agent needs.
+- Keep approval on for [connected apps](connected-apps.md)' tools that send, create or
+  delete things, at least until a few runs show the agent uses them well.

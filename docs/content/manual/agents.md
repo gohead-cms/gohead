@@ -79,7 +79,8 @@ Choose **Start blank** in the gallery, then fill in each section of the form:
   the model is told the same. For tools that read or write content, check the collections
   under **On collections**: with none checked, the tool may use every collection, which is
   rarely what you want for writes. A tool added after choosing a collection-event trigger
-  starts with that collection checked. **Customize** changes the name the model sees (when
+  starts with that collection checked. Tools of [connected apps](connected-apps.md)
+  (GitHub, Gmail through Zapier…) are listed under **Connected apps**. **Customize** changes the name the model sees (when
   the system prompt refers to it), its description or its arguments; most agents don't need
   it.
 
