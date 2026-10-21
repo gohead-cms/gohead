@@ -1,34 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link as RouterLink, useSearchParams } from "react-router-dom";
-import {
-  Alert,
-  AlertIcon,
-  Badge,
-  Box,
-  Button,
-  HStack,
-  Icon,
-  IconButton,
-  Input,
-  Link,
-  Select,
-  Spinner,
-  Tab,
-  TabList,
-  Table,
-  TableContainer,
-  Tabs,
-  Tag,
-  TagCloseButton,
-  TagLabel,
-  Tbody,
-  Td,
-  Text,
-  Th,
-  Thead,
-  Tr,
-  useColorModeValue,
-} from "@chakra-ui/react";
+import { Alert, Badge, Box, Button, HStack, Icon, IconButton, Input, Link, NativeSelect, Spinner, Table, Tabs, Tag, Text } from "@chakra-ui/react";
+import { useColorModeValue } from "@/components/ui/color-mode";
 import { FiAlertTriangle, FiCheckCircle, FiRefreshCw } from "react-icons/fi";
 import { EmptyState } from "../../shared/ui/EmptyState";
 import { Page, PageHeader } from "../../shared/ui/PageHeader";
@@ -70,7 +43,6 @@ export function ApprovalsPage() {
   const { proposals, pagination, loading, error, refetch } = useProposals(filters, page);
   const { collections } = useCollectionsList();
   const hover = useColorModeValue("gray.50", "gray.700");
-  const tabIndex = Math.max(0, STATUS_TABS.findIndex((t) => t.value === filters.status));
   const narrowed = Boolean(filters.collection || filters.agent || filters.agentRun);
 
   /** Sets filters (and goes back to the first page). */
@@ -112,46 +84,47 @@ export function ApprovalsPage() {
       <PageHeader
         title="Approvals"
         description="Content changes proposed by agents that need an editor's approval. Nothing is written until you approve."
-        actions={<IconButton aria-label="Refresh" icon={<FiRefreshCw />} size="sm" onClick={refetch} isLoading={loading} />}
+        actions={
+          <IconButton aria-label="Refresh" size="xs" variant="subtle" onClick={refetch} loading={loading}>
+            <FiRefreshCw />
+          </IconButton>
+        }
       />
 
       <Box bg="white" borderWidth="1px" borderRadius="lg" p={{ base: 4, md: 5 }}>
-        <Tabs
-          index={tabIndex}
-          onChange={(i) => update({ status: STATUS_TABS[i].value === "pending" ? undefined : STATUS_TABS[i].value })}
-          colorScheme="purple"
+        <Tabs.Root
+          value={filters.status}
+          onValueChange={(e) => update({ status: e.value === "pending" ? undefined : e.value })}
+          colorPalette="purple"
           size="sm"
           mb={4}
         >
-          <TabList overflowX="auto" overflowY="hidden">
+          <Tabs.List overflowX="auto" overflowY="hidden">
             {STATUS_TABS.map((t) => (
-              <Tab key={t.value} whiteSpace="nowrap">
+              <Tabs.Trigger key={t.value} value={t.value} whiteSpace="nowrap" _selected={{ color: "purple.600" }}>
                 {t.label}
-              </Tab>
+              </Tabs.Trigger>
             ))}
-          </TabList>
-        </Tabs>
+          </Tabs.List>
+        </Tabs.Root>
 
-        <HStack mb={4} spacing={3} wrap="wrap">
-          <Select
-            size="sm"
-            maxW="200px"
-            aria-label="Filter by collection"
-            value={filters.collection}
-            onChange={(e) => update({ collection: e.target.value })}
-          >
-            <option value="">All collections</option>
-            {filters.collection && !collections.some((c) => c.schema.collectionName === filters.collection) && (
-              <option value={filters.collection}>{filters.collection}</option>
-            )}
-            {collections.map((c) => (
-              <option key={c.schema.collectionName} value={c.schema.collectionName}>
-                {c.schema.info?.displayName || c.schema.collectionName}
-              </option>
-            ))}
-          </Select>
+        <HStack mb={4} gap={3} wrap="wrap">
+          <NativeSelect.Root size="xs" maxW="200px">
+            <NativeSelect.Field aria-label="Filter by collection" value={filters.collection} onChange={(e) => update({ collection: e.target.value })}>
+              <option value="">All collections</option>
+              {filters.collection && !collections.some((c) => c.schema.collectionName === filters.collection) && (
+                <option value={filters.collection}>{filters.collection}</option>
+              )}
+              {collections.map((c) => (
+                <option key={c.schema.collectionName} value={c.schema.collectionName}>
+                  {c.schema.info?.displayName || c.schema.collectionName}
+                </option>
+              ))}
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
           <Input
-            size="sm"
+            size="xs"
             maxW="200px"
             aria-label="Filter by agent"
             placeholder="Agent name"
@@ -163,10 +136,12 @@ export function ApprovalsPage() {
             }}
           />
           {filters.agentRun && (
-            <Tag size="md" colorScheme="purple" borderRadius="full">
-              <TagLabel>Run #{filters.agentRun}</TagLabel>
-              <TagCloseButton aria-label="Show every run" onClick={() => update({ agentRun: undefined })} />
-            </Tag>
+            <Tag.Root size="md" variant="subtle" colorPalette="purple" borderRadius="full">
+              <Tag.Label>Run #{filters.agentRun}</Tag.Label>
+              <Tag.EndElement>
+                <Tag.CloseTrigger aria-label="Show every run" onClick={() => update({ agentRun: undefined })} />
+              </Tag.EndElement>
+            </Tag.Root>
           )}
           {pagination && (
             <Text fontSize="sm" color="gray.500" ml="auto">
@@ -176,17 +151,19 @@ export function ApprovalsPage() {
         </HStack>
 
         {error && (
-          <Alert status="error" mb={3} borderRadius="md">
-            <AlertIcon />
-            {error}
-          </Alert>
+          <Alert.Root status="error" mb={3} borderRadius="md">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Description>{error}</Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
         )}
         {loading && proposals.length === 0 && <Spinner />}
         {!loading && !error && proposals.length === 0 &&
           (narrowed ? (
             <Text fontSize="sm" color="gray.500">
               No proposals match these filters.{" "}
-              <Button variant="link" size="sm" onClick={clearFilters}>
+              <Button variant="plain" size="xs" color="gray.500" px={0} h="auto" _hover={{ textDecoration: "underline" }} onClick={clearFilters}>
                 Clear filters
               </Button>
             </Text>
@@ -198,36 +175,36 @@ export function ApprovalsPage() {
           ))}
 
         {proposals.length > 0 && (
-          <TableContainer borderWidth="1px" borderRadius="md">
-            <Table size="sm" sx={{ "th, td": { px: 3 } }}>
-              <Thead>
-                <Tr>
-                  <Th>Proposed</Th>
-                  <Th>Agent</Th>
-                  <Th>Change</Th>
-                  <Th>Entry</Th>
-                  <Th>Reason</Th>
-                  {showStatus && <Th>Status</Th>}
-                </Tr>
-              </Thead>
-              <Tbody>
+          <Table.ScrollArea whiteSpace="nowrap" borderWidth="1px" borderRadius="md">
+            <Table.Root size="sm" css={{ "& th, & td": { px: 3 } }}>
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader>Proposed</Table.ColumnHeader>
+                  <Table.ColumnHeader>Agent</Table.ColumnHeader>
+                  <Table.ColumnHeader>Change</Table.ColumnHeader>
+                  <Table.ColumnHeader>Entry</Table.ColumnHeader>
+                  <Table.ColumnHeader>Reason</Table.ColumnHeader>
+                  {showStatus && <Table.ColumnHeader>Status</Table.ColumnHeader>}
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
                 {proposals.map((p) => (
                   <ProposalRow key={p.id} proposal={p} stale={Boolean(p.stale)} showStatus={showStatus} hover={hover} onOpen={() => setOpen(p.id)} />
                 ))}
-              </Tbody>
-            </Table>
-          </TableContainer>
+              </Table.Body>
+            </Table.Root>
+          </Table.ScrollArea>
         )}
 
         {pagination && pagination.pageCount > 1 && (
           <HStack mt={3} justify="flex-end">
-            <Button size="sm" onClick={() => update({ page: page - 1 }, true)} isDisabled={page <= 1}>
+            <Button size="xs" variant="subtle" onClick={() => update({ page: page - 1 }, true)} disabled={page <= 1}>
               Newer
             </Button>
             <Text fontSize="sm">
               {page} / {pagination.pageCount}
             </Text>
-            <Button size="sm" onClick={() => update({ page: page + 1 }, true)} isDisabled={page >= pagination.pageCount}>
+            <Button size="xs" variant="subtle" onClick={() => update({ page: page + 1 }, true)} disabled={page >= pagination.pageCount}>
               Older
             </Button>
           </HStack>
@@ -255,13 +232,16 @@ function ProposalRow({
   return (
     // The whole row opens the proposal with the mouse; the button in its
     // first cell does it from the keyboard.
-    <Tr cursor="pointer" _hover={{ bg: hover }} onClick={onOpen}>
-      <Td whiteSpace="nowrap" title={formatTime(p.createdAt)}>
+    <Table.Row cursor="pointer" _hover={{ bg: hover }} onClick={onOpen}>
+      <Table.Cell whiteSpace="nowrap" title={formatTime(p.createdAt)}>
         <Button
-          variant="link"
-          size="sm"
+          variant="plain"
+          size="xs"
+          px={0}
+          h="auto"
           fontWeight="normal"
           color="inherit"
+          _hover={{ textDecoration: "underline" }}
           aria-label={`Open proposal ${p.id} by ${p.agentName}`}
           onClick={(e) => {
             e.stopPropagation();
@@ -270,27 +250,21 @@ function ProposalRow({
         >
           {formatShortTime(p.createdAt)}
         </Button>
-      </Td>
-      <Td maxW="160px" overflow="hidden" textOverflow="ellipsis" fontWeight="medium" title={p.agentName}>
+      </Table.Cell>
+      <Table.Cell maxW="160px" overflow="hidden" textOverflow="ellipsis" fontWeight="medium" title={p.agentName}>
         {p.agentName}
-      </Td>
-      <Td>
+      </Table.Cell>
+      <Table.Cell>
         <ProposalBadges proposal={p} />
-      </Td>
-      <Td maxW="220px" overflow="hidden" textOverflow="ellipsis">
-        <HStack spacing={1.5}>
+      </Table.Cell>
+      <Table.Cell maxW="220px" overflow="hidden" textOverflow="ellipsis">
+        <HStack gap={1.5}>
           <Text as="span" fontWeight="medium">
             {p.collection}
           </Text>
           {p.itemId !== undefined ? (
-            <Link
-              as={RouterLink}
-              to={entryLink(p.collection, p.itemId)}
-              color="purple.600"
-              onClick={(e) => e.stopPropagation()}
-              title="Open the entry"
-            >
-              #{p.itemId}
+            <Link asChild color="purple.600" onClick={(e) => e.stopPropagation()} title="Open the entry">
+              <RouterLink to={entryLink(p.collection, p.itemId)}>#{p.itemId}</RouterLink>
             </Link>
           ) : (
             <Text as="span" color="gray.500" fontSize="xs">
@@ -298,23 +272,23 @@ function ProposalRow({
             </Text>
           )}
           {stale && (
-            <Badge colorScheme="orange" variant="subtle" display="inline-flex" alignItems="center" gap={1} title="The entry changed since the agent proposed this">
+            <Badge colorPalette="orange" variant="subtle" display="inline-flex" alignItems="center" gap={1} title="The entry changed since the agent proposed this">
               <Icon as={FiAlertTriangle} />
               changed since
             </Badge>
           )}
         </HStack>
-      </Td>
-      <Td maxW="320px" overflow="hidden" textOverflow="ellipsis" title={p.reason || undefined} color={p.reason ? undefined : "gray.400"}>
+      </Table.Cell>
+      <Table.Cell maxW="320px" overflow="hidden" textOverflow="ellipsis" title={p.reason || undefined} color={p.reason ? undefined : "gray.400"}>
         {p.reason || "–"}
-      </Td>
+      </Table.Cell>
       {showStatus && (
-        <Td>
-          <Badge colorScheme={proposalStatusColor[p.status] ?? "gray"} title={p.error || p.reviewNote || undefined}>
+        <Table.Cell>
+          <Badge colorPalette={proposalStatusColor[p.status] ?? "gray"} title={p.error || p.reviewNote || undefined}>
             {p.status}
           </Badge>
-        </Td>
+        </Table.Cell>
       )}
-    </Tr>
+    </Table.Row>
   );
 }

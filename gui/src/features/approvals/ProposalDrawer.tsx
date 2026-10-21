@@ -1,35 +1,8 @@
 import { useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
-import {
-  Alert,
-  AlertDescription,
-  AlertIcon,
-  AlertTitle,
-  Badge,
-  Box,
-  Button,
-  Code,
-  Drawer,
-  DrawerBody,
-  DrawerCloseButton,
-  DrawerContent,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerOverlay,
-  FormControl,
-  FormErrorMessage,
-  FormHelperText,
-  FormLabel,
-  HStack,
-  Icon,
-  Link,
-  Spinner,
-  Text,
-  Textarea,
-  VStack,
-  Wrap,
-  useColorModeValue,
-} from "@chakra-ui/react";
+import { Alert, Badge, Box, Button, Code, Field, HStack, Icon, Link, Spinner, Text, Textarea, VStack, Wrap } from "@chakra-ui/react";
+import { useColorModeValue } from "@/components/ui/color-mode";
+import { DrawerBody, DrawerCloseTrigger, DrawerContent, DrawerFooter, DrawerHeader, DrawerRoot, DrawerTitle } from "@/components/ui/drawer";
 import { FiCheck, FiEdit3, FiExternalLink, FiGlobe, FiX } from "react-icons/fi";
 import { ApiError } from "../../services/api";
 import { useNotify } from "../../shared/hooks/useNotify";
@@ -75,8 +48,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 /** Status, action and locale of a proposal. */
 export function ProposalBadges({ proposal }: { proposal: Pick<Proposal, "status" | "action" | "locale"> }) {
   return (
-    <HStack spacing={1.5} display="inline-flex" wrap="wrap">
-      <Badge colorScheme={proposalActionColor[proposal.action] ?? "gray"}>{proposalActionLabel(proposal)}</Badge>
+    <HStack gap={1.5} display="inline-flex" wrap="wrap">
+      <Badge colorPalette={proposalActionColor[proposal.action] ?? "gray"}>{proposalActionLabel(proposal)}</Badge>
       {proposal.locale && <LocaleBadge locale={proposal.locale} />}
     </HStack>
   );
@@ -85,7 +58,7 @@ export function ProposalBadges({ proposal }: { proposal: Pick<Proposal, "status"
 export function LocaleBadge({ locale }: { locale: string }) {
   return (
     <Badge
-      colorScheme="purple"
+      colorPalette="purple"
       variant="outline"
       textTransform="none"
       display="inline-flex"
@@ -106,19 +79,25 @@ export function LocaleBadge({ locale }: { locale: string }) {
 export function ProposalDrawer({ proposalId, onClose }: ProposalDrawerProps) {
   const { detail, loading, error, refetch } = useProposal(proposalId);
   return (
-    <Drawer isOpen={proposalId !== null} onClose={onClose} placement="right" size="xl">
-      <DrawerOverlay />
+    <DrawerRoot
+      open={proposalId !== null}
+      onOpenChange={(e) => {
+        if (!e.open) onClose();
+      }}
+      placement="end"
+      size="xl"
+    >
       <DrawerContent maxW={{ base: "100vw", lg: "4xl" }}>
-        <DrawerCloseButton />
+        <DrawerCloseTrigger />
         <DrawerHeader borderBottomWidth="1px">
-          <HStack spacing={3} wrap="wrap">
-            <Text>Proposal #{proposalId}</Text>
+          <DrawerTitle display="flex" alignItems="center" gap={3} flexWrap="wrap" fontSize="xl" fontWeight="semibold">
+            <Text as="span">Proposal #{proposalId}</Text>
             {detail && (
-              <Badge colorScheme={proposalStatusColor[detail.proposal.status] ?? "gray"} fontSize="0.7em">
+              <Badge colorPalette={proposalStatusColor[detail.proposal.status] ?? "gray"} fontSize="0.7em">
                 {detail.proposal.status}
               </Badge>
             )}
-          </HStack>
+          </DrawerTitle>
         </DrawerHeader>
         {loading && !detail && (
           <DrawerBody>
@@ -127,16 +106,18 @@ export function ProposalDrawer({ proposalId, onClose }: ProposalDrawerProps) {
         )}
         {error && !detail && (
           <DrawerBody>
-            <Alert status="error" mt={4} borderRadius="md">
-              <AlertIcon />
-              {error}
-            </Alert>
+            <Alert.Root status="error" mt={4} borderRadius="md">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Description>{error}</Alert.Description>
+              </Alert.Content>
+            </Alert.Root>
           </DrawerBody>
         )}
         {/* A new proposal starts the review from scratch. */}
         {detail && <ProposalReview key={detail.proposal.id} detail={detail} reload={refetch} onClose={onClose} />}
       </DrawerContent>
-    </Drawer>
+    </DrawerRoot>
   );
 }
 
@@ -263,8 +244,8 @@ function ProposalReview({ detail, reload, onClose }: { detail: ProposalDetail; r
   return (
     <>
       <DrawerBody>
-        <VStack align="stretch" spacing={5} py={4}>
-          <Wrap spacing={4} fontSize="sm" align="center">
+        <VStack align="stretch" gap={5} py={4}>
+          <Wrap gap={4} fontSize="sm" align="center">
             <ProposalBadges proposal={p} />
             <Text>
               <Text as="span" color="gray.500">
@@ -275,8 +256,8 @@ function ProposalReview({ detail, reload, onClose }: { detail: ProposalDetail; r
               </Text>
               {p.agentRunId !== undefined &&
                 (isAdmin ? (
-                  <Link as={RouterLink} to={agentRunLink(p.agentName, p.agentRunId)} color="purple.600" ml={1}>
-                    run #{p.agentRunId}
+                  <Link asChild color="purple.600" ml={1}>
+                    <RouterLink to={agentRunLink(p.agentName, p.agentRunId)}>run #{p.agentRunId}</RouterLink>
                   </Link>
                 ) : (
                   <Text as="span" color="gray.500" ml={1}>
@@ -288,17 +269,20 @@ function ProposalReview({ detail, reload, onClose }: { detail: ProposalDetail; r
           </Wrap>
 
           <Section title="Entry">
-            <HStack spacing={2} wrap="wrap">
+            <HStack gap={2} wrap="wrap">
               <Text fontWeight="medium">{proposalEntryLabel(p)}</Text>
               {p.locale && <LocaleBadge locale={p.locale} />}
               {currentStatus && (
-                <Badge colorScheme={currentStatus === "published" ? "green" : "gray"} variant="subtle">
+                <Badge colorPalette={currentStatus === "published" ? "green" : "gray"} variant="subtle">
                   {currentStatus}
                 </Badge>
               )}
               {p.itemId !== undefined && (
-                <Button as={RouterLink} to={entryLink(p.collection, p.itemId)} size="xs" variant="ghost" rightIcon={<FiExternalLink />}>
-                  Open entry
+                <Button asChild size="2xs" variant="ghost">
+                  <RouterLink to={entryLink(p.collection, p.itemId)}>
+                    Open entry
+                    <FiExternalLink />
+                  </RouterLink>
                 </Button>
               )}
             </HStack>
@@ -313,29 +297,29 @@ function ProposalReview({ detail, reload, onClose }: { detail: ProposalDetail; r
           )}
 
           {!pending && (
-            <Alert status={p.status === "approved" ? "success" : p.status === "failed" ? "error" : "info"} borderRadius="md" alignItems="start">
-              <AlertIcon />
-              <Box>
-                <AlertTitle textTransform="capitalize">{p.status === "applying" ? "Being applied" : p.status}</AlertTitle>
-                <AlertDescription fontSize="sm">
+            <Alert.Root status={p.status === "approved" ? "success" : p.status === "failed" ? "error" : "info"} borderRadius="md" alignItems="start">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Title textTransform="capitalize">{p.status === "applying" ? "Being applied" : p.status}</Alert.Title>
+                <Alert.Description fontSize="sm">
                   {[p.reviewedBy && `By ${p.reviewedBy}`, p.decidedAt && formatTime(p.decidedAt)].filter(Boolean).join(", ")}
                   {p.reviewNote && <Text mt={1}>“{p.reviewNote}”</Text>}
                   {p.error && <Text mt={1}>{p.error}</Text>}
-                </AlertDescription>
-              </Box>
-            </Alert>
+                </Alert.Description>
+              </Alert.Content>
+            </Alert.Root>
           )}
 
           {showStale && (
-            <Alert status="warning" borderRadius="md" alignItems="start" data-testid="stale-warning">
-              <AlertIcon />
-              <Box flex="1">
-                <AlertTitle>The entry changed since the agent proposed this</AlertTitle>
-                <AlertDescription fontSize="sm" display="block">
+            <Alert.Root status="warning" borderRadius="md" alignItems="start" data-testid="stale-warning">
+              <Alert.Indicator />
+              <Alert.Content flex="1">
+                <Alert.Title>The entry changed since the agent proposed this</Alert.Title>
+                <Alert.Description fontSize="sm" display="block">
                   The “current” column shows the entry as it is now, and “proposed” what approving writes: only the fields the agent
                   changed are applied over it.
                   {canForce && " Approve anyway to apply them."}
-                </AlertDescription>
+                </Alert.Description>
                 {editReset && mode === "edit" && (
                   <Text fontSize="sm" mt={2} fontWeight="medium" data-testid="edit-reset-note">
                     The entry changed while you were editing: the values to apply were reset to the entry as it is now with the agent's
@@ -343,12 +327,12 @@ function ProposalReview({ detail, reload, onClose }: { detail: ProposalDetail; r
                   </Text>
                 )}
                 {canForce && (
-                  <Button mt={2} size="sm" colorScheme="orange" onClick={() => approve(true)} isLoading={busy === "force"} isDisabled={working}>
+                  <Button mt={2} size="xs" colorPalette="orange" alignSelf="start" onClick={() => approve(true)} loading={busy === "force"} disabled={working}>
                     Apply anyway
                   </Button>
                 )}
-              </Box>
-            </Alert>
+              </Alert.Content>
+            </Alert.Root>
           )}
 
           <Section title={p.action === "delete" ? "Deletes the entry" : pending ? "Changes" : "Proposed values"}>
@@ -370,40 +354,42 @@ function ProposalReview({ detail, reload, onClose }: { detail: ProposalDetail; r
           </Section>
 
           {pending && mode === "edit" && (
-            <FormControl isInvalid={Boolean(parsed?.error)}>
-              <FormLabel fontSize="sm">Values to apply</FormLabel>
+            <Field.Root invalid={Boolean(parsed?.error)}>
+              <Field.Label fontSize="sm">Values to apply</Field.Label>
               <Textarea
                 rows={12}
                 fontFamily="mono"
                 fontSize="sm"
                 value={edited}
                 onChange={(e) => setEdited(e.target.value)}
-                isDisabled={working}
+                disabled={working}
                 aria-label="Values to apply (JSON)"
                 spellCheck={false}
               />
               {parsed?.error ? (
-                <FormErrorMessage>{parsed.error}</FormErrorMessage>
+                <Field.ErrorText>{parsed.error}</Field.ErrorText>
               ) : (
-                <FormHelperText>
+                <Field.HelperText>
                   The entry's values after the change{p.locale ? `, in ${p.locale}` : ""}, as JSON. They replace the agent's values.
-                </FormHelperText>
+                </Field.HelperText>
               )}
-            </FormControl>
+            </Field.Root>
           )}
 
           {pending && mode === "reject" && (
-            <FormControl>
-              <FormLabel fontSize="sm">Note (optional)</FormLabel>
-              <Textarea rows={3} isDisabled={working} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Why the change is rejected" />
-            </FormControl>
+            <Field.Root>
+              <Field.Label fontSize="sm">Note (optional)</Field.Label>
+              <Textarea rows={3} disabled={working} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Why the change is rejected" />
+            </Field.Root>
           )}
 
           {actionError && (
-            <Alert status="error" borderRadius="md">
-              <AlertIcon />
-              {actionError}
-            </Alert>
+            <Alert.Root status="error" borderRadius="md">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Description>{actionError}</Alert.Description>
+              </Alert.Content>
+            </Alert.Root>
           )}
         </VStack>
       </DrawerBody>
@@ -412,35 +398,40 @@ function ProposalReview({ detail, reload, onClose }: { detail: ProposalDetail; r
         <DrawerFooter borderTopWidth="1px" gap={2} flexWrap="wrap">
           {mode === "review" && (
             <>
-              <Button variant="outline" colorScheme="red" leftIcon={<FiX />} onClick={() => setMode("reject")} mr="auto" isDisabled={working}>
+              <Button variant="outline" colorPalette="red" onClick={() => setMode("reject")} mr="auto" disabled={working}>
+                <FiX />
                 Reject
               </Button>
               {p.action !== "delete" && (
-                <Button variant="outline" leftIcon={<FiEdit3 />} onClick={() => setMode("edit")} isDisabled={working}>
+                <Button variant="outline" onClick={() => setMode("edit")} disabled={working}>
+                  <FiEdit3 />
                   Edit and approve
                 </Button>
               )}
-              <Button colorScheme="green" leftIcon={<FiCheck />} onClick={() => approve(false)} isLoading={busy === "approve"} isDisabled={working}>
+              <Button colorPalette="green" onClick={() => approve(false)} loading={busy === "approve"} disabled={working}>
+                <FiCheck />
                 Approve
               </Button>
             </>
           )}
           {mode === "edit" && (
             <>
-              <Button variant="ghost" onClick={() => setMode("review")} isDisabled={working}>
+              <Button variant="ghost" onClick={() => setMode("review")} disabled={working}>
                 Cancel
               </Button>
-              <Button colorScheme="green" leftIcon={<FiCheck />} onClick={() => approve(false)} isLoading={busy === "approve"} isDisabled={working || Boolean(parsed?.error)}>
+              <Button colorPalette="green" onClick={() => approve(false)} loading={busy === "approve"} disabled={working || Boolean(parsed?.error)}>
+                <FiCheck />
                 Approve with edits
               </Button>
             </>
           )}
           {mode === "reject" && (
             <>
-              <Button variant="ghost" onClick={() => setMode("review")} isDisabled={working}>
+              <Button variant="ghost" onClick={() => setMode("review")} disabled={working}>
                 Cancel
               </Button>
-              <Button colorScheme="red" leftIcon={<FiX />} onClick={reject} isLoading={busy === "reject"} isDisabled={working}>
+              <Button colorPalette="red" onClick={reject} loading={busy === "reject"} disabled={working}>
+                <FiX />
                 Reject proposal
               </Button>
             </>

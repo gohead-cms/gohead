@@ -1,4 +1,5 @@
-import { Badge, HStack, Icon, Link, Text, Tooltip } from "@chakra-ui/react";
+import { Badge, HStack, Icon, Link, Text } from "@chakra-ui/react";
+import { Tooltip } from "@/components/ui/tooltip";
 import { Link as RouterLink } from "react-router-dom";
 import { FiCpu, FiKey, FiServer, FiUser } from "react-icons/fi";
 import type { IconType } from "react-icons";
@@ -15,7 +16,7 @@ const actorIcon: Record<ActorKind, IconType> = {
 export function ActionBadge({ action }: { action: RevisionAction }) {
   return (
     <Badge
-      colorScheme={actionColor[action] ?? "gray"}
+      colorPalette={actionColor[action] ?? "gray"}
       title={action === "baseline" ? "Baseline: the content before history was recorded" : undefined}
     >
       {actionLabel[action] ?? action}
@@ -26,7 +27,7 @@ export function ActionBadge({ action }: { action: RevisionAction }) {
 export function StatusBadge({ status }: { status?: string }) {
   if (!status) return null;
   return (
-    <Badge variant="outline" colorScheme={status === "published" ? "green" : "gray"}>
+    <Badge variant="outline" colorPalette={status === "published" ? "green" : "gray"}>
       {status}
     </Badge>
   );
@@ -41,20 +42,20 @@ export function ActorTag({ revision, links = true }: { revision: Pick<Revision, 
   const { actorKind, actorName, agentRunId } = revision;
   const { isAdmin } = useMe();
   return (
-    <HStack spacing={1.5} minW={0} fontSize="sm">
-      <Tooltip label={actorKind}>
-        <Badge colorScheme={actorKindColor[actorKind] ?? "gray"} display="inline-flex" alignItems="center" gap={1} aria-label={`${actorKind} actor`}>
+    <HStack gap={1.5} minW={0} fontSize="sm">
+      <Tooltip content={actorKind}>
+        <Badge colorPalette={actorKindColor[actorKind] ?? "gray"} display="inline-flex" alignItems="center" gap={1} aria-label={`${actorKind} actor`}>
           <Icon as={actorIcon[actorKind] ?? FiUser} />
           {actorKind}
         </Badge>
       </Tooltip>
-      <Text as="span" noOfLines={1} title={actorName}>
+      <Text as="span" lineClamp={1} title={actorName}>
         {actorName || "unknown"}
       </Text>
       {actorKind === "agent" && agentRunId !== undefined && (
         links && isAdmin && actorName ? (
-          <Link as={RouterLink} to={agentRunLink(actorName, agentRunId)} color="purple.600" whiteSpace="nowrap" onClick={(e) => e.stopPropagation()}>
-            run #{agentRunId}
+          <Link asChild color="purple.600" whiteSpace="nowrap" onClick={(e) => e.stopPropagation()}>
+            <RouterLink to={agentRunLink(actorName, agentRunId)}>run #{agentRunId}</RouterLink>
           </Link>
         ) : (
           <Text as="span" color="gray.500" whiteSpace="nowrap">
