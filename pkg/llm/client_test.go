@@ -327,6 +327,7 @@ func TestChatAnthropic(t *testing.T) {
 		expectedResponse  *Response
 		expectErr         bool
 		expectedErrText   string
+		expectedTokens    [2]int // input, output; checked when set
 	}{
 		{
 			name: "simple text response",
@@ -394,6 +395,39 @@ func TestChatAnthropic(t *testing.T) {
 					},
 				},
 			},
+		},
+		{
+			// Claude usually says what it is about to do, then calls the
+			// tool: the text and the tool call are two content blocks.
+			name: "text then tool call",
+			inputMessages: []Message{
+				{Role: RoleUser, Content: "Summarize this article"},
+			},
+			mockApiResponse: `{
+                "id": "msg_04",
+                "type": "message",
+                "role": "assistant",
+                "model": "claude-sonnet-4-5",
+                "stop_reason": "tool_use",
+                "usage": {"input_tokens": 1287, "output_tokens": 158},
+                "content": [
+                    {"type": "text", "text": "I'll read the content, write a summary and save it."},
+                    {"type": "tool_use", "id": "toolu_02", "name": "save_summary", "input": {"id": 1, "summary": "Agents observe, plan, act and reflect."}}
+                ]
+            }`,
+			mockApiStatusCode: http.StatusOK,
+			expectedResponse: &Response{
+				Type:    ResponseTypeToolCall,
+				Content: "I'll read the content, write a summary and save it.",
+				ToolCall: &llms.ToolCall{
+					ID: "toolu_02",
+					FunctionCall: &llms.FunctionCall{
+						Name:      "save_summary",
+						Arguments: `{"id":1,"summary":"Agents observe, plan, act and reflect."}`,
+					},
+				},
+			},
+			expectedTokens: [2]int{1287, 158},
 		},
 		{
 			name: "request with tools option",
@@ -470,6 +504,9 @@ func TestChatAnthropic(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, 1, resp.Usage.Calls, "every call reports its usage")
+				if tt.expectedTokens != [2]int{} {
+					assert.Equal(t, tt.expectedTokens, [2]int{resp.Usage.InputTokens, resp.Usage.OutputTokens}, "tokens counted once, not once per content block")
+				}
 				resp.Usage = tt.expectedResponse.Usage
 				assert.Equal(t, tt.expectedResponse, resp)
 			}

@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Fixed
+- **Agents on Anthropic call their functions.** Claude usually writes a sentence before calling a tool ("I'll write a summary and save it."), and that text and the tool call arrive as two content blocks. Only the first was read, so the run ended with the sentence as its answer and no function call. Runs now see the tool call, and the run log shows the sentence before it.
+
 ## [0.6.2] - 2026-10-21
 
 ### Added
