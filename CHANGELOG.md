@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+- **Deploy to Render**: a button, `render.yaml` and a guide run GoHead in your Render account in one click: `gohead standalone` with a persistent disk, about $7 a month.
+
 ### Fixed
 - **Agents on Anthropic call their functions.** Claude usually writes a sentence before calling a tool ("I'll write a summary and save it."), and that text and the tool call arrive as two content blocks. Only the first was read, so the run ended with the sentence as its answer and no function call. Runs now see the tool call, and the run log shows the sentence before it.
 
