@@ -48,7 +48,7 @@ jobs:
       - run: npm ci
       - name: Set the versions
         run: |
-          npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --workspace @gohead-cms/client --workspace @gohead-cms/create
+          npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --allow-same-version --workspace @gohead-cms/client --workspace @gohead-cms/create
           # Templates depend on the client released alongside them.
           for f in templates/*/package.json; do
             node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync(process.argv[1]));p.dependencies["@gohead-cms/client"]="^"+process.argv[2];fs.writeFileSync(process.argv[1],JSON.stringify(p,null,2)+"\n")' "$f" "${{ steps.version.outputs.version }}"
