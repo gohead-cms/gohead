@@ -68,6 +68,12 @@ migrations are explicit, reviewed steps; contributors add them in `pkg/migration
 
 ## Version notes
 
+### 0.6.2
+
+No migration and nothing to change. The admin UI moves to Chakra UI v3, with the same
+screens and behaviour. On a Mac, GoHead also installs with Homebrew
+(`brew install gohead-cms/tap/gohead`).
+
 ### 0.6.1
 
 A bug fix release, with no migration and nothing to change: public access works again
