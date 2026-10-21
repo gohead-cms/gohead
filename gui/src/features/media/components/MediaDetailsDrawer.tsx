@@ -1,32 +1,32 @@
 import { type ReactNode, useState } from "react";
 import {
   Alert,
-  AlertIcon,
   Box,
   Button,
   Center,
+  chakra,
   Code,
-  Divider,
-  Drawer,
-  DrawerBody,
-  DrawerCloseButton,
-  DrawerContent,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerOverlay,
-  FormControl,
-  FormLabel,
+  Field,
   Grid,
   HStack,
   IconButton,
   Image,
   Input,
-  Link,
+  Separator,
   Spinner,
   Text,
-  Tooltip,
   useClipboard,
 } from "@chakra-ui/react";
+import {
+  DrawerBody,
+  DrawerCloseTrigger,
+  DrawerContent,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerRoot,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import { Tooltip } from "@/components/ui/tooltip";
 import { FiCheck, FiCopy, FiExternalLink, FiTrash2 } from "react-icons/fi";
 import { api } from "../../../services/api";
 import { getJSON, useApiQuery } from "../../../shared/hooks/useApiQuery";
@@ -48,13 +48,13 @@ function Preview({ item }: { item: MediaItem }) {
     );
   }
   if (item.mime.startsWith("video/")) {
-    return <Box as="video" src={src} controls preload="metadata" w="100%" maxH="320px" borderRadius="md" bg="black" />;
+    return <chakra.video src={src} controls preload="metadata" w="100%" maxH="320px" borderRadius="md" bg="black" />;
   }
   if (item.mime.startsWith("audio/")) {
     return (
       <Box>
         <MediaThumb item={item} height="120px" />
-        <Box as="audio" src={src} controls w="100%" mt={2} />
+        <chakra.audio src={src} controls w="100%" mt={2} />
       </Box>
     );
   }
@@ -66,18 +66,24 @@ function Preview({ item }: { item: MediaItem }) {
 }
 
 function UrlField({ url }: { url: string }) {
-  const { onCopy, hasCopied } = useClipboard(url);
+  const clip = useClipboard({ value: url });
   return (
-    <FormControl>
-      <FormLabel fontSize="sm">URL</FormLabel>
-      <HStack spacing={1}>
-        <Input size="sm" value={url} isReadOnly fontFamily="mono" fontSize="xs" onFocus={(e) => e.target.select()} />
-        <Tooltip label={hasCopied ? "Copied" : "Copy URL"}>
-          <IconButton aria-label="Copy URL" size="sm" icon={hasCopied ? <FiCheck /> : <FiCopy />} onClick={onCopy} />
+    <Field.Root>
+      <Field.Label fontSize="sm">URL</Field.Label>
+      <HStack gap={1} w="full">
+        <Input size="xs" value={url} readOnly fontFamily="mono" fontSize="xs" onFocus={(e) => e.target.select()} />
+        <Tooltip content={clip.copied ? "Copied" : "Copy URL"}>
+          <IconButton aria-label="Copy URL" size="xs" variant="subtle" onClick={() => clip.copy()}>
+            {clip.copied ? <FiCheck /> : <FiCopy />}
+          </IconButton>
         </Tooltip>
-        <IconButton as={Link} href={url} isExternal aria-label="Open file in a new tab" size="sm" icon={<FiExternalLink />} />
+        <IconButton asChild aria-label="Open file in a new tab" size="xs" variant="subtle">
+          <a href={url} target="_blank" rel="noopener noreferrer">
+            <FiExternalLink />
+          </a>
+        </IconButton>
       </HStack>
-    </FormControl>
+    </Field.Root>
   );
 }
 
@@ -150,21 +156,27 @@ export function MediaDetailsDrawer({
   };
 
   return (
-    <Drawer isOpen={id !== null} onClose={onClose} size="md" placement="right">
-      <DrawerOverlay />
+    <DrawerRoot
+      open={id !== null}
+      onOpenChange={(e) => {
+        if (!e.open) onClose();
+      }}
+      size="md"
+      placement="end"
+    >
       <DrawerContent>
-        <DrawerCloseButton />
+        <DrawerCloseTrigger />
         <DrawerHeader pr={12}>
-          <Text noOfLines={1} title={item?.name}>
+          <DrawerTitle fontSize="xl" fontWeight="semibold" lineClamp={1} title={item?.name}>
             {item?.name ?? "File details"}
-          </Text>
+          </DrawerTitle>
         </DrawerHeader>
         <DrawerBody>
           {query.error && (
-            <Alert status="error" borderRadius="md">
-              <AlertIcon />
-              {query.error}
-            </Alert>
+            <Alert.Root status="error" borderRadius="md">
+              <Alert.Indicator />
+              <Alert.Content>{query.error}</Alert.Content>
+            </Alert.Root>
           )}
           {!item && !query.error && (
             <Center py={12}>
@@ -176,7 +188,7 @@ export function MediaDetailsDrawer({
               <Preview item={item} />
               <UrlField url={absoluteUrl(item.url)} />
               <Facts item={item} />
-              <Divider />
+              <Separator />
               <MediaDetailsForm
                 key={`${item.id}-${item.updatedAt}`}
                 item={item}
@@ -187,10 +199,10 @@ export function MediaDetailsDrawer({
                 }}
               />
               {deleteError?.id === item.id && (
-                <Alert status="error" borderRadius="md" fontSize="sm">
-                  <AlertIcon />
-                  {deleteError.message}
-                </Alert>
+                <Alert.Root status="error" borderRadius="md" fontSize="sm">
+                  <Alert.Indicator />
+                  <Alert.Content>{deleteError.message}</Alert.Content>
+                </Alert.Root>
               )}
             </Box>
           )}
@@ -211,17 +223,18 @@ export function MediaDetailsDrawer({
               }
               onConfirm={remove}
               trigger={
-                <Button leftIcon={<FiTrash2 />} colorScheme="red" variant="outline" size="sm">
+                <Button colorPalette="red" variant="outline" size="xs">
+                  <FiTrash2 />
                   Delete file
                 </Button>
               }
             />
-            <Button size="sm" onClick={onClose}>
+            <Button size="xs" variant="subtle" onClick={onClose}>
               Close
             </Button>
           </DrawerFooter>
         )}
       </DrawerContent>
-    </Drawer>
+    </DrawerRoot>
   );
 }

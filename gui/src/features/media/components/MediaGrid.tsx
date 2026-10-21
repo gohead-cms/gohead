@@ -1,12 +1,11 @@
-import { Box, SimpleGrid, Text } from "@chakra-ui/react";
+import { Box, chakra, SimpleGrid, Text } from "@chakra-ui/react";
 import { type MediaItem, dimensions, formatBytes } from "../media";
 import { MediaThumb } from "./MediaThumb";
 
 function MediaCard({ item, onOpen }: { item: MediaItem; onOpen: () => void }) {
   const dims = dimensions(item);
   return (
-    <Box
-      as="button"
+    <chakra.button
       type="button"
       onClick={onOpen}
       aria-label={`Open ${item.name}`}
@@ -22,22 +21,22 @@ function MediaCard({ item, onOpen }: { item: MediaItem; onOpen: () => void }) {
     >
       <MediaThumb item={item} height="130px" />
       <Box px={3} py={2}>
-        <Text fontSize="sm" fontWeight="medium" noOfLines={1} title={item.name}>
+        <Text fontSize="sm" fontWeight="medium" lineClamp={1} title={item.name}>
           {item.name}
         </Text>
-        <Text fontSize="xs" color="gray.500" noOfLines={1}>
+        <Text fontSize="xs" color="gray.500" lineClamp={1}>
           {formatBytes(item.size)}
           {dims && ` · ${dims}`}
         </Text>
       </Box>
-    </Box>
+    </chakra.button>
   );
 }
 
 /** Responsive grid of media cards. */
 export function MediaGrid({ items, onOpen }: { items: MediaItem[]; onOpen: (id: number) => void }) {
   return (
-    <SimpleGrid minChildWidth="160px" spacing={4}>
+    <SimpleGrid minChildWidth="160px" gap={4}>
       {items.map((m) => (
         <MediaCard key={m.id} item={m} onOpen={() => onOpen(m.id)} />
       ))}

@@ -1,8 +1,6 @@
 import { Link as RouterLink } from "react-router-dom";
 import {
   Alert,
-  AlertDescription,
-  AlertIcon,
   Badge,
   Box,
   Button,
@@ -14,14 +12,9 @@ import {
   Link,
   Spinner,
   Table,
-  Tbody,
-  Td,
   Text,
-  Th,
-  Thead,
-  Tooltip,
-  Tr,
 } from "@chakra-ui/react";
+import { Tooltip } from "@/components/ui/tooltip";
 import { FiEdit2, FiGlobe, FiLayers, FiPlus, FiTrash2 } from "react-icons/fi";
 import { api } from "../../../services/api";
 import { useApiQuery } from "../../../shared/hooks/useApiQuery";
@@ -50,8 +43,11 @@ export function TypeTable({ kind }: { kind: ModelKind }) {
   };
 
   const newButton = (
-    <Button as={RouterLink} to={`/model/${kind}/new`} leftIcon={<FiPlus />} colorScheme="teal" size="sm">
-      New {singular}
+    <Button asChild colorPalette="teal" size="xs">
+      <RouterLink to={`/model/${kind}/new`}>
+        <FiPlus />
+        New {singular}
+      </RouterLink>
     </Button>
   );
 
@@ -62,13 +58,13 @@ export function TypeTable({ kind }: { kind: ModelKind }) {
         {newButton}
       </Flex>
       {error ? (
-        <Alert status="error" borderRadius="md">
-          <AlertIcon />
-          <AlertDescription flex="1">{error}</AlertDescription>
-          <Button size="sm" onClick={refetch}>
+        <Alert.Root status="error" borderRadius="md" alignItems="center">
+          <Alert.Indicator />
+          <Alert.Description flex="1">{error}</Alert.Description>
+          <Button size="xs" variant="subtle" onClick={refetch}>
             Retry
           </Button>
-        </Alert>
+        </Alert.Root>
       ) : loading && !data ? (
         <Center py={10}>
           <Spinner />
@@ -79,22 +75,22 @@ export function TypeTable({ kind }: { kind: ModelKind }) {
         </EmptyState>
       ) : (
         <Box bg="white" borderWidth="1px" borderRadius="lg" overflowX="auto">
-          <Table size="sm">
-            <Thead>
-              <Tr>
-                <Th>Name</Th>
-                <Th>Description</Th>
-                <Th isNumeric>Attributes</Th>
-                {kind === "collections" && <Th>Workflow</Th>}
-                <Th textAlign="right">Actions</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
+          <Table.Root size="sm">
+            <Table.Header>
+              <Table.Row>
+                <Table.ColumnHeader>Name</Table.ColumnHeader>
+                <Table.ColumnHeader>Description</Table.ColumnHeader>
+                <Table.ColumnHeader textAlign="end">Attributes</Table.ColumnHeader>
+                {kind === "collections" && <Table.ColumnHeader>Workflow</Table.ColumnHeader>}
+                <Table.ColumnHeader textAlign="right">Actions</Table.ColumnHeader>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
               {data.map((t) => (
                 <TypeRow key={t.name} kind={kind} type={t} onDelete={() => remove(t.name)} />
               ))}
-            </Tbody>
-          </Table>
+            </Table.Body>
+          </Table.Root>
         </Box>
       )}
     </Box>
@@ -105,45 +101,52 @@ function TypeRow({ kind, type, onDelete }: { kind: ModelKind; type: TypeSummary;
   const editPath = `/model/${kind}/${encodeURIComponent(type.name)}`;
   const { singular } = KIND_LABELS[kind];
   return (
-    <Tr>
-      <Td fontWeight="medium">
-        <HStack spacing={2}>
-          <Link as={RouterLink} to={editPath} color="teal.600">
-            {type.name}
+    <Table.Row>
+      <Table.Cell fontWeight="medium">
+        <HStack gap={2}>
+          <Link asChild color="teal.600">
+            <RouterLink to={editPath}>{type.name}</RouterLink>
           </Link>
           {type.localizedCount > 0 && (
-            <Tooltip hasArrow label={`${type.localizedCount} localized ${type.localizedCount === 1 ? "attribute" : "attributes"}: a value per locale`}>
-              <Badge colorScheme="purple" variant="subtle" display="inline-flex" alignItems="center" gap={1} aria-label="Localized">
+            <Tooltip showArrow content={`${type.localizedCount} localized ${type.localizedCount === 1 ? "attribute" : "attributes"}: a value per locale`}>
+              <Badge colorPalette="purple" variant="subtle" display="inline-flex" alignItems="center" gap={1} aria-label="Localized">
                 <Icon as={FiGlobe} />
                 {type.localizedCount}
               </Badge>
             </Tooltip>
           )}
         </HStack>
-      </Td>
-      <Td color="gray.600" maxW="sm">
-        <Text noOfLines={1}>{type.description || "—"}</Text>
-      </Td>
-      <Td isNumeric>{type.attributeCount}</Td>
+      </Table.Cell>
+      <Table.Cell color="gray.600" maxW="sm">
+        <Text lineClamp={1}>{type.description || "—"}</Text>
+      </Table.Cell>
+      <Table.Cell textAlign="end">{type.attributeCount}</Table.Cell>
       {kind === "collections" && (
-        <Td>
-          {type.draftAndPublish ? <Badge colorScheme="purple">Draft &amp; publish</Badge> : <Text color="gray.400">—</Text>}
-        </Td>
+        <Table.Cell>
+          {type.draftAndPublish ? <Badge colorPalette="purple">Draft &amp; publish</Badge> : <Text color="gray.400">—</Text>}
+        </Table.Cell>
       )}
-      <Td>
-        <HStack justify="flex-end" spacing={1}>
-          <Button as={RouterLink} to={editPath} size="xs" variant="ghost" leftIcon={<FiEdit2 />} aria-label={`Edit ${type.name}`}>
-            Edit
+      <Table.Cell>
+        <HStack justify="flex-end" gap={1}>
+          <Button asChild size="2xs" variant="ghost" aria-label={`Edit ${type.name}`}>
+            <RouterLink to={editPath}>
+              <FiEdit2 />
+              Edit
+            </RouterLink>
           </Button>
           <ConfirmButton
-            trigger={<IconButton aria-label={`Delete ${type.name}`} icon={<FiTrash2 />} size="xs" variant="ghost" colorScheme="red" />}
+            trigger={
+              <IconButton aria-label={`Delete ${type.name}`} size="2xs" variant="ghost" colorPalette="red">
+                <FiTrash2 />
+              </IconButton>
+            }
             title={`Delete ${singular} "${type.name}"?`}
             body={deleteWarning(kind)}
             onConfirm={onDelete}
           />
         </HStack>
-      </Td>
-    </Tr>
+      </Table.Cell>
+    </Table.Row>
   );
 }
 

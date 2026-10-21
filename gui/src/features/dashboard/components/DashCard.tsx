@@ -7,10 +7,10 @@ export function DashCard({ title, link, children }: { title: string; link?: { to
   return (
     <Box bg="white" borderWidth="1px" borderRadius="lg" p={5} minW={0}>
       <Flex justify="space-between" align="baseline" mb={4} gap={3}>
-        <Heading size="sm">{title}</Heading>
+        <Heading size="md" fontWeight="bold">{title}</Heading>
         {link && (
-          <Link as={RouterLink} to={link.to} fontSize="sm" color="purple.600" whiteSpace="nowrap">
-            {link.label}
+          <Link asChild fontSize="sm" color="purple.600" whiteSpace="nowrap">
+            <RouterLink to={link.to}>{link.label}</RouterLink>
           </Link>
         )}
       </Flex>

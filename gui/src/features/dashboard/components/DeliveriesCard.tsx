@@ -8,22 +8,22 @@ function DeliveryRow({ d }: { d: RecentDelivery }) {
   return (
     <Flex justify="space-between" align="center" gap={3} py={1.5} px={2} borderRadius="md" bg={failed ? "red.50" : undefined}>
       <Box minW={0}>
-        <Text fontSize="sm" noOfLines={1}>
+        <Text fontSize="sm" lineClamp={1}>
           {d.event}
           {d.collection && ` · ${d.collection}`}
           {d.itemId ? ` #${d.itemId}` : ""}
         </Text>
         {failed && d.error && (
-          <Text fontSize="xs" color="red.600" noOfLines={1} title={d.error}>
+          <Text fontSize="xs" color="red.600" lineClamp={1} title={d.error}>
             {d.error}
           </Text>
         )}
       </Box>
-      <HStack spacing={2} flexShrink={0}>
+      <HStack gap={2} flexShrink={0}>
         <Text fontSize="xs" color="gray.500">
           {timeAgo(d.createdAt)}
         </Text>
-        <Badge colorScheme={failed ? "red" : "green"}>{d.statusCode || "no reply"}</Badge>
+        <Badge colorPalette={failed ? "red" : "green"}>{d.statusCode || "no reply"}</Badge>
       </HStack>
     </Flex>
   );
@@ -33,12 +33,12 @@ function DeliveryRow({ d }: { d: RecentDelivery }) {
 export function DeliveriesCard({ webhooks, deliveries, recent }: { webhooks: number; deliveries: Overview["deliveries24h"]; recent: RecentDelivery[] }) {
   if (webhooks === 0) {
     return (
-      <VStack align="start" spacing={3}>
+      <VStack align="start" gap={3}>
         <Text fontSize="sm" color="gray.500">
           No webhooks yet. Webhooks notify other services when content changes.
         </Text>
-        <Button as={RouterLink} to="/settings/webhooks" size="sm" variant="outline">
-          Add a webhook
+        <Button asChild size="xs" variant="outline">
+          <RouterLink to="/settings/webhooks">Add a webhook</RouterLink>
         </Button>
       </VStack>
     );
@@ -46,7 +46,7 @@ export function DeliveriesCard({ webhooks, deliveries, recent }: { webhooks: num
   const failed = deliveries.failed;
   return (
     <>
-      <HStack spacing={6} mb={3}>
+      <HStack gap={6} mb={3}>
         <Box>
           <Text fontSize="xs" color="gray.500">
             Last 24 h
@@ -69,7 +69,7 @@ export function DeliveriesCard({ webhooks, deliveries, recent }: { webhooks: num
           Nothing delivered yet.
         </Text>
       ) : (
-        <VStack align="stretch" spacing={0.5}>
+        <VStack align="stretch" gap={0.5}>
           {recent.slice(0, 5).map((d) => (
             <DeliveryRow key={d.id} d={d} />
           ))}

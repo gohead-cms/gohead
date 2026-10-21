@@ -1,13 +1,13 @@
 import { useRef, useState } from "react";
+import { Button } from "@chakra-ui/react";
 import {
-  AlertDialog,
-  AlertDialogBody,
-  AlertDialogContent,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogOverlay,
-  Button,
-} from "@chakra-ui/react";
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogRoot,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { api } from "../../../services/api";
 import { useNotify } from "../../../shared/hooks/useNotify";
 import { serverMessage } from "../../model/api";
@@ -36,27 +36,34 @@ export function DeleteNodeDialog({ target, onClose, onDeleted }: { target: NodeR
   };
 
   return (
-    <AlertDialog isOpen={!!target} leastDestructiveRef={cancelRef} onClose={onClose}>
-      <AlertDialogOverlay>
-        <AlertDialogContent>
-          <AlertDialogHeader fontSize="lg" fontWeight="bold">
+    <DialogRoot
+      role="alertdialog"
+      open={!!target}
+      onOpenChange={(e) => {
+        if (!e.open) onClose();
+      }}
+      initialFocusEl={() => cancelRef.current}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle fontSize="lg" fontWeight="bold">
             Delete {target?.kind} "{target?.name}"?
-          </AlertDialogHeader>
-          <AlertDialogBody>
-            {target?.kind === "collection"
-              ? "The collection and all its items are deleted. This cannot be undone."
-              : "The agent and its configuration are deleted. This cannot be undone."}
-          </AlertDialogBody>
-          <AlertDialogFooter>
-            <Button ref={cancelRef} onClick={onClose} isDisabled={busy}>
-              Cancel
-            </Button>
-            <Button colorScheme="red" onClick={confirm} ml={3} isLoading={busy}>
-              Delete
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialogOverlay>
-    </AlertDialog>
+          </DialogTitle>
+        </DialogHeader>
+        <DialogBody>
+          {target?.kind === "collection"
+            ? "The collection and all its items are deleted. This cannot be undone."
+            : "The agent and its configuration are deleted. This cannot be undone."}
+        </DialogBody>
+        <DialogFooter>
+          <Button ref={cancelRef} variant="subtle" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button colorPalette="red" onClick={confirm} ml={3} loading={busy}>
+            Delete
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </DialogRoot>
   );
 }

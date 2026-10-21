@@ -1,7 +1,7 @@
 import React from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
-import { Box, VStack, HStack, Text, Icon, Divider } from '@chakra-ui/react';
+import { Box, VStack, HStack, Text, Icon, Separator } from '@chakra-ui/react';
 import { FaDatabase, FaQuoteLeft, FaHashtag, FaToggleOn, FaLink, FaCalendarAlt, FaCheckSquare, FaImage } from 'react-icons/fa';
 import type { AttributeItem, CollectionNode as CollectionNodeType } from '../../../shared/types/workspace';
 
@@ -50,22 +50,22 @@ export function CollectionNode({ data, selected }: NodeProps<CollectionNodeType>
           bg="#52b4ca" // Reverted to the original solid blue color
           color="white"
           p={3}
-          spacing={3}
+          gap={3}
         >
           <Icon as={FaDatabase} boxSize={5} />
-          <Text fontWeight="bold" fontSize="md" noOfLines={1}>
+          <Text fontWeight="bold" fontSize="md" lineClamp={1}>
             {data.label}
           </Text>
         </HStack>
 
         {/* Body with Attributes List */}
-        <VStack spacing={2} align="stretch" p={3} maxH="200px" overflowY="auto">
+        <VStack gap={2} align="stretch" p={3} maxH="200px" overflowY="auto">
           {attributes.length > 0 ? (
             attributes.map((attr: AttributeItem) => (
               <React.Fragment key={attr.name}>
                 <HStack
                   justify="space-between"
-                  spacing={3}
+                  gap={3}
                   _hover={{ bg: 'gray.50' }}
                   p={1}
                   borderRadius="md"
@@ -80,11 +80,11 @@ export function CollectionNode({ data, selected }: NodeProps<CollectionNodeType>
                       {attr.name}
                     </Text>
                   </HStack>
-                  <Text fontSize="xs" color="gray.500" noOfLines={1} maxW="100px">
+                  <Text fontSize="xs" color="gray.500" lineClamp={1} maxW="100px">
                     {attr.type}
                   </Text>
                 </HStack>
-                <Divider />
+                <Separator />
               </React.Fragment>
             ))
           ) : (

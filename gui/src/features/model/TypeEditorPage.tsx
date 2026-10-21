@@ -1,5 +1,5 @@
 import { Link as RouterLink, Navigate, useParams } from "react-router-dom";
-import { Alert, AlertDescription, AlertIcon, Button, Center, Spinner } from "@chakra-ui/react";
+import { Alert, Button, Center, Spinner } from "@chakra-ui/react";
 import { useApiQuery } from "../../shared/hooks/useApiQuery";
 import { EmptyState } from "../../shared/ui/EmptyState";
 import { Page, PageHeader } from "../../shared/ui/PageHeader";
@@ -30,13 +30,13 @@ export function TypeEditorPage() {
     return (
       <Page maxW="6xl">
         <PageHeader title={name ? `Edit ${singular} "${name}"` : `New ${singular}`} />
-        <Alert status="error" borderRadius="md">
-          <AlertIcon />
-          <AlertDescription flex="1">{error}</AlertDescription>
-          <Button size="sm" onClick={() => queries.forEach((q) => q.refetch())}>
+        <Alert.Root status="error" borderRadius="md" alignItems="center">
+          <Alert.Indicator />
+          <Alert.Description flex="1">{error}</Alert.Description>
+          <Button size="xs" variant="subtle" onClick={() => queries.forEach((q) => q.refetch())}>
             Retry
           </Button>
-        </Alert>
+        </Alert.Root>
       </Page>
     );
   }
@@ -54,8 +54,8 @@ export function TypeEditorPage() {
         <EmptyState
           title={`No ${singular} named "${name}"`}
           action={
-            <Button as={RouterLink} to={backTo} colorScheme="teal" size="sm">
-              Back to the content model
+            <Button asChild colorPalette="teal" size="xs">
+              <RouterLink to={backTo}>Back to the content model</RouterLink>
             </Button>
           }
         >

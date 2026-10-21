@@ -3,23 +3,18 @@ import type { FormEvent } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import {
   Alert,
-  AlertDescription,
-  AlertIcon,
   Box,
   Button,
+  Field,
   Flex,
-  FormControl,
-  FormErrorMessage,
-  FormHelperText,
-  FormLabel,
   Heading,
   Input,
-  Switch,
   Text,
   Textarea,
   VStack,
 } from "@chakra-ui/react";
 import { FiPlus } from "react-icons/fi";
+import { Switch } from "@/components/ui/switch";
 import { api } from "../../../services/api";
 import { useNotify } from "../../../shared/hooks/useNotify";
 import { PageHeader } from "../../../shared/ui/PageHeader";
@@ -97,80 +92,84 @@ export function TypeEditorForm({ kind, existingName, initial, collections, compo
         description={existingName ? "Changes replace the saved definition: removed attributes are deleted." : undefined}
         actions={
           <>
-            <Button as={RouterLink} to={backTo} variant="ghost" size="sm">
-              Cancel
+            <Button asChild variant="ghost" size="xs">
+              <RouterLink to={backTo}>Cancel</RouterLink>
             </Button>
-            <Button type="submit" colorScheme="teal" size="sm" isLoading={saving} loadingText="Saving">
+            <Button type="submit" colorPalette="teal" size="xs" loading={saving} loadingText="Saving">
               Save
             </Button>
           </>
         }
       />
-      <VStack align="stretch" spacing={6}>
+      <VStack align="stretch" gap={6}>
         {serverError && (
-          <Alert status="error" borderRadius="md">
-            <AlertIcon />
-            <AlertDescription>{serverError}</AlertDescription>
-          </Alert>
+          <Alert.Root status="error" borderRadius="md">
+            <Alert.Indicator />
+            <Alert.Description>{serverError}</Alert.Description>
+          </Alert.Root>
         )}
         {submitted && hasErrors(errors) && (
-          <Alert status="warning" borderRadius="md">
-            <AlertIcon />
-            <AlertDescription>{errors.general ?? "Fix the highlighted fields before saving."}</AlertDescription>
-          </Alert>
+          <Alert.Root status="warning" borderRadius="md">
+            <Alert.Indicator />
+            <Alert.Description>{errors.general ?? "Fix the highlighted fields before saving."}</Alert.Description>
+          </Alert.Root>
         )}
 
         <Box bg="white" borderWidth="1px" borderRadius="lg" p={6}>
-          <Heading size="sm" mb={4}>
+          <Heading size="md" fontWeight="bold" mb={4}>
             Settings
           </Heading>
-          <VStack align="stretch" spacing={4}>
-            <FormControl isRequired isInvalid={!!shown.name}>
-              <FormLabel>Name</FormLabel>
+          <VStack align="stretch" gap={4}>
+            <Field.Root required invalid={!!shown.name}>
+              <Field.Label>
+                Name
+                <Field.RequiredIndicator />
+              </Field.Label>
               <Input
                 value={form.name}
                 onChange={(e) => set({ name: e.target.value })}
-                isReadOnly={!canRename}
+                readOnly={!canRename}
                 bg={canRename ? undefined : "gray.100"}
                 placeholder={kind === "collections" ? "articles" : kind === "components" ? "seo" : "homepage"}
                 maxW="md"
               />
               {shown.name ? (
-                <FormErrorMessage>{shown.name}</FormErrorMessage>
+                <Field.ErrorText>{shown.name}</Field.ErrorText>
               ) : (
-                <FormHelperText>{nameHelp(kind, !!existingName)}</FormHelperText>
+                <Field.HelperText>{nameHelp(kind, !!existingName)}</Field.HelperText>
               )}
-            </FormControl>
-            <FormControl>
-              <FormLabel>Description</FormLabel>
+            </Field.Root>
+            <Field.Root>
+              <Field.Label>Description</Field.Label>
               <Textarea rows={2} value={form.description} onChange={(e) => set({ description: e.target.value })} />
-            </FormControl>
+            </Field.Root>
             {kind === "collections" && (
-              <FormControl display="flex" flexDirection="column">
+              <Field.Root display="flex" flexDirection="column">
                 <Flex align="center" gap={3}>
                   <Switch
-                    id="draft-and-publish"
-                    isChecked={form.draftAndPublish}
-                    onChange={(e) => set({ draftAndPublish: e.target.checked })}
-                    colorScheme="teal"
+                    size="sm"
+                    checked={form.draftAndPublish}
+                    onCheckedChange={(e) => set({ draftAndPublish: e.checked })}
+                    colorPalette="teal"
                   />
-                  <FormLabel htmlFor="draft-and-publish" mb={0}>
-                    Draft and publish
-                  </FormLabel>
+                  <Field.Label mb={0}>Draft and publish</Field.Label>
                 </Flex>
-                <FormHelperText>
+                <Field.HelperText>
                   New items start as drafts and readers only see published items. Turning it on publishes existing items;
                   turning it off makes drafts visible.
-                </FormHelperText>
-              </FormControl>
+                </Field.HelperText>
+              </Field.Root>
             )}
           </VStack>
         </Box>
 
         <Box bg="white" borderWidth="1px" borderRadius="lg" p={6}>
           <Flex justify="space-between" align="center" mb={1} gap={4} wrap="wrap">
-            <Heading size="sm">Attributes</Heading>
-            <Button size="sm" leftIcon={<FiPlus />} onClick={() => setAttributes((a) => [...a, emptyAttribute()])}>
+            <Heading size="md" fontWeight="bold">
+              Attributes
+            </Heading>
+            <Button size="xs" variant="subtle" onClick={() => setAttributes((a) => [...a, emptyAttribute()])}>
+              <FiPlus />
               Add attribute
             </Button>
           </Flex>
@@ -179,7 +178,7 @@ export function TypeEditorForm({ kind, existingName, initial, collections, compo
             {kindSupportsLocalized(kind) &&
               " Localized attributes have a value per locale (see Settings → Locales); the others are shared by every locale."}
           </Text>
-          <VStack align="stretch" spacing={3}>
+          <VStack align="stretch" gap={3}>
             {form.attributes.length === 0 && (
               <Text color="gray.500" textAlign="center" py={6}>
                 No attributes yet. Add at least one.
@@ -205,10 +204,10 @@ export function TypeEditorForm({ kind, existingName, initial, collections, compo
         </Box>
 
         <Flex justify="flex-end" gap={2}>
-          <Button as={RouterLink} to={backTo} variant="ghost">
-            Cancel
+          <Button asChild variant="ghost">
+            <RouterLink to={backTo}>Cancel</RouterLink>
           </Button>
-          <Button type="submit" colorScheme="teal" isLoading={saving} loadingText="Saving">
+          <Button type="submit" colorPalette="teal" loading={saving} loadingText="Saving">
             Save {singular}
           </Button>
         </Flex>

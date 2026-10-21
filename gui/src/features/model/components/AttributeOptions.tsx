@@ -1,14 +1,5 @@
-import {
-  Checkbox,
-  FormControl,
-  FormErrorMessage,
-  FormHelperText,
-  FormLabel,
-  Input,
-  Select,
-  SimpleGrid,
-  Textarea,
-} from "@chakra-ui/react";
+import { Field, Input, NativeSelect, SimpleGrid, Textarea } from "@chakra-ui/react";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { AttributeField, AttributeForm } from "../schema";
 import {
   minMaxLabels,
@@ -30,10 +21,13 @@ export interface AttributeOptionsProps {
 /** The type-specific settings of an attribute. */
 export function AttributeOptions({ attr, errors, onChange, collections, components }: AttributeOptionsProps) {
   return (
-    <SimpleGrid columns={{ base: 1, md: 2, xl: 3 }} spacing={3}>
+    <SimpleGrid columns={{ base: 1, md: 2, xl: 3 }} gap={3}>
       {attr.type === "enum" && (
-        <FormControl isInvalid={!!errors.options} isRequired gridColumn={{ md: "span 2", xl: "span 3" }}>
-          <FormLabel fontSize="sm">Options</FormLabel>
+        <Field.Root invalid={!!errors.options} required gridColumn={{ md: "span 2", xl: "span 3" }}>
+          <Field.Label fontSize="sm">
+            Options
+            <Field.RequiredIndicator />
+          </Field.Label>
           <Textarea
             size="sm"
             rows={3}
@@ -41,98 +35,115 @@ export function AttributeOptions({ attr, errors, onChange, collections, componen
             onChange={(e) => onChange({ options: e.target.value.split("\n") })}
             placeholder={"draft\nactive\narchived"}
           />
-          {errors.options ? <FormErrorMessage>{errors.options}</FormErrorMessage> : <FormHelperText>One option per line.</FormHelperText>}
-        </FormControl>
+          {errors.options ? <Field.ErrorText>{errors.options}</Field.ErrorText> : <Field.HelperText>One option per line.</Field.HelperText>}
+        </Field.Root>
       )}
 
       {attr.type === "relation" && (
         <>
-          <FormControl isInvalid={!!errors.target} isRequired>
-            <FormLabel fontSize="sm">Target collection</FormLabel>
-            <Select size="sm" value={attr.target} onChange={(e) => onChange({ target: e.target.value })} placeholder="Choose a collection">
-              {withCurrent(collections, attr.target).map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </Select>
-            <FormErrorMessage>{errors.target}</FormErrorMessage>
-          </FormControl>
-          <FormControl isRequired>
-            <FormLabel fontSize="sm">Relation type</FormLabel>
-            <Select size="sm" value={attr.relation} onChange={(e) => onChange({ relation: e.target.value })}>
-              {RELATION_TYPES.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
-              ))}
-            </Select>
-          </FormControl>
+          <Field.Root invalid={!!errors.target} required>
+            <Field.Label fontSize="sm">
+              Target collection
+              <Field.RequiredIndicator />
+            </Field.Label>
+            <NativeSelect.Root size="xs">
+              <NativeSelect.Field value={attr.target} onChange={(e) => onChange({ target: e.target.value })} placeholder="Choose a collection">
+                {withCurrent(collections, attr.target).map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
+            <Field.ErrorText>{errors.target}</Field.ErrorText>
+          </Field.Root>
+          <Field.Root required>
+            <Field.Label fontSize="sm">
+              Relation type
+              <Field.RequiredIndicator />
+            </Field.Label>
+            <NativeSelect.Root size="xs">
+              <NativeSelect.Field value={attr.relation} onChange={(e) => onChange({ relation: e.target.value })}>
+                {RELATION_TYPES.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
+          </Field.Root>
         </>
       )}
 
       {attr.type === "component" && (
         <>
-          <FormControl isInvalid={!!errors.component} isRequired>
-            <FormLabel fontSize="sm">Component</FormLabel>
-            <Select
-              size="sm"
-              value={attr.component}
-              onChange={(e) => onChange({ component: e.target.value })}
-              placeholder="Choose a component"
-            >
-              {withCurrent(components, attr.component).map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </Select>
+          <Field.Root invalid={!!errors.component} required>
+            <Field.Label fontSize="sm">
+              Component
+              <Field.RequiredIndicator />
+            </Field.Label>
+            <NativeSelect.Root size="xs">
+              <NativeSelect.Field
+                value={attr.component}
+                onChange={(e) => onChange({ component: e.target.value })}
+                placeholder="Choose a component"
+              >
+                {withCurrent(components, attr.component).map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
             {errors.component ? (
-              <FormErrorMessage>{errors.component}</FormErrorMessage>
+              <Field.ErrorText>{errors.component}</Field.ErrorText>
             ) : (
-              components.length === 0 && <FormHelperText>Create a component first.</FormHelperText>
+              components.length === 0 && <Field.HelperText>Create a component first.</Field.HelperText>
             )}
-          </FormControl>
-          <FormControl alignSelf="end" pb={1}>
-            <Checkbox isChecked={attr.repeatable} onChange={(e) => onChange({ repeatable: e.target.checked })}>
+          </Field.Root>
+          <Field.Root alignSelf="end" pb={1}>
+            <Checkbox size="sm" checked={attr.repeatable} onCheckedChange={(e) => onChange({ repeatable: !!e.checked })}>
               Repeatable (a list)
             </Checkbox>
-          </FormControl>
+          </Field.Root>
         </>
       )}
 
       {attr.type === "media" && (
         <>
-          <FormControl>
-            <FormLabel fontSize="sm">Allowed types</FormLabel>
+          <Field.Root>
+            <Field.Label fontSize="sm">Allowed types</Field.Label>
             <Input
-              size="sm"
+              size="xs"
               value={attr.allowedTypes}
               onChange={(e) => onChange({ allowedTypes: e.target.value })}
               placeholder="image/*, application/pdf"
             />
-            <FormHelperText>Comma-separated MIME patterns; empty allows any file.</FormHelperText>
-          </FormControl>
-          <FormControl alignSelf="center">
-            <Checkbox isChecked={attr.multiple} onChange={(e) => onChange({ multiple: e.target.checked })}>
+            <Field.HelperText>Comma-separated MIME patterns; empty allows any file.</Field.HelperText>
+          </Field.Root>
+          <Field.Root alignSelf="center">
+            <Checkbox size="sm" checked={attr.multiple} onCheckedChange={(e) => onChange({ multiple: !!e.checked })}>
               Multiple files
             </Checkbox>
-          </FormControl>
+          </Field.Root>
         </>
       )}
 
       {supportsPattern(attr) && (
-        <FormControl isInvalid={!!errors.pattern}>
-          <FormLabel fontSize="sm">Pattern</FormLabel>
+        <Field.Root invalid={!!errors.pattern}>
+          <Field.Label fontSize="sm">Pattern</Field.Label>
           <Input
-            size="sm"
+            size="xs"
             fontFamily="mono"
             value={attr.pattern}
             onChange={(e) => onChange({ pattern: e.target.value })}
             placeholder="^[a-z0-9-]+$"
           />
-          {errors.pattern ? <FormErrorMessage>{errors.pattern}</FormErrorMessage> : <FormHelperText>Regular expression values must match.</FormHelperText>}
-        </FormControl>
+          {errors.pattern ? <Field.ErrorText>{errors.pattern}</Field.ErrorText> : <Field.HelperText>Regular expression values must match.</Field.HelperText>}
+        </Field.Root>
       )}
 
       {supportsMinMax(attr) && <MinMax attr={attr} errors={errors} onChange={onChange} />}
@@ -144,16 +155,16 @@ function MinMax({ attr, errors, onChange }: Pick<AttributeOptionsProps, "attr" |
   const labels = minMaxLabels(attr);
   return (
     <>
-      <FormControl isInvalid={!!errors.min}>
-        <FormLabel fontSize="sm">{labels.min}</FormLabel>
-        <Input size="sm" type="number" step={1} value={attr.min} onChange={(e) => onChange({ min: e.target.value })} />
-        <FormErrorMessage>{errors.min}</FormErrorMessage>
-      </FormControl>
-      <FormControl isInvalid={!!errors.max}>
-        <FormLabel fontSize="sm">{labels.max}</FormLabel>
-        <Input size="sm" type="number" step={1} value={attr.max} onChange={(e) => onChange({ max: e.target.value })} />
-        <FormErrorMessage>{errors.max}</FormErrorMessage>
-      </FormControl>
+      <Field.Root invalid={!!errors.min}>
+        <Field.Label fontSize="sm">{labels.min}</Field.Label>
+        <Input size="xs" type="number" step={1} value={attr.min} onChange={(e) => onChange({ min: e.target.value })} />
+        <Field.ErrorText>{errors.min}</Field.ErrorText>
+      </Field.Root>
+      <Field.Root invalid={!!errors.max}>
+        <Field.Label fontSize="sm">{labels.max}</Field.Label>
+        <Input size="xs" type="number" step={1} value={attr.max} onChange={(e) => onChange({ max: e.target.value })} />
+        <Field.ErrorText>{errors.max}</Field.ErrorText>
+      </Field.Root>
     </>
   );
 }

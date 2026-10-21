@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Alert, AlertDescription, AlertIcon, Box, Button, Center, Spinner } from "@chakra-ui/react";
+import { Alert, Box, Button, Center, Spinner } from "@chakra-ui/react";
 import { FiPlus, FiShare2 } from "react-icons/fi";
 import { EmptyState } from "../../shared/ui/EmptyState";
 import { DeleteNodeDialog } from "./components/DeleteNodeDialog";
@@ -30,13 +30,13 @@ export default function WorkspaceCanvas() {
   if (error) {
     content = (
       <Box p={8}>
-        <Alert status="error" borderRadius="md">
-          <AlertIcon />
-          <AlertDescription flex="1">{error}</AlertDescription>
-          <Button size="sm" onClick={refetch}>
+        <Alert.Root status="error" borderRadius="md" alignItems="center">
+          <Alert.Indicator />
+          <Alert.Description flex="1">{error}</Alert.Description>
+          <Button size="xs" variant="subtle" onClick={refetch}>
             Retry
           </Button>
-        </Alert>
+        </Alert.Root>
       </Box>
     );
   } else if (!graph) {
@@ -52,7 +52,8 @@ export default function WorkspaceCanvas() {
           icon={FiShare2}
           title="Nothing to show yet"
           action={
-            <Button colorScheme="teal" size="sm" leftIcon={<FiPlus />} onClick={newCollection}>
+            <Button colorPalette="teal" size="xs" onClick={newCollection}>
+              <FiPlus />
               New collection
             </Button>
           }

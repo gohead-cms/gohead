@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from "react";
-import { Alert, AlertIcon, Button, FormControl, FormErrorMessage, FormLabel, Input, Stack, Textarea } from "@chakra-ui/react";
+import { Alert, Button, Field, Input, Stack, Textarea } from "@chakra-ui/react";
 import { api } from "../../../services/api";
 import { useNotify } from "../../../shared/hooks/useNotify";
 import { errorMessage } from "../../../shared/utils/errors";
@@ -43,28 +43,31 @@ export function MediaDetailsForm({
 
   return (
     <form onSubmit={submit} noValidate>
-      <Stack spacing={3}>
+      <Stack gap={3}>
         {error && (
-          <Alert status="error" borderRadius="md" fontSize="sm">
-            <AlertIcon />
-            {error}
-          </Alert>
+          <Alert.Root status="error" borderRadius="md" fontSize="sm">
+            <Alert.Indicator />
+            <Alert.Content>{error}</Alert.Content>
+          </Alert.Root>
         )}
-        <FormControl isInvalid={!!nameError} isReadOnly={!canWrite} isRequired>
-          <FormLabel fontSize="sm">Name</FormLabel>
-          <Input size="sm" value={name} onChange={(e) => setName(e.target.value)} maxLength={255} />
-          {nameError && <FormErrorMessage>{nameError}</FormErrorMessage>}
-        </FormControl>
-        <FormControl isReadOnly={!canWrite}>
-          <FormLabel fontSize="sm">Alt text</FormLabel>
-          <Input size="sm" value={alt} onChange={(e) => setAlt(e.target.value)} placeholder="Describe the image for screen readers" />
-        </FormControl>
-        <FormControl isReadOnly={!canWrite}>
-          <FormLabel fontSize="sm">Caption</FormLabel>
+        <Field.Root invalid={!!nameError} readOnly={!canWrite} required>
+          <Field.Label fontSize="sm">
+            Name
+            <Field.RequiredIndicator />
+          </Field.Label>
+          <Input size="xs" value={name} onChange={(e) => setName(e.target.value)} maxLength={255} />
+          {nameError && <Field.ErrorText>{nameError}</Field.ErrorText>}
+        </Field.Root>
+        <Field.Root readOnly={!canWrite}>
+          <Field.Label fontSize="sm">Alt text</Field.Label>
+          <Input size="xs" value={alt} onChange={(e) => setAlt(e.target.value)} placeholder="Describe the image for screen readers" />
+        </Field.Root>
+        <Field.Root readOnly={!canWrite}>
+          <Field.Label fontSize="sm">Caption</Field.Label>
           <Textarea size="sm" rows={3} value={caption} onChange={(e) => setCaption(e.target.value)} />
-        </FormControl>
+        </Field.Root>
         {canWrite && (
-          <Button type="submit" size="sm" colorScheme="blue" alignSelf="flex-start" isLoading={saving} isDisabled={!dirty || !!nameError}>
+          <Button type="submit" size="xs" colorPalette="blue" alignSelf="flex-start" loading={saving} disabled={!dirty || !!nameError}>
             Save details
           </Button>
         )}

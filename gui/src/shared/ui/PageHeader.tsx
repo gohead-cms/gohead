@@ -6,14 +6,14 @@ export function PageHeader({ title, description, actions }: { title: ReactNode; 
   return (
     <Flex justify="space-between" align={{ base: "start", md: "center" }} gap={4} mb={6} direction={{ base: "column", md: "row" }}>
       <Box>
-        <Heading size="lg">{title}</Heading>
+        <Heading size="2xl" fontWeight="bold">{title}</Heading>
         {description && (
           <Text color="gray.500" mt={1}>
             {description}
           </Text>
         )}
       </Box>
-      {actions && <HStack spacing={2}>{actions}</HStack>}
+      {actions && <HStack gap={2}>{actions}</HStack>}
     </Flex>
   );
 }

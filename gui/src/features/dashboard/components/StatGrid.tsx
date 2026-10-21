@@ -9,7 +9,7 @@ const plural = (n: number, word: string) => `${n.toLocaleString()} ${word}${n ==
 /** The instance's counts: content, model, media, people and integrations. */
 export function StatGrid({ counts }: { counts: Overview["counts"] }) {
   return (
-    <SimpleGrid columns={{ base: 1, md: 2, xl: 3 }} spacing={4}>
+    <SimpleGrid columns={{ base: 1, md: 2, xl: 3 }} gap={4}>
       <StatCard label="Entries" value={counts.items} detail="Across all collections" icon={FiFileText} to="/contrib" />
       <StatCard
         label="Content model"

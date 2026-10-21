@@ -27,7 +27,7 @@ export function UploadQueue({
   return (
     <Box bg="white" borderWidth="1px" borderRadius="lg" p={4} mb={4} aria-label="Uploads" role="region">
       <Flex justify="space-between" align="center" mb={2} gap={2} wrap="wrap">
-        <HStack spacing={2}>
+        <HStack gap={2}>
           {busy && <Spinner size="sm" color="blue.500" />}
           <Text fontWeight="semibold" fontSize="sm">
             {busy ? "Uploading…" : "Uploads"} {done}/{tasks.length} done
@@ -35,19 +35,19 @@ export function UploadQueue({
           </Text>
         </HStack>
         {!busy && (
-          <Button size="xs" variant="ghost" onClick={onClear}>
+          <Button size="2xs" variant="ghost" onClick={onClear}>
             Clear
           </Button>
         )}
       </Flex>
-      <Stack spacing={1}>
+      <Stack gap={1}>
         {tasks.map((t) => (
           <Flex key={t.id} align="center" gap={3} fontSize="sm" minW={0}>
-            <Badge colorScheme={statusLabel[t.status].color} flexShrink={0}>
+            <Badge colorPalette={statusLabel[t.status].color} flexShrink={0}>
               {statusLabel[t.status].label}
             </Badge>
             <Box flex="1" minW={0}>
-              <Text noOfLines={1} title={t.name}>
+              <Text lineClamp={1} title={t.name}>
                 {t.name} <Text as="span" color="gray.500">({formatBytes(t.size)})</Text>
               </Text>
               {t.error && (
@@ -57,7 +57,9 @@ export function UploadQueue({
               )}
             </Box>
             {(t.status === "done" || t.status === "error") && (
-              <IconButton aria-label={`Dismiss ${t.name}`} icon={<FiX />} size="xs" variant="ghost" onClick={() => onDismiss(t.id)} />
+              <IconButton aria-label={`Dismiss ${t.name}`} size="2xs" variant="ghost" onClick={() => onDismiss(t.id)}>
+                <FiX />
+              </IconButton>
             )}
           </Flex>
         ))}
