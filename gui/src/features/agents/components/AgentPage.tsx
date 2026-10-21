@@ -1,5 +1,5 @@
 import { useNavigate, useSearchParams, Link as RouterLink } from "react-router-dom";
-import { Flex, Box, Spinner, Text, Alert, AlertIcon, Button } from "@chakra-ui/react";
+import { Flex, Box, Spinner, Text, Button } from "@chakra-ui/react";
 import { FiCpu, FiPlus } from "react-icons/fi";
 import { api } from "../../../services/api";
 import { useNotify } from "../../../shared/hooks/useNotify";
@@ -9,6 +9,7 @@ import { useAgentsList } from "../hook/useAgentList";
 import { useAgentDetails } from "../hook/useAgentDetails";
 import { AgentSidebar } from "./AgentSidebar";
 import { AgentDetails } from "./AgentDetails";
+import { Notice } from "./EditorParts";
 
 /** Agents list and the selected agent (?name=…; the first agent otherwise; ?run=… opens one of its runs). */
 export default function AgentsPage() {
@@ -44,10 +45,9 @@ export default function AgentsPage() {
 
       <Box flex="1" minW={0} p={{ base: 4, md: 10 }} overflowY="auto">
         {error && (
-          <Alert status="error" mb={4}>
-            <AlertIcon />
+          <Notice status="error" mb={4}>
             {error}
-          </Alert>
+          </Notice>
         )}
         {noAgents ? (
           <EmptyState
@@ -55,8 +55,11 @@ export default function AgentsPage() {
             title="No agents yet"
             action={
               isAdmin && (
-                <Button as={RouterLink} to="/agents/new" colorScheme="teal" leftIcon={<FiPlus />}>
-                  New agent
+                <Button asChild colorPalette="teal">
+                  <RouterLink to="/agents/new">
+                    <FiPlus />
+                    New agent
+                  </RouterLink>
                 </Button>
               )
             }

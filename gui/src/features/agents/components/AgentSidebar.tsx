@@ -1,5 +1,5 @@
 import { Link as RouterLink } from "react-router-dom";
-import { Box, Text, Badge, Spinner, List, ListItem, Button, Flex } from "@chakra-ui/react";
+import { Box, Text, Badge, Spinner, List, Button, Flex, chakra } from "@chakra-ui/react";
 import { FiPlus } from "react-icons/fi";
 import { type AgentNodeData } from "../../../shared/types";
 
@@ -28,26 +28,28 @@ export function AgentSidebar({ agents, selectedAgent, onSelectAgent, loading, ca
       <Flex justify="space-between" align="center" mb={4} gap={2}>
         <Text fontWeight="bold" fontSize="sm" letterSpacing="wide" textTransform="uppercase">
           Agents
-          <Badge variant="solid" colorScheme="purple" fontSize="0.75em" borderRadius="full" px={2} ml={2}>
+          <Badge variant="solid" colorPalette="purple" fontSize="0.75em" borderRadius="full" px={2} ml={2}>
             {agents.length}
           </Badge>
         </Text>
       </Flex>
       {canCreate && (
-        <Button as={RouterLink} to="/agents/new" size="sm" colorScheme="teal" leftIcon={<FiPlus />} w="full" mb={4}>
-          New agent
+        <Button asChild size="xs" colorPalette="teal" w="full" mb={4}>
+          <RouterLink to="/agents/new">
+            <FiPlus />
+            New agent
+          </RouterLink>
         </Button>
       )}
       {loading ? (
         <Spinner />
       ) : (
-        <List spacing={1}>
+        <List.Root gap={1} listStyleType="none">
           {agents.map(({ name }) => {
             const active = selectedAgent === name;
             return (
-              <ListItem key={name}>
-                <Box
-                  as="button"
+              <List.Item key={name}>
+                <chakra.button
                   type="button"
                   w="full"
                   textAlign="left"
@@ -63,11 +65,11 @@ export function AgentSidebar({ agents, selectedAgent, onSelectAgent, loading, ca
                   _hover={{ bg: active ? "purple.100" : "gray.100" }}
                 >
                   {name}
-                </Box>
-              </ListItem>
+                </chakra.button>
+              </List.Item>
             );
           })}
-        </List>
+        </List.Root>
       )}
     </Box>
   );

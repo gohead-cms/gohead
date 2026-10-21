@@ -1,32 +1,27 @@
 import {
-  Alert,
-  AlertIcon,
   Box,
   Button,
-  Checkbox,
   CheckboxGroup,
   Code,
-  FormControl,
-  FormErrorMessage,
-  FormHelperText,
-  FormLabel,
+  Field as ChakraField,
+  Fieldset,
   HStack,
   Input,
-  InputGroup,
-  InputLeftAddon,
-  Select,
+  NativeSelect,
   SimpleGrid,
-  Switch,
   Text,
   Textarea,
   VStack,
   Wrap,
   WrapItem,
 } from "@chakra-ui/react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { InputGroup } from "@/components/ui/input-group";
+import { Switch } from "@/components/ui/switch";
 import { API_BASE_URL } from "../../../services/api";
 import { type CollectionChoice } from "../hook/useEditorData";
 import { type AgentDraft, type DraftErrors, EVENTS, LIMIT_FIELDS, PROVIDERS, TRIGGER_TYPES, generateToken } from "./agentForm";
-import { CopyButton, EditorSection, Field } from "./EditorParts";
+import { CopyButton, EditorSection, Field, Notice, RequiredMark } from "./EditorParts";
 
 export interface SectionProps {
   draft: AgentDraft;
@@ -48,8 +43,8 @@ const KEY_ENV: Record<string, string> = {
 export function BasicsSection({ draft, set, errors }: SectionProps) {
   return (
     <EditorSection title="Basics">
-      <VStack spacing={4} align="stretch">
-        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+      <VStack gap={4} align="stretch">
+        <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
           <Field label="Name" error={errors.name} isRequired help="Unique; used in URLs and the run history.">
             <Input value={draft.name} onChange={(e) => set("name", e.target.value)} placeholder="summarizer" autoComplete="off" />
           </Field>
@@ -78,7 +73,7 @@ function ApiKeyField({ draft, set }: SectionProps) {
     help = (
       <>
         A key is stored and kept unchanged.{" "}
-        <Button variant="link" size="xs" colorScheme="red" onClick={() => set("api_key_stored", false)}>
+        <Button variant="plain" size="2xs" colorPalette="red" color="red.500" px={0} h="auto" _hover={{ textDecoration: "underline" }} onClick={() => set("api_key_stored", false)}>
           Remove stored key
         </Button>
       </>
@@ -101,15 +96,18 @@ export function ModelSection(props: SectionProps) {
   const { draft, set, errors } = props;
   return (
     <EditorSection title="Model" description="Empty fields use the instance defaults (the llm block of the configuration) when the provider matches.">
-      <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+      <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
         <Field label="Provider" error={errors.provider} isRequired>
-          <Select value={draft.provider} onChange={(e) => set("provider", e.target.value)}>
-            {PROVIDERS.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </Select>
+          <NativeSelect.Root>
+            <NativeSelect.Field value={draft.provider} onChange={(e) => set("provider", e.target.value)}>
+              {PROVIDERS.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
         </Field>
         <Field label="Model" error={errors.model} isRequired={draft.provider === "ollama"} help={draft.provider === "ollama" ? "A model that supports tool calling." : "Empty: the default model."}>
           <Input value={draft.model} onChange={(e) => set("model", e.target.value)} placeholder={MODEL_HINTS[draft.provider]} />
@@ -136,11 +134,9 @@ export function ModelSection(props: SectionProps) {
 function WebhookFields({ draft, set, errors, agentId }: SectionProps & { agentId?: number }) {
   const url = agentId ? `${API_BASE_URL}/agents/webhook/${agentId}` : null;
   return (
-    <VStack spacing={4} align="stretch">
-      <FormControl>
-        <FormLabel fontSize="sm" mb={1}>
-          Trigger URL
-        </FormLabel>
+    <VStack gap={4} align="stretch">
+      <ChakraField.Root gap={1}>
+        <ChakraField.Label fontSize="sm">Trigger URL</ChakraField.Label>
         {url ? (
           <HStack>
             <Code px={2} py={1} fontSize="sm" wordBreak="break-all">
@@ -153,41 +149,38 @@ function WebhookFields({ draft, set, errors, agentId }: SectionProps & { agentId
             Shown once the agent is saved: <Code fontSize="xs">POST {API_BASE_URL}/agents/webhook/&#123;id&#125;</Code>
           </Text>
         )}
-        <FormHelperText>
+        <ChakraField.HelperText fontSize="sm">
           Send a JSON body with the header <Code fontSize="xs">Webhook-Token</Code>; the body is passed to the agent.
-        </FormHelperText>
-      </FormControl>
-      <FormControl isInvalid={Boolean(errors.webhook_token)}>
-        <FormLabel fontSize="sm" mb={1}>
-          Webhook token
-        </FormLabel>
+        </ChakraField.HelperText>
+      </ChakraField.Root>
+      <ChakraField.Root invalid={Boolean(errors.webhook_token)} gap={1}>
+        <ChakraField.Label fontSize="sm">Webhook token</ChakraField.Label>
         {draft.webhook_token ? (
           <>
-            <HStack>
-              <Input value={draft.webhook_token} isReadOnly fontFamily="mono" fontSize="sm" aria-label="New webhook token" />
+            <HStack w="full">
+              <Input value={draft.webhook_token} readOnly fontFamily="mono" fontSize="sm" aria-label="New webhook token" />
               <CopyButton value={draft.webhook_token} />
-              <Button size="sm" variant="ghost" onClick={() => set("webhook_token", generateToken())} flexShrink={0}>
+              <Button size="xs" variant="ghost" onClick={() => set("webhook_token", generateToken())} flexShrink={0}>
                 Regenerate
               </Button>
             </HStack>
-            <Alert status="info" mt={2} borderRadius="md" fontSize="sm">
-              <AlertIcon />
+            <Notice status="info" mt={1} borderRadius="md" fontSize="sm">
               Copy this token now: after saving it is stored and only shown masked.
               {draft.webhook_token_stored && " Saving replaces the current token."}
-            </Alert>
+            </Notice>
           </>
         ) : (
           <HStack>
             <Text fontSize="sm" color="gray.600">
               A token is stored (hidden) and kept unchanged.
             </Text>
-            <Button size="sm" variant="outline" onClick={() => set("webhook_token", generateToken())}>
+            <Button size="xs" variant="outline" onClick={() => set("webhook_token", generateToken())}>
               Generate a new token
             </Button>
           </HStack>
         )}
-        <FormErrorMessage>{errors.webhook_token}</FormErrorMessage>
-      </FormControl>
+        <ChakraField.ErrorText fontSize="sm">{errors.webhook_token}</ChakraField.ErrorText>
+      </ChakraField.Root>
     </VStack>
   );
 }
@@ -199,44 +192,50 @@ export function TriggerSection(props: SectionProps & { collections: CollectionCh
   const draftOnlyPicked = chosen && !chosen.draftAndPublish && draft.events.some((ev) => EVENTS.find((x) => x.value === ev)?.draftOnly);
   return (
     <EditorSection title="Trigger" description="What starts a run. Any agent can also be run by hand from the agents page.">
-      <VStack spacing={4} align="stretch">
+      <VStack gap={4} align="stretch">
         <Field label="Trigger type" isRequired>
-          <Select value={draft.trigger_type} onChange={(e) => set("trigger_type", e.target.value)} maxW={{ md: "sm" }}>
-            {TRIGGER_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </Select>
+          <NativeSelect.Root maxW={{ md: "sm" }}>
+            <NativeSelect.Field value={draft.trigger_type} onChange={(e) => set("trigger_type", e.target.value)}>
+              {TRIGGER_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
         </Field>
 
         {draft.trigger_type === "collection_event" && (
           <>
             {collectionsError && (
-              <Alert status="error" borderRadius="md">
-                <AlertIcon />
+              <Notice status="error" borderRadius="md">
                 {collectionsError}
-              </Alert>
+              </Notice>
             )}
             <Field label="Collection" error={errors.collection} isRequired>
-              <Select placeholder="Choose a collection" value={draft.collection} onChange={(e) => set("collection", e.target.value)} maxW={{ md: "sm" }}>
-                {draft.collection && !names.includes(draft.collection) && <option value={draft.collection}>{draft.collection} (missing)</option>}
-                {names.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </Select>
+              <NativeSelect.Root maxW={{ md: "sm" }}>
+                <NativeSelect.Field placeholder="Choose a collection" value={draft.collection} onChange={(e) => set("collection", e.target.value)}>
+                  {draft.collection && !names.includes(draft.collection) && <option value={draft.collection}>{draft.collection} (missing)</option>}
+                  {names.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
             </Field>
-            <FormControl as="fieldset" isInvalid={Boolean(errors.events)} isRequired>
-              <FormLabel as="legend" fontSize="sm" mb={1}>
+            <Fieldset.Root invalid={Boolean(errors.events)} size="sm">
+              <Fieldset.Legend fontSize="sm">
                 Events
-              </FormLabel>
-              <CheckboxGroup value={draft.events} onChange={(v) => set("events", v.map(String))}>
-                <Wrap spacingX={5} spacingY={1}>
+                <RequiredMark />
+              </Fieldset.Legend>
+              <CheckboxGroup value={draft.events} onValueChange={(v) => set("events", v.map(String))}>
+                <Wrap columnGap={5} rowGap={1}>
                   {EVENTS.map((ev) => (
                     <WrapItem key={ev.value}>
-                      <Checkbox value={ev.value}>
+                      <Checkbox value={ev.value} size="sm">
                         {ev.label}
                         <Text as="span" color="gray.500" fontSize="xs" ml={1}>
                           {ev.value}
@@ -247,15 +246,15 @@ export function TriggerSection(props: SectionProps & { collections: CollectionCh
                 </Wrap>
               </CheckboxGroup>
               {errors.events ? (
-                <FormErrorMessage>{errors.events}</FormErrorMessage>
+                <Fieldset.ErrorText>{errors.events}</Fieldset.ErrorText>
               ) : (
-                <FormHelperText>Published and unpublished only happen in draft-and-publish collections. Writes made by agents emit no events.</FormHelperText>
+                <Fieldset.HelperText>Published and unpublished only happen in draft-and-publish collections. Writes made by agents emit no events.</Fieldset.HelperText>
               )}
-            </FormControl>
+            </Fieldset.Root>
             {draftOnlyPicked && (
-              <Alert status="warning" borderRadius="md" fontSize="sm">
-                <AlertIcon />'{draft.collection}' does not use draft-and-publish, so published / unpublished events never fire.
-              </Alert>
+              <Notice status="warning" borderRadius="md" fontSize="sm">
+                '{draft.collection}' does not use draft-and-publish, so published / unpublished events never fire.
+              </Notice>
             )}
           </>
         )}
@@ -278,16 +277,14 @@ export function LimitsSection({ draft, set, errors }: SectionProps) {
   return (
     <EditorSection title="Limits" description="Empty or 0: no limit. Windows are rolling (last 60 minutes, last 24 hours). A run over a limit is skipped or stopped and recorded as limited.">
       {none && automatic && (
-        <Alert status="warning" borderRadius="md" fontSize="sm" mb={4}>
-          <AlertIcon />
+        <Notice status="warning" borderRadius="md" fontSize="sm" mb={4}>
           No limits: this agent can run and spend without bound. Set at least a number of runs per hour.
-        </Alert>
+        </Notice>
       )}
-      <SimpleGrid columns={{ base: 1, md: 2, xl: 3 }} spacing={4}>
+      <SimpleGrid columns={{ base: 1, md: 2, xl: 3 }} gap={4}>
         {LIMIT_FIELDS.map((f) => (
           <Field key={f.key} label={f.label} error={errors[`limits.${f.key}`]} help={f.help}>
-            <InputGroup>
-              {f.decimal && <InputLeftAddon>$</InputLeftAddon>}
+            <InputGroup w="full" startAddon={f.decimal ? "$" : undefined}>
               <Input
                 type="number"
                 min={0}
@@ -306,7 +303,7 @@ export function LimitsSection({ draft, set, errors }: SectionProps) {
 export function MemorySection({ draft, set, errors }: SectionProps) {
   return (
     <EditorSection title="Memory" description="How the conversation is stored. The last 40 messages are replayed on each run. The defaults suit most agents.">
-      <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+      <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
         <Field label="Memory type" error={errors.memory_type} isRequired>
           <Input value={draft.memory_type} onChange={(e) => set("memory_type", e.target.value)} placeholder="in-memory" />
         </Field>
@@ -321,24 +318,22 @@ export function MemorySection({ draft, set, errors }: SectionProps) {
 export function ApprovalSection({ draft, set }: SectionProps) {
   return (
     <EditorSection title="Review" description="Whether people check the agent's content changes before they are made.">
-      <FormControl display="flex" alignItems="start" gap={3}>
+      <ChakraField.Root flexDirection="row" alignItems="start" gap={3}>
         <Switch
-          id="agent-require-approval"
-          mt={0.5}
-          colorScheme="teal"
-          isChecked={draft.require_approval}
-          onChange={(e) => set("require_approval", e.target.checked)}
+          size="sm"
+          mt={1}
+          colorPalette="teal"
+          checked={draft.require_approval}
+          onCheckedChange={(e) => set("require_approval", e.checked)}
         />
         <Box>
-          <FormLabel htmlFor="agent-require-approval" mb={0}>
-            Require approval
-          </FormLabel>
-          <FormHelperText mt={1}>
+          <ChakraField.Label fontSize="md">Require approval</ChakraField.Label>
+          <ChakraField.HelperText fontSize="sm" mt={1}>
             Creates, updates, translations and deletes are not applied: they wait on the Approvals page until an editor approves, edits or
             rejects them.
-          </FormHelperText>
+          </ChakraField.HelperText>
         </Box>
-      </FormControl>
+      </ChakraField.Root>
     </EditorSection>
   );
 }

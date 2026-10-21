@@ -1,28 +1,7 @@
 import { useState } from "react";
-import {
-  Alert,
-  AlertIcon,
-  Button,
-  FormControl,
-  FormHelperText,
-  FormLabel,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
-  Radio,
-  RadioGroup,
-  Select,
-  Spinner,
-  Stack,
-  Text,
-  Textarea,
-  VStack,
-  useDisclosure,
-} from "@chakra-ui/react";
+import { Button, Field, NativeSelect, Spinner, Stack, Text, Textarea, VStack, useDisclosure } from "@chakra-ui/react";
+import { DialogBody, DialogCloseTrigger, DialogContent, DialogFooter, DialogHeader, DialogRoot, DialogTitle } from "@/components/ui/dialog";
+import { Radio, RadioGroup } from "@/components/ui/radio";
 import { FiZap } from "react-icons/fi";
 import { api } from "../../../services/api";
 import { getJSON, useApiQuery } from "../../../shared/hooks/useApiQuery";
@@ -31,6 +10,7 @@ import { type AgentNodeData } from "../../../shared/types";
 import { errorMessage } from "../../../shared/utils/errors";
 import { dataTitle } from "../../history/history";
 import { EVENTS } from "./agentForm";
+import { Notice } from "./EditorParts";
 
 /** The response of POST /admin/agents/{name}/run and /test. */
 export interface QueuedRun {
@@ -59,7 +39,7 @@ const eventLabel = (value: string) => EVENTS.find((e) => e.value === value)?.lab
  * collection-event agent can be tried on an existing entry.
  */
 export function TestRunButton({ agent, onQueued }: { agent: AgentNodeData; onQueued: (runId: number) => void }) {
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { open, onOpen, onClose } = useDisclosure();
   const trigger = agent.schema.trigger;
   const collection = trigger.type === "collection_event" ? (trigger.event_trigger?.collection ?? "") : "";
   const events = trigger.event_trigger?.events ?? [];
@@ -73,7 +53,7 @@ export function TestRunButton({ agent, onQueued }: { agent: AgentNodeData; onQue
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const notify = useNotify();
-  const { items, loading: itemsLoading, error: itemsError } = useRecentItems(isOpen && mode === "event" && collection ? collection : null);
+  const { items, loading: itemsLoading, error: itemsError } = useRecentItems(open && mode === "event" && collection ? collection : null);
   const chosenItem = itemId && items.some((it) => String(it.id) === itemId) ? itemId : items[0] ? String(items[0].id) : "";
 
   const close = () => {
@@ -101,23 +81,31 @@ export function TestRunButton({ agent, onQueued }: { agent: AgentNodeData; onQue
 
   return (
     <>
-      <Button size="sm" variant="outline" colorScheme="purple" leftIcon={<FiZap />} onClick={onOpen}>
+      <Button size="xs" variant="outline" colorPalette="purple" onClick={onOpen}>
+        <FiZap />
         Test run
       </Button>
-      <Modal isOpen={isOpen} onClose={close} size="lg">
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Test {agent.name}</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <VStack align="stretch" spacing={4}>
+      <DialogRoot
+        open={open}
+        onOpenChange={(e) => {
+          if (!e.open) close();
+        }}
+        size="lg"
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Test {agent.name}</DialogTitle>
+          </DialogHeader>
+          <DialogCloseTrigger />
+          <DialogBody>
+            <VStack align="stretch" gap={4}>
               <Text fontSize="sm" color="gray.600">
                 A dry run: the agent calls the model and reads content as usual, but its creates, updates and deletes are only reported (“would
                 update…”). Nothing is written. It counts toward the agent's limits.
               </Text>
               {collection && (
-                <RadioGroup value={mode} onChange={(v) => setMode(v as "event" | "input")}>
-                  <Stack direction={{ base: "column", sm: "row" }} spacing={5}>
+                <RadioGroup size="sm" value={mode} onValueChange={(e) => setMode(e.value === "event" ? "event" : "input")}>
+                  <Stack direction={{ base: "column", sm: "row" }} gap={5}>
                     <Radio value="event">On an entry of {collection}</Radio>
                     <Radio value="input">With a message</Radio>
                   </Stack>
@@ -125,10 +113,11 @@ export function TestRunButton({ agent, onQueued }: { agent: AgentNodeData; onQue
               )}
               {mode === "event" ? (
                 <>
-                  <FormControl isRequired>
-                    <FormLabel htmlFor="test-run-item" fontSize="sm">
+                  <Field.Root required ids={{ control: "test-run-item" }} gap={2}>
+                    <Field.Label>
                       Entry
-                    </FormLabel>
+                      <Field.RequiredIndicator />
+                    </Field.Label>
                     {itemsLoading && items.length === 0 ? (
                       <Spinner size="sm" />
                     ) : items.length === 0 ? (
@@ -136,68 +125,68 @@ export function TestRunButton({ agent, onQueued }: { agent: AgentNodeData; onQue
                         {itemsError ?? `${collection} has no entries yet: create one, or test with a message.`}
                       </Text>
                     ) : (
-                      <Select id="test-run-item" value={chosenItem} onChange={(e) => setItemId(e.target.value)}>
-                        {items.map((it) => {
-                          const title = dataTitle(it);
-                          return (
-                            <option key={String(it.id)} value={String(it.id)}>
-                              #{String(it.id)}
-                              {title ? ` — ${title}` : ""}
-                            </option>
-                          );
-                        })}
-                      </Select>
+                      <NativeSelect.Root>
+                        <NativeSelect.Field value={chosenItem} onChange={(e) => setItemId(e.target.value)}>
+                          {items.map((it) => {
+                            const title = dataTitle(it);
+                            return (
+                              <option key={String(it.id)} value={String(it.id)}>
+                                #{String(it.id)}
+                                {title ? ` — ${title}` : ""}
+                              </option>
+                            );
+                          })}
+                        </NativeSelect.Field>
+                        <NativeSelect.Indicator />
+                      </NativeSelect.Root>
                     )}
-                    <FormHelperText>The {ITEM_CHOICES} latest entries. The agent gets the entry's data as in a real event.</FormHelperText>
-                  </FormControl>
+                    <Field.HelperText fontSize="sm">The {ITEM_CHOICES} latest entries. The agent gets the entry's data as in a real event.</Field.HelperText>
+                  </Field.Root>
                   {events.length > 0 && (
-                    <FormControl>
-                      <FormLabel htmlFor="test-run-event" fontSize="sm">
-                        Event
-                      </FormLabel>
-                      <Select id="test-run-event" value={event} onChange={(e) => setEvent(e.target.value)}>
-                        {events.map((ev) => (
-                          <option key={ev} value={ev}>
-                            {eventLabel(ev)} ({ev})
-                          </option>
-                        ))}
-                      </Select>
-                    </FormControl>
+                    <Field.Root ids={{ control: "test-run-event" }} gap={2}>
+                      <Field.Label>Event</Field.Label>
+                      <NativeSelect.Root>
+                        <NativeSelect.Field value={event} onChange={(e) => setEvent(e.target.value)}>
+                          {events.map((ev) => (
+                            <option key={ev} value={ev}>
+                              {eventLabel(ev)} ({ev})
+                            </option>
+                          ))}
+                        </NativeSelect.Field>
+                        <NativeSelect.Indicator />
+                      </NativeSelect.Root>
+                    </Field.Root>
                   )}
                 </>
               ) : (
-                <FormControl>
-                  <FormLabel htmlFor="test-run-input" fontSize="sm">
-                    Input (optional)
-                  </FormLabel>
+                <Field.Root ids={{ control: "test-run-input" }} gap={2}>
+                  <Field.Label>Input (optional)</Field.Label>
                   <Textarea
-                    id="test-run-input"
                     rows={5}
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="The first message sent to the model"
                   />
-                  <FormHelperText>Empty: “This is a test run started from the admin UI. Do your task.”</FormHelperText>
-                </FormControl>
+                  <Field.HelperText fontSize="sm">Empty: “This is a test run started from the admin UI. Do your task.”</Field.HelperText>
+                </Field.Root>
               )}
               {error && (
-                <Alert status="error" borderRadius="md">
-                  <AlertIcon />
+                <Notice status="error" borderRadius="md">
                   {error}
-                </Alert>
+                </Notice>
               )}
             </VStack>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={close} isDisabled={busy}>
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="ghost" onClick={close} disabled={busy}>
               Cancel
             </Button>
-            <Button colorScheme="purple" onClick={run} isLoading={busy} loadingText="Queuing" isDisabled={!canRun}>
+            <Button colorPalette="purple" onClick={run} loading={busy} loadingText="Queuing" disabled={!canRun}>
               Start test run
             </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+          </DialogFooter>
+        </DialogContent>
+      </DialogRoot>
     </>
   );
 }

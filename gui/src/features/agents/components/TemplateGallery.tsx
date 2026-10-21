@@ -1,40 +1,15 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import {
-  Alert,
-  AlertIcon,
-  Box,
-  Button,
-  Checkbox,
-  CheckboxGroup,
-  FormControl,
-  FormErrorMessage,
-  FormHelperText,
-  FormLabel,
-  Heading,
-  Icon,
-  Input,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
-  Select,
-  SimpleGrid,
-  Spinner,
-  Switch,
-  Text,
-  VStack,
-  Wrap,
-  WrapItem,
-} from "@chakra-ui/react";
+import { Box, Button, CheckboxGroup, Field, Fieldset, Heading, Icon, Input, NativeSelect, SimpleGrid, Spinner, Text, VStack, Wrap, WrapItem } from "@chakra-ui/react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DialogBody, DialogCloseTrigger, DialogContent, DialogFooter, DialogHeader, DialogRoot, DialogTitle } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import { type IconType } from "react-icons";
 import { FiCpu, FiFileText, FiGlobe, FiPlus, FiShield, FiTag } from "react-icons/fi";
 import { api } from "../../../services/api";
 import { type AgentDefinition, type AgentTemplate, type AgentTemplateParam, type Attribute } from "../../../shared/types";
 import { errorMessage } from "../../../shared/utils/errors";
 import { type CollectionChoice, useAgentTemplates, useCollectionAttributes } from "../hook/useEditorData";
+import { Notice, RequiredMark } from "./EditorParts";
 
 const TEMPLATE_ICONS: Record<string, IconType> = {
   summarizer: FiFileText,
@@ -72,14 +47,14 @@ function GalleryCard({
     >
       <Icon as={icon} boxSize={6} color="teal.500" />
       <Box flex="1">
-        <Heading size="sm" mb={1}>
+        <Heading size="md" fontWeight="bold" mb={1}>
           {title}
         </Heading>
         <Text fontSize="sm" color="gray.600">
           {description}
         </Text>
       </Box>
-      <Button size="sm" colorScheme="teal" variant="outline" alignSelf="start" onClick={onClick}>
+      <Button size="xs" colorPalette="teal" variant="outline" alignSelf="start" onClick={onClick}>
         {action}
       </Button>
     </Box>
@@ -99,20 +74,21 @@ export function TemplateGallery({ collections, onBlank, onRendered }: TemplateGa
   const [chosen, setChosen] = useState<AgentTemplate | null>(null);
 
   return (
-    <VStack align="stretch" spacing={4}>
+    <VStack align="stretch" gap={4}>
       <Box>
-        <Heading size="md">Start from a template</Heading>
+        <Heading size="xl" fontWeight="bold">
+          Start from a template
+        </Heading>
         <Text fontSize="sm" color="gray.500" mt={1}>
           A template writes the system prompt, trigger and functions for a common task. You review everything before the agent is created.
         </Text>
       </Box>
       {error && (
-        <Alert status="warning" borderRadius="md">
-          <AlertIcon />
+        <Notice status="warning" borderRadius="md">
           {error}
-        </Alert>
+        </Notice>
       )}
-      <SimpleGrid columns={{ base: 1, md: 2, xl: 3 }} spacing={4}>
+      <SimpleGrid columns={{ base: 1, md: 2, xl: 3 }} gap={4}>
         <GalleryCard
           icon={FiPlus}
           title="Blank agent"
@@ -264,27 +240,32 @@ function TemplateParamsModal({
     const id = `template-param-${p.key}`;
     if (p.type === "bool") {
       return (
-        <FormControl key={p.key} display="flex" alignItems="start" gap={3}>
-          <Switch id={id} mt={0.5} colorScheme="teal" isChecked={v === true} onChange={(e) => setValue(p.key, e.target.checked)} />
+        <Field.Root key={p.key} ids={{ control: id }} flexDirection="row" alignItems="start" gap={3}>
+          <Switch size="sm" mt={0.5} colorPalette="teal" checked={v === true} onCheckedChange={(e) => setValue(p.key, e.checked)} />
           <Box>
-            <FormLabel htmlFor={id} mb={0} fontSize="sm">
-              {p.label}
-            </FormLabel>
-            {p.help && <FormHelperText mt={0.5}>{p.help}</FormHelperText>}
+            <Field.Label fontSize="sm">{p.label}</Field.Label>
+            {p.help && (
+              <Field.HelperText fontSize="sm" mt={0.5}>
+                {p.help}
+              </Field.HelperText>
+            )}
           </Box>
-        </FormControl>
+        </Field.Root>
       );
     }
     let control: React.ReactNode;
     if (p.type === "collection") {
       control = (
-        <Select id={id} placeholder="Choose a collection" value={String(v ?? "")} onChange={(e) => setCollection(p.key, e.target.value)}>
-          {collections.map((c) => (
-            <option key={c.name} value={c.name}>
-              {c.name}
-            </option>
-          ))}
-        </Select>
+        <NativeSelect.Root>
+          <NativeSelect.Field placeholder="Choose a collection" value={String(v ?? "")} onChange={(e) => setCollection(p.key, e.target.value)}>
+            {collections.map((c) => (
+              <option key={c.name} value={c.name}>
+                {c.name}
+              </option>
+            ))}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
       );
     } else if (p.type === "field" || p.type === "fields") {
       const choices = fieldChoices(p, attributes);
@@ -304,21 +285,24 @@ function TemplateParamsModal({
         );
       } else if (p.type === "field") {
         control = (
-          <Select id={id} placeholder={p.required ? "Choose a field" : "None"} value={String(v ?? "")} onChange={(e) => setValue(p.key, e.target.value)}>
-            {choices.map((a) => (
-              <option key={a.name} value={a.name}>
-                {a.name} ({a.type})
-              </option>
-            ))}
-          </Select>
+          <NativeSelect.Root>
+            <NativeSelect.Field placeholder={p.required ? "Choose a field" : "None"} value={String(v ?? "")} onChange={(e) => setValue(p.key, e.target.value)}>
+              {choices.map((a) => (
+                <option key={a.name} value={a.name}>
+                  {a.name} ({a.type})
+                </option>
+              ))}
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
         );
       } else {
         control = (
-          <CheckboxGroup value={Array.isArray(v) ? v : []} onChange={(next) => setValue(p.key, next.map(String))}>
-            <Wrap spacingX={5} spacingY={1}>
+          <CheckboxGroup value={Array.isArray(v) ? v : []} onValueChange={(next) => setValue(p.key, next.map(String))}>
+            <Wrap columnGap={5} rowGap={1}>
               {choices.map((a) => (
                 <WrapItem key={a.name}>
-                  <Checkbox value={a.name}>
+                  <Checkbox value={a.name} size="sm">
                     {a.name}
                     <Text as="span" color="gray.500" fontSize="xs" ml={1}>
                       {a.type}
@@ -333,7 +317,6 @@ function TemplateParamsModal({
     } else {
       control = (
         <Input
-          id={id}
           type={p.type === "number" ? "number" : "text"}
           min={p.type === "number" ? 0 : undefined}
           step={p.type === "number" ? 1 : undefined}
@@ -342,66 +325,95 @@ function TemplateParamsModal({
         />
       );
     }
-    const isGroup = p.type === "fields";
+    if (p.type === "fields") {
+      // Checkboxes must not sit in a Field (they would share its control id).
+      return (
+        <Fieldset.Root key={p.key} size="sm" invalid={Boolean(shown[p.key])}>
+          <Fieldset.Legend fontSize="sm">
+            {p.label}
+            {p.required && <RequiredMark />}
+          </Fieldset.Legend>
+          {control}
+          {shown[p.key] ? <Fieldset.ErrorText>{shown[p.key]}</Fieldset.ErrorText> : p.help ? <Fieldset.HelperText>{p.help}</Fieldset.HelperText> : null}
+        </Fieldset.Root>
+      );
+    }
     return (
-      <FormControl key={p.key} as={isGroup ? "fieldset" : undefined} isRequired={p.required} isInvalid={Boolean(shown[p.key])}>
-        <FormLabel as={isGroup ? "legend" : undefined} htmlFor={isGroup ? undefined : id} fontSize="sm" mb={1}>
+      <Field.Root key={p.key} ids={{ control: id }} required={p.required} invalid={Boolean(shown[p.key])} gap={1}>
+        <Field.Label fontSize="sm">
           {p.label}
-        </FormLabel>
+          <Field.RequiredIndicator />
+        </Field.Label>
         {control}
-        {shown[p.key] ? <FormErrorMessage>{shown[p.key]}</FormErrorMessage> : p.help ? <FormHelperText>{p.help}</FormHelperText> : null}
-      </FormControl>
+        {shown[p.key] ? (
+          <Field.ErrorText fontSize="sm">{shown[p.key]}</Field.ErrorText>
+        ) : p.help ? (
+          <Field.HelperText fontSize="sm">{p.help}</Field.HelperText>
+        ) : null}
+      </Field.Root>
     );
   };
 
   return (
-    <Modal isOpen onClose={onClose} size="xl" scrollBehavior="inside">
-      <ModalOverlay />
-      <ModalContent as="form" onSubmit={submit} noValidate>
-        <ModalHeader>{template.name}</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody>
-          <VStack align="stretch" spacing={4}>
-            <Text fontSize="sm" color="gray.600">
-              {template.description}
-            </Text>
-            {template.params.map(renderParam)}
-            <FormControl isInvalid={Boolean(shown.name)}>
-              <FormLabel htmlFor="template-agent-name" fontSize="sm" mb={1}>
-                Agent name
-              </FormLabel>
-              <Input
-                id="template-agent-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={`${template.id}-${collection || "<collection>"}`}
-                autoComplete="off"
-              />
-              {shown.name ? <FormErrorMessage>{shown.name}</FormErrorMessage> : <FormHelperText>Empty: {template.id}-{collection || "<collection>"}.</FormHelperText>}
-            </FormControl>
-            {attrsError && (
-              <Alert status="error" borderRadius="md">
-                <AlertIcon />
-                {attrsError}
-              </Alert>
-            )}
-            {serverError && (
-              <Alert status="error" borderRadius="md">
-                <AlertIcon />
-                {serverError}
-              </Alert>
-            )}
-          </VStack>
-        </ModalBody>
-        <ModalFooter>
-          <Button variant="ghost" mr={3} onClick={onClose} isDisabled={busy}>
-            Cancel
-          </Button>
-          <Button type="submit" colorScheme="teal" isLoading={busy} loadingText="Preparing">
-            Continue
-          </Button>
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
+    <DialogRoot
+      open
+      onOpenChange={(e) => {
+        if (!e.open) onClose();
+      }}
+      size="xl"
+      scrollBehavior="inside"
+    >
+      <DialogContent>
+        {/* display: contents keeps header, body and footer laid out by the dialog (scrolling body). */}
+        <form onSubmit={submit} noValidate style={{ display: "contents" }}>
+          <DialogHeader>
+            <DialogTitle>{template.name}</DialogTitle>
+          </DialogHeader>
+          <DialogCloseTrigger />
+          <DialogBody>
+            <VStack align="stretch" gap={4}>
+              <Text fontSize="sm" color="gray.600">
+                {template.description}
+              </Text>
+              {template.params.map(renderParam)}
+              <Field.Root invalid={Boolean(shown.name)} ids={{ control: "template-agent-name" }} gap={1}>
+                <Field.Label fontSize="sm">Agent name</Field.Label>
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={`${template.id}-${collection || "<collection>"}`}
+                  autoComplete="off"
+                />
+                {shown.name ? (
+                  <Field.ErrorText fontSize="sm">{shown.name}</Field.ErrorText>
+                ) : (
+                  <Field.HelperText fontSize="sm">
+                    Empty: {template.id}-{collection || "<collection>"}.
+                  </Field.HelperText>
+                )}
+              </Field.Root>
+              {attrsError && (
+                <Notice status="error" borderRadius="md">
+                  {attrsError}
+                </Notice>
+              )}
+              {serverError && (
+                <Notice status="error" borderRadius="md">
+                  {serverError}
+                </Notice>
+              )}
+            </VStack>
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="ghost" onClick={onClose} disabled={busy}>
+              Cancel
+            </Button>
+            <Button type="submit" colorPalette="teal" loading={busy} loadingText="Preparing">
+              Continue
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </DialogRoot>
   );
 }

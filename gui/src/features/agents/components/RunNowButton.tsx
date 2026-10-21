@@ -1,30 +1,16 @@
 import { useState } from "react";
-import {
-  Alert,
-  AlertIcon,
-  Button,
-  FormControl,
-  FormHelperText,
-  FormLabel,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
-  Textarea,
-  useDisclosure,
-} from "@chakra-ui/react";
+import { Button, Field, Textarea, useDisclosure } from "@chakra-ui/react";
+import { DialogBody, DialogCloseTrigger, DialogContent, DialogFooter, DialogHeader, DialogRoot, DialogTitle } from "@/components/ui/dialog";
 import { FiPlay } from "react-icons/fi";
 import { api } from "../../../services/api";
 import { useNotify } from "../../../shared/hooks/useNotify";
 import { errorMessage } from "../../../shared/utils/errors";
+import { Notice } from "./EditorParts";
 import { type QueuedRun } from "./TestRunButton";
 
 /** Queues a manual run (POST /admin/agents/{name}/run) with an optional input; onQueued gets the run to follow. */
 export function RunNowButton({ agentName, onQueued }: { agentName: string; onQueued: (runId?: number) => void }) {
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { open, onOpen, onClose } = useDisclosure();
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,39 +39,46 @@ export function RunNowButton({ agentName, onQueued }: { agentName: string; onQue
 
   return (
     <>
-      <Button size="sm" colorScheme="teal" leftIcon={<FiPlay />} onClick={onOpen}>
+      <Button size="xs" colorPalette="teal" onClick={onOpen}>
+        <FiPlay />
         Run now
       </Button>
-      <Modal isOpen={isOpen} onClose={close} size="lg">
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Run {agentName} now</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <FormControl>
-              <FormLabel>Input (optional)</FormLabel>
+      <DialogRoot
+        open={open}
+        onOpenChange={(e) => {
+          if (!e.open) close();
+        }}
+        size="lg"
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Run {agentName} now</DialogTitle>
+          </DialogHeader>
+          <DialogCloseTrigger />
+          <DialogBody>
+            <Field.Root gap={2}>
+              <Field.Label fontSize="md">Input (optional)</Field.Label>
               <Textarea rows={5} value={input} onChange={(e) => setInput(e.target.value)} placeholder="The first message sent to the model" />
-              <FormHelperText>
+              <Field.HelperText fontSize="sm">
                 Empty: “This is a manual run started from the admin UI. Do your task.” The run counts toward the agent's limits.
-              </FormHelperText>
-            </FormControl>
+              </Field.HelperText>
+            </Field.Root>
             {error && (
-              <Alert status="error" mt={4} borderRadius="md">
-                <AlertIcon />
+              <Notice status="error" mt={4} borderRadius="md">
                 {error}
-              </Alert>
+              </Notice>
             )}
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={close} isDisabled={busy}>
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="ghost" onClick={close} disabled={busy}>
               Cancel
             </Button>
-            <Button colorScheme="teal" onClick={run} isLoading={busy} loadingText="Queuing">
+            <Button colorPalette="teal" onClick={run} loading={busy} loadingText="Queuing">
               Queue run
             </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+          </DialogFooter>
+        </DialogContent>
+      </DialogRoot>
     </>
   );
 }

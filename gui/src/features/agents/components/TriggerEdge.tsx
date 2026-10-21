@@ -78,7 +78,7 @@ export function TriggerEdge({
               borderColor="purple.100"
               px={2}
               py={1}
-              spacing={1.5}
+              gap={1.5}
             >
               {events.slice(0, 1).map((event: string) => {
                  const eventName = event.split(':')[1];
@@ -86,14 +86,14 @@ export function TriggerEdge({
                  return (
                     <React.Fragment key={event}>
                       <Icon as={IconComp} color="purple.500" boxSize={3} />
-                      <Badge colorScheme='purple' variant='subtle' size='sm' textTransform="lowercase">
+                      <Badge colorPalette='purple' variant='subtle' size='sm' textTransform="lowercase">
                         on:{eventName}
                       </Badge>
                     </React.Fragment>
                  )
               })}
                {events.length > 1 && (
-                   <Badge colorScheme='purple' variant='solid' size='sm' borderRadius='full'>
+                   <Badge colorPalette='purple' variant='solid' size='sm' borderRadius='full'>
                       +{events.length - 1}
                   </Badge>
                )}

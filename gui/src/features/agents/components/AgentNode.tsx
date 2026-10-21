@@ -6,9 +6,8 @@ import {
   HStack,
   Text,
   Badge,
-  Divider,
+  Separator,
   Icon,
-  Tooltip,
   IconButton,
 } from '@chakra-ui/react';
 import { 
@@ -21,7 +20,8 @@ import {
 import { PiFunctionFill } from "react-icons/pi"; 
 import { LobeHub, OpenAI, Ollama, Anthropic } from '@lobehub/icons';
 import type { AgentNodeData } from '../../../shared/types';
-import { Menu, MenuButton, MenuList, MenuItem } from '@chakra-ui/react';
+import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from '@/components/ui/menu';
+import { Tooltip } from '@/components/ui/tooltip';
 
 
 interface AgentNodeProps {
@@ -75,67 +75,69 @@ export const AgentNode: React.FC<AgentNodeProps> = ({ data, selected, onEdit, on
       >
         {/* Header */}
         <Box bg="linear-gradient(135deg, #8a52ca, #a855f7)" color="white" p={3}>
-          <HStack spacing={2} align="center">
+          <HStack gap={2} align="center">
             <Icon as={FaRobot} boxSize={5} />
-            <VStack align="start" spacing={0} flex={1}>
-              <Text fontWeight="bold" fontSize="md" noOfLines={1}>{agentName}</Text>
+            <VStack align="start" gap={0} flex={1}>
+              <Text fontWeight="bold" fontSize="md" lineClamp={1}>{agentName}</Text>
               <Text fontSize="xs" opacity={0.9}>AI Agent</Text>
             </VStack>
             {/* Action Menu */}
-            <Menu>
-              <MenuButton
-                as={IconButton}
-                icon={<FaEllipsisV />}
-                size="xs"
-                variant="ghost"
-                color="white"
-                aria-label="Agent Actions"
-                opacity={showActions ? 1 : 0}
-                transition="opacity 0.2s"
-                _hover={{ bg: 'whiteAlpha.300' }}
-                _active={{ bg: 'whiteAlpha.400' }}
-              />
-              <MenuList>
-                <MenuItem icon={<FaEdit />} color="gray.700" onClick={() => onEdit(data.name)}>Edit Agent</MenuItem>
-                <MenuItem icon={<FaHistory />} color="gray.700" onClick={() => onViewLogs(data.name)}>View Logs</MenuItem>
-                <MenuItem icon={<FaTrash />} color="red.500" onClick={() => onDelete(data.name)}>Delete Agent</MenuItem>
-              </MenuList>
-            </Menu>
-            <Tooltip label={isActive ? "Agent is Active" : "Agent is Inactive"}>
+            <MenuRoot>
+              <MenuTrigger asChild>
+                <IconButton
+                  size="2xs"
+                  variant="ghost"
+                  color="white"
+                  aria-label="Agent Actions"
+                  opacity={showActions ? 1 : 0}
+                  transition="opacity 0.2s"
+                  _hover={{ bg: 'whiteAlpha.300' }}
+                  _active={{ bg: 'whiteAlpha.400' }}
+                >
+                  <FaEllipsisV />
+                </IconButton>
+              </MenuTrigger>
+              <MenuContent>
+                <MenuItem value="edit" color="gray.700" onClick={() => onEdit(data.name)}><FaEdit />Edit Agent</MenuItem>
+                <MenuItem value="logs" color="gray.700" onClick={() => onViewLogs(data.name)}><FaHistory />View Logs</MenuItem>
+                <MenuItem value="delete" color="red.500" onClick={() => onDelete(data.name)}><FaTrash />Delete Agent</MenuItem>
+              </MenuContent>
+            </MenuRoot>
+            <Tooltip content={isActive ? "Agent is Active" : "Agent is Inactive"}>
                <Box w="8px" h="8px" bg={isActive ? "green.300" : "gray.400"} borderRadius="full" />
             </Tooltip>
           </HStack>
         </Box>
 
         {/* Body */}
-        <VStack spacing={0} align="stretch">
+        <VStack gap={0} align="stretch">
           {/* LLM Section */}
           <Box p={3}>
-            <HStack spacing={2} align="center" mb={2}>
+            <HStack gap={2} align="center" mb={2}>
               <Text fontWeight="semibold" fontSize="sm" color="gray.700">LLM Config</Text>
             </HStack>
             <HStack>
                 <Icon as={getProviderIcon(llmProvider)} color="purple.500" boxSize={5} />
-              <Tooltip label={llmModel}>
-                <Badge colorScheme="purple" size="sm" variant="subtle" maxW="150px" noOfLines={1}>{llmModel}</Badge>
+              <Tooltip content={llmModel}>
+                <Badge colorPalette="purple" size="sm" variant="subtle" maxW="150px" lineClamp={1}>{llmModel}</Badge>
               </Tooltip>
             </HStack>
           </Box>
 
-          <Divider />
+          <Separator />
 
           {/* Functions Section */}
           <Box p={3} bg="gray.50">
-            <HStack spacing={2} align="center" mb={2}>
+            <HStack gap={2} align="center" mb={2}>
               <Icon as={PiFunctionFill} color="green.500" boxSize={4} />
               <Text fontWeight="semibold" fontSize="sm" color="gray.700">Functions</Text>
-              <Badge colorScheme="green" size="sm" variant="outline">{functions.length}</Badge>
+              <Badge colorPalette="green" size="sm" variant="outline">{functions.length}</Badge>
             </HStack>
             
             {functions.length > 0 ? (
-              <VStack spacing={1} align="stretch">
+              <VStack gap={1} align="stretch">
                 {functions.slice(0, 3).map((func, index) => (
-                  <Text key={index} fontSize="xs" color="gray.600" noOfLines={1}>- {func.name}</Text>
+                  <Text key={index} fontSize="xs" color="gray.600" lineClamp={1}>- {func.name}</Text>
                 ))}
                 {functions.length > 3 && (
                   <Text fontSize="xs" color="gray.500" fontStyle="italic" cursor="pointer" _hover={{textDecor: 'underline'}}>
