@@ -51,6 +51,8 @@ export function ConfirmButton({
       {cloneElement(trigger, { onClick: onOpen })}
       <DialogRoot
         role="alertdialog"
+        // As v2's AlertDialog: a click outside cancels.
+        closeOnInteractOutside
         open={open}
         onOpenChange={(e) => {
           if (!e.open) onClose();

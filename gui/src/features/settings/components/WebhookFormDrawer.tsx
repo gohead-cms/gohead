@@ -223,23 +223,22 @@ export function WebhookFormDrawer({
                   Enabled
                 </Switch>
 
-                <Field.Root>
-                  <Stack gap={2} w="full">
-                    <Switch size="sm" checked={signed} onCheckedChange={(e) => setSigned(e.checked)}>
-                      Sign deliveries
-                    </Switch>
-                    <Field.HelperText mt={0}>
-                      Adds an <Code fontSize="xs">X-Gohead-Signature</Code> header (HMAC-SHA256 of <Code fontSize="xs">timestamp.body</Code>
-                      ) so the receiver can check the request came from GoHead.{" "}
-                      {creating || (signed && !webhook.signed) ? "A secret is generated and shown once after saving." : ""}
-                    </Field.HelperText>
-                    {!creating && webhook.signed && signed && (
-                      <Checkbox size="sm" checked={rotate} onCheckedChange={(e) => setRotate(e.checked === true)}>
-                        Generate a new secret (the old one stops working)
-                      </Checkbox>
-                    )}
-                  </Stack>
-                </Field.Root>
+                {/* No Field.Root here: it would give the switch and the checkbox the same input id. */}
+                <Stack gap={2} w="full">
+                  <Switch size="sm" checked={signed} onCheckedChange={(e) => setSigned(e.checked)}>
+                    Sign deliveries
+                  </Switch>
+                  <Text fontSize="sm" color="fg.muted">
+                    Adds an <Code fontSize="xs">X-Gohead-Signature</Code> header (HMAC-SHA256 of <Code fontSize="xs">timestamp.body</Code>)
+                    so the receiver can check the request came from GoHead.{" "}
+                    {creating || (signed && !webhook.signed) ? "A secret is generated and shown once after saving." : ""}
+                  </Text>
+                  {!creating && webhook.signed && signed && (
+                    <Checkbox size="sm" checked={rotate} onCheckedChange={(e) => setRotate(e.checked === true)}>
+                      Generate a new secret (the old one stops working)
+                    </Checkbox>
+                  )}
+                </Stack>
 
                 <Field.Root invalid={submitted && !!headersError}>
                   <Text fontWeight="medium" fontSize="sm">

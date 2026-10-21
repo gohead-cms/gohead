@@ -112,7 +112,7 @@ export function TestRunButton({ agent, onQueued }: { agent: AgentNodeData; onQue
               )}
               {mode === "event" ? (
                 <>
-                  <Field.Root required ids={{ control: "test-run-item" }} gap={2}>
+                  <Field.Root required id="test-run-item" gap={2}>
                     <Field.Label>
                       Entry
                       <Field.RequiredIndicator />
@@ -142,7 +142,7 @@ export function TestRunButton({ agent, onQueued }: { agent: AgentNodeData; onQue
                     <Field.HelperText fontSize="sm">The {ITEM_CHOICES} latest entries. The agent gets the entry's data as in a real event.</Field.HelperText>
                   </Field.Root>
                   {events.length > 0 && (
-                    <Field.Root ids={{ control: "test-run-event" }} gap={2}>
+                    <Field.Root id="test-run-event" gap={2}>
                       <Field.Label>Event</Field.Label>
                       <NativeSelect.Root>
                         <NativeSelect.Field value={event} onChange={(e) => setEvent(e.target.value)}>
@@ -158,7 +158,7 @@ export function TestRunButton({ agent, onQueued }: { agent: AgentNodeData; onQue
                   )}
                 </>
               ) : (
-                <Field.Root ids={{ control: "test-run-input" }} gap={2}>
+                <Field.Root id="test-run-input" gap={2}>
                   <Field.Label>Input (optional)</Field.Label>
                   <Textarea
                     rows={5}

@@ -38,6 +38,8 @@ export function DeleteNodeDialog({ target, onClose, onDeleted }: { target: NodeR
   return (
     <DialogRoot
       role="alertdialog"
+      // As v2's AlertDialog: a click outside cancels.
+      closeOnInteractOutside
       open={!!target}
       onOpenChange={(e) => {
         if (!e.open) onClose();

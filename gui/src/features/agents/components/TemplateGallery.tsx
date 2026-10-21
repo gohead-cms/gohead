@@ -240,7 +240,7 @@ function TemplateParamsModal({
     const id = `template-param-${p.key}`;
     if (p.type === "bool") {
       return (
-        <Field.Root key={p.key} ids={{ control: id }} flexDirection="row" alignItems="start" gap={3}>
+        <Field.Root key={p.key} id={id} flexDirection="row" alignItems="start" gap={3}>
           <Switch size="sm" mt={0.5} colorPalette="teal" checked={v === true} onCheckedChange={(e) => setValue(p.key, e.checked)} />
           <Box>
             <Field.Label fontSize="sm">{p.label}</Field.Label>
@@ -339,7 +339,7 @@ function TemplateParamsModal({
       );
     }
     return (
-      <Field.Root key={p.key} ids={{ control: id }} required={p.required} invalid={Boolean(shown[p.key])} gap={1}>
+      <Field.Root key={p.key} id={id} required={p.required} invalid={Boolean(shown[p.key])} gap={1}>
         <Field.Label fontSize="sm">
           {p.label}
           <Field.RequiredIndicator />
@@ -375,7 +375,7 @@ function TemplateParamsModal({
                 {template.description}
               </Text>
               {template.params.map(renderParam)}
-              <Field.Root invalid={Boolean(shown.name)} ids={{ control: "template-agent-name" }} gap={1}>
+              <Field.Root invalid={Boolean(shown.name)} id="template-agent-name" gap={1}>
                 <Field.Label fontSize="sm">Agent name</Field.Label>
                 <Input
                   value={name}

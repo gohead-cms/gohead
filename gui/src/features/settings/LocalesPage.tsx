@@ -259,6 +259,8 @@ function PurgeDialog({ inUse, onClose, onConfirm }: { inUse: InUse | null; onClo
   return (
     <DialogRoot
       role="alertdialog"
+      // As v2's AlertDialog: a click outside cancels.
+      closeOnInteractOutside
       open={!!inUse}
       onOpenChange={(e) => {
         if (!e.open) onClose();

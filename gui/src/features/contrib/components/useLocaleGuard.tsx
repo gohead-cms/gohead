@@ -38,6 +38,8 @@ export function useLocaleGuard(onSwitch: (code: string) => void) {
   const dialog = (
     <DialogRoot
       role="alertdialog"
+      // As v2's AlertDialog: a click outside cancels.
+      closeOnInteractOutside
       open={pending !== null}
       initialFocusEl={() => cancelRef.current}
       onOpenChange={(e) => {
