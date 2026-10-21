@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-10-21
+
 ### Added
 - **Homebrew**: `brew install gohead-cms/tap/gohead`, then `gohead standalone`, starts GoHead on a Mac with no Docker. The cask is published to `gohead-cms/homebrew-tap` with each release.
 
