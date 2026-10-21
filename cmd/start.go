@@ -308,9 +308,9 @@ func InitializeServer(cfgPath string, opts ServerOptions) (*Server, func(), erro
 	}
 	// Requests without a token act with the public role, when it grants
 	// anything; they have their own rate limit.
-	var publicLimit gin.HandlerFunc
+	var publicLimit middleware.Limiter
 	if cfg.RateLimit.Enabled {
-		publicLimit = middleware.RateLimit(authLimiter, "public", cfg.RateLimit.PublicPerMinute, time.Minute)
+		publicLimit = middleware.RateLimitAllow(authLimiter, "public", cfg.RateLimit.PublicPerMinute, time.Minute)
 	}
 	handlers.APIVersion = version
 	setupRoutes(router, authLimit, publicLimit, localMedia, cfg.OpenAPI)
@@ -365,7 +365,7 @@ func initMediaStore(cfg config.Config) (*media.Local, error) {
 	return local, nil
 }
 
-func setupRoutes(router *gin.Engine, authLimit, publicLimit gin.HandlerFunc, localMedia *media.Local, openAPI config.OpenAPIConfig) {
+func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, publicLimit middleware.Limiter, localMedia *media.Local, openAPI config.OpenAPIConfig) {
 	// API description: the spec (public or behind a token) and Swagger UI.
 	if openAPI.Enabled {
 		if openAPI.Public {

@@ -39,18 +39,17 @@ const AnonymousKey = "anonymous"
 // without an Authorization header acts with the public role when that role
 // grants anything. Anonymous requests go through limit (per client IP), and
 // a 403 they get becomes a 401 so clients know signing in may help.
-func PublicOrAuth(limit gin.HandlerFunc) gin.HandlerFunc {
+func PublicOrAuth(limit Limiter) gin.HandlerFunc {
 	authenticated := AuthMiddleware()
 	return func(c *gin.Context) {
 		if c.GetHeader("Authorization") != "" || !storage.PublicAccessEnabled() {
 			authenticated(c)
 			return
 		}
-		if limit != nil {
-			limit(c)
-			if c.IsAborted() {
-				return
-			}
+		// A Limiter, not a middleware: a middleware would run the handlers
+		// here, before the request is marked as public.
+		if limit != nil && !limit(c) {
+			return
 		}
 		c.Set("username", "")
 		c.Set("role", auth.RolePublic)

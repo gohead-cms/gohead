@@ -8,10 +8,12 @@ import (
 	"net/http/httptest"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/gohead-cms/gohead/internal/api/middleware"
 	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/migrations"
+	"github.com/gohead-cms/gohead/pkg/ratelimit"
 	"github.com/gohead-cms/gohead/pkg/testutils"
 
 	"github.com/gin-gonic/gin"
@@ -52,7 +54,9 @@ func newContentAPI(t *testing.T) *contentAPI {
 	admin.GET("/agent-templates", ListAgentTemplates)
 	admin.POST("/agent-templates/:id/render", RenderAgentTemplate)
 
-	api := router.Group("/api", middleware.PublicOrAuth(nil))
+	// A real limiter, as in production (rate limiting is on by default), so
+	// the public-role tests go through it.
+	api := router.Group("/api", middleware.PublicOrAuth(middleware.RateLimitAllow(ratelimit.NewMemory(), "public", 10_000, time.Minute)))
 	signedIn := middleware.SignedInOnly()
 	api.Any("/collections/:collection", DynamicCollectionHandler)
 	api.Any("/collections/:collection/:id", DynamicCollectionHandler)
