@@ -1,32 +1,7 @@
 import { useRef, useState } from "react";
-import {
-  Alert,
-  AlertDescription,
-  AlertDialog,
-  AlertDialogBody,
-  AlertDialogContent,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogOverlay,
-  AlertIcon,
-  Badge,
-  Box,
-  Button,
-  Code,
-  HStack,
-  IconButton,
-  Skeleton,
-  Stack,
-  Table,
-  TableContainer,
-  Tbody,
-  Td,
-  Text,
-  Th,
-  Thead,
-  Tooltip,
-  Tr,
-} from "@chakra-ui/react";
+import { Alert, Badge, Box, Button, Code, HStack, IconButton, Skeleton, Stack, Table, Text } from "@chakra-ui/react";
+import { DialogBody, DialogContent, DialogFooter, DialogHeader, DialogRoot, DialogTitle } from "@/components/ui/dialog";
+import { Tooltip } from "@/components/ui/tooltip";
 import { FiEdit2, FiGlobe, FiPlus, FiStar, FiTrash2 } from "react-icons/fi";
 import { api, ApiError } from "../../services/api";
 import { useApiQuery } from "../../shared/hooks/useApiQuery";
@@ -107,7 +82,8 @@ export function LocalesPage() {
   };
 
   const addButton = (
-    <Button leftIcon={<FiPlus />} colorScheme="blue" onClick={() => openForm(null)}>
+    <Button colorPalette="blue" onClick={() => openForm(null)}>
+      <FiPlus />
       Add locale
     </Button>
   );
@@ -121,13 +97,15 @@ export function LocalesPage() {
       />
 
       {error && (
-        <Alert status="error" borderRadius="md" mb={4}>
-          <AlertIcon />
-          <AlertDescription flex="1">{error}</AlertDescription>
-          <Button size="sm" onClick={refetch}>
+        <Alert.Root status="error" borderRadius="md" mb={4} alignItems="center">
+          <Alert.Indicator />
+          <Alert.Content flex="1">
+            <Alert.Description>{error}</Alert.Description>
+          </Alert.Content>
+          <Button size="xs" variant="subtle" onClick={refetch}>
             Retry
           </Button>
-        </Alert>
+        </Alert.Root>
       )}
 
       {loading && !data ? (
@@ -143,29 +121,35 @@ export function LocalesPage() {
       ) : data ? (
         <>
           <Box bg="white" borderWidth="1px" borderRadius="lg" overflow="hidden">
-            <TableContainer whiteSpace="normal">
-              <Table size="sm">
-                <Thead>
-                  <Tr>
-                    <Th>Code</Th>
-                    <Th>Name</Th>
-                    <Th>Added</Th>
-                    <Th textAlign="right">Actions</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
+            <Table.ScrollArea whiteSpace="normal">
+              <Table.Root size="sm">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader>Code</Table.ColumnHeader>
+                    <Table.ColumnHeader>Name</Table.ColumnHeader>
+                    <Table.ColumnHeader>Added</Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="right">Actions</Table.ColumnHeader>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
                   {locales.map((l) => (
-                    <Tr key={l.code}>
-                      <Td>
+                    <Table.Row key={l.code}>
+                      <Table.Cell>
                         <HStack>
                           <Code fontSize="sm">{l.code}</Code>
-                          {l.isDefault && <Badge colorScheme="purple">Default</Badge>}
+                          {l.isDefault && <Badge colorPalette="purple">Default</Badge>}
                         </HStack>
-                      </Td>
-                      <Td fontWeight="medium">{l.name || <Text as="span" color="gray.400">—</Text>}</Td>
-                      <Td color="gray.600">{optTime(l.createdAt)}</Td>
-                      <Td>
-                        <HStack justify="flex-end" spacing={1}>
+                      </Table.Cell>
+                      <Table.Cell fontWeight="medium">
+                        {l.name || (
+                          <Text as="span" color="gray.400">
+                            —
+                          </Text>
+                        )}
+                      </Table.Cell>
+                      <Table.Cell color="gray.600">{optTime(l.createdAt)}</Table.Cell>
+                      <Table.Cell>
+                        <HStack justify="flex-end" gap={1}>
                           {!l.isDefault && (
                             <ConfirmButton
                               title={`Make ${l.code} the default locale?`}
@@ -173,10 +157,10 @@ export function LocalesPage() {
                               confirmColorScheme="purple"
                               onConfirm={() => makeDefault(l)}
                               body={
-                                <Stack spacing={3}>
+                                <Stack gap={3}>
                                   <Text>
-                                    Entries' main content is relabelled as <strong>{l.code}</strong>: nothing is translated or moved,
-                                    so do this when the content is actually written in {l.name || l.code}
+                                    Entries' main content is relabelled as <strong>{l.code}</strong>: nothing is translated or moved, so do
+                                    this when the content is actually written in {l.name || l.code}
                                     {defaultLocale ? ` rather than ${defaultLocale.name || defaultLocale.code}` : ""}.
                                   </Text>
                                   <Text color="gray.600" fontSize="sm">
@@ -186,19 +170,24 @@ export function LocalesPage() {
                                 </Stack>
                               }
                               trigger={
-                                <Button size="xs" variant="ghost" leftIcon={<FiStar />} aria-label={`Make ${l.code} the default`}>
+                                <Button size="2xs" variant="ghost" aria-label={`Make ${l.code} the default`}>
+                                  <FiStar />
                                   Make default
                                 </Button>
                               }
                             />
                           )}
-                          <Tooltip label="Rename">
-                            <IconButton aria-label={`Rename ${l.code}`} icon={<FiEdit2 />} size="sm" variant="ghost" onClick={() => openForm(l)} />
+                          <Tooltip content="Rename">
+                            <IconButton aria-label={`Rename ${l.code}`} size="xs" variant="ghost" onClick={() => openForm(l)}>
+                              <FiEdit2 />
+                            </IconButton>
                           </Tooltip>
                           {l.isDefault ? (
-                            <Tooltip label="The default locale cannot be deleted: make another locale the default first." hasArrow>
+                            <Tooltip content="The default locale cannot be deleted: make another locale the default first." showArrow>
                               <span>
-                                <IconButton aria-label={`Delete ${l.code}`} icon={<FiTrash2 />} size="sm" variant="ghost" colorScheme="red" isDisabled />
+                                <IconButton aria-label={`Delete ${l.code}`} size="xs" variant="ghost" colorPalette="red" disabled>
+                                  <FiTrash2 />
+                                </IconButton>
                               </span>
                             </Tooltip>
                           ) : (
@@ -206,21 +195,24 @@ export function LocalesPage() {
                               title={`Delete locale ${l.code}?`}
                               body={`Clients can no longer read or write content in ${l.name || l.code}. If entries have translations in it, you will be asked before they are deleted.`}
                               onConfirm={() => remove(l)}
-                              trigger={<IconButton aria-label={`Delete ${l.code}`} icon={<FiTrash2 />} size="sm" variant="ghost" colorScheme="red" />}
+                              trigger={
+                                <IconButton aria-label={`Delete ${l.code}`} size="xs" variant="ghost" colorPalette="red">
+                                  <FiTrash2 />
+                                </IconButton>
+                              }
                             />
                           )}
                         </HStack>
-                      </Td>
-                    </Tr>
+                      </Table.Cell>
+                    </Table.Row>
                   ))}
-                </Tbody>
-              </Table>
-            </TableContainer>
+                </Table.Body>
+              </Table.Root>
+            </Table.ScrollArea>
           </Box>
           {locales.length === 1 && (
             <Text fontSize="sm" color="gray.500" mt={3}>
-              Add a second locale to start translating: the content editor then shows a locale switcher for types with localized
-              attributes.
+              Add a second locale to start translating: the content editor then shows a locale switcher for types with localized attributes.
             </Text>
           )}
         </>
@@ -265,28 +257,35 @@ function PurgeDialog({ inUse, onClose, onConfirm }: { inUse: InUse | null; onClo
   };
   const n = inUse?.entries ?? 0;
   return (
-    <AlertDialog isOpen={!!inUse} leastDestructiveRef={cancelRef} onClose={onClose}>
-      <AlertDialogOverlay>
-        <AlertDialogContent>
-          <AlertDialogHeader fontSize="lg" fontWeight="bold">
+    <DialogRoot
+      role="alertdialog"
+      open={!!inUse}
+      onOpenChange={(e) => {
+        if (!e.open) onClose();
+      }}
+      initialFocusEl={() => cancelRef.current}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle fontSize="lg" fontWeight="bold">
             {inUse?.locale.code} has translations
-          </AlertDialogHeader>
-          <AlertDialogBody>
-            <Text>
-              {plural(n, "entry has", "entries have")} content in {inUse?.locale.name || inUse?.locale.code}. Deleting the locale
-              deletes {n === 1 ? "this translation" : "these translations"} too; the default-locale content is kept.
-            </Text>
-          </AlertDialogBody>
-          <AlertDialogFooter>
-            <Button ref={cancelRef} onClick={onClose} isDisabled={busy}>
-              Cancel
-            </Button>
-            <Button colorScheme="red" onClick={confirm} ml={3} isLoading={busy}>
-              Delete with its {plural(n, "translation", "translations")}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialogOverlay>
-    </AlertDialog>
+          </DialogTitle>
+        </DialogHeader>
+        <DialogBody>
+          <Text>
+            {plural(n, "entry has", "entries have")} content in {inUse?.locale.name || inUse?.locale.code}. Deleting the locale deletes{" "}
+            {n === 1 ? "this translation" : "these translations"} too; the default-locale content is kept.
+          </Text>
+        </DialogBody>
+        <DialogFooter>
+          <Button ref={cancelRef} variant="subtle" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button colorPalette="red" onClick={confirm} ml={3} loading={busy}>
+            Delete with its {plural(n, "translation", "translations")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </DialogRoot>
   );
 }

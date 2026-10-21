@@ -1,25 +1,6 @@
 import { useState } from "react";
-import {
-  Alert,
-  AlertDescription,
-  AlertIcon,
-  Badge,
-  Box,
-  Button,
-  HStack,
-  IconButton,
-  Skeleton,
-  Stack,
-  Table,
-  TableContainer,
-  Tbody,
-  Td,
-  Text,
-  Th,
-  Thead,
-  Tooltip,
-  Tr,
-} from "@chakra-ui/react";
+import { Alert, Badge, Box, Button, HStack, IconButton, Skeleton, Stack, Table, Text } from "@chakra-ui/react";
+import { Tooltip } from "@/components/ui/tooltip";
 import { FiEdit2, FiEye, FiGlobe, FiPlus, FiShield, FiTrash2 } from "react-icons/fi";
 import { api, ApiError } from "../../services/api";
 import { useNotify } from "../../shared/hooks/useNotify";
@@ -73,7 +54,8 @@ export function RolesPage() {
   };
 
   const newButton = (
-    <Button leftIcon={<FiPlus />} colorScheme="blue" onClick={() => open(null)}>
+    <Button colorPalette="blue" onClick={() => open(null)}>
+      <FiPlus />
       New role
     </Button>
   );
@@ -87,13 +69,15 @@ export function RolesPage() {
       />
 
       {error && (
-        <Alert status="error" borderRadius="md" mb={4}>
-          <AlertIcon />
-          <AlertDescription flex="1">{error}</AlertDescription>
-          <Button size="sm" onClick={refetch}>
+        <Alert.Root status="error" borderRadius="md" mb={4} alignItems="center">
+          <Alert.Indicator />
+          <Alert.Content flex="1">
+            <Alert.Description>{error}</Alert.Description>
+          </Alert.Content>
+          <Button size="xs" variant="subtle" onClick={refetch}>
             Retry
           </Button>
-        </Alert>
+        </Alert.Root>
       )}
 
       {loading && !data ? (
@@ -103,70 +87,76 @@ export function RolesPage() {
           ))}
         </Stack>
       ) : data ? (
-        <Stack spacing={6}>
+        <Stack gap={6}>
           <Box bg="white" borderWidth="1px" borderRadius="lg" overflow="hidden">
-            <TableContainer whiteSpace="normal">
-              <Table size="sm">
-                <Thead>
-                  <Tr>
-                    <Th>Role</Th>
-                    <Th>Permissions</Th>
-                    <Th textAlign="right">Actions</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
+            <Table.ScrollArea whiteSpace="normal">
+              <Table.Root size="sm">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader>Role</Table.ColumnHeader>
+                    <Table.ColumnHeader>Permissions</Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="right">Actions</Table.ColumnHeader>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
                   {roles.map((r) => (
-                    <Tr key={r.name}>
-                      <Td maxW="280px">
-                        <HStack spacing={2}>
+                    <Table.Row key={r.name}>
+                      <Table.Cell maxW="280px">
+                        <HStack gap={2}>
                           <RoleBadge role={r.name} />
                           {r.builtin && (
-                            <Badge variant="outline" colorScheme="gray" fontSize="2xs">
+                            <Badge variant="outline" colorPalette="gray" fontSize="2xs">
                               built-in
                             </Badge>
                           )}
                         </HStack>
-                        <Text fontSize="xs" color="gray.500" mt={1} noOfLines={2} title={roleHelp(r)}>
+                        <Text fontSize="xs" color="gray.500" mt={1} lineClamp={2} title={roleHelp(r)}>
                           {roleHelp(r)}
                         </Text>
-                      </Td>
-                      <Td fontSize="xs" color="gray.700">
+                      </Table.Cell>
+                      <Table.Cell fontSize="xs" color="gray.700">
                         {r.name === "admin" ? (
                           <Text>Everything, plus the admin area</Text>
                         ) : (
-                          <Text noOfLines={2} title={permissionSummary(r.permissions)}>
+                          <Text lineClamp={2} title={permissionSummary(r.permissions)}>
                             {permissionSummary(r.permissions)}
                           </Text>
                         )}
-                      </Td>
-                      <Td>
-                        <HStack spacing={1} justify="flex-end">
+                      </Table.Cell>
+                      <Table.Cell>
+                        <HStack gap={1} justify="flex-end">
                           {r.builtin ? (
-                            <Tooltip label="View permissions" hasArrow>
-                              <IconButton aria-label={`View ${r.name}`} icon={<FiEye />} size="sm" variant="ghost" onClick={() => open(r)} />
+                            <Tooltip content="View permissions" showArrow>
+                              <IconButton aria-label={`View ${r.name}`} size="xs" variant="ghost" onClick={() => open(r)}>
+                                <FiEye />
+                              </IconButton>
                             </Tooltip>
                           ) : (
                             <>
-                              <Tooltip label="Edit" hasArrow>
-                                <IconButton aria-label={`Edit ${r.name}`} icon={<FiEdit2 />} size="sm" variant="ghost" onClick={() => open(r)} />
+                              <Tooltip content="Edit" showArrow>
+                                <IconButton aria-label={`Edit ${r.name}`} size="xs" variant="ghost" onClick={() => open(r)}>
+                                  <FiEdit2 />
+                                </IconButton>
                               </Tooltip>
                               <ConfirmButton
                                 title={`Delete the ${r.name} role?`}
                                 body="Only a role no user or API token has can be deleted. This cannot be undone."
                                 onConfirm={() => remove(r)}
                                 trigger={
-                                  <IconButton aria-label={`Delete ${r.name}`} icon={<FiTrash2 />} size="sm" variant="ghost" colorScheme="red" />
+                                  <IconButton aria-label={`Delete ${r.name}`} size="xs" variant="ghost" colorPalette="red">
+                                    <FiTrash2 />
+                                  </IconButton>
                                 }
                               />
                             </>
                           )}
                         </HStack>
-                      </Td>
-                    </Tr>
+                      </Table.Cell>
+                    </Table.Row>
                   ))}
-                </Tbody>
-              </Table>
-            </TableContainer>
+                </Table.Body>
+              </Table.Root>
+            </Table.ScrollArea>
           </Box>
           {custom.length === 0 && (
             <EmptyState icon={FiShield} title="No custom roles yet" action={newButton}>
@@ -200,15 +190,15 @@ function PublicAccess({ role, onEdit }: { role: Role; onEdit: () => void }) {
   const closed = readable === null;
   return (
     <Box bg="white" borderWidth="1px" borderRadius="lg" p={4} data-testid="public-role">
-      <HStack spacing={4} align="flex-start">
+      <HStack gap={4} align="flex-start">
         <Box color="orange.500" pt={1}>
           <FiGlobe />
         </Box>
         <Box flex="1" minW={0}>
-          <HStack spacing={2} flexWrap="wrap">
+          <HStack gap={2} flexWrap="wrap">
             <Text fontWeight="semibold">Public (anonymous visitors)</Text>
             <RoleBadge role={role.name} />
-            <Badge variant="outline" colorScheme={closed ? "gray" : "orange"} fontSize="2xs">
+            <Badge variant="outline" colorPalette={closed ? "gray" : "orange"} fontSize="2xs">
               {closed ? "closed" : "open to anyone"}
             </Badge>
           </HStack>
@@ -234,8 +224,10 @@ function PublicAccess({ role, onEdit }: { role: Role; onEdit: () => void }) {
             )}
           </Text>
         </Box>
-        <Tooltip label="Edit public access" hasArrow>
-          <IconButton aria-label={`Edit ${role.name}`} icon={<FiEdit2 />} size="sm" variant="ghost" onClick={onEdit} />
+        <Tooltip content="Edit public access" showArrow>
+          <IconButton aria-label={`Edit ${role.name}`} size="xs" variant="ghost" onClick={onEdit}>
+            <FiEdit2 />
+          </IconButton>
         </Tooltip>
       </HStack>
     </Box>

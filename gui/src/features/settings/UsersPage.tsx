@@ -1,25 +1,6 @@
 import { useState } from "react";
-import {
-  Alert,
-  AlertDescription,
-  AlertIcon,
-  Badge,
-  Box,
-  Button,
-  HStack,
-  IconButton,
-  Skeleton,
-  Stack,
-  Table,
-  TableContainer,
-  Tbody,
-  Td,
-  Text,
-  Th,
-  Thead,
-  Tooltip,
-  Tr,
-} from "@chakra-ui/react";
+import { Alert, Badge, Box, Button, HStack, IconButton, Skeleton, Stack, Table, Text } from "@chakra-ui/react";
+import { Tooltip } from "@/components/ui/tooltip";
 import { FiEdit2, FiPlus, FiTrash2, FiUsers } from "react-icons/fi";
 import { api } from "../../services/api";
 import { getJSON, useApiQuery } from "../../shared/hooks/useApiQuery";
@@ -60,7 +41,8 @@ export function UsersPage() {
   };
 
   const newButton = (
-    <Button leftIcon={<FiPlus />} colorScheme="blue" onClick={() => setEditing({ user: null })}>
+    <Button colorPalette="blue" onClick={() => setEditing({ user: null })}>
+      <FiPlus />
       New user
     </Button>
   );
@@ -74,13 +56,15 @@ export function UsersPage() {
       />
 
       {error && (
-        <Alert status="error" borderRadius="md" mb={4}>
-          <AlertIcon />
-          <AlertDescription flex="1">{error}</AlertDescription>
-          <Button size="sm" onClick={refetch}>
+        <Alert.Root status="error" borderRadius="md" mb={4} alignItems="center">
+          <Alert.Indicator />
+          <Alert.Content flex="1">
+            <Alert.Description>{error}</Alert.Description>
+          </Alert.Content>
+          <Button size="xs" variant="subtle" onClick={refetch}>
             Retry
           </Button>
-        </Alert>
+        </Alert.Root>
       )}
 
       {loading && !data ? (
@@ -95,47 +79,45 @@ export function UsersPage() {
         </EmptyState>
       ) : data ? (
         <Box bg="white" borderWidth="1px" borderRadius="lg" overflow="hidden">
-          <TableContainer>
-            <Table size="sm">
-              <Thead>
-                <Tr>
-                  <Th>Username</Th>
-                  <Th>Email</Th>
-                  <Th>Role</Th>
-                  <Th>Created</Th>
-                  <Th textAlign="right">Actions</Th>
-                </Tr>
-              </Thead>
-              <Tbody>
+          <Table.ScrollArea>
+            <Table.Root size="sm">
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader>Username</Table.ColumnHeader>
+                  <Table.ColumnHeader>Email</Table.ColumnHeader>
+                  <Table.ColumnHeader>Role</Table.ColumnHeader>
+                  <Table.ColumnHeader>Created</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="right">Actions</Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
                 {users.map((u) => {
                   const self = isSelf(u);
                   return (
-                    <Tr key={u.ID}>
-                      <Td fontWeight="medium">
-                        <HStack spacing={2}>
+                    <Table.Row key={u.ID}>
+                      <Table.Cell fontWeight="medium">
+                        <HStack gap={2}>
                           <Text>{u.username}</Text>
-                          {self && <Badge colorScheme="green">you</Badge>}
+                          {self && <Badge colorPalette="green">you</Badge>}
                         </HStack>
-                      </Td>
-                      <Td>{u.email}</Td>
-                      <Td>
+                      </Table.Cell>
+                      <Table.Cell>{u.email}</Table.Cell>
+                      <Table.Cell>
                         <RoleBadge role={userRoleName(u)} />
-                      </Td>
-                      <Td color="gray.600">{optTime(userCreatedAt(u))}</Td>
-                      <Td>
-                        <HStack spacing={1} justify="flex-end">
-                          <IconButton
-                            aria-label={`Edit ${u.username}`}
-                            icon={<FiEdit2 />}
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setEditing({ user: u })}
-                          />
+                      </Table.Cell>
+                      <Table.Cell color="gray.600">{optTime(userCreatedAt(u))}</Table.Cell>
+                      <Table.Cell>
+                        <HStack gap={1} justify="flex-end">
+                          <IconButton aria-label={`Edit ${u.username}`} size="xs" variant="ghost" onClick={() => setEditing({ user: u })}>
+                            <FiEdit2 />
+                          </IconButton>
                           {self ? (
-                            <Tooltip label={SELF_DELETE_REASON} hasArrow>
+                            <Tooltip content={SELF_DELETE_REASON} showArrow>
                               {/* A disabled button gets no hover events: the span shows the reason. */}
                               <span tabIndex={0} aria-label={SELF_DELETE_REASON}>
-                                <IconButton aria-label={`Delete ${u.username}`} icon={<FiTrash2 />} size="sm" variant="ghost" isDisabled />
+                                <IconButton aria-label={`Delete ${u.username}`} size="xs" variant="ghost" disabled>
+                                  <FiTrash2 />
+                                </IconButton>
                               </span>
                             </Tooltip>
                           ) : (
@@ -144,24 +126,20 @@ export function UsersPage() {
                               body={`${u.username} will no longer be able to sign in. Content they created stays. This cannot be undone.`}
                               onConfirm={() => remove(u)}
                               trigger={
-                                <IconButton
-                                  aria-label={`Delete ${u.username}`}
-                                  icon={<FiTrash2 />}
-                                  size="sm"
-                                  variant="ghost"
-                                  colorScheme="red"
-                                />
+                                <IconButton aria-label={`Delete ${u.username}`} size="xs" variant="ghost" colorPalette="red">
+                                  <FiTrash2 />
+                                </IconButton>
                               }
                             />
                           )}
                         </HStack>
-                      </Td>
-                    </Tr>
+                      </Table.Cell>
+                    </Table.Row>
                   );
                 })}
-              </Tbody>
-            </Table>
-          </TableContainer>
+              </Table.Body>
+            </Table.Root>
+          </Table.ScrollArea>
         </Box>
       ) : null}
 

@@ -1,27 +1,6 @@
 import { useState } from "react";
-import {
-  Alert,
-  AlertDescription,
-  AlertIcon,
-  Badge,
-  Box,
-  Button,
-  Code,
-  HStack,
-  IconButton,
-  Skeleton,
-  Stack,
-  Table,
-  TableContainer,
-  Tbody,
-  Td,
-  Text,
-  Th,
-  Thead,
-  Tooltip,
-  Tr,
-  Wrap,
-} from "@chakra-ui/react";
+import { Alert, Badge, Box, Button, Code, HStack, IconButton, Skeleton, Stack, Table, Text, Wrap } from "@chakra-ui/react";
+import { Tooltip } from "@/components/ui/tooltip";
 import { FiEdit2, FiList, FiPlus, FiSend, FiTrash2, FiZap } from "react-icons/fi";
 import { api } from "../../services/api";
 import { getJSON, useApiQuery } from "../../shared/hooks/useApiQuery";
@@ -52,12 +31,12 @@ function LastDelivery({ w }: { w: Webhook }) {
   });
   return (
     <Box>
-      <Badge colorScheme={failed ? "red" : "green"}>{w.lastStatus || "no response"}</Badge>
+      <Badge colorPalette={failed ? "red" : "green"}>{w.lastStatus || "no response"}</Badge>
       <Text color="gray.600" fontSize="xs" whiteSpace="nowrap">
         {optTime(w.lastDeliveryAt)}
       </Text>
       {w.lastError && (
-        <Text fontSize="xs" color="red.600" noOfLines={2} title={w.lastError} whiteSpace="normal">
+        <Text fontSize="xs" color="red.600" lineClamp={2} title={w.lastError} whiteSpace="normal">
           {w.lastError}
         </Text>
       )}
@@ -108,7 +87,8 @@ export function WebhooksPage() {
   };
 
   const newButton = (
-    <Button leftIcon={<FiPlus />} colorScheme="blue" onClick={() => openForm(null)}>
+    <Button colorPalette="blue" onClick={() => openForm(null)}>
+      <FiPlus />
       New webhook
     </Button>
   );
@@ -122,13 +102,15 @@ export function WebhooksPage() {
       />
 
       {error && (
-        <Alert status="error" borderRadius="md" mb={4}>
-          <AlertIcon />
-          <AlertDescription flex="1">{error}</AlertDescription>
-          <Button size="sm" onClick={refetch}>
+        <Alert.Root status="error" borderRadius="md" mb={4} alignItems="center">
+          <Alert.Indicator />
+          <Alert.Content flex="1">
+            <Alert.Description>{error}</Alert.Description>
+          </Alert.Content>
+          <Button size="xs" variant="subtle" onClick={refetch}>
             Retry
           </Button>
-        </Alert>
+        </Alert.Root>
       )}
 
       {loading && !data ? (
@@ -143,32 +125,32 @@ export function WebhooksPage() {
         </EmptyState>
       ) : data ? (
         <Box bg="white" borderWidth="1px" borderRadius="lg" overflow="hidden">
-          <TableContainer whiteSpace="normal">
-            <Table size="sm">
-              <Thead>
-                <Tr>
-                  <Th>Webhook</Th>
-                  <Th>Events</Th>
-                  <Th>Collections</Th>
-                  <Th>Last delivery</Th>
-                  <Th textAlign="right">Actions</Th>
-                </Tr>
-              </Thead>
-              <Tbody>
+          <Table.ScrollArea whiteSpace="normal">
+            <Table.Root size="sm">
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader>Webhook</Table.ColumnHeader>
+                  <Table.ColumnHeader>Events</Table.ColumnHeader>
+                  <Table.ColumnHeader>Collections</Table.ColumnHeader>
+                  <Table.ColumnHeader>Last delivery</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="right">Actions</Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
                 {hooks.map((w) => (
-                  <Tr key={w.id}>
-                    <Td maxW="300px">
-                      <Text fontWeight="medium" noOfLines={1} title={w.name}>
+                  <Table.Row key={w.id}>
+                    <Table.Cell maxW="300px">
+                      <Text fontWeight="medium" lineClamp={1} title={w.name}>
                         {w.name}
                       </Text>
-                      <Text fontSize="xs" color="gray.500" wordBreak="break-all" noOfLines={1} title={w.url}>
+                      <Text fontSize="xs" color="gray.500" wordBreak="break-all" lineClamp={1} title={w.url}>
                         {w.url}
                       </Text>
-                      <Wrap spacing={1} mt={1}>
+                      <Wrap gap={1} mt={1}>
                         <Badge variant="outline">{w.format}</Badge>
-                        {!w.enabled && <Badge colorScheme="orange">disabled</Badge>}
+                        {!w.enabled && <Badge colorPalette="orange">disabled</Badge>}
                         {w.signed && (
-                          <Badge colorScheme="purple" title="Deliveries carry an X-Gohead-Signature">
+                          <Badge colorPalette="purple" title="Deliveries carry an X-Gohead-Signature">
                             signed
                           </Badge>
                         )}
@@ -179,57 +161,52 @@ export function WebhooksPage() {
                           </Badge>
                         )}
                       </Wrap>
-                    </Td>
-                    <Td fontSize="xs">{listOrAll(w.events, "All events")}</Td>
-                    <Td fontSize="xs">{listOrAll(w.collections, "All collections")}</Td>
-                    <Td>
+                    </Table.Cell>
+                    <Table.Cell fontSize="xs">{listOrAll(w.events, "All events")}</Table.Cell>
+                    <Table.Cell fontSize="xs">{listOrAll(w.collections, "All collections")}</Table.Cell>
+                    <Table.Cell>
                       <LastDelivery w={w} />
-                    </Td>
-                    <Td>
-                      <HStack spacing={0} justify="flex-end">
-                        <Tooltip label="Send test" hasArrow>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <HStack gap={0} justify="flex-end">
+                        <Tooltip content="Send test" showArrow>
                           <IconButton
                             aria-label={`Send test to ${w.name}`}
-                            icon={<FiSend />}
-                            size="sm"
+                            size="xs"
                             variant="ghost"
-                            isLoading={testing === w.id}
+                            loading={testing === w.id}
                             onClick={() => sendTest(w)}
-                          />
+                          >
+                            <FiSend />
+                          </IconButton>
                         </Tooltip>
-                        <Tooltip label="Deliveries" hasArrow>
-                          <IconButton
-                            aria-label={`Deliveries of ${w.name}`}
-                            icon={<FiList />}
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setDeliveriesOf(w)}
-                          />
+                        <Tooltip content="Deliveries" showArrow>
+                          <IconButton aria-label={`Deliveries of ${w.name}`} size="xs" variant="ghost" onClick={() => setDeliveriesOf(w)}>
+                            <FiList />
+                          </IconButton>
                         </Tooltip>
-                        <Tooltip label="Edit" hasArrow>
-                          <IconButton
-                            aria-label={`Edit ${w.name}`}
-                            icon={<FiEdit2 />}
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => openForm(w)}
-                          />
+                        <Tooltip content="Edit" showArrow>
+                          <IconButton aria-label={`Edit ${w.name}`} size="xs" variant="ghost" onClick={() => openForm(w)}>
+                            <FiEdit2 />
+                          </IconButton>
                         </Tooltip>
                         <ConfirmButton
                           title={`Delete ${w.name}?`}
                           body="Events stop being sent to this URL and its delivery log is deleted. This cannot be undone."
                           onConfirm={() => remove(w)}
                           trigger={
-                            <IconButton aria-label={`Delete ${w.name}`} icon={<FiTrash2 />} size="sm" variant="ghost" colorScheme="red" />
+                            <IconButton aria-label={`Delete ${w.name}`} size="xs" variant="ghost" colorPalette="red">
+                              <FiTrash2 />
+                            </IconButton>
                           }
                         />
                       </HStack>
-                    </Td>
-                  </Tr>
+                    </Table.Cell>
+                  </Table.Row>
                 ))}
-              </Tbody>
-            </Table>
-          </TableContainer>
+              </Table.Body>
+            </Table.Root>
+          </Table.ScrollArea>
         </Box>
       ) : null}
 

@@ -1,4 +1,4 @@
-import { FormControl, FormHelperText, FormLabel, Select } from "@chakra-ui/react";
+import { Field, NativeSelect } from "@chakra-ui/react";
 import { BUILTIN_ROLE_HELP, isPublicRole, roleHelp, useRoles } from "./roles";
 
 /**
@@ -24,23 +24,22 @@ export function RoleSelect({
   const options = value && !names.includes(value) ? [...names, value] : names;
   const custom = new Set(roles.filter((r) => !r.builtin).map((r) => r.name));
   const current = roles.find((r) => r.name === value);
-  const help = error
-    ? `Custom roles could not be loaded (${error}).`
-    : current
-      ? roleHelp(current)
-      : (BUILTIN_ROLE_HELP[value] ?? "");
+  const help = error ? `Custom roles could not be loaded (${error}).` : current ? roleHelp(current) : (BUILTIN_ROLE_HELP[value] ?? "");
 
   return (
-    <FormControl isDisabled={isDisabled}>
-      <FormLabel>Role</FormLabel>
-      <Select value={value} onChange={(e) => onChange(e.target.value)}>
-        {options.map((r) => (
-          <option key={r} value={r}>
-            {custom.has(r) ? `${r} (custom)` : r}
-          </option>
-        ))}
-      </Select>
-      <FormHelperText>{isDisabled && disabledReason ? disabledReason : help}</FormHelperText>
-    </FormControl>
+    <Field.Root disabled={isDisabled}>
+      <Field.Label>Role</Field.Label>
+      <NativeSelect.Root>
+        <NativeSelect.Field value={value} onChange={(e) => onChange(e.target.value)}>
+          {options.map((r) => (
+            <option key={r} value={r}>
+              {custom.has(r) ? `${r} (custom)` : r}
+            </option>
+          ))}
+        </NativeSelect.Field>
+        <NativeSelect.Indicator />
+      </NativeSelect.Root>
+      <Field.HelperText>{isDisabled && disabledReason ? disabledReason : help}</Field.HelperText>
+    </Field.Root>
   );
 }
