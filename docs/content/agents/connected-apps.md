@@ -110,7 +110,7 @@ read are called, so the run sees real data.
   `connections.allow_private_networks` is on, and never cloud metadata addresses. Redirects
   are not followed.
 - Only admins manage connections and review calls, and only from a signed-in session.
-  [API tokens](../guides/api-tokens.md), even with the admin role, cannot manage
+  [API tokens](../guides/integrations.md#api-tokens), even with the admin role, cannot manage
   connections, see or approve calls, or save an agent whose app tool has
   `"approval": false`; they can still give agents app tools that wait for approval.
 
