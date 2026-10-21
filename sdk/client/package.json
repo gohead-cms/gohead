@@ -15,7 +15,7 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "bin": { "gohead-client": "./dist/cli/main.js" },
+  "bin": { "gohead-client": "dist/cli/main.js" },
   "files": ["dist", "README.md"],
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json && chmod +x dist/cli/main.js",
