@@ -76,3 +76,6 @@ sdk/create/templates/
 # Admin UI embedded in the binary (built by `make ui`)
 internal/webui/static/*
 !internal/webui/static/.keep
+
+# Playwright, when run from the repository root
+/test-results/
