@@ -68,6 +68,12 @@ migrations are explicit, reviewed steps; contributors add them in `pkg/migration
 
 ## Version notes
 
+### 0.6.3
+
+No migration and nothing to change. Agents on Anthropic call their functions again: on
+0.6.2 and earlier, a run often ended after Claude's first sentence. GoHead can also be
+deployed to [Render](render.md) in one click.
+
 ### 0.6.2
 
 No migration and nothing to change. The admin UI moves to Chakra UI v3, with the same
