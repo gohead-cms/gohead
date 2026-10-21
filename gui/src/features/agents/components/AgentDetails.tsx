@@ -11,13 +11,8 @@ import {
   Badge,
   Link,
   List,
-  ListItem,
   VStack,
   Tabs,
-  TabList,
-  Tab,
-  TabPanels,
-  TabPanel,
   Wrap,
 } from "@chakra-ui/react";
 import { FiEdit2, FiTrash2 } from "react-icons/fi";
@@ -56,14 +51,14 @@ const limitLabels: [keyof AgentLimits, string][] = [
 
 export function AgentDetails({ agent, onDelete, initialRun }: AgentDetailsProps) {
   const { name, schema } = agent;
-  const [tab, setTab] = useState(initialRun ? 1 : 0);
+  const [tab, setTab] = useState(initialRun ? "runs" : "overview");
   // The run to open, until the user moves on (the Runs tab remounts lazily).
   const [startRun, setStartRun] = useState(initialRun);
   // Bumped after "Run now" so the Runs tab reloads.
   const [runsVersion, setRunsVersion] = useState(0);
   /** After "Run now" or "Test run": the Runs tab, reloaded, with the new run open (it updates until it ends). */
   const follow = (runId?: number) => {
-    setTab(1);
+    setTab("runs");
     setStartRun(runId);
     setRunsVersion((v) => v + 1);
   };
@@ -76,21 +71,25 @@ export function AgentDetails({ agent, onDelete, initialRun }: AgentDetailsProps)
   const priced = (llmConfig.input_cost_per_million ?? 0) > 0 || (llmConfig.output_cost_per_million ?? 0) > 0;
 
   return (
-    <VStack spacing={4} align="stretch">
+    <VStack gap={4} align="stretch">
       <Flex justify="space-between" align="center" gap={3} wrap="wrap">
-        <Heading size="lg" wordBreak="break-word">
+        <Heading size="2xl" fontWeight="bold" wordBreak="break-word">
           {name}
         </Heading>
         {onDelete && (
-          <HStack spacing={2}>
+          <HStack gap={2}>
             <RunNowButton agentName={name} onQueued={follow} />
             <TestRunButton agent={agent} onQueued={follow} />
-            <Button as={RouterLink} to={`/agents/${encodeURIComponent(name)}/edit`} size="sm" leftIcon={<FiEdit2 />}>
-              Edit
+            <Button asChild size="xs" variant="subtle">
+              <RouterLink to={`/agents/${encodeURIComponent(name)}/edit`}>
+                <FiEdit2 />
+                Edit
+              </RouterLink>
             </Button>
             <ConfirmButton
               trigger={
-                <Button size="sm" variant="outline" colorScheme="red" leftIcon={<FiTrash2 />}>
+                <Button size="xs" variant="outline" colorPalette="red">
+                  <FiTrash2 />
                   Delete
                 </Button>
               }
@@ -101,139 +100,141 @@ export function AgentDetails({ agent, onDelete, initialRun }: AgentDetailsProps)
           </HStack>
         )}
       </Flex>
-      <Tabs
-        isLazy
-        colorScheme="teal"
-        index={tab}
-        onChange={(i) => {
-          setTab(i);
+      <Tabs.Root
+        lazyMount
+        unmountOnExit
+        colorPalette="teal"
+        value={tab}
+        onValueChange={(e) => {
+          // v3 also calls this when `follow` sets the tab: only a tab the user
+          // picks drops the run to open.
+          if (e.value === tab) return;
+          setTab(e.value);
           setStartRun(undefined);
         }}
       >
-        <TabList>
-          <Tab>Overview</Tab>
-          <Tab>Runs</Tab>
-        </TabList>
-        <TabPanels>
-          <TabPanel px={0}>
-            <VStack spacing={6} align="stretch">
-              {schema.systemPrompt && (
-                <Box>
-                  <Label>System prompt</Label>
-                  <Text fontSize="sm" whiteSpace="pre-wrap" bg="white" borderWidth="1px" borderRadius="md" p={3} maxH="200px" overflowY="auto">
-                    {schema.systemPrompt}
-                  </Text>
-                  {schema.maxTurns ? (
-                    <Text fontSize="sm" color="gray.500" mt={1}>
-                      Up to {schema.maxTurns} turns per run
-                    </Text>
-                  ) : null}
-                </Box>
-              )}
+        <Tabs.List>
+          <Tabs.Trigger value="overview">Overview</Tabs.Trigger>
+          <Tabs.Trigger value="runs">Runs</Tabs.Trigger>
+        </Tabs.List>
+        <Tabs.Content value="overview" px={0} py={4}>
+          <VStack gap={6} align="stretch">
+            {schema.systemPrompt && (
               <Box>
-                <Label>LLM Config</Label>
-                <Text>
-                  Provider: <Badge colorScheme="teal">{llmConfig.provider}</Badge>
+                <Label>System prompt</Label>
+                <Text fontSize="sm" whiteSpace="pre-wrap" bg="white" borderWidth="1px" borderRadius="md" p={3} maxH="200px" overflowY="auto">
+                  {schema.systemPrompt}
                 </Text>
-                <Text>
-                  Model: <Badge colorScheme="cyan">{llmConfig.model || "default"}</Badge>
-                </Text>
-                {priced && (
+                {schema.maxTurns ? (
                   <Text fontSize="sm" color="gray.500" mt={1}>
-                    ${llmConfig.input_cost_per_million ?? 0} / ${llmConfig.output_cost_per_million ?? 0} per
-                    million input / output tokens
+                    Up to {schema.maxTurns} turns per run
                   </Text>
-                )}
+                ) : null}
               </Box>
-              <Box>
-                <Label>Trigger</Label>
-                <Text>
-                  Type: <Badge colorScheme="purple">{trigger.type}</Badge>
+            )}
+            <Box>
+              <Label>LLM Config</Label>
+              <Text>
+                Provider: <Badge colorPalette="teal">{llmConfig.provider}</Badge>
+              </Text>
+              <Text>
+                Model: <Badge colorPalette="cyan">{llmConfig.model || "default"}</Badge>
+              </Text>
+              {priced && (
+                <Text fontSize="sm" color="gray.500" mt={1}>
+                  ${llmConfig.input_cost_per_million ?? 0} / ${llmConfig.output_cost_per_million ?? 0} per
+                  million input / output tokens
                 </Text>
-                {trigger.type === "collection_event" && trigger.event_trigger && (
-                  <Text>
-                    On: '{trigger.event_trigger.collection}' [{events.join(", ")}]
-                  </Text>
-                )}
-                {trigger.type === "cron" && trigger.cron && (
-                  <Text>
-                    Schedule: <Code>{trigger.cron}</Code> (UTC)
-                  </Text>
-                )}
-                {webhookUrl && (
-                  <HStack mt={1} spacing={2} flexWrap="wrap">
-                    <Code fontSize="sm" wordBreak="break-all">
-                      POST {webhookUrl}
-                    </Code>
-                    <CopyButton value={webhookUrl} label="Copy URL" />
-                  </HStack>
-                )}
-              </Box>
-              {requireApproval && (
-                <Box>
-                  <Label>Review</Label>
-                  <Text fontSize="sm">
-                    <Badge colorScheme="yellow" mr={2}>
-                      Requires approval
-                    </Badge>
-                    Content changes wait on the{" "}
-                    <Link as={RouterLink} to={approvalsLink({ agent: name })} color="purple.600">
-                      Approvals
-                    </Link>{" "}
-                    page for an editor.
-                  </Text>
-                </Box>
               )}
+            </Box>
+            <Box>
+              <Label>Trigger</Label>
+              <Text>
+                Type: <Badge colorPalette="purple">{trigger.type}</Badge>
+              </Text>
+              {trigger.type === "collection_event" && trigger.event_trigger && (
+                <Text>
+                  On: '{trigger.event_trigger.collection}' [{events.join(", ")}]
+                </Text>
+              )}
+              {trigger.type === "cron" && trigger.cron && (
+                <Text>
+                  Schedule: <Code>{trigger.cron}</Code> (UTC)
+                </Text>
+              )}
+              {webhookUrl && (
+                <HStack mt={1} gap={2} flexWrap="wrap">
+                  <Code fontSize="sm" wordBreak="break-all">
+                    POST {webhookUrl}
+                  </Code>
+                  <CopyButton value={webhookUrl} label="Copy URL" />
+                </HStack>
+              )}
+            </Box>
+            {requireApproval && (
               <Box>
-                <Label>Limits</Label>
-                {setLimits.length > 0 ? (
-                  <Wrap>
-                    {setLimits.map(([k, label]) => (
-                      <Badge key={k} colorScheme="orange" variant="subtle">
-                        {limits?.[k]} {label}
-                      </Badge>
-                    ))}
-                  </Wrap>
-                ) : (
-                  <Text fontSize="sm" color="gray.500">
-                    No limits: this agent can run and spend without bound.
-                  </Text>
-                )}
+                <Label>Review</Label>
+                <Text fontSize="sm">
+                  <Badge colorPalette="yellow" mr={2}>
+                    Requires approval
+                  </Badge>
+                  Content changes wait on the{" "}
+                  <Link asChild color="purple.600">
+                    <RouterLink to={approvalsLink({ agent: name })}>Approvals</RouterLink>
+                  </Link>{" "}
+                  page for an editor.
+                </Text>
               </Box>
-              <Box>
-                <Label>Functions ({functions.length})</Label>
-                {functions.length === 0 && (
-                  <Text fontSize="sm" color="gray.500">
-                    No functions: this agent can only answer with text.
-                  </Text>
-                )}
-                <List spacing={2} mt={2}>
-                  {functions.map((func) => (
-                    <ListItem key={func.name} fontSize="sm">
-                      <Badge colorScheme="gray" mr={2}>
-                        {func.name}
-                      </Badge>
-                      {func.description}
-                      {func.collections && func.collections.length > 0 ? (
-                        <Text as="span" ml={2} color="gray.500">
-                          (only {func.collections.join(", ")})
-                        </Text>
-                      ) : func.impl_key?.startsWith("collections.") ? (
-                        <Text as="span" ml={2} color="orange.500">
-                          (all collections)
-                        </Text>
-                      ) : null}
-                    </ListItem>
+            )}
+            <Box>
+              <Label>Limits</Label>
+              {setLimits.length > 0 ? (
+                <Wrap>
+                  {setLimits.map(([k, label]) => (
+                    <Badge key={k} colorPalette="orange" variant="subtle">
+                      {limits?.[k]} {label}
+                    </Badge>
                   ))}
-                </List>
-              </Box>
-            </VStack>
-          </TabPanel>
-          <TabPanel px={0}>
-            <RunsPanel key={runsVersion} agentName={name} initialRun={startRun} />
-          </TabPanel>
-        </TabPanels>
-      </Tabs>
+                </Wrap>
+              ) : (
+                <Text fontSize="sm" color="gray.500">
+                  No limits: this agent can run and spend without bound.
+                </Text>
+              )}
+            </Box>
+            <Box>
+              <Label>Functions ({functions.length})</Label>
+              {functions.length === 0 && (
+                <Text fontSize="sm" color="gray.500">
+                  No functions: this agent can only answer with text.
+                </Text>
+              )}
+              <List.Root gap={2} mt={2} listStyleType="none">
+                {functions.map((func) => (
+                  <List.Item key={func.name} fontSize="sm">
+                    <Badge colorPalette="gray" mr={2}>
+                      {func.name}
+                    </Badge>
+                    {func.description}
+                    {func.collections && func.collections.length > 0 ? (
+                      <Text as="span" ml={2} color="gray.500">
+                        (only {func.collections.join(", ")})
+                      </Text>
+                    ) : func.impl_key?.startsWith("collections.") ? (
+                      <Text as="span" ml={2} color="orange.500">
+                        (all collections)
+                      </Text>
+                    ) : null}
+                  </List.Item>
+                ))}
+              </List.Root>
+            </Box>
+          </VStack>
+        </Tabs.Content>
+        <Tabs.Content value="runs" px={0} py={4}>
+          <RunsPanel key={runsVersion} agentName={name} initialRun={startRun} />
+        </Tabs.Content>
+      </Tabs.Root>
     </VStack>
   );
 }

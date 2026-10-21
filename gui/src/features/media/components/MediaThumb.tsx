@@ -22,14 +22,13 @@ export function MediaThumb({ item, height }: { item: MediaItem; height: string |
           h="100%"
           objectFit="cover"
           loading="lazy"
-          fallback={<Center h="100%"><Icon as={FiFile} boxSize={8} color="gray.400" /></Center>}
         />
       </Box>
     );
   }
   return (
     <Center h={height} bg="gray.50">
-      <VStack spacing={1}>
+      <VStack gap={1}>
         <Icon as={iconFor(item.mime)} boxSize={8} color="gray.400" />
         <Text fontSize="xs" fontWeight="bold" color="gray.500" letterSpacing="wide">
           {extension(item.name, item.mime)}

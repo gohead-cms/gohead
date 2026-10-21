@@ -1,27 +1,7 @@
 import { useState } from "react";
-import {
-  Alert,
-  AlertIcon,
-  Button,
-  Flex,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalHeader,
-  ModalOverlay,
-  Spinner,
-  Table,
-  TableContainer,
-  Tbody,
-  Td,
-  Text,
-  Th,
-  Thead,
-  Tooltip,
-  Tr,
-  useDisclosure,
-} from "@chakra-ui/react";
+import { Alert, Button, Flex, Spinner, Table, Text, useDisclosure } from "@chakra-ui/react";
+import { DialogBody, DialogCloseTrigger, DialogContent, DialogHeader, DialogRoot, DialogTitle } from "@/components/ui/dialog";
+import { Tooltip } from "@/components/ui/tooltip";
 import { FiRotateCcw, FiTrash } from "react-icons/fi";
 import { useNotify } from "../../shared/hooks/useNotify";
 import { formatShortTime, formatTime } from "../agents/components/runFormat";
@@ -45,20 +25,29 @@ export function RecentlyDeletedButton({
   drafts: boolean;
   onRestored: () => void;
 }) {
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { open, onOpen, onClose } = useDisclosure();
   return (
     <>
-      <Button bg="white" variant="outline" size="sm" leftIcon={<FiTrash />} onClick={onOpen}>
+      <Button bg="white" variant="outline" size="xs" onClick={onOpen}>
+        <FiTrash />
         Recently deleted
       </Button>
-      <Modal isOpen={isOpen} onClose={onClose} size="3xl" scrollBehavior="inside">
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Recently deleted</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody pb={6}>{isOpen && <DeletedList collection={collection} drafts={drafts} onRestored={onRestored} />}</ModalBody>
-        </ModalContent>
-      </Modal>
+      <DialogRoot
+        open={open}
+        onOpenChange={(e) => {
+          if (!e.open) onClose();
+        }}
+        size="xl"
+        scrollBehavior="inside"
+      >
+        <DialogContent maxW="3xl">
+          <DialogHeader>
+            <DialogTitle>Recently deleted</DialogTitle>
+          </DialogHeader>
+          <DialogBody pb={6}>{open && <DeletedList collection={collection} drafts={drafts} onRestored={onRestored} />}</DialogBody>
+          <DialogCloseTrigger />
+        </DialogContent>
+      </DialogRoot>
     </>
   );
 }
@@ -88,10 +77,12 @@ function DeletedList({ collection, drafts, onRestored }: { collection: string; d
 
   if (error) {
     return (
-      <Alert status="error" borderRadius="md">
-        <AlertIcon />
-        {error}
-      </Alert>
+      <Alert.Root role="alert" status="error" borderRadius="md">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Description>{error}</Alert.Description>
+        </Alert.Content>
+      </Alert.Root>
     );
   }
   if (loading && entries.length === 0) {
@@ -114,47 +105,47 @@ function DeletedList({ collection, drafts, onRestored }: { collection: string; d
       <Text fontSize="sm" color="gray.500" mb={3}>
         Restoring brings an entry back with the content and publication state it had when it was deleted.
       </Text>
-      <TableContainer borderWidth="1px" borderRadius="md">
-        <Table size="sm" sx={{ "th, td": { px: 3 } }}>
-          <Thead>
-            <Tr>
-              <Th>Entry</Th>
-              <Th>Deleted by</Th>
-              <Th>When</Th>
-              <Th isNumeric />
-            </Tr>
-          </Thead>
-          <Tbody>
+      <Table.ScrollArea whiteSpace="nowrap" borderWidth="1px" borderRadius="md">
+        <Table.Root size="sm" css={{ "& th, & td": { px: 3 } }}>
+          <Table.Header>
+            <Table.Row>
+              <Table.ColumnHeader>Entry</Table.ColumnHeader>
+              <Table.ColumnHeader>Deleted by</Table.ColumnHeader>
+              <Table.ColumnHeader>When</Table.ColumnHeader>
+              <Table.ColumnHeader textAlign="end" />
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
             {entries.map((e) => (
-              <Tr key={e.revision.entityId}>
-                <Td maxW="240px">
-                  <Text fontWeight="medium" noOfLines={1} title={e.title}>
+              <Table.Row key={e.revision.entityId}>
+                <Table.Cell maxW="240px">
+                  <Text fontWeight="medium" lineClamp={1} title={e.title}>
                     {e.title ?? "Untitled"}
                   </Text>
                   <Text fontSize="xs" color="gray.500">
                     #{e.revision.entityId}
                   </Text>
-                </Td>
-                <Td>
+                </Table.Cell>
+                <Table.Cell>
                   <ActorTag revision={e.revision} />
-                </Td>
-                <Td whiteSpace="nowrap" title={formatTime(e.revision.createdAt)}>
+                </Table.Cell>
+                <Table.Cell whiteSpace="nowrap" title={formatTime(e.revision.createdAt)}>
                   {formatShortTime(e.revision.createdAt)}
-                </Td>
-                <Td isNumeric>
+                </Table.Cell>
+                <Table.Cell textAlign="end">
                   <RestoreButton
                     // The delete revision is the latest: restoring brings the entry back.
                     blocked={restoreBlockReason(e.revision, e.revision, rights, drafts)}
-                    isLoading={restoring === e.revision.entityId}
-                    isDisabled={restoring !== null && restoring !== e.revision.entityId}
+                    loading={restoring === e.revision.entityId}
+                    disabled={restoring !== null && restoring !== e.revision.entityId}
                     onClick={() => restore(e)}
                   />
-                </Td>
-              </Tr>
+                </Table.Cell>
+              </Table.Row>
             ))}
-          </Tbody>
-        </Table>
-      </TableContainer>
+          </Table.Body>
+        </Table.Root>
+      </Table.ScrollArea>
       <ScanNote />
     </>
   );
@@ -162,31 +153,31 @@ function DeletedList({ collection, drafts, onRestored }: { collection: string; d
 
 function RestoreButton({
   blocked,
-  isLoading,
-  isDisabled,
+  loading,
+  disabled,
   onClick,
 }: {
   blocked: string | null;
-  isLoading: boolean;
-  isDisabled: boolean;
+  loading: boolean;
+  disabled: boolean;
   onClick: () => void;
 }) {
   const button = (
     <Button
-      size="xs"
-      colorScheme="purple"
+      size="2xs"
+      colorPalette="purple"
       variant="outline"
-      leftIcon={<FiRotateCcw />}
-      isLoading={isLoading}
-      isDisabled={isDisabled || !!blocked}
+      loading={loading}
+      disabled={disabled || !!blocked}
       onClick={onClick}
     >
+      <FiRotateCcw />
       Restore
     </Button>
   );
   if (!blocked) return button;
   return (
-    <Tooltip label={blocked} hasArrow>
+    <Tooltip content={blocked} showArrow>
       {/* A disabled button gets no hover events: the span shows the reason. */}
       <span tabIndex={0} aria-label={blocked}>
         {button}

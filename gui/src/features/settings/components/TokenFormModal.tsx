@@ -1,26 +1,7 @@
 import { type FormEvent, useState } from "react";
-import {
-  Alert,
-  AlertDescription,
-  AlertIcon,
-  Button,
-  FormControl,
-  FormErrorMessage,
-  FormHelperText,
-  FormLabel,
-  Input,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
-  NumberInput,
-  NumberInputField,
-  Select,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Button, Input, NativeSelect, NumberInput, VStack } from "@chakra-ui/react";
+import { DialogBody, DialogCloseTrigger, DialogContent, DialogFooter, DialogHeader, DialogRoot, DialogTitle } from "@/components/ui/dialog";
+import { Field } from "@/components/ui/field";
 import { api } from "../../../services/api";
 import { errorMessage } from "../../../shared/utils/errors";
 import { RoleSelect } from "./RoleSelect";
@@ -84,62 +65,67 @@ export function TokenFormModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} closeOnOverlayClick={!saving}>
-      <ModalOverlay />
-      <ModalContent>
+    <DialogRoot
+      open={isOpen}
+      onOpenChange={(e) => {
+        if (!e.open) onClose();
+      }}
+      closeOnInteractOutside={!saving}
+    >
+      <DialogContent>
         <form onSubmit={submit} noValidate>
-          <ModalHeader>New API token</ModalHeader>
-          <ModalCloseButton isDisabled={saving} />
-          <ModalBody>
-            <VStack spacing={4} align="stretch">
+          <DialogHeader>
+            <DialogTitle>New API token</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <VStack gap={4} align="stretch">
               {serverError && (
-                <Alert status="error" borderRadius="md">
-                  <AlertIcon />
-                  <AlertDescription>{serverError}</AlertDescription>
-                </Alert>
+                <Alert.Root role="alert" status="error" borderRadius="md">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Description>{serverError}</Alert.Description>
+                  </Alert.Content>
+                </Alert.Root>
               )}
-              <FormControl isRequired isInvalid={submitted && !!nameError}>
-                <FormLabel>Name</FormLabel>
+              <Field label="Name" required invalid={submitted && !!nameError} errorText={nameError}>
                 <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="website, ci-deploy…" autoFocus />
-                <FormErrorMessage>{nameError}</FormErrorMessage>
-              </FormControl>
-              <FormControl>
-                <FormLabel>Description</FormLabel>
+              </Field>
+              <Field label="Description">
                 <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What uses it, who to ask" />
-              </FormControl>
+              </Field>
               <RoleSelect value={role} onChange={setRole} />
-              <FormControl>
-                <FormLabel>Expires</FormLabel>
-                <Select value={expiry} onChange={(e) => setExpiry(e.target.value)}>
-                  {EXPIRY_PRESETS.map((p) => (
-                    <option key={p.value} value={p.value}>
-                      {p.label}
-                    </option>
-                  ))}
-                </Select>
-                <FormHelperText>Short-lived tokens limit the damage if one leaks.</FormHelperText>
-              </FormControl>
+              <Field label="Expires" helperText="Short-lived tokens limit the damage if one leaks.">
+                <NativeSelect.Root>
+                  <NativeSelect.Field value={expiry} onChange={(e) => setExpiry(e.target.value)}>
+                    {EXPIRY_PRESETS.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
+              </Field>
               {expiry === "custom" && (
-                <FormControl isRequired isInvalid={submitted && !!daysError}>
-                  <FormLabel>Days until expiry</FormLabel>
-                  <NumberInput min={1} max={MAX_DAYS} value={customDays} onChange={(v) => setCustomDays(v)}>
-                    <NumberInputField />
-                  </NumberInput>
-                  <FormErrorMessage>{daysError}</FormErrorMessage>
-                </FormControl>
+                <Field label="Days until expiry" required invalid={submitted && !!daysError} errorText={daysError}>
+                  <NumberInput.Root min={1} max={MAX_DAYS} value={customDays} onValueChange={(e) => setCustomDays(e.value)} w="full">
+                    <NumberInput.Input />
+                  </NumberInput.Root>
+                </Field>
               )}
             </VStack>
-          </ModalBody>
-          <ModalFooter gap={3}>
-            <Button onClick={onClose} isDisabled={saving}>
+          </DialogBody>
+          <DialogFooter gap={3}>
+            <Button variant="subtle" onClick={onClose} disabled={saving}>
               Cancel
             </Button>
-            <Button type="submit" colorScheme="blue" isLoading={saving}>
+            <Button type="submit" colorPalette="blue" loading={saving}>
               Create token
             </Button>
-          </ModalFooter>
+          </DialogFooter>
         </form>
-      </ModalContent>
-    </Modal>
+        <DialogCloseTrigger disabled={saving} />
+      </DialogContent>
+    </DialogRoot>
   );
 }

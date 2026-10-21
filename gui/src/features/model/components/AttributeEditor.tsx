@@ -1,18 +1,6 @@
-import {
-  Box,
-  Checkbox,
-  Flex,
-  FormControl,
-  FormErrorMessage,
-  FormLabel,
-  HStack,
-  Icon,
-  IconButton,
-  Input,
-  Select,
-  Text,
-  Tooltip,
-} from "@chakra-ui/react";
+import { Box, Field, Flex, HStack, Icon, IconButton, Input, NativeSelect, Text } from "@chakra-ui/react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip } from "@/components/ui/tooltip";
 import { FiArrowDown, FiArrowUp, FiGlobe, FiTrash2 } from "react-icons/fi";
 import type { AttributeField, AttributeForm } from "../schema";
 import { supportsLocalized, supportsUnique, TYPE_HINTS, typeLabel } from "../schema";
@@ -43,50 +31,51 @@ export function AttributeEditor({ attr, index, count, types, errors, collections
   return (
     <Box role="group" aria-label={`Attribute ${index + 1}`} borderWidth="1px" borderRadius="md" p={4} bg="gray.50">
       <Flex gap={3} align="start" wrap={{ base: "wrap", lg: "nowrap" }}>
-        <FormControl isInvalid={!!errors.name} isRequired flex="2" minW="180px">
-          <FormLabel fontSize="sm">Attribute name</FormLabel>
-          <Input size="sm" bg="white" value={attr.name} onChange={(e) => onChange({ name: e.target.value })} placeholder="title" />
-          <FormErrorMessage>{errors.name}</FormErrorMessage>
-        </FormControl>
-        <FormControl isRequired flex="2" minW="180px">
-          <FormLabel fontSize="sm">Type</FormLabel>
-          <Select size="sm" bg="white" value={attr.type} onChange={(e) => onChange({ type: e.target.value })}>
-            {typeOptions.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </Select>
-        </FormControl>
-        <HStack spacing={4} pt={{ base: 0, lg: 8 }} flexShrink={0}>
-          <Checkbox isChecked={attr.required} onChange={(e) => onChange({ required: e.target.checked })}>
+        <Field.Root invalid={!!errors.name} required flex="2" minW="180px">
+          <Field.Label fontSize="sm">
+            Attribute name
+            <Field.RequiredIndicator />
+          </Field.Label>
+          <Input size="xs" bg="white" value={attr.name} onChange={(e) => onChange({ name: e.target.value })} placeholder="title" />
+          <Field.ErrorText>{errors.name}</Field.ErrorText>
+        </Field.Root>
+        <Field.Root required flex="2" minW="180px">
+          <Field.Label fontSize="sm">
+            Type
+            <Field.RequiredIndicator />
+          </Field.Label>
+          <NativeSelect.Root size="xs">
+            <NativeSelect.Field bg="white" value={attr.type} onChange={(e) => onChange({ type: e.target.value })}>
+              {typeOptions.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
+        </Field.Root>
+        <HStack gap={4} pt={{ base: 0, lg: 8 }} flexShrink={0}>
+          <Checkbox size="sm" checked={attr.required} onCheckedChange={(e) => onChange({ required: !!e.checked })}>
             Required
           </Checkbox>
           {unique && (
-            <Checkbox isChecked={attr.unique} onChange={(e) => onChange({ unique: e.target.checked })}>
+            <Checkbox size="sm" checked={attr.unique} onCheckedChange={(e) => onChange({ unique: !!e.checked })}>
               Unique
             </Checkbox>
           )}
           {localizable && <LocalizedCheckbox attr={attr} onChange={onChange} />}
         </HStack>
-        <HStack spacing={1} pt={{ base: 0, lg: 7 }} ml="auto" flexShrink={0}>
-          <IconButton
-            size="sm"
-            variant="ghost"
-            aria-label={`Move ${label} up`}
-            icon={<FiArrowUp />}
-            isDisabled={index === 0}
-            onClick={() => onMove(-1)}
-          />
-          <IconButton
-            size="sm"
-            variant="ghost"
-            aria-label={`Move ${label} down`}
-            icon={<FiArrowDown />}
-            isDisabled={index === count - 1}
-            onClick={() => onMove(1)}
-          />
-          <IconButton size="sm" variant="ghost" colorScheme="red" aria-label={`Remove ${label}`} icon={<FiTrash2 />} onClick={onRemove} />
+        <HStack gap={1} pt={{ base: 0, lg: 7 }} ml="auto" flexShrink={0}>
+          <IconButton size="xs" variant="ghost" aria-label={`Move ${label} up`} disabled={index === 0} onClick={() => onMove(-1)}>
+            <FiArrowUp />
+          </IconButton>
+          <IconButton size="xs" variant="ghost" aria-label={`Move ${label} down`} disabled={index === count - 1} onClick={() => onMove(1)}>
+            <FiArrowDown />
+          </IconButton>
+          <IconButton size="xs" variant="ghost" colorPalette="red" aria-label={`Remove ${label}`} onClick={onRemove}>
+            <FiTrash2 />
+          </IconButton>
         </HStack>
       </Flex>
       {TYPE_HINTS[attr.type] && (
@@ -106,11 +95,12 @@ function LocalizedCheckbox({ attr, onChange }: Pick<Props, "attr" | "onChange">)
   const allowed = supportsLocalized(attr);
   const box = (
     <Checkbox
-      isChecked={allowed && attr.localized}
-      isDisabled={!allowed}
-      onChange={(e) => onChange({ localized: e.target.checked })}
+      size="sm"
+      checked={allowed && attr.localized}
+      disabled={!allowed}
+      onCheckedChange={(e) => onChange({ localized: !!e.checked })}
     >
-      <HStack as="span" spacing={1}>
+      <HStack as="span" gap={1}>
         <Icon as={FiGlobe} color={allowed && attr.localized ? "purple.500" : "gray.400"} />
         <span>Localized</span>
       </HStack>
@@ -118,9 +108,9 @@ function LocalizedCheckbox({ attr, onChange }: Pick<Props, "attr" | "onChange">)
   );
   return (
     <Tooltip
-      hasArrow
+      showArrow
       openDelay={300}
-      label={
+      content={
         allowed
           ? "A value per locale: translators edit it in each locale, other attributes are shared."
           : "Relations cannot be localized: links are shared by every locale."

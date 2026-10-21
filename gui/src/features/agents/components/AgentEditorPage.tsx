@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { Link as RouterLink, useParams } from "react-router-dom";
-import { Alert, AlertDescription, AlertIcon, Box, Button, Center, Spinner } from "@chakra-ui/react";
+import { Alert, Box, Button, Center, Spinner } from "@chakra-ui/react";
 import { Page, PageHeader } from "../../../shared/ui/PageHeader";
 import { useAgentDetails } from "../hook/useAgentDetails";
 import { useAgentsList } from "../hook/useAgentList";
 import { useCollectionChoices, useFunctionCatalog } from "../hook/useEditorData";
 import { type AgentDraft, draftFromAgent, draftFromDefinition } from "./agentForm";
 import { AgentForm } from "./AgentForm";
+import { Notice } from "./EditorParts";
 import { TemplateGallery } from "./TemplateGallery";
 
 /** How a new agent starts: blank, or from a template's definition. */
@@ -41,16 +42,15 @@ export function AgentEditorPage() {
         title={editing ? `Edit ${editing}` : "New agent"}
         description="An LLM with a system prompt, the functions it may call, and the trigger that starts it."
         actions={
-          <Button as={RouterLink} to={backTo} variant="ghost" size="sm">
-            Back to agents
+          <Button asChild variant="ghost" size="xs">
+            <RouterLink to={backTo}>Back to agents</RouterLink>
           </Button>
         }
       />
       {agentError ? (
-        <Alert status="error" borderRadius="md">
-          <AlertIcon />
+        <Notice status="error" borderRadius="md">
           {agentError}
-        </Alert>
+        </Notice>
       ) : loading || (editing && !initial) ? (
         <Center py={16}>
           <Spinner />
@@ -64,19 +64,19 @@ export function AgentEditorPage() {
       ) : (
         <>
           {!editing && (
-            <Alert status="info" variant="left-accent" borderRadius="md" mb={5}>
-              <AlertIcon />
-              <AlertDescription flex="1" fontSize="sm">
+            <Alert.Root role="alert" status="info" variant="subtle" borderStartWidth="4px" borderStartColor="colorPalette.solid" borderRadius="md" mb={5} alignItems="center">
+              <Alert.Indicator />
+              <Alert.Description flex="1" fontSize="sm">
                 {start?.template
                   ? `Prepared from the ${start.template} template. Review it (model, functions, limits), then create the agent.`
                   : "A blank agent: fill in each section."}
-              </AlertDescription>
+              </Alert.Description>
               <Box>
-                <Button size="sm" variant="ghost" onClick={() => setStart(null)}>
+                <Button size="xs" variant="ghost" onClick={() => setStart(null)}>
                   Choose another template
                 </Button>
               </Box>
-            </Alert>
+            </Alert.Root>
           )}
           {/* Choosing again goes through the gallery, which starts a new form. */}
           <AgentForm

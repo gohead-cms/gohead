@@ -44,8 +44,8 @@ function Shortcut({ to, icon, title, children }: { to: string; icon: IconType; t
           <Icon as={icon} boxSize={5} color="purple.500" />
         </Flex>
         <Box>
-          <LinkOverlay as={RouterLink} to={to} fontWeight="semibold">
-            {title}
+          <LinkOverlay asChild fontWeight="semibold">
+            <RouterLink to={to}>{title}</RouterLink>
           </LinkOverlay>
           <Text fontSize="sm" color="gray.500">
             {children}
@@ -65,15 +65,15 @@ export function MemberDashboard({ me, canWrite }: { me: Me | null; canWrite: boo
     <Page maxW="5xl">
       <PageHeader title={me ? `Welcome, ${me.username}` : "Welcome"} description="Overview of your GoHead CMS system" />
       <Box bg="white" borderWidth="1px" borderRadius="lg" p={5} mb={6}>
-        <HStack spacing={3} mb={1}>
+        <HStack gap={3} mb={1}>
           <Text fontWeight="semibold">Your role</Text>
-          <Badge colorScheme={canWrite ? "purple" : "gray"}>{me?.role ?? "unknown"}</Badge>
+          <Badge colorPalette={canWrite ? "purple" : "gray"}>{me?.role ?? "unknown"}</Badge>
         </HStack>
         <Text fontSize="sm" color="gray.500">
           {describe(perms)}
         </Text>
       </Box>
-      <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+      <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
         {content && (
           <Shortcut to="/contrib" icon={FiEdit3} title="Content editor">
             {canWrite ? "Write and update entries." : "Browse entries."}

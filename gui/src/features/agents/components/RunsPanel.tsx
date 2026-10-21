@@ -1,34 +1,12 @@
 import { useState } from "react";
-import {
-  Alert,
-  AlertIcon,
-  Box,
-  Button,
-  HStack,
-  IconButton,
-  Progress,
-  Select,
-  SimpleGrid,
-  Spinner,
-  Stat,
-  StatHelpText,
-  StatLabel,
-  StatNumber,
-  Table,
-  TableContainer,
-  Tbody,
-  Td,
-  Text,
-  Th,
-  Thead,
-  Tr,
-  useColorModeValue,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, IconButton, NativeSelect, Progress, SimpleGrid, Spinner, Stat, Table, Text } from "@chakra-ui/react";
+import { useColorModeValue } from "@/components/ui/color-mode";
 import { FiRefreshCw } from "react-icons/fi";
 import { type RunStatus } from "../../../shared/types";
 import { useAgentRuns } from "../hook/useAgentRuns";
 import { RunStatusBadge } from "./RunBadges";
 import { RunDetailDrawer } from "./RunDetailDrawer";
+import { Notice } from "./EditorParts";
 import {
   formatCost,
   formatDuration,
@@ -54,14 +32,18 @@ function UsageStat({
 }) {
   const pct = limit ? Math.min(100, (used / limit) * 100) : 0;
   return (
-    <Stat borderWidth="1px" borderRadius="md" p={3}>
-      <StatLabel>{label}</StatLabel>
-      <StatNumber fontSize="xl">{value}</StatNumber>
-      <StatHelpText mb={limit ? 1 : 0}>{limit ? `limit ${format(limit)}` : "no limit"}</StatHelpText>
+    <Stat.Root borderWidth="1px" borderRadius="md" p={3} gap={0}>
+      <Stat.Label>{label}</Stat.Label>
+      <Stat.ValueText fontSize="xl">{value}</Stat.ValueText>
+      <Stat.HelpText mb={limit ? 1 : 0}>{limit ? `limit ${format(limit)}` : "no limit"}</Stat.HelpText>
       {limit ? (
-        <Progress size="xs" value={pct} colorScheme={pct >= 100 ? "red" : pct >= 80 ? "orange" : "green"} />
+        <Progress.Root size="xs" value={pct} colorPalette={pct >= 100 ? "red" : pct >= 80 ? "orange" : "green"}>
+          <Progress.Track>
+            <Progress.Range />
+          </Progress.Track>
+        </Progress.Root>
       ) : null}
-    </Stat>
+    </Stat.Root>
   );
 }
 
@@ -81,7 +63,7 @@ export function RunsPanel({ agentName, initialRun }: { agentName: string; initia
   return (
     <Box>
       {usage && day && hour && (
-        <SimpleGrid columns={{ base: 1, sm: 2, lg: 4 }} spacing={3} mb={5}>
+        <SimpleGrid columns={{ base: 1, sm: 2, lg: 4 }} gap={3} mb={5}>
           <UsageStat
             label="Runs, last hour"
             value={count(hour.runs)}
@@ -118,24 +100,27 @@ export function RunsPanel({ agentName, initialRun }: { agentName: string; initia
         </Text>
       ) : null}
 
-      <HStack mb={3} spacing={3}>
-        <Select
-          size="sm"
-          maxW="180px"
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value as RunStatus | "");
-            setPage(1);
-          }}
-        >
-          <option value="">All runs</option>
-          {RUN_STATUS_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </Select>
-        <IconButton aria-label="Refresh" size="sm" icon={<FiRefreshCw />} onClick={refresh} isLoading={loading} />
+      <HStack mb={3} gap={3}>
+        <NativeSelect.Root size="xs" maxW="180px">
+          <NativeSelect.Field
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value as RunStatus | "");
+              setPage(1);
+            }}
+          >
+            <option value="">All runs</option>
+            {RUN_STATUS_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
+        <IconButton aria-label="Refresh" size="xs" variant="subtle" onClick={refresh} loading={loading}>
+          <FiRefreshCw />
+        </IconButton>
         {pagination && (
           <Text fontSize="sm" color="gray.500">
             {pagination.total} run{pagination.total === 1 ? "" : "s"}
@@ -144,10 +129,9 @@ export function RunsPanel({ agentName, initialRun }: { agentName: string; initia
       </HStack>
 
       {error && (
-        <Alert status="error" mb={3}>
-          <AlertIcon />
+        <Notice status="error" mb={3}>
           {error}
-        </Alert>
+        </Notice>
       )}
       {loading && runs.length === 0 && <Spinner />}
       {!loading && !error && runs.length === 0 && (
@@ -157,53 +141,55 @@ export function RunsPanel({ agentName, initialRun }: { agentName: string; initia
       )}
 
       {runs.length > 0 && (
-        <TableContainer borderWidth="1px" borderRadius="md">
-          <Table size="sm" sx={{ "th, td": { px: 3 } }}>
-            <Thead>
-              <Tr>
-                <Th>Started</Th>
-                <Th>Status</Th>
-                <Th>Trigger</Th>
-                <Th isNumeric title="Model calls / function calls">Turns</Th>
-                <Th isNumeric>Tokens</Th>
-                <Th isNumeric>Cost</Th>
-                <Th isNumeric>Duration</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
+        <Table.ScrollArea borderWidth="1px" borderRadius="md">
+          <Table.Root size="sm" css={{ "& th, & td": { px: 3 } }}>
+            <Table.Header>
+              <Table.Row>
+                <Table.ColumnHeader>Started</Table.ColumnHeader>
+                <Table.ColumnHeader>Status</Table.ColumnHeader>
+                <Table.ColumnHeader>Trigger</Table.ColumnHeader>
+                <Table.ColumnHeader textAlign="end" title="Model calls / function calls">
+                  Turns
+                </Table.ColumnHeader>
+                <Table.ColumnHeader textAlign="end">Tokens</Table.ColumnHeader>
+                <Table.ColumnHeader textAlign="end">Cost</Table.ColumnHeader>
+                <Table.ColumnHeader textAlign="end">Duration</Table.ColumnHeader>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
               {runs.map((r) => (
-                <Tr key={r.id} cursor="pointer" _hover={{ bg: hover }} onClick={() => setOpenRun(r.id)}>
-                  <Td whiteSpace="nowrap" title={formatTime(r.startedAt)}>
+                <Table.Row key={r.id} cursor="pointer" _hover={{ bg: hover }} onClick={() => setOpenRun(r.id)}>
+                  <Table.Cell whiteSpace="nowrap" title={formatTime(r.startedAt)}>
                     {formatShortTime(r.startedAt)}
-                  </Td>
-                  <Td>
+                  </Table.Cell>
+                  <Table.Cell>
                     <RunStatusBadge run={r} />
-                  </Td>
-                  <Td maxW="180px" overflow="hidden" textOverflow="ellipsis" title={triggerSummary(r.triggerType, r.trigger)}>
+                  </Table.Cell>
+                  <Table.Cell maxW="180px" overflow="hidden" textOverflow="ellipsis" title={triggerSummary(r.triggerType, r.trigger)}>
                     {triggerSummary(r.triggerType, r.trigger)}
-                  </Td>
-                  <Td isNumeric whiteSpace="nowrap">
+                  </Table.Cell>
+                  <Table.Cell textAlign="end" whiteSpace="nowrap">
                     {r.turns} / {r.toolCalls}
-                  </Td>
-                  <Td isNumeric>{formatTokens(r.inputTokens + r.outputTokens)}</Td>
-                  <Td isNumeric>{formatCost(r.costUsd)}</Td>
-                  <Td isNumeric>{formatDuration(r.durationMs)}</Td>
-                </Tr>
+                  </Table.Cell>
+                  <Table.Cell textAlign="end">{formatTokens(r.inputTokens + r.outputTokens)}</Table.Cell>
+                  <Table.Cell textAlign="end">{formatCost(r.costUsd)}</Table.Cell>
+                  <Table.Cell textAlign="end">{formatDuration(r.durationMs)}</Table.Cell>
+                </Table.Row>
               ))}
-            </Tbody>
-          </Table>
-        </TableContainer>
+            </Table.Body>
+          </Table.Root>
+        </Table.ScrollArea>
       )}
 
       {pagination && pagination.pageCount > 1 && (
         <HStack mt={3} justify="flex-end">
-          <Button size="sm" onClick={() => setPage((p) => p - 1)} isDisabled={page <= 1}>
+          <Button size="xs" variant="subtle" onClick={() => setPage((p) => p - 1)} disabled={page <= 1}>
             Newer
           </Button>
           <Text fontSize="sm">
             {page} / {pagination.pageCount}
           </Text>
-          <Button size="sm" onClick={() => setPage((p) => p + 1)} isDisabled={page >= pagination.pageCount}>
+          <Button size="xs" variant="subtle" onClick={() => setPage((p) => p + 1)} disabled={page >= pagination.pageCount}>
             Older
           </Button>
         </HStack>

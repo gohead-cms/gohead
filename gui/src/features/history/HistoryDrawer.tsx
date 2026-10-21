@@ -1,28 +1,8 @@
 import { useState } from "react";
-import {
-  Alert,
-  AlertIcon,
-  Box,
-  Button,
-  ButtonGroup,
-  Code,
-  Drawer,
-  DrawerBody,
-  DrawerCloseButton,
-  DrawerContent,
-  DrawerHeader,
-  DrawerOverlay,
-  Flex,
-  Grid,
-  Heading,
-  HStack,
-  Icon,
-  Spinner,
-  Text,
-  Tooltip,
-  VStack,
-  useColorModeValue,
-} from "@chakra-ui/react";
+import { Alert, Box, Button, ButtonGroup, chakra, Code, Flex, Grid, Heading, HStack, Icon, Spinner, Text, VStack } from "@chakra-ui/react";
+import { useColorModeValue } from "@/components/ui/color-mode";
+import { DrawerBody, DrawerCloseTrigger, DrawerContent, DrawerHeader, DrawerRoot, DrawerTitle } from "@/components/ui/drawer";
+import { Tooltip } from "@/components/ui/tooltip";
 import { FiClock, FiRotateCcw } from "react-icons/fi";
 import { useNotify } from "../../shared/hooks/useNotify";
 import { ConfirmButton } from "../../shared/ui/ConfirmButton";
@@ -63,24 +43,30 @@ interface HistoryDrawerProps {
  */
 export function HistoryDrawer({ target, onClose, onRestored }: HistoryDrawerProps) {
   return (
-    <Drawer isOpen={target !== null} onClose={onClose} placement="right" size="xl">
-      <DrawerOverlay />
+    <DrawerRoot
+      open={target !== null}
+      onOpenChange={(e) => {
+        if (!e.open) onClose();
+      }}
+      placement="end"
+      size="xl"
+    >
       <DrawerContent maxW={{ base: "100vw", lg: "5xl" }}>
-        <DrawerCloseButton />
         <DrawerHeader borderBottomWidth="1px">
-          <HStack spacing={2}>
+          <DrawerTitle display="flex" alignItems="center" gap={2} fontSize="xl" fontWeight="semibold" minW={0}>
             <Icon as={FiClock} color="purple.500" />
-            <Text>History</Text>
+            <Text as="span">History</Text>
             {target && (
-              <Text as="span" fontWeight="normal" color="gray.500" fontSize="md" noOfLines={1}>
+              <Text as="span" fontWeight="normal" color="gray.500" fontSize="md" lineClamp={1}>
                 {targetLabel(target)}
               </Text>
             )}
-          </HStack>
+          </DrawerTitle>
         </DrawerHeader>
         <DrawerBody p={0}>{target && <HistoryContent key={targetKey(target)} target={target} onRestored={onRestored} />}</DrawerBody>
+        <DrawerCloseTrigger />
       </DrawerContent>
-    </Drawer>
+    </DrawerRoot>
   );
 }
 
@@ -113,10 +99,12 @@ function HistoryContent({ target, onRestored }: { target: HistoryTarget; onResto
 
   if (error) {
     return (
-      <Alert status="error" m={4} borderRadius="md" w="auto">
-        <AlertIcon />
-        {error}
-      </Alert>
+      <Alert.Root role="alert" status="error" m={4} borderRadius="md" w="auto">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Description>{error}</Alert.Description>
+        </Alert.Content>
+      </Alert.Root>
     );
   }
   if (loading && revisions.length === 0) {
@@ -140,13 +128,12 @@ function HistoryContent({ target, onRestored }: { target: HistoryTarget; onResto
         <Text fontSize="xs" color="gray.500" px={4} pt={3} pb={1}>
           {total} version{total === 1 ? "" : "s"}, newest first
         </Text>
-        <VStack as="ul" listStyleType="none" spacing={0} align="stretch" aria-label="Versions">
+        <VStack as="ul" listStyleType="none" gap={0} align="stretch" aria-label="Versions">
           {revisions.map((r) => {
             const active = r.version === current?.version;
             return (
               <Box as="li" key={r.id}>
-                <Box
-                  as="button"
+                <chakra.button
                   type="button"
                   w="full"
                   textAlign="left"
@@ -161,14 +148,14 @@ function HistoryContent({ target, onRestored }: { target: HistoryTarget; onResto
                   onClick={() => setSelected(r.version)}
                 >
                   <RevisionSummary revision={r} isLatest={r.version === latest?.version} />
-                </Box>
+                </chakra.button>
               </Box>
             );
           })}
         </VStack>
         {hasMore && (
           <Flex justify="center" py={3}>
-            <Button size="xs" variant="outline" onClick={loadMore} isLoading={loading}>
+            <Button size="2xs" variant="outline" onClick={loadMore} loading={loading}>
               Load more ({total - revisions.length} older)
             </Button>
           </Flex>
@@ -194,8 +181,8 @@ function HistoryContent({ target, onRestored }: { target: HistoryTarget; onResto
 
 function RevisionSummary({ revision: r, isLatest }: { revision: Revision; isLatest: boolean }) {
   return (
-    <VStack align="stretch" spacing={1}>
-      <HStack spacing={2}>
+    <VStack align="stretch" gap={1}>
+      <HStack gap={2}>
         <Text fontWeight="bold" fontSize="sm">
           v{r.version}
         </Text>
@@ -261,15 +248,17 @@ function RevisionPanel({ target, revision: r, isLatest, latest, compare, onCompa
         : "Before";
 
   return (
-    <VStack align="stretch" spacing={5}>
+    <VStack align="stretch" gap={5}>
       <Flex justify="space-between" align="start" gap={3} wrap="wrap">
         <Box minW={0}>
-          <HStack spacing={2} mb={1}>
-            <Heading size="md">Version {r.version}</Heading>
+          <HStack gap={2} mb={1}>
+            <Heading size="xl" fontWeight="bold">
+              Version {r.version}
+            </Heading>
             <ActionBadge action={r.action} />
             <StatusBadge status={r.status} />
           </HStack>
-          <HStack spacing={2} wrap="wrap" color="gray.600" fontSize="sm">
+          <HStack gap={2} wrap="wrap" color="gray.600" fontSize="sm">
             <ActorTag revision={r} />
             <Text>· {formatTime(r.createdAt)}</Text>
           </HStack>
@@ -280,10 +269,11 @@ function RevisionPanel({ target, revision: r, isLatest, latest, compare, onCompa
           )}
         </Box>
         {canRestore && blocked ? (
-          <Tooltip label={blocked} hasArrow>
+          <Tooltip content={blocked} showArrow>
             {/* A disabled button gets no hover events: the span shows the reason. */}
             <span tabIndex={0} aria-label={blocked}>
-              <Button size="sm" colorScheme="purple" leftIcon={<FiRotateCcw />} isDisabled>
+              <Button size="xs" colorPalette="purple" disabled>
+                <FiRotateCcw />
                 Restore this version
               </Button>
             </span>
@@ -291,7 +281,8 @@ function RevisionPanel({ target, revision: r, isLatest, latest, compare, onCompa
         ) : canRestore ? (
           <ConfirmButton
             trigger={
-              <Button size="sm" colorScheme="purple" leftIcon={<FiRotateCcw />}>
+              <Button size="xs" colorPalette="purple">
+                <FiRotateCcw />
                 Restore this version
               </Button>
             }
@@ -321,9 +312,9 @@ function RevisionPanel({ target, revision: r, isLatest, latest, compare, onCompa
                 : "Differences from the current version"
               : "Changes in this version"}
           </Text>
-          <ButtonGroup size="xs" isAttached variant="outline" role="group" aria-label="Compare with">
+          <ButtonGroup size="2xs" attached variant="outline" role="group" aria-label="Compare with">
             <Button
-              colorScheme={compare === "previous" ? "purple" : "gray"}
+              colorPalette={compare === "previous" ? "purple" : "gray"}
               variant={compare === "previous" ? "solid" : "outline"}
               aria-pressed={compare === "previous"}
               onClick={() => onCompare("previous")}
@@ -331,7 +322,7 @@ function RevisionPanel({ target, revision: r, isLatest, latest, compare, onCompa
               vs previous
             </Button>
             <Button
-              colorScheme={compare === "current" ? "purple" : "gray"}
+              colorPalette={compare === "current" ? "purple" : "gray"}
               variant={compare === "current" ? "solid" : "outline"}
               aria-pressed={compare === "current"}
               onClick={() => onCompare("current")}
@@ -342,10 +333,12 @@ function RevisionPanel({ target, revision: r, isLatest, latest, compare, onCompa
         </Flex>
         {loading && !detail && <Spinner size="sm" color="purple.500" />}
         {error && (
-          <Alert status="error" borderRadius="md">
-            <AlertIcon />
-            {error}
-          </Alert>
+          <Alert.Root role="alert" status="error" borderRadius="md">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Description>{error}</Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
         )}
         {detail && !error && (
           <>
@@ -385,7 +378,16 @@ function RevisionPanel({ target, revision: r, isLatest, latest, compare, onCompa
 
       {detail?.data && (
         <Box>
-          <Button size="xs" variant="link" colorScheme="purple" onClick={() => setShowData((v) => !v)}>
+          <Button
+            size="2xs"
+            variant="plain"
+            colorPalette="purple"
+            color="purple.500"
+            px={0}
+            h="auto"
+            _hover={{ textDecoration: "underline" }}
+            onClick={() => setShowData((v) => !v)}
+          >
             {showData ? "Hide stored data" : "Show stored data"}
           </Button>
           {showData && (

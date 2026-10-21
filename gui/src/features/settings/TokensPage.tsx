@@ -1,24 +1,5 @@
 import { useState } from "react";
-import {
-  Alert,
-  AlertDescription,
-  AlertIcon,
-  Badge,
-  Box,
-  Button,
-  Code,
-  IconButton,
-  Skeleton,
-  Stack,
-  Table,
-  TableContainer,
-  Tbody,
-  Td,
-  Text,
-  Th,
-  Thead,
-  Tr,
-} from "@chakra-ui/react";
+import { Alert, Badge, Box, Button, Code, IconButton, Skeleton, Stack, Table, Text } from "@chakra-ui/react";
 import { FiKey, FiPlus, FiSlash } from "react-icons/fi";
 import { api } from "../../services/api";
 import { getJSON, useApiQuery } from "../../shared/hooks/useApiQuery";
@@ -59,7 +40,8 @@ export function TokensPage() {
   };
 
   const newButton = (
-    <Button leftIcon={<FiPlus />} colorScheme="blue" onClick={openForm}>
+    <Button colorPalette="blue" onClick={openForm}>
+      <FiPlus />
       New token
     </Button>
   );
@@ -73,13 +55,15 @@ export function TokensPage() {
       />
 
       {error && (
-        <Alert status="error" borderRadius="md" mb={4}>
-          <AlertIcon />
-          <AlertDescription flex="1">{error}</AlertDescription>
-          <Button size="sm" onClick={refetch}>
+        <Alert.Root role="alert" status="error" borderRadius="md" mb={4} alignItems="center">
+          <Alert.Indicator />
+          <Alert.Content flex="1">
+            <Alert.Description>{error}</Alert.Description>
+          </Alert.Content>
+          <Button size="xs" variant="subtle" onClick={refetch}>
             Retry
           </Button>
-        </Alert>
+        </Alert.Root>
       )}
 
       {loading && !data ? (
@@ -94,54 +78,56 @@ export function TokensPage() {
         </EmptyState>
       ) : data ? (
         <Box bg="white" borderWidth="1px" borderRadius="lg" overflow="hidden">
-          <TableContainer whiteSpace="normal">
-            <Table size="sm">
-              <Thead>
-                <Tr>
-                  <Th>Name</Th>
-                  <Th>Role</Th>
-                  <Th>Status</Th>
-                  <Th>Created</Th>
-                  <Th>Last used</Th>
-                  <Th>Expires</Th>
-                  <Th textAlign="right">Actions</Th>
-                </Tr>
-              </Thead>
-              <Tbody>
+          <Table.ScrollArea whiteSpace="normal">
+            <Table.Root size="sm">
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader>Name</Table.ColumnHeader>
+                  <Table.ColumnHeader>Role</Table.ColumnHeader>
+                  <Table.ColumnHeader>Status</Table.ColumnHeader>
+                  <Table.ColumnHeader>Created</Table.ColumnHeader>
+                  <Table.ColumnHeader>Last used</Table.ColumnHeader>
+                  <Table.ColumnHeader>Expires</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="right">Actions</Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
                 {tokens.map((t) => {
                   const active = t.status === "active";
                   return (
-                    <Tr key={t.id} opacity={active ? 1 : 0.65}>
-                      <Td maxW="240px">
-                        <Text fontWeight="medium" noOfLines={1} title={t.name}>
+                    <Table.Row key={t.id} opacity={active ? 1 : 0.65}>
+                      <Table.Cell maxW="240px">
+                        <Text fontWeight="medium" lineClamp={1} title={t.name}>
                           {t.name}
                         </Text>
                         <Code fontSize="xs" title="The token starts with these characters">
                           {t.prefix}…
                         </Code>
                         {t.description && (
-                          <Text fontSize="xs" color="gray.500" noOfLines={1} title={t.description}>
+                          <Text fontSize="xs" color="gray.500" lineClamp={1} title={t.description}>
                             {t.description}
                           </Text>
                         )}
-                      </Td>
-                      <Td>
+                      </Table.Cell>
+                      <Table.Cell>
                         <RoleBadge role={t.role} />
-                      </Td>
-                      <Td>
-                        <Badge colorScheme={tokenStatusColor[t.status] ?? "gray"}>{t.status}</Badge>
-                      </Td>
-                      <Td color="gray.600">
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Badge colorPalette={tokenStatusColor[t.status] ?? "gray"}>{t.status}</Badge>
+                      </Table.Cell>
+                      <Table.Cell color="gray.600">
                         <Text>{optTime(t.createdAt)}</Text>
                         {t.createdBy && (
                           <Text fontSize="xs" color="gray.500">
                             by {t.createdBy}
                           </Text>
                         )}
-                      </Td>
-                      <Td color="gray.600">{optTime(t.lastUsedAt, "Never")}</Td>
-                      <Td color="gray.600">{t.revokedAt ? `Revoked ${optTime(t.revokedAt)}` : optTime(t.expiresAt, "Never")}</Td>
-                      <Td textAlign="right">
+                      </Table.Cell>
+                      <Table.Cell color="gray.600">{optTime(t.lastUsedAt, "Never")}</Table.Cell>
+                      <Table.Cell color="gray.600">
+                        {t.revokedAt ? `Revoked ${optTime(t.revokedAt)}` : optTime(t.expiresAt, "Never")}
+                      </Table.Cell>
+                      <Table.Cell textAlign="right">
                         {active && (
                           <ConfirmButton
                             title={`Revoke ${t.name}?`}
@@ -149,17 +135,19 @@ export function TokensPage() {
                             confirmLabel="Revoke"
                             onConfirm={() => revoke(t)}
                             trigger={
-                              <IconButton aria-label={`Revoke ${t.name}`} icon={<FiSlash />} size="sm" variant="ghost" colorScheme="red" />
+                              <IconButton aria-label={`Revoke ${t.name}`} size="xs" variant="ghost" colorPalette="red">
+                                <FiSlash />
+                              </IconButton>
                             }
                           />
                         )}
-                      </Td>
-                    </Tr>
+                      </Table.Cell>
+                    </Table.Row>
                   );
                 })}
-              </Tbody>
-            </Table>
-          </TableContainer>
+              </Table.Body>
+            </Table.Root>
+          </Table.ScrollArea>
         </Box>
       ) : null}
 

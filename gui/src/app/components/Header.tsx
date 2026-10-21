@@ -1,9 +1,19 @@
-import { Badge, Box, Button, Flex, Icon, Menu, MenuButton, MenuDivider, MenuItem, MenuList, Text, Avatar } from "@chakra-ui/react";
+import { Badge, Box, Button, Flex, Icon, Text } from "@chakra-ui/react";
+import { Avatar } from "@/components/ui/avatar";
+import { MenuContent, MenuItem, MenuRoot, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { useNavigate } from "react-router-dom";
 import { FiBookOpen, FiCode, FiLogOut } from "react-icons/fi";
 import { useAuthStore } from "../../services/auth";
 import { API_BASE_URL } from "../../services/api";
 import { useMe } from "../../features/auth/me";
+
+// As in v2, the avatar gets a color picked from the name.
+const AVATAR_PALETTES = ["red", "orange", "green", "teal", "blue", "cyan", "purple", "pink"];
+function avatarPalette(name: string) {
+  let hash = 0;
+  for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
+  return AVATAR_PALETTES[Math.abs(hash) % AVATAR_PALETTES.length];
+}
 
 export function Header() {
   const logout = useAuthStore((s) => s.logout);
@@ -38,32 +48,41 @@ export function Header() {
           GoHead
         </Text>
       </Flex>
-      <Menu>
-        <MenuButton as={Button} variant="ghost" px={2} py={1} borderRadius="full" aria-label="Account menu">
-          <Avatar size="sm" name={me?.username ?? "?"} />
-        </MenuButton>
-        <MenuList>
+      <MenuRoot>
+        <MenuTrigger asChild>
+          <Button variant="ghost" px={2} py={1} borderRadius="full" aria-label="Account menu">
+            <Avatar size="xs" variant="solid" colorPalette={avatarPalette(me?.username ?? "?")} name={me?.username ?? "?"} />
+          </Button>
+        </MenuTrigger>
+        <MenuContent>
           <Box px={4} py={2}>
             <Text fontWeight="bold">{me?.username ?? "…"}</Text>
             {me && (
-              <Badge mt={1} colorScheme={me.role === "admin" ? "purple" : "gray"}>
+              <Badge mt={1} colorPalette={me.role === "admin" ? "purple" : "gray"}>
                 {me.role}
               </Badge>
             )}
           </Box>
-          <MenuDivider />
-          <MenuItem as="a" href={`${API_BASE_URL}/api/docs`} target="_blank" rel="noreferrer" icon={<Icon as={FiCode} />}>
-            API reference
+          <MenuSeparator />
+          <MenuItem value="api-reference" asChild>
+            <a href={`${API_BASE_URL}/api/docs`} target="_blank" rel="noreferrer">
+              <Icon as={FiCode} />
+              API reference
+            </a>
           </MenuItem>
-          <MenuItem as="a" href="https://gohead-cms.github.io/gohead/" target="_blank" rel="noreferrer" icon={<Icon as={FiBookOpen} />}>
-            Documentation
+          <MenuItem value="documentation" asChild>
+            <a href="https://gohead-cms.github.io/gohead/" target="_blank" rel="noreferrer">
+              <Icon as={FiBookOpen} />
+              Documentation
+            </a>
           </MenuItem>
-          <MenuDivider />
-          <MenuItem onClick={handleLogout} icon={<Icon as={FiLogOut} />}>
+          <MenuSeparator />
+          <MenuItem value="sign-out" onClick={handleLogout}>
+            <Icon as={FiLogOut} />
             Sign out
           </MenuItem>
-        </MenuList>
-      </Menu>
+        </MenuContent>
+      </MenuRoot>
     </Flex>
   );
 }

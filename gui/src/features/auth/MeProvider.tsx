@@ -1,4 +1,4 @@
-import { Alert, AlertDescription, AlertIcon, Button } from "@chakra-ui/react";
+import { Alert, Button } from "@chakra-ui/react";
 import { type ReactNode, useMemo } from "react";
 import { getJSON, useApiQuery } from "../../shared/hooks/useApiQuery";
 import { type Me, MeContext, meState } from "./me";
@@ -10,15 +10,15 @@ export function MeProvider({ children }: { children: ReactNode }) {
   return (
     <MeContext.Provider value={value}>
       {error && (
-        <Alert status="error" variant="left-accent">
-          <AlertIcon />
-          <AlertDescription flex="1">
+        <Alert.Root role="alert" status="error" variant="subtle" borderStartWidth="4px" borderStartColor="colorPalette.solid" alignItems="center">
+          <Alert.Indicator />
+          <Alert.Description flex="1">
             Could not load your account ({error}). Menus and permissions may be incomplete.
-          </AlertDescription>
-          <Button size="sm" onClick={refetch} isLoading={loading}>
+          </Alert.Description>
+          <Button size="xs" variant="subtle" onClick={refetch} loading={loading}>
             Retry
           </Button>
-        </Alert>
+        </Alert.Root>
       )}
       {children}
     </MeContext.Provider>

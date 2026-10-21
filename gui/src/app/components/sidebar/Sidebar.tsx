@@ -4,14 +4,9 @@ import {
   Flex,
   Icon,
   useDisclosure,
-  Drawer,
-  DrawerOverlay,
-  DrawerContent,
-  DrawerCloseButton,
   IconButton,
-  Collapse,
+  Collapsible,
   Text,
-  useColorModeValue,
   type BoxProps,
   HStack,
   Badge,
@@ -35,6 +30,8 @@ import {
 } from 'react-icons/fi';
 import { type IconType } from 'react-icons';
 import { NavLink, useLocation } from "react-router-dom";
+import { useColorModeValue } from "@/components/ui/color-mode";
+import { DrawerCloseTrigger, DrawerContent, DrawerRoot } from "@/components/ui/drawer";
 import { LiaProjectDiagramSolid } from "react-icons/lia";
 import { LuBrain } from "react-icons/lu";
 import { VscRobot } from "react-icons/vsc";
@@ -104,37 +101,38 @@ const LinkItems: Array<NavItemProps> = [
 
 // --- Main Sidebar Component ---
 export function Sidebar() {
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { open, onOpen, onClose } = useDisclosure();
 
   return (
     <Box>
-      <SidebarContent 
-        display={{ base: "none", md: "block" }} 
+      <SidebarContent
+        display={{ base: "none", md: "block" }}
       />
-      <Drawer
-        isOpen={isOpen}
-        placement="left"
-        onClose={onClose}
-        returnFocusOnClose={false}
-        onOverlayClick={onClose}
+      <DrawerRoot
+        open={open}
+        placement="start"
+        onOpenChange={(e) => {
+          if (!e.open) onClose();
+        }}
+        restoreFocus={false}
         size="full"
       >
-        <DrawerOverlay />
         <DrawerContent>
           <SidebarContent onClose={onClose} />
         </DrawerContent>
-      </Drawer>
+      </DrawerRoot>
       <IconButton
         display={{ base: 'flex', md: 'none' }}
         onClick={onOpen}
         variant="outline"
         aria-label="open menu"
-        icon={<FiMenu />}
         position="fixed"
         top="4"
         left="4"
         zIndex="overlay"
-      />
+      >
+        <FiMenu />
+      </IconButton>
     </Box>
   );
 }
@@ -174,7 +172,7 @@ function SidebarContent({ onClose, ...rest }: SidebarContentProps) {
           GoHead
         </Text>
         {onClose && (
-            <DrawerCloseButton display={{ base: 'flex', md: 'none' }} onClick={onClose} />
+            <DrawerCloseTrigger display={{ base: 'flex', md: 'none' }} onClick={onClose} />
         )}
       </Flex>
       <Box overflowY="auto" h="calc(100% - 80px)" pb={10}>
@@ -190,7 +188,7 @@ function SidebarContent({ onClose, ...rest }: SidebarContentProps) {
 
 // --- Navigation Item Component ---
 function NavItem({ icon, children, href, childrenItems, onNavItemClick, badges, badge }: { icon: IconType; children: React.ReactNode; href?: string; childrenItems?: NavItemProps[]; onNavItemClick?: () => void; badges?: Badges; badge?: NavItemProps["badge"] }) {
-  const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
+  const { open: isOpen, onToggle } = useDisclosure({ defaultOpen: true });
   const location = useLocation();
   
   const isParentActive = childrenItems?.some(child => child.href && location.pathname.startsWith(child.href));
@@ -247,49 +245,52 @@ function NavItem({ icon, children, href, childrenItems, onNavItemClick, badges, 
             transform={isOpen ? 'rotate(180deg)' : ''}
           />
         </Flex>
-        <Collapse in={isOpen} animateOpacity style={{ marginTop: '0!' }}>
-          <Box pl={1} py={1} borderLeft="1px solid" borderColor={childBorder} ml={2} mr={4}>
-            {childrenItems.map((child) => (
-              <NavItem
-                key={child.name}
-                icon={child.icon}
-                href={child.href}
-                childrenItems={child.children}
-                onNavItemClick={onNavItemClick}
-                badges={badges}
-                badge={child.badge}
-              >
-                {child.name}
-              </NavItem>
-            ))}
-          </Box>
-        </Collapse>
+        <Collapsible.Root open={isOpen}>
+          <Collapsible.Content>
+            <Box pl={1} py={1} borderLeft="1px solid" borderColor={childBorder} ml={2} mr={4}>
+              {childrenItems.map((child) => (
+                <NavItem
+                  key={child.name}
+                  icon={child.icon}
+                  href={child.href}
+                  childrenItems={child.children}
+                  onNavItemClick={onNavItemClick}
+                  badges={badges}
+                  badge={child.badge}
+                >
+                  {child.name}
+                </NavItem>
+              ))}
+            </Box>
+          </Collapsible.Content>
+        </Collapsible.Root>
       </Box>
     );
   }
 
   return (
     <Flex
-      as={NavLink}
-      to={href || '#'}
+      asChild
       {...commonStyles}
       _hover={hoverStyles}
       onClick={handleLinkClick}
-      _activeLink={{
+      _currentPage={{
         bg: activeBg,
         color: activeColor,
         fontWeight: 'semibold',
       }}
     >
-      <HStack flex="1">
-        <Icon mr="2" fontSize="16" as={icon} />
-        <Text>{children}</Text>
-        {count ? (
-          <Badge ml="auto" colorScheme="orange" variant="solid" borderRadius="full" px={2} title={`${count} pending`} data-testid="approvals-count">
-            {count > 99 ? "99+" : count}
-          </Badge>
-        ) : null}
-      </HStack>
+      <NavLink to={href || '#'}>
+        <HStack flex="1">
+          <Icon mr="2" fontSize="16" as={icon} />
+          <Text>{children}</Text>
+          {count ? (
+            <Badge ml="auto" colorPalette="orange" variant="solid" borderRadius="full" px={2} title={`${count} pending`} data-testid="approvals-count">
+              {count > 99 ? "99+" : count}
+            </Badge>
+          ) : null}
+        </HStack>
+      </NavLink>
     </Flex>
   );
 }

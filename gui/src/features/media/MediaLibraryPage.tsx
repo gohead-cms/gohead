@@ -1,23 +1,20 @@
 import { type ChangeEvent, type DragEvent, useEffect, useRef, useState } from "react";
 import {
   Alert,
-  AlertIcon,
   Box,
   Button,
   Center,
+  Field,
   Flex,
-  FormControl,
-  FormLabel,
   Icon,
   Input,
-  InputGroup,
-  InputLeftElement,
-  Select,
+  NativeSelect,
   Spinner,
   Text,
   VisuallyHidden,
 } from "@chakra-ui/react";
 import { FiImage, FiLock, FiSearch, FiUpload, FiUploadCloud } from "react-icons/fi";
+import { InputGroup } from "@/components/ui/input-group";
 import { getJSON, useApiQuery } from "../../shared/hooks/useApiQuery";
 import { useNotify } from "../../shared/hooks/useNotify";
 import { EmptyState } from "../../shared/ui/EmptyState";
@@ -42,10 +39,10 @@ function Pager({ p, onPage }: { p: MediaPagination; onPage: (page: number) => vo
         Page {p.page} of {p.pageCount} · {p.total} files
       </Text>
       <Flex gap={2}>
-        <Button size="sm" onClick={() => onPage(p.page - 1)} isDisabled={p.page <= 1}>
+        <Button size="xs" variant="subtle" onClick={() => onPage(p.page - 1)} disabled={p.page <= 1}>
           Previous
         </Button>
-        <Button size="sm" onClick={() => onPage(p.page + 1)} isDisabled={p.page >= p.pageCount}>
+        <Button size="xs" variant="subtle" onClick={() => onPage(p.page + 1)} disabled={p.page >= p.pageCount}>
           Next
         </Button>
       </Flex>
@@ -125,7 +122,8 @@ export function MediaLibraryPage() {
     : {};
 
   const uploadButton = (
-    <Button leftIcon={<FiUpload />} colorScheme="blue" onClick={pickFiles} isLoading={uploads.busy} loadingText="Uploading">
+    <Button colorPalette="blue" onClick={pickFiles} loading={uploads.busy} loadingText="Uploading">
+      <FiUpload />
       Upload files
     </Button>
   );
@@ -156,13 +154,13 @@ export function MediaLibraryPage() {
   let body;
   if (list.error) {
     body = (
-      <Alert status="error" borderRadius="md">
-        <AlertIcon />
+      <Alert.Root role="alert" status="error" borderRadius="md" alignItems="center">
+        <Alert.Indicator />
         <Box flex="1">{list.error}</Box>
-        <Button size="sm" onClick={list.refetch}>
+        <Button size="xs" variant="subtle" onClick={list.refetch}>
           Retry
         </Button>
-      </Alert>
+      </Alert.Root>
     );
   } else if (!list.data) {
     body = (
@@ -172,7 +170,7 @@ export function MediaLibraryPage() {
     );
   } else if (items.length === 0 && page > 1) {
     body = (
-      <EmptyState icon={FiImage} title="No files on this page" action={<Button size="sm" onClick={() => setPage(1)}>Go to the first page</Button>} />
+      <EmptyState icon={FiImage} title="No files on this page" action={<Button size="xs" variant="subtle" onClick={() => setPage(1)}>Go to the first page</Button>} />
     );
   } else if (items.length === 0 && filtered) {
     body = (
@@ -181,7 +179,8 @@ export function MediaLibraryPage() {
         title="No file matches"
         action={
           <Button
-            size="sm"
+            size="xs"
+            variant="subtle"
             onClick={() => {
               setSearchInput("");
               setSearch("");
@@ -232,34 +231,33 @@ export function MediaLibraryPage() {
         </VisuallyHidden>
 
         <Flex gap={3} mb={4} direction={{ base: "column", md: "row" }} align={{ base: "stretch", md: "flex-end" }}>
-          <FormControl flex="1" maxW={{ md: "sm" }}>
-            <FormLabel fontSize="sm">Search</FormLabel>
-            <InputGroup size="sm" bg="white">
-              <InputLeftElement pointerEvents="none">
-                <Icon as={FiSearch} color="gray.400" />
-              </InputLeftElement>
-              <Input type="search" placeholder="File name" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} borderRadius="md" />
+          <Field.Root flex="1" maxW={{ md: "sm" }}>
+            <Field.Label fontSize="sm">Search</Field.Label>
+            <InputGroup w="full" bg="white" startElement={<Icon as={FiSearch} color="gray.400" />}>
+              <Input size="xs" type="search" placeholder="File name" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} borderRadius="md" />
             </InputGroup>
-          </FormControl>
-          <FormControl w={{ base: "100%", md: "180px" }}>
-            <FormLabel fontSize="sm">Type</FormLabel>
-            <Select
-              size="sm"
-              bg="white"
-              borderRadius="md"
-              value={mime}
-              onChange={(e) => {
-                setMime(e.target.value);
-                setPage(1);
-              }}
-            >
-              {TYPE_FILTERS.map((f) => (
-                <option key={f.value} value={f.value}>
-                  {f.label}
-                </option>
-              ))}
-            </Select>
-          </FormControl>
+          </Field.Root>
+          <Field.Root w={{ base: "100%", md: "180px" }}>
+            <Field.Label fontSize="sm">Type</Field.Label>
+            <NativeSelect.Root size="xs">
+              <NativeSelect.Field
+                bg="white"
+                borderRadius="md"
+                value={mime}
+                onChange={(e) => {
+                  setMime(e.target.value);
+                  setPage(1);
+                }}
+              >
+                {TYPE_FILTERS.map((f) => (
+                  <option key={f.value} value={f.value}>
+                    {f.label}
+                  </option>
+                ))}
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
+          </Field.Root>
           {pagination && (
             <Text fontSize="sm" color="gray.500" ml={{ md: "auto" }} pb={1}>
               {pagination.total} {pagination.total === 1 ? "file" : "files"}

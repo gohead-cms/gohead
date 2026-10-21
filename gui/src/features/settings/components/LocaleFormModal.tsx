@@ -1,24 +1,7 @@
 import { type FormEvent, useState } from "react";
-import {
-  Alert,
-  AlertDescription,
-  AlertIcon,
-  Button,
-  Code,
-  FormControl,
-  FormErrorMessage,
-  FormHelperText,
-  FormLabel,
-  Input,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Button, Code, Input, VStack } from "@chakra-ui/react";
+import { DialogBody, DialogCloseTrigger, DialogContent, DialogFooter, DialogHeader, DialogRoot, DialogTitle } from "@/components/ui/dialog";
+import { Field } from "@/components/ui/field";
 import { api } from "../../../services/api";
 import type { Locale } from "../../../shared/hooks/useLocales";
 import { errorMessage } from "../../../shared/utils/errors";
@@ -91,7 +74,10 @@ export function LocaleFormModal({
     try {
       const res = editing
         ? await api<Locale>("PUT", `/admin/locales/${encodeURIComponent(locale.code)}`, { name: name.trim() })
-        : await api<Locale>("POST", "/admin/locales", { code: trimmed, name: name.trim() });
+        : await api<Locale>("POST", "/admin/locales", {
+            code: trimmed,
+            name: name.trim(),
+          });
       onSaved(res.data);
     } catch (err) {
       setServerError(errorMessage(err));
@@ -101,28 +87,51 @@ export function LocaleFormModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} closeOnOverlayClick={!saving}>
-      <ModalOverlay />
-      <ModalContent>
+    <DialogRoot
+      open={isOpen}
+      onOpenChange={(e) => {
+        if (!e.open) onClose();
+      }}
+      closeOnInteractOutside={!saving}
+    >
+      <DialogContent>
         <form onSubmit={submit} noValidate>
-          <ModalHeader>{editing ? `Rename ${locale.code}` : "Add a locale"}</ModalHeader>
-          <ModalCloseButton isDisabled={saving} />
-          <ModalBody>
-            <VStack spacing={4} align="stretch">
+          <DialogHeader>
+            <DialogTitle>{editing ? `Rename ${locale.code}` : "Add a locale"}</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <VStack gap={4} align="stretch">
               {serverError && (
-                <Alert status="error" borderRadius="md">
-                  <AlertIcon />
-                  <AlertDescription>{serverError}</AlertDescription>
-                </Alert>
+                <Alert.Root role="alert" status="error" borderRadius="md">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Description>{serverError}</Alert.Description>
+                  </Alert.Content>
+                </Alert.Root>
               )}
-              <FormControl isRequired={!editing} isInvalid={submitted && !!codeError}>
-                <FormLabel>Code</FormLabel>
+              <Field
+                label="Code"
+                required={!editing}
+                invalid={submitted && !!codeError}
+                errorText={codeError}
+                helperText={
+                  submitted && codeError ? undefined : editing ? (
+                    "The code cannot change: API clients ask for content with it."
+                  ) : (
+                    <>
+                      A BCP 47 language tag: a language (<Code fontSize="xs">fr</Code>), optionally with a region (
+                      <Code fontSize="xs">pt-BR</Code>) or script (<Code fontSize="xs">zh-Hans</Code>). Clients read content with{" "}
+                      <Code fontSize="xs">?locale=</Code> and this code.
+                    </>
+                  )
+                }
+              >
                 <Input
                   value={code}
                   onChange={(e) => onCodeChange(e.target.value)}
                   placeholder="fr"
                   list={editing ? undefined : "common-locale-codes"}
-                  isReadOnly={editing}
+                  readOnly={editing}
                   bg={editing ? "gray.100" : undefined}
                   fontFamily="mono"
                   autoFocus={!editing}
@@ -137,39 +146,23 @@ export function LocaleFormModal({
                     ))}
                   </datalist>
                 )}
-                {submitted && codeError ? (
-                  <FormErrorMessage>{codeError}</FormErrorMessage>
-                ) : (
-                  <FormHelperText>
-                    {editing ? (
-                      "The code cannot change: API clients ask for content with it."
-                    ) : (
-                      <>
-                        A BCP 47 language tag: a language (<Code fontSize="xs">fr</Code>), optionally with a region (
-                        <Code fontSize="xs">pt-BR</Code>) or script (<Code fontSize="xs">zh-Hans</Code>). Clients read content with{" "}
-                        <Code fontSize="xs">?locale=</Code> and this code.
-                      </>
-                    )}
-                  </FormHelperText>
-                )}
-              </FormControl>
-              <FormControl isRequired isInvalid={submitted && !!nameError}>
-                <FormLabel>Name</FormLabel>
+              </Field>
+              <Field label="Name" required invalid={submitted && !!nameError} errorText={nameError}>
                 <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Français" autoFocus={editing} />
-                <FormErrorMessage>{nameError}</FormErrorMessage>
-              </FormControl>
+              </Field>
             </VStack>
-          </ModalBody>
-          <ModalFooter gap={3}>
-            <Button onClick={onClose} isDisabled={saving}>
+          </DialogBody>
+          <DialogFooter gap={3}>
+            <Button variant="subtle" onClick={onClose} disabled={saving}>
               Cancel
             </Button>
-            <Button type="submit" colorScheme="blue" isLoading={saving}>
+            <Button type="submit" colorPalette="blue" loading={saving}>
               {editing ? "Save" : "Add locale"}
             </Button>
-          </ModalFooter>
+          </DialogFooter>
         </form>
-      </ModalContent>
-    </Modal>
+        <DialogCloseTrigger disabled={saving} />
+      </DialogContent>
+    </DialogRoot>
   );
 }

@@ -1,19 +1,6 @@
 import { type ReactNode, useState } from "react";
-import {
-  Alert,
-  AlertIcon,
-  Drawer,
-  DrawerOverlay,
-  DrawerContent,
-  DrawerHeader,
-  DrawerCloseButton,
-  DrawerBody,
-  DrawerFooter,
-  Button,
-  Flex,
-  Spacer,
-  Text,
-} from "@chakra-ui/react";
+import { Alert, Button, Flex, Spacer, Text } from "@chakra-ui/react";
+import { DrawerBody, DrawerCloseTrigger, DrawerContent, DrawerFooter, DrawerHeader, DrawerRoot, DrawerTitle } from "@/components/ui/drawer";
 import { FiClock } from "react-icons/fi";
 import { getJSON, useApiQuery } from "../../../shared/hooks/useApiQuery";
 import { useNotify } from "../../../shared/hooks/useNotify";
@@ -77,7 +64,8 @@ export function EntryFormModal({
   const path = itemToEdit ? `/api/collections/${encodeURIComponent(collection)}/${encodeURIComponent(String(itemToEdit.id))}` : null;
 
   const historyButton = itemToEdit && onShowHistory && (
-    <Button variant="ghost" leftIcon={<FiClock />} onClick={() => onShowHistory(itemToEdit)}>
+    <Button variant="ghost" onClick={() => onShowHistory(itemToEdit)}>
+      <FiClock />
       History
     </Button>
   );
@@ -88,12 +76,18 @@ export function EntryFormModal({
   );
 
   return (
-    <Drawer isOpen={isOpen} placement="right" onClose={onClose} size="lg">
-      <DrawerOverlay />
+    <DrawerRoot
+      open={isOpen}
+      placement="end"
+      onOpenChange={(e) => {
+        if (!e.open) onClose();
+      }}
+      size="lg"
+    >
       <DrawerContent>
-        <DrawerCloseButton />
         <DrawerHeader borderBottomWidth="1px" pr={12}>
-          <Flex align="center" gap={3} wrap="wrap">
+          <DrawerTitle asChild fontSize="xl" fontWeight="semibold">
+            <Flex align="center" gap={3} wrap="wrap">
             <Text as="span">
               {itemToEdit ? "Edit Entry" : "Add New Entry"} in {schema.info?.displayName || schema.collectionName}
             </Text>
@@ -108,7 +102,8 @@ export function EntryFormModal({
                 }
               />
             )}
-          </Flex>
+            </Flex>
+          </DrawerTitle>
         </DrawerHeader>
         {active && defaultLocale && path ? (
           <TranslationForm
@@ -155,8 +150,9 @@ export function EntryFormModal({
           />
         )}
         {guard.dialog}
+        <DrawerCloseTrigger />
       </DrawerContent>
-    </Drawer>
+    </DrawerRoot>
   );
 }
 
@@ -186,10 +182,10 @@ function DefaultLocaleEntry(props: DefaultLocaleEntryProps) {
   if (error) {
     return (
       <DrawerBody>
-        <Alert status="error" borderRadius="md">
-          <AlertIcon />
-          {error}
-        </Alert>
+        <Alert.Root role="alert" status="error" borderRadius="md">
+          <Alert.Indicator />
+          <Alert.Description>{error}</Alert.Description>
+        </Alert.Root>
       </DrawerBody>
     );
   }
@@ -246,7 +242,7 @@ function DefaultLocaleForm({ schema, item, entry, onSubmit, onClose, draftOnly, 
           </Text>
         )}
         {cancel}
-        <Button colorScheme="purple" onClick={handleSubmit} isLoading={isSubmitting}>
+        <Button colorPalette="purple" onClick={handleSubmit} loading={isSubmitting}>
           {draftOnly ? "Save draft" : "Save Changes"}
         </Button>
       </DrawerFooter>

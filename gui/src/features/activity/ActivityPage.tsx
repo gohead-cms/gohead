@@ -1,28 +1,6 @@
 import { useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
-import {
-  Alert,
-  AlertIcon,
-  Box,
-  Button,
-  HStack,
-  IconButton,
-  Select,
-  Spinner,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Table,
-  TableContainer,
-  Tbody,
-  Td,
-  Text,
-  Th,
-  Thead,
-  Tabs,
-  Tr,
-} from "@chakra-ui/react";
+import { Alert, Box, Button, HStack, IconButton, NativeSelect, Spinner, Table, Tabs, Text } from "@chakra-ui/react";
 import { FiActivity, FiRefreshCw } from "react-icons/fi";
 import { type AgentRun, type RunStatus } from "../../shared/types";
 import { EmptyState } from "../../shared/ui/EmptyState";
@@ -69,32 +47,36 @@ export function ActivityPage() {
         title="Activity"
         description="What every agent did, and every change to content."
         actions={
-          <IconButton aria-label="Refresh" icon={<FiRefreshCw />} size="sm" onClick={refresh} isLoading={loading || usage.loading} />
+          <IconButton aria-label="Refresh" size="xs" variant="subtle" onClick={refresh} loading={loading || usage.loading}>
+            <FiRefreshCw />
+          </IconButton>
         }
       />
 
-      <Tabs isLazy colorScheme="purple">
-        <TabList mb={4}>
-          <Tab>Agent runs</Tab>
-          <Tab>Content changes</Tab>
-        </TabList>
-        <TabPanels>
-          <TabPanel px={0}>
-            <UsageSummaryCard summary={usage.summary} loading={usage.loading} error={usage.error} />
+      <Tabs.Root defaultValue="runs" lazyMount unmountOnExit colorPalette="purple">
+        <Tabs.List mb={4}>
+          <Tabs.Trigger value="runs" _selected={{ color: "purple.600" }}>
+            Agent runs
+          </Tabs.Trigger>
+          <Tabs.Trigger value="changes" _selected={{ color: "purple.600" }}>
+            Content changes
+          </Tabs.Trigger>
+        </Tabs.List>
+        <Tabs.Content value="runs" px={0} py={4}>
+          <UsageSummaryCard summary={usage.summary} loading={usage.loading} error={usage.error} />
 
-            <Box bg="white" borderWidth="1px" borderRadius="lg" p={{ base: 4, md: 5 }}>
-              <HStack mb={4} spacing={3} wrap="wrap">
-                <Text fontWeight="semibold" mr="auto">
-                  Runs
+          <Box bg="white" borderWidth="1px" borderRadius="lg" p={{ base: 4, md: 5 }}>
+            <HStack mb={4} gap={3} wrap="wrap">
+              <Text fontWeight="semibold" mr="auto">
+                Runs
+              </Text>
+              {pagination && (
+                <Text fontSize="sm" color="gray.500">
+                  {pagination.total} run{pagination.total === 1 ? "" : "s"}
                 </Text>
-                {pagination && (
-                  <Text fontSize="sm" color="gray.500">
-                    {pagination.total} run{pagination.total === 1 ? "" : "s"}
-                  </Text>
-                )}
-                <Select
-                  size="sm"
-                  maxW="180px"
+              )}
+              <NativeSelect.Root size="xs" maxW="180px">
+                <NativeSelect.Field
                   aria-label="Filter by status"
                   value={status}
                   onChange={(e) => {
@@ -108,128 +90,139 @@ export function ActivityPage() {
                       {o.label}
                     </option>
                   ))}
-                </Select>
-              </HStack>
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
+            </HStack>
 
-              {error && (
-                <Alert status="error" mb={3} borderRadius="md">
-                  <AlertIcon />
-                  {error}
-                </Alert>
-              )}
-              {loading && runs.length === 0 && <Spinner />}
-              {!loading && !error && runs.length === 0 &&
-                (status ? (
-                  <Text fontSize="sm" color="gray.500">
-                    No {status} runs.{" "}
-                    <Button variant="link" size="sm" onClick={() => {
-                        setStatus("");
-                        setPage(1);
-                      }}>
-                      Show all runs
-                    </Button>
-                  </Text>
-                ) : (
-                  <EmptyState
-                    icon={FiActivity}
-                    title="No runs yet"
-                    action={
-                      <Button as={RouterLink} to="/agents" size="sm" colorScheme="teal">
-                        Go to agents
-                      </Button>
-                    }
+            {error && (
+              <Alert.Root role="alert" status="error" mb={3} borderRadius="md">
+                <Alert.Indicator />
+                <Alert.Content>
+                  <Alert.Description>{error}</Alert.Description>
+                </Alert.Content>
+              </Alert.Root>
+            )}
+            {loading && runs.length === 0 && <Spinner />}
+            {!loading && !error && runs.length === 0 &&
+              (status ? (
+                <Text fontSize="sm" color="gray.500">
+                  No {status} runs.{" "}
+                  <Button
+                    variant="plain"
+                    size="xs"
+                    color="gray.500"
+                    px={0}
+                    h="auto"
+                    _hover={{ textDecoration: "underline" }}
+                    onClick={() => {
+                      setStatus("");
+                      setPage(1);
+                    }}
                   >
-                    Runs appear here when an agent is triggered by an event, a webhook or a schedule, or run by hand.
-                  </EmptyState>
-                ))}
-
-              {runs.length > 0 && (
-                <TableContainer borderWidth="1px" borderRadius="md">
-                  <Table size="sm" sx={{ "th, td": { px: 3 } }}>
-                    <Thead>
-                      <Tr>
-                        <Th>Started</Th>
-                        <Th>Agent</Th>
-                        <Th>Status</Th>
-                        <Th>Trigger</Th>
-                        <Th isNumeric title="Model calls / function calls">
-                          Turns / calls
-                        </Th>
-                        <Th isNumeric>Tokens</Th>
-                        <Th isNumeric>Cost</Th>
-                        <Th isNumeric>Duration</Th>
-                      </Tr>
-                    </Thead>
-                    <Tbody>
-                      {runs.map((r) => {
-                        const agent = agentOf(r);
-                        const trigger = triggerSummary(r.triggerType, r.trigger);
-                        return (
-                          <Tr
-                            key={r.id}
-                            cursor="pointer"
-                            _hover={{ bg: "gray.50" }}
-                            tabIndex={0}
-                            aria-label={`Run ${r.id} of ${agent}`}
-                            onClick={() => setOpen({ agent, id: r.id })}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") setOpen({ agent, id: r.id });
-                            }}
-                          >
-                            <Td whiteSpace="nowrap" title={formatTime(r.startedAt)}>
-                              {formatShortTime(r.startedAt)}
-                            </Td>
-                            <Td maxW="160px" overflow="hidden" textOverflow="ellipsis" fontWeight="medium" title={agent}>
-                              {agent}
-                            </Td>
-                            <Td>
-                              <RunStatusBadge run={r} />
-                            </Td>
-                            <Td maxW="180px" overflow="hidden" textOverflow="ellipsis" title={trigger}>
-                              {trigger}
-                            </Td>
-                            <Td isNumeric whiteSpace="nowrap">
-                              {r.turns} / {r.toolCalls}
-                            </Td>
-                            <Td isNumeric>{formatTokens(r.inputTokens + r.outputTokens)}</Td>
-                            <Td isNumeric>{formatCost(r.costUsd)}</Td>
-                            <Td isNumeric>{formatDuration(r.durationMs)}</Td>
-                          </Tr>
-                        );
-                      })}
-                    </Tbody>
-                  </Table>
-                </TableContainer>
-              )}
-
-              {pagination && pagination.pageCount > 1 && (
-                <HStack mt={3} justify="flex-end">
-                  <Button size="sm" onClick={() => setPage((p) => p - 1)} isDisabled={page <= 1}>
-                    Newer
+                    Show all runs
                   </Button>
-                  <Text fontSize="sm">
-                    {page} / {pagination.pageCount}
-                  </Text>
-                  <Button size="sm" onClick={() => setPage((p) => p + 1)} isDisabled={page >= pagination.pageCount}>
-                    Older
-                  </Button>
-                </HStack>
-              )}
-            </Box>
-          </TabPanel>
-          <TabPanel px={0}>
-            <Box bg="white" borderWidth="1px" borderRadius="lg" p={{ base: 4, md: 5 }}>
-              <Text fontWeight="semibold" mb={1}>
-                Content changes
-              </Text>
-              <Text fontSize="sm" color="gray.500" mb={4}>
-                Every change to an entry, by users, API tokens and agents. Open one to see its history and restore a version.
-              </Text>
-              <ContentChanges filters />
-            </Box>
-          </TabPanel>
-        </TabPanels>
-      </Tabs>
+                </Text>
+              ) : (
+                <EmptyState
+                  icon={FiActivity}
+                  title="No runs yet"
+                  action={
+                    <Button asChild size="xs" colorPalette="teal">
+                      <RouterLink to="/agents">Go to agents</RouterLink>
+                    </Button>
+                  }
+                >
+                  Runs appear here when an agent is triggered by an event, a webhook or a schedule, or run by hand.
+                </EmptyState>
+              ))}
+
+            {runs.length > 0 && (
+              <Table.ScrollArea whiteSpace="nowrap" borderWidth="1px" borderRadius="md">
+                <Table.Root size="sm" css={{ "& th, & td": { px: 3 } }}>
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeader>Started</Table.ColumnHeader>
+                      <Table.ColumnHeader>Agent</Table.ColumnHeader>
+                      <Table.ColumnHeader>Status</Table.ColumnHeader>
+                      <Table.ColumnHeader>Trigger</Table.ColumnHeader>
+                      <Table.ColumnHeader textAlign="end" title="Model calls / function calls">
+                        Turns / calls
+                      </Table.ColumnHeader>
+                      <Table.ColumnHeader textAlign="end">Tokens</Table.ColumnHeader>
+                      <Table.ColumnHeader textAlign="end">Cost</Table.ColumnHeader>
+                      <Table.ColumnHeader textAlign="end">Duration</Table.ColumnHeader>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    {runs.map((r) => {
+                      const agent = agentOf(r);
+                      const trigger = triggerSummary(r.triggerType, r.trigger);
+                      return (
+                        <Table.Row
+                          key={r.id}
+                          cursor="pointer"
+                          _hover={{ bg: "gray.50" }}
+                          tabIndex={0}
+                          aria-label={`Run ${r.id} of ${agent}`}
+                          onClick={() => setOpen({ agent, id: r.id })}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") setOpen({ agent, id: r.id });
+                          }}
+                        >
+                          <Table.Cell whiteSpace="nowrap" title={formatTime(r.startedAt)}>
+                            {formatShortTime(r.startedAt)}
+                          </Table.Cell>
+                          <Table.Cell maxW="160px" overflow="hidden" textOverflow="ellipsis" fontWeight="medium" title={agent}>
+                            {agent}
+                          </Table.Cell>
+                          <Table.Cell>
+                            <RunStatusBadge run={r} />
+                          </Table.Cell>
+                          <Table.Cell maxW="180px" overflow="hidden" textOverflow="ellipsis" title={trigger}>
+                            {trigger}
+                          </Table.Cell>
+                          <Table.Cell textAlign="end" whiteSpace="nowrap">
+                            {r.turns} / {r.toolCalls}
+                          </Table.Cell>
+                          <Table.Cell textAlign="end">{formatTokens(r.inputTokens + r.outputTokens)}</Table.Cell>
+                          <Table.Cell textAlign="end">{formatCost(r.costUsd)}</Table.Cell>
+                          <Table.Cell textAlign="end">{formatDuration(r.durationMs)}</Table.Cell>
+                        </Table.Row>
+                      );
+                    })}
+                  </Table.Body>
+                </Table.Root>
+              </Table.ScrollArea>
+            )}
+
+            {pagination && pagination.pageCount > 1 && (
+              <HStack mt={3} justify="flex-end">
+                <Button size="xs" variant="subtle" onClick={() => setPage((p) => p - 1)} disabled={page <= 1}>
+                  Newer
+                </Button>
+                <Text fontSize="sm">
+                  {page} / {pagination.pageCount}
+                </Text>
+                <Button size="xs" variant="subtle" onClick={() => setPage((p) => p + 1)} disabled={page >= pagination.pageCount}>
+                  Older
+                </Button>
+              </HStack>
+            )}
+          </Box>
+        </Tabs.Content>
+        <Tabs.Content value="changes" px={0} py={4}>
+          <Box bg="white" borderWidth="1px" borderRadius="lg" p={{ base: 4, md: 5 }}>
+            <Text fontWeight="semibold" mb={1}>
+              Content changes
+            </Text>
+            <Text fontSize="sm" color="gray.500" mb={4}>
+              Every change to an entry, by users, API tokens and agents. Open one to see its history and restore a version.
+            </Text>
+            <ContentChanges filters />
+          </Box>
+        </Tabs.Content>
+      </Tabs.Root>
 
       <RunDetailDrawer
         agentName={open?.agent ?? ""}

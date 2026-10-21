@@ -1,4 +1,4 @@
-import { Badge, SimpleGrid, Stat, StatLabel, StatNumber, Text, Wrap, WrapItem } from "@chakra-ui/react";
+import { Badge, SimpleGrid, Stat, Text, Wrap, WrapItem } from "@chakra-ui/react";
 import { formatCost, formatTokens, statusColor } from "../../agents/components/runFormat";
 import type { Overview } from "../overview";
 import { successRate } from "../overview";
@@ -16,32 +16,32 @@ export function AgentActivityCard({ runs }: { runs: Overview["runs24h"] }) {
   ] as const;
   return (
     <>
-      <SimpleGrid columns={2} spacingX={4} spacingY={3} mb={4}>
-        <Stat size="sm">
-          <StatLabel color="gray.500">Runs</StatLabel>
-          <StatNumber>{runs.total.toLocaleString()}</StatNumber>
-        </Stat>
-        <Stat size="sm">
-          <StatLabel color="gray.500">Success rate</StatLabel>
-          <StatNumber>{successRate(runs)}</StatNumber>
-        </Stat>
-        <Stat size="sm">
-          <StatLabel color="gray.500">Tokens in / out</StatLabel>
-          <StatNumber>
+      <SimpleGrid columns={2} columnGap={4} rowGap={3} mb={4}>
+        <Stat.Root size="sm">
+          <Stat.Label color="gray.500">Runs</Stat.Label>
+          <Stat.ValueText>{runs.total.toLocaleString()}</Stat.ValueText>
+        </Stat.Root>
+        <Stat.Root size="sm">
+          <Stat.Label color="gray.500">Success rate</Stat.Label>
+          <Stat.ValueText>{successRate(runs)}</Stat.ValueText>
+        </Stat.Root>
+        <Stat.Root size="sm">
+          <Stat.Label color="gray.500">Tokens in / out</Stat.Label>
+          <Stat.ValueText>
             {formatTokens(runs.inputTokens)} / {formatTokens(runs.outputTokens)}
-          </StatNumber>
-        </Stat>
-        <Stat size="sm">
-          <StatLabel color="gray.500">Cost</StatLabel>
-          <StatNumber>{formatCost(runs.costUsd)}</StatNumber>
-        </Stat>
+          </Stat.ValueText>
+        </Stat.Root>
+        <Stat.Root size="sm">
+          <Stat.Label color="gray.500">Cost</Stat.Label>
+          <Stat.ValueText>{formatCost(runs.costUsd)}</Stat.ValueText>
+        </Stat.Root>
       </SimpleGrid>
-      <Wrap spacing={2}>
+      <Wrap gap={2}>
         {byStatus
           .filter((s) => s.n > 0)
           .map((s) => (
             <WrapItem key={s.status}>
-              <Badge colorScheme={statusColor[s.status]} variant={s.status === "failed" ? "solid" : "subtle"}>
+              <Badge colorPalette={statusColor[s.status]} variant={s.status === "failed" ? "solid" : "subtle"}>
                 {s.n} {s.status}
               </Badge>
             </WrapItem>

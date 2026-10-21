@@ -1,5 +1,6 @@
 import React, { type ReactNode } from "react";
-import { FormControl, FormHelperText, FormLabel, Input, Select, Switch, Text, Textarea, VStack } from "@chakra-ui/react";
+import { Field, Input, NativeSelect, Text, Textarea, VStack } from "@chakra-ui/react";
+import { Switch } from "@/components/ui/switch";
 import type { Attribute } from "../../../shared/types";
 import { ComponentField } from "./ComponentField";
 import { JsonField } from "./JsonField";
@@ -24,17 +25,20 @@ function FieldInput({ id, name, attr, value, onChange, placeholder = `Enter ${na
   const onText = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange(name, e.target.value);
 
   if (isBooleanType(attr.type)) {
-    return <Switch id={id} isChecked={value === true} onChange={(e) => onChange(name, e.target.checked)} />;
+    return <Switch size="sm" inputProps={{ id }} checked={value === true} onCheckedChange={(e) => onChange(name, e.checked)} />;
   }
   if (attr.type === "enum" && attr.options?.length) {
     return (
-      <Select id={id} value={typeof value === "string" ? value : ""} placeholder="Choose…" onChange={(e) => onChange(name, e.target.value)}>
-        {attr.options.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
-      </Select>
+      <NativeSelect.Root>
+        <NativeSelect.Field id={id} value={typeof value === "string" ? value : ""} placeholder="Choose…" onChange={(e) => onChange(name, e.target.value)}>
+          {attr.options.map((o) => (
+            <option key={o} value={o}>
+              {o}
+            </option>
+          ))}
+        </NativeSelect.Field>
+        <NativeSelect.Indicator />
+      </NativeSelect.Root>
     );
   }
   switch (attr.type) {
@@ -86,12 +90,14 @@ interface EntryFieldsProps {
  */
 export function EntryFields({ attributes, values, onChange, idPrefix = "field-", hints, placeholders }: EntryFieldsProps) {
   return (
-    <VStack spacing={6} align="stretch">
+    <VStack gap={6} align="stretch">
       {Object.entries(attributes).map(([key, attr]) => {
         const id = `${idPrefix}${key}`;
+        // A group's label names the group (aria-labelledby), not an input:
+        // the field keeps its own generated control id.
         return (
-          <FormControl key={key} isRequired={attr.required}>
-            <FormLabel htmlFor={GROUPS.has(attr.type) ? undefined : id} id={`${id}-label`}>
+          <Field.Root key={key} required={attr.required} id={GROUPS.has(attr.type) ? undefined : id} ids={{ label: `${id}-label` }}>
+            <Field.Label>
               {key}
               {attr.type === "relation" && attr.target && (
                 <Text as="span" fontWeight="normal" color="gray.500" fontSize="sm">
@@ -100,10 +106,11 @@ export function EntryFields({ attributes, values, onChange, idPrefix = "field-",
                   {attr.relation === "manyToMany" ? " (several)" : ""}
                 </Text>
               )}
-            </FormLabel>
+              <Field.RequiredIndicator />
+            </Field.Label>
             <FieldInput id={id} name={key} attr={attr} value={values[key]} onChange={onChange} placeholder={placeholders?.[key]} />
-            {hints?.[key] && <FormHelperText>{hints[key]}</FormHelperText>}
-          </FormControl>
+            {hints?.[key] && <Field.HelperText>{hints[key]}</Field.HelperText>}
+          </Field.Root>
         );
       })}
     </VStack>

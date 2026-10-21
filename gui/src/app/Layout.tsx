@@ -21,7 +21,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           as="main"
           flex="1"
           // The left margin now dynamically changes based on the sidebar's state
-          ml={{ base: 0, md: isCollapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH }} 
+          ml={{ base: 0, md: isCollapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH }}
           mt="64px"
           transition="margin-left .2s ease-in-out"
         >

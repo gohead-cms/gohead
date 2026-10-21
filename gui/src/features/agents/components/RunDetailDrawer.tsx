@@ -1,26 +1,11 @@
-import {
-  Alert,
-  AlertIcon,
-  Badge,
-  Box,
-  Code,
-  Divider,
-  Drawer,
-  DrawerBody,
-  DrawerCloseButton,
-  DrawerContent,
-  DrawerHeader,
-  DrawerOverlay,
-  HStack,
-  Spinner,
-  Text,
-  VStack,
-  useColorModeValue,
-} from "@chakra-ui/react";
+import { Badge, Box, Code, HStack, Separator, Spinner, Text, VStack } from "@chakra-ui/react";
+import { useColorModeValue } from "@/components/ui/color-mode";
+import { DrawerBody, DrawerCloseTrigger, DrawerContent, DrawerHeader, DrawerRoot, DrawerTitle } from "@/components/ui/drawer";
 import { type AgentRunStep } from "../../../shared/types";
 import { RunProposals } from "../../approvals/RunProposals";
 import { RunContentChanges } from "../../history/RunContentChanges";
 import { useAgentRun } from "../hook/useAgentRuns";
+import { Notice } from "./EditorParts";
 import { RunStatusBadge } from "./RunBadges";
 import {
   formatCost,
@@ -71,11 +56,11 @@ function Step({ step }: { step: AgentRunStep }) {
   const tokens = step.inputTokens + step.outputTokens;
   return (
     <Box borderLeftWidth="3px" borderColor={step.error ? "red.400" : border} pl={3} py={1}>
-      <HStack spacing={2} wrap="wrap" mb={1}>
+      <HStack gap={2} wrap="wrap" mb={1}>
         <Text fontSize="xs" color="gray.500">
           #{step.seq}
         </Text>
-        <Badge colorScheme={step.type === "llm" ? "purple" : "teal"}>
+        <Badge colorPalette={step.type === "llm" ? "purple" : "teal"}>
           {step.type === "llm" ? "model" : "function"}
         </Badge>
         <Text fontWeight="semibold" fontSize="sm">
@@ -92,7 +77,7 @@ function Step({ step }: { step: AgentRunStep }) {
           {step.costUsd > 0 && ` · ${formatCost(step.costUsd)}`}
         </Text>
       </HStack>
-      <VStack align="stretch" spacing={2}>
+      <VStack align="stretch" gap={2}>
         {step.arguments && <Pre text={prettyJSON(step.arguments)} />}
         {step.result && <Pre text={prettyJSON(step.result)} />}
         {step.error && (
@@ -110,54 +95,61 @@ export function RunDetailDrawer({ agentName, runId, onClose }: RunDetailDrawerPr
   const { run, loading, error, inProgress } = useAgentRun(agentName, runId);
 
   return (
-    <Drawer isOpen={runId !== null} onClose={onClose} size="lg" placement="right">
-      <DrawerOverlay />
+    <DrawerRoot
+      open={runId !== null}
+      onOpenChange={(e) => {
+        if (!e.open) onClose();
+      }}
+      // It opens as the test/run-now dialog closes and gives focus back to its
+      // button: that must not count as leaving the drawer (v2 ignored it too).
+      onFocusOutside={(e) => e.preventDefault()}
+      size="lg"
+      placement="end"
+    >
       <DrawerContent>
-        <DrawerCloseButton />
-        <DrawerHeader borderBottomWidth="1px">
-          Run #{runId}
-          <Text as="span" fontWeight="normal" color="gray.500" fontSize="md" ml={2}>
-            {agentName}
-          </Text>
-          {run && (
-            <Box as="span" ml={3}>
-              <RunStatusBadge run={run} />
-            </Box>
-          )}
-          {inProgress && <Spinner size="xs" ml={2} color="gray.400" aria-label="Updating" />}
+        <DrawerHeader borderBottomWidth="1px" pb={4}>
+          <DrawerTitle fontSize="xl" fontWeight="semibold" pe={8}>
+            Run #{runId}
+            <Text as="span" fontWeight="normal" color="gray.500" fontSize="md" ml={2}>
+              {agentName}
+            </Text>
+            {run && (
+              <Box as="span" ml={3}>
+                <RunStatusBadge run={run} />
+              </Box>
+            )}
+            {inProgress && <Spinner size="xs" ml={2} color="gray.400" aria-label="Updating" />}
+          </DrawerTitle>
         </DrawerHeader>
         <DrawerBody>
           {/* A run that has not ended reloads in place: keep it on screen. */}
           {loading && !run && <Spinner mt={4} />}
           {error && (
-            <Alert status="error" mt={4}>
-              <AlertIcon />
+            <Notice status="error" mt={4}>
               {error}
-            </Alert>
+            </Notice>
           )}
           {run && (
-            <VStack align="stretch" spacing={5} py={4}>
+            <VStack align="stretch" gap={5} py={4}>
               {run.status === "queued" && (
-                <Alert status="info" borderRadius="md">
-                  <AlertIcon />
+                <Notice status="info" borderRadius="md">
                   Queued: the run starts as soon as a worker picks it up.
-                </Alert>
+                </Notice>
               )}
               {run.dryRun && (
-                <Alert status="info" variant="left-accent" borderRadius="md">
-                  <AlertIcon />
+                <Notice status="info" variant="subtle" borderStartWidth="4px" borderStartColor="colorPalette.solid" borderRadius="md">
                   Test run: the agent ran for real, but content functions only reported what they would change (“would_update”…). Nothing
                   was written.
-                </Alert>
+                </Notice>
               )}
-              <HStack spacing={6} wrap="wrap" fontSize="sm">
+              <HStack gap={6} wrap="wrap" fontSize="sm">
                 <Text>Started {formatTime(run.startedAt)}</Text>
                 <Text>{formatDuration(run.durationMs)}</Text>
                 <Text>
                   {formatTokens(run.inputTokens)} in / {formatTokens(run.outputTokens)} out
                 </Text>
                 <Text>{formatCost(run.costUsd)}</Text>
-                {run.attempt > 1 && <Badge colorScheme="yellow">attempt {run.attempt}</Badge>}
+                {run.attempt > 1 && <Badge colorPalette="yellow">attempt {run.attempt}</Badge>}
                 {run.model && (
                   <Text color="gray.500">
                     {run.provider}/{run.model}
@@ -165,10 +157,9 @@ export function RunDetailDrawer({ agentName, runId, onClose }: RunDetailDrawerPr
                 )}
               </HStack>
               {run.error && (
-                <Alert status={run.status === "limited" ? "warning" : "error"}>
-                  <AlertIcon />
+                <Notice status={run.status === "limited" ? "warning" : "error"}>
                   {run.error}
-                </Alert>
+                </Notice>
               )}
               <Section title={`Trigger (${run.triggerType.replace(/_/g, " ")})`}>
                 <Pre text={prettyJSON(run.trigger)} />
@@ -178,10 +169,10 @@ export function RunDetailDrawer({ agentName, runId, onClose }: RunDetailDrawerPr
                   <Pre text={run.input} />
                 </Section>
               )}
-              <Divider />
+              <Separator />
               <Section title={`Steps (${run.steps?.length ?? 0})`}>
                 {run.steps && run.steps.length > 0 ? (
-                  <VStack align="stretch" spacing={3}>
+                  <VStack align="stretch" gap={3}>
                     {run.steps.map((s) => (
                       <Step key={s.id} step={s} />
                     ))}
@@ -197,14 +188,15 @@ export function RunDetailDrawer({ agentName, runId, onClose }: RunDetailDrawerPr
                   <Pre text={run.output} />
                 </Section>
               )}
-              <Divider />
+              <Separator />
               {/* Reloaded once the run ends: it may propose more while it runs. */}
               {runId !== null && <RunProposals key={`${runId}-${run.status}`} runId={runId} />}
               {runId !== null && !run.dryRun && <RunContentChanges key={runId} agentName={agentName} runId={runId} />}
             </VStack>
           )}
         </DrawerBody>
+        <DrawerCloseTrigger />
       </DrawerContent>
-    </Drawer>
+    </DrawerRoot>
   );
 }

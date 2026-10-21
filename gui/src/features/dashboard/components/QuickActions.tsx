@@ -14,24 +14,21 @@ const ACTIONS: { label: string; to: string; icon: IconType }[] = [
 /** Links to the most common tasks. */
 export function QuickActions() {
   return (
-    <VStack align="stretch" spacing={2}>
+    <VStack align="stretch" gap={2}>
       {ACTIONS.map((a) => (
-        <Button key={a.to} as={RouterLink} to={a.to} variant="outline" size="sm" justifyContent="flex-start" leftIcon={<Icon as={a.icon} />}>
-          {a.label}
+        <Button key={a.to} asChild variant="outline" size="xs" justifyContent="flex-start">
+          <RouterLink to={a.to}>
+            <Icon as={a.icon} />
+            {a.label}
+          </RouterLink>
         </Button>
       ))}
-      <Button
-        as="a"
-        href={`${API_BASE_URL}/api/docs`}
-        target="_blank"
-        rel="noopener noreferrer"
-        variant="outline"
-        size="sm"
-        justifyContent="flex-start"
-        leftIcon={<Icon as={FiBookOpen} />}
-        rightIcon={<Icon as={FiExternalLink} />}
-      >
-        API reference
+      <Button asChild variant="outline" size="xs" justifyContent="flex-start">
+        <a href={`${API_BASE_URL}/api/docs`} target="_blank" rel="noopener noreferrer">
+          <Icon as={FiBookOpen} />
+          API reference
+          <Icon as={FiExternalLink} />
+        </a>
       </Button>
     </VStack>
   );

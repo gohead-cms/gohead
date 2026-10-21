@@ -1,21 +1,7 @@
 import { useState } from "react";
-import {
-  Box,
-  Button,
-  Input,
-  InputGroup,
-  InputLeftElement,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
-  SimpleGrid,
-  Spinner,
-  Text,
-} from "@chakra-ui/react";
+import { Box, Button, Input, SimpleGrid, Spinner, Text, chakra } from "@chakra-ui/react";
+import { DialogBody, DialogCloseTrigger, DialogContent, DialogFooter, DialogHeader, DialogRoot, DialogTitle } from "@/components/ui/dialog";
+import { InputGroup } from "@/components/ui/input-group";
 import { FiCheckCircle, FiSearch } from "react-icons/fi";
 import { getJSON, useApiQuery } from "../../../shared/hooks/useApiQuery";
 import { MediaThumb } from "../../media/components/MediaThumb";
@@ -60,16 +46,20 @@ export function MediaLibraryPicker({ multiple, accept, selected, onClose, onPick
   };
 
   return (
-    <Modal isOpen onClose={onClose} size="4xl" scrollBehavior="inside">
-      <ModalOverlay />
-      <ModalContent>
-        <ModalHeader>{multiple ? "Add files from the library" : "Choose a file from the library"}</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody>
-          <InputGroup mb={4}>
-            <InputLeftElement pointerEvents="none">
-              <FiSearch />
-            </InputLeftElement>
+    <DialogRoot
+      open
+      onOpenChange={(e) => {
+        if (!e.open) onClose();
+      }}
+      size="xl"
+      scrollBehavior="inside"
+    >
+      <DialogContent maxW="4xl">
+        <DialogHeader>
+          <DialogTitle>{multiple ? "Add files from the library" : "Choose a file from the library"}</DialogTitle>
+        </DialogHeader>
+        <DialogBody>
+          <InputGroup mb={4} w="full" startElement={<FiSearch />}>
             <Input
               autoFocus
               placeholder="Search by file name"
@@ -91,15 +81,14 @@ export function MediaLibraryPicker({ multiple, accept, selected, onClose, onPick
               {search.trim() ? "No file matches." : "The library has no matching files yet."}
             </Text>
           )}
-          <SimpleGrid minChildWidth="140px" spacing={3}>
+          <SimpleGrid minChildWidth="140px" gap={3}>
             {data?.items.map((m) => {
               const already = selected.includes(m.id);
               const allowed = mimeAllowed(m.mime, accept);
               const on = isPicked(m);
               return (
-                <Box
+                <chakra.button
                   key={m.id}
-                  as="button"
                   type="button"
                   onClick={() => !already && allowed && choose(m)}
                   aria-disabled={already || !allowed}
@@ -122,22 +111,22 @@ export function MediaLibraryPicker({ multiple, accept, selected, onClose, onPick
                       <FiCheckCircle size={20} />
                     </Box>
                   )}
-                  <Text fontSize="xs" px={2} py={1} noOfLines={1}>
+                  <Text fontSize="xs" px={2} py={1} lineClamp={1}>
                     {m.name}
                   </Text>
-                </Box>
+                </chakra.button>
               );
             })}
           </SimpleGrid>
-        </ModalBody>
-        <ModalFooter gap={2}>
-          <Button size="sm" variant="ghost" onClick={() => setPage((p) => p - 1)} isDisabled={page <= 1}>
+        </DialogBody>
+        <DialogFooter gap={2}>
+          <Button size="xs" variant="ghost" onClick={() => setPage((p) => p - 1)} disabled={page <= 1}>
             Previous
           </Button>
           <Text fontSize="sm" color="gray.500">
             {page} / {pages}
           </Text>
-          <Button size="sm" variant="ghost" onClick={() => setPage((p) => p + 1)} isDisabled={page >= pages}>
+          <Button size="xs" variant="ghost" onClick={() => setPage((p) => p + 1)} disabled={page >= pages}>
             Next
           </Button>
           <Box flex="1" />
@@ -145,12 +134,13 @@ export function MediaLibraryPicker({ multiple, accept, selected, onClose, onPick
             Cancel
           </Button>
           {multiple && (
-            <Button colorScheme="purple" onClick={() => onPick(picked)} isDisabled={picked.length === 0}>
+            <Button colorPalette="purple" onClick={() => onPick(picked)} disabled={picked.length === 0}>
               Add {picked.length || ""}
             </Button>
           )}
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
+        </DialogFooter>
+        <DialogCloseTrigger />
+      </DialogContent>
+    </DialogRoot>
   );
 }

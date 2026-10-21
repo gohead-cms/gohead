@@ -1,4 +1,5 @@
-import { Table, Thead, Tbody, Tr, Th, Td, TableContainer, IconButton, HStack, Box, Badge, Button, Tooltip } from "@chakra-ui/react";
+import { Table, IconButton, HStack, Box, Badge, Button } from "@chakra-ui/react";
+import { Tooltip } from "@/components/ui/tooltip";
 import { FiClock, FiEdit, FiTrash2, FiEye, FiEyeOff, FiInbox, FiPlus } from "react-icons/fi";
 import type { Locale } from "../../../shared/hooks/useLocales";
 import type { Schema } from "../../../shared/types";
@@ -37,7 +38,8 @@ export function ContentTable({ schema, items, perms, locales, onAdd, onEdit, onH
         title="This collection is empty"
         action={
           perms.create && (
-            <Button size="sm" colorScheme="purple" leftIcon={<FiPlus />} onClick={onAdd}>
+            <Button size="xs" colorPalette="purple" onClick={onAdd}>
+              <FiPlus />
               Add the first entry
             </Button>
           )
@@ -50,70 +52,76 @@ export function ContentTable({ schema, items, perms, locales, onAdd, onEdit, onH
 
   return (
     <Box borderWidth="1px" borderRadius="lg" overflow="hidden" bg="white">
-      <TableContainer>
-        <Table variant="simple" size="sm">
-          <Thead bg="gray.50">
-            <Tr>
+      <Table.ScrollArea>
+        <Table.Root size="sm">
+          <Table.Header bg="gray.50">
+            <Table.Row>
               {headers.map((header) => (
-                <Th key={header}>{header.replace(/_/g, " ")}</Th>
+                <Table.ColumnHeader key={header}>{header.replace(/_/g, " ")}</Table.ColumnHeader>
               ))}
-              {locales && <Th>Locales</Th>}
-              {drafts && <Th>Status</Th>}
-              {actions && <Th isNumeric>Actions</Th>}
-            </Tr>
-          </Thead>
-          <Tbody>
+              {locales && <Table.ColumnHeader>Locales</Table.ColumnHeader>}
+              {drafts && <Table.ColumnHeader>Status</Table.ColumnHeader>}
+              {actions && <Table.ColumnHeader textAlign="end">Actions</Table.ColumnHeader>}
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
             {items.map((item) => {
               const published = item.status === "published";
               return (
-                <Tr key={item.id}>
+                <Table.Row key={item.id}>
                   {headers.map((header) => (
                     // Items are flat: attributes sit next to id.
-                    <Td key={header}>{displayValue(item[header])}</Td>
+                    <Table.Cell key={header}>{displayValue(item[header])}</Table.Cell>
                   ))}
                   {locales && (
-                    <Td>
+                    <Table.Cell>
                       <EntryLocales codes={item.locales} locales={locales} />
-                    </Td>
+                    </Table.Cell>
                   )}
                   {drafts && (
-                    <Td>
-                      <Badge colorScheme={published ? "green" : "gray"}>{item.status}</Badge>
-                    </Td>
+                    <Table.Cell>
+                      <Badge colorPalette={published ? "green" : "gray"}>{item.status}</Badge>
+                    </Table.Cell>
                   )}
                   {actions && (
-                    <Td isNumeric>
-                      <HStack spacing={1} justify="flex-end">
+                    <Table.Cell textAlign="end">
+                      <HStack gap={1} justify="flex-end">
                         {canPublish && (
-                          <Tooltip label={published ? "Unpublish" : "Publish"}>
-                            <IconButton
-                              aria-label={published ? "Unpublish item" : "Publish item"}
-                              icon={published ? <FiEyeOff /> : <FiEye />}
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => onTogglePublish(item)}
-                            />
+                          <Tooltip content={published ? "Unpublish" : "Publish"}>
+                            <IconButton aria-label={published ? "Unpublish item" : "Publish item"} size="xs" variant="ghost" onClick={() => onTogglePublish(item)}>
+                              {published ? <FiEyeOff /> : <FiEye />}
+                            </IconButton>
                           </Tooltip>
                         )}
                         {perms.update &&
                           (drafts && published && !perms.publish ? (
                             // Changing published content needs publish (the server says 403).
-                            <Tooltip label={PUBLISHED_LOCKED} hasArrow>
+                            <Tooltip content={PUBLISHED_LOCKED} showArrow>
                               <span tabIndex={0} aria-label={PUBLISHED_LOCKED}>
-                                <IconButton aria-label="Edit item" icon={<FiEdit />} size="sm" variant="ghost" isDisabled />
+                                <IconButton aria-label="Edit item" size="xs" variant="ghost" disabled>
+                                  <FiEdit />
+                                </IconButton>
                               </span>
                             </Tooltip>
                           ) : (
-                            <IconButton aria-label="Edit item" icon={<FiEdit />} size="sm" variant="ghost" onClick={() => onEdit(item)} />
+                            <IconButton aria-label="Edit item" size="xs" variant="ghost" onClick={() => onEdit(item)}>
+                              <FiEdit />
+                            </IconButton>
                           ))}
                         {onHistory && (
-                          <Tooltip label="History">
-                            <IconButton aria-label="Item history" icon={<FiClock />} size="sm" variant="ghost" onClick={() => onHistory(item)} />
+                          <Tooltip content="History">
+                            <IconButton aria-label="Item history" size="xs" variant="ghost" onClick={() => onHistory(item)}>
+                              <FiClock />
+                            </IconButton>
                           </Tooltip>
                         )}
                         {perms.delete && (
                           <ConfirmButton
-                            trigger={<IconButton aria-label="Delete item" icon={<FiTrash2 />} size="sm" variant="ghost" colorScheme="red" />}
+                            trigger={
+                              <IconButton aria-label="Delete item" size="xs" variant="ghost" colorPalette="red">
+                                <FiTrash2 />
+                              </IconButton>
+                            }
                             title="Delete this entry?"
                             body={
                               perms.update
@@ -124,14 +132,14 @@ export function ContentTable({ schema, items, perms, locales, onAdd, onEdit, onH
                           />
                         )}
                       </HStack>
-                    </Td>
+                    </Table.Cell>
                   )}
-                </Tr>
+                </Table.Row>
               );
             })}
-          </Tbody>
-        </Table>
-      </TableContainer>
+          </Table.Body>
+        </Table.Root>
+      </Table.ScrollArea>
     </Box>
   );
 }
@@ -140,14 +148,14 @@ export function ContentTable({ schema, items, perms, locales, onAdd, onEdit, onH
 function EntryLocales({ codes, locales }: { codes: string[] | undefined; locales: Locale[] }) {
   const has = new Set(codes ?? []);
   return (
-    <HStack spacing={1} flexWrap="nowrap">
+    <HStack gap={1} flexWrap="nowrap">
       {locales.map((l) => {
         const present = l.isDefault || has.has(l.code);
         return (
-          <Tooltip key={l.code} label={l.isDefault ? `${l.code}: default locale` : present ? `${l.code}: translated` : `${l.code}: not translated (falls back)`}>
+          <Tooltip key={l.code} content={l.isDefault ? `${l.code}: default locale` : present ? `${l.code}: translated` : `${l.code}: not translated (falls back)`}>
             <Badge
               fontSize="2xs"
-              colorScheme={l.isDefault ? "purple" : present ? "green" : "gray"}
+              colorPalette={l.isDefault ? "purple" : present ? "green" : "gray"}
               variant={present ? "subtle" : "outline"}
               opacity={present ? 1 : 0.6}
               textTransform="none"

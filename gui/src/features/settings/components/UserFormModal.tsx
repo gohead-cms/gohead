@@ -1,23 +1,7 @@
 import { type FormEvent, useState } from "react";
-import {
-  Alert,
-  AlertDescription,
-  AlertIcon,
-  Button,
-  FormControl,
-  FormErrorMessage,
-  FormHelperText,
-  FormLabel,
-  Input,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Button, Input, VStack } from "@chakra-ui/react";
+import { DialogBody, DialogCloseTrigger, DialogContent, DialogFooter, DialogHeader, DialogRoot, DialogTitle } from "@/components/ui/dialog";
+import { Field } from "@/components/ui/field";
 import { api } from "../../../services/api";
 import { errorMessage } from "../../../shared/utils/errors";
 import { RoleSelect } from "./RoleSelect";
@@ -102,45 +86,51 @@ export function UserFormModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} closeOnOverlayClick={!saving}>
-      <ModalOverlay />
-      <ModalContent>
+    <DialogRoot
+      open={isOpen}
+      onOpenChange={(e) => {
+        if (!e.open) onClose();
+      }}
+      closeOnInteractOutside={!saving}
+    >
+      <DialogContent>
         <form onSubmit={submit} noValidate>
-          <ModalHeader>{creating ? "New user" : `Edit ${user.username}`}</ModalHeader>
-          <ModalCloseButton isDisabled={saving} />
-          <ModalBody>
-            <VStack spacing={4} align="stretch">
+          <DialogHeader>
+            <DialogTitle>{creating ? "New user" : `Edit ${user.username}`}</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <VStack gap={4} align="stretch">
               {serverError && (
-                <Alert status="error" borderRadius="md">
-                  <AlertIcon />
-                  <AlertDescription>{serverError}</AlertDescription>
-                </Alert>
+                <Alert.Root role="alert" status="error" borderRadius="md">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Description>{serverError}</Alert.Description>
+                  </Alert.Content>
+                </Alert.Root>
               )}
               {creating && (
-                <FormControl isRequired isInvalid={submitted && !!usernameError}>
-                  <FormLabel>Username</FormLabel>
+                <Field label="Username" required invalid={submitted && !!usernameError} errorText={usernameError}>
                   <Input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="off" autoFocus />
-                  <FormErrorMessage>{usernameError}</FormErrorMessage>
-                </FormControl>
+                </Field>
               )}
-              <FormControl isRequired isInvalid={submitted && !!emailError}>
-                <FormLabel>Email</FormLabel>
+              <Field label="Email" required invalid={submitted && !!emailError} errorText={emailError}>
                 <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" />
-                <FormErrorMessage>{emailError}</FormErrorMessage>
-              </FormControl>
-              <FormControl isRequired={creating} isInvalid={submitted && !!passwordError}>
-                <FormLabel>{creating ? "Password" : "New password"}</FormLabel>
-                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
-                {submitted && passwordError ? (
-                  <FormErrorMessage>{passwordError}</FormErrorMessage>
-                ) : (
-                  <FormHelperText>
-                    {creating
+              </Field>
+              <Field
+                label={creating ? "Password" : "New password"}
+                required={creating}
+                invalid={submitted && !!passwordError}
+                errorText={passwordError}
+                helperText={
+                  submitted && passwordError
+                    ? undefined
+                    : creating
                       ? `At least ${MIN_PASSWORD_LENGTH} characters. Share it with the user through a safe channel.`
-                      : "Leave empty to keep the current password."}
-                  </FormHelperText>
-                )}
-              </FormControl>
+                      : "Leave empty to keep the current password."
+                }
+              >
+                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
+              </Field>
               <RoleSelect
                 value={role}
                 onChange={setRole}
@@ -148,17 +138,18 @@ export function UserFormModal({
                 disabledReason="You cannot change your own role: another admin must do it, so the site always keeps an admin."
               />
             </VStack>
-          </ModalBody>
-          <ModalFooter gap={3}>
-            <Button onClick={onClose} isDisabled={saving}>
+          </DialogBody>
+          <DialogFooter gap={3}>
+            <Button variant="subtle" onClick={onClose} disabled={saving}>
               Cancel
             </Button>
-            <Button type="submit" colorScheme="blue" isLoading={saving} isDisabled={unchanged}>
+            <Button type="submit" colorPalette="blue" loading={saving} disabled={unchanged}>
               {creating ? "Create user" : "Save changes"}
             </Button>
-          </ModalFooter>
+          </DialogFooter>
         </form>
-      </ModalContent>
-    </Modal>
+        <DialogCloseTrigger disabled={saving} />
+      </DialogContent>
+    </DialogRoot>
   );
 }

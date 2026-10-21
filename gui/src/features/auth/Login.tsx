@@ -6,12 +6,8 @@ import {
   Alert,
   Flex,
   Text,
-  AlertIcon,
-  AlertTitle,
-  AlertDescription,
   VStack,
-  FormControl,
-  FormLabel,
+  Field,
 } from "@chakra-ui/react";
 import { useAuthStore } from "../../services/auth";
 import { useNavigate } from "react-router-dom";
@@ -79,38 +75,38 @@ export function LoginPage() {
           </Text>
         </Flex>
         <form onSubmit={handleLogin}>
-          <VStack spacing={4}>
-            <FormControl>
-              <FormLabel>Username</FormLabel>
+          <VStack gap={4}>
+            <Field.Root>
+              <Field.Label>Username</Field.Label>
               <Input
                 placeholder="Username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 autoFocus
               />
-            </FormControl>
-            <FormControl>
-              <FormLabel>Password</FormLabel>
+            </Field.Root>
+            <Field.Root>
+              <Field.Label>Password</Field.Label>
               <Input
                 placeholder="Password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
-            </FormControl>
-            <Button type="submit" colorScheme="blue" width="100%">
+            </Field.Root>
+            <Button type="submit" colorPalette="blue" width="100%">
               Login
             </Button>
           </VStack>
         </form>
         {error && (
-          <Alert status="error" mt={4} borderRadius="md">
-            <AlertIcon />
-            <Box>
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Box>
-          </Alert>
+          <Alert.Root role="alert" status="error" mt={4} borderRadius="md">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>Error</Alert.Title>
+              <Alert.Description>{error}</Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
         )}
       </Box>
     </Flex>

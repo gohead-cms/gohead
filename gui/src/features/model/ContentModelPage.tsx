@@ -1,5 +1,5 @@
 import { Link as RouterLink, useSearchParams } from "react-router-dom";
-import { Button, Tab, TabList, TabPanel, TabPanels, Tabs } from "@chakra-ui/react";
+import { Button, Tabs } from "@chakra-ui/react";
 import { FiShare2 } from "react-icons/fi";
 import { Page, PageHeader } from "../../shared/ui/PageHeader";
 import { TypeTable } from "./components/TypeTable";
@@ -9,7 +9,7 @@ import { isModelKind, KIND_LABELS, MODEL_KINDS } from "./schema";
 export function ContentModelPage() {
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") ?? undefined;
-  const index = isModelKind(tab) ? MODEL_KINDS.indexOf(tab) : 0;
+  const value = isModelKind(tab) ? tab : MODEL_KINDS[0];
 
   return (
     <Page>
@@ -17,30 +17,34 @@ export function ContentModelPage() {
         title="Content model"
         description="The types your content is made of. Changes apply to the API and GraphQL schema right away."
         actions={
-          <Button as={RouterLink} to="/workspace" leftIcon={<FiShare2 />} variant="outline" size="sm">
-            Schema designer
+          <Button asChild variant="outline" size="xs">
+            <RouterLink to="/workspace">
+              <FiShare2 />
+              Schema designer
+            </RouterLink>
           </Button>
         }
       />
-      <Tabs
-        index={index}
-        onChange={(i) => setParams(i === 0 ? {} : { tab: MODEL_KINDS[i] }, { replace: true })}
-        colorScheme="teal"
-        isLazy
+      <Tabs.Root
+        value={value}
+        onValueChange={(e) => setParams(e.value === MODEL_KINDS[0] ? {} : { tab: e.value }, { replace: true })}
+        colorPalette="teal"
+        lazyMount
+        unmountOnExit
       >
-        <TabList>
+        <Tabs.List>
           {MODEL_KINDS.map((k) => (
-            <Tab key={k}>{KIND_LABELS[k].plural}</Tab>
+            <Tabs.Trigger key={k} value={k}>
+              {KIND_LABELS[k].plural}
+            </Tabs.Trigger>
           ))}
-        </TabList>
-        <TabPanels>
-          {MODEL_KINDS.map((k) => (
-            <TabPanel key={k} px={0}>
-              <TypeTable kind={k} />
-            </TabPanel>
-          ))}
-        </TabPanels>
-      </Tabs>
+        </Tabs.List>
+        {MODEL_KINDS.map((k) => (
+          <Tabs.Content key={k} value={k} px={0}>
+            <TypeTable kind={k} />
+          </Tabs.Content>
+        ))}
+      </Tabs.Root>
     </Page>
   );
 }

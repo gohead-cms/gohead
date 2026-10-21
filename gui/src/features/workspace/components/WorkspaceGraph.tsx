@@ -2,7 +2,8 @@ import { createContext, useCallback, useContext, useState } from "react";
 import { applyNodeChanges, Background, BackgroundVariant, Controls, Panel, ReactFlow } from "@xyflow/react";
 import type { Edge, NodeChange, NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Box, Button, ButtonGroup, Flex, IconButton, Text, Tooltip } from "@chakra-ui/react";
+import { Box, Button, ButtonGroup, Flex, IconButton, Text } from "@chakra-ui/react";
+import { Tooltip } from "@/components/ui/tooltip";
 import { FaArrowsAltH, FaArrowsAltV } from "react-icons/fa";
 import { FiEdit2, FiPlus, FiRefreshCw, FiTrash2 } from "react-icons/fi";
 import type { AgentNodeType } from "../../../shared/types";
@@ -78,46 +79,54 @@ export function WorkspaceGraph({ initialNodes, edges, direction, onDirection, on
       >
         <Panel position="top-left">
           <Flex gap={2} p={2} bg="white" borderRadius="md" boxShadow="md" align="center" wrap="wrap">
-            <Button size="sm" colorScheme="teal" leftIcon={<FiPlus />} onClick={onNew}>
+            <Button size="xs" colorPalette="teal" onClick={onNew}>
+              <FiPlus />
               New collection
             </Button>
             <Box h="24px" w="1px" bg="gray.200" />
-            <Text fontSize="sm" color="gray.600" maxW="200px" noOfLines={1}>
+            <Text fontSize="sm" color="gray.600" maxW="200px" lineClamp={1}>
               {selectedRef ? `${selectedRef.kind}: ${selectedRef.name}` : "Select a node"}
             </Text>
-            <Button size="sm" leftIcon={<FiEdit2 />} isDisabled={!selectedRef} onClick={() => selectedRef && onEdit(selectedRef)}>
+            <Button size="xs" variant="subtle" disabled={!selectedRef} onClick={() => selectedRef && onEdit(selectedRef)}>
+              <FiEdit2 />
               Edit
             </Button>
             <Button
-              size="sm"
-              leftIcon={<FiTrash2 />}
-              colorScheme="red"
+              size="xs"
+              colorPalette="red"
               variant="outline"
-              isDisabled={!selectedRef}
+              disabled={!selectedRef}
               onClick={() => selectedRef && onDelete(selectedRef)}
             >
+              <FiTrash2 />
               Delete
             </Button>
             <Box h="24px" w="1px" bg="gray.200" />
-            <ButtonGroup size="sm" isAttached variant="outline">
-              <Tooltip label="Left to right">
+            <ButtonGroup size="xs" attached variant="outline">
+              <Tooltip content="Left to right">
                 <IconButton
                   aria-label="Left-to-right layout"
-                  icon={<FaArrowsAltH />}
-                  isActive={direction === "LR"}
+                  data-active={direction === "LR" ? "" : undefined}
+                  _active={{ bg: "gray.200" }}
                   onClick={() => onDirection("LR")}
-                />
+                >
+                  <FaArrowsAltH />
+                </IconButton>
               </Tooltip>
-              <Tooltip label="Top to bottom">
+              <Tooltip content="Top to bottom">
                 <IconButton
                   aria-label="Top-to-bottom layout"
-                  icon={<FaArrowsAltV />}
-                  isActive={direction === "TB"}
+                  data-active={direction === "TB" ? "" : undefined}
+                  _active={{ bg: "gray.200" }}
                   onClick={() => onDirection("TB")}
-                />
+                >
+                  <FaArrowsAltV />
+                </IconButton>
               </Tooltip>
             </ButtonGroup>
-            <IconButton size="sm" variant="ghost" aria-label="Reload the model" icon={<FiRefreshCw />} onClick={onRefresh} />
+            <IconButton size="xs" variant="ghost" aria-label="Reload the model" onClick={onRefresh}>
+              <FiRefreshCw />
+            </IconButton>
           </Flex>
         </Panel>
         <Controls showInteractive={false} />

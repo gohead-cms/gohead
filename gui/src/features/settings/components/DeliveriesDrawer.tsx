@@ -1,27 +1,5 @@
-import {
-  Alert,
-  AlertDescription,
-  AlertIcon,
-  Badge,
-  Button,
-  Drawer,
-  DrawerBody,
-  DrawerCloseButton,
-  DrawerContent,
-  DrawerHeader,
-  DrawerOverlay,
-  HStack,
-  Skeleton,
-  Stack,
-  Table,
-  TableContainer,
-  Tbody,
-  Td,
-  Text,
-  Th,
-  Thead,
-  Tr,
-} from "@chakra-ui/react";
+import { Alert, Badge, Button, HStack, Skeleton, Stack, Table, Text } from "@chakra-ui/react";
+import { DrawerBody, DrawerCloseTrigger, DrawerContent, DrawerHeader, DrawerRoot, DrawerTitle } from "@/components/ui/drawer";
 import { FiRefreshCw } from "react-icons/fi";
 import { getJSON, useApiQuery } from "../../../shared/hooks/useApiQuery";
 import { formatDuration, formatTime } from "../../agents/components/runFormat";
@@ -39,12 +17,16 @@ export function DeliveriesDrawer({ webhook, onClose }: { webhook: Webhook | null
   const failures = list.filter(deliveryFailed).length;
 
   return (
-    <Drawer isOpen={webhook !== null} onClose={onClose} size="xl">
-      <DrawerOverlay />
+    <DrawerRoot
+      open={webhook !== null}
+      onOpenChange={(e) => {
+        if (!e.open) onClose();
+      }}
+      size="xl"
+    >
       <DrawerContent>
-        <DrawerCloseButton />
-        <DrawerHeader borderBottomWidth="1px">
-          <Text>Deliveries: {webhook?.name}</Text>
+        <DrawerHeader borderBottomWidth="1px" flexDirection="column" alignItems="stretch" gap={0}>
+          <DrawerTitle>Deliveries: {webhook?.name}</DrawerTitle>
           <Text fontSize="sm" fontWeight="normal" color="gray.500" wordBreak="break-all">
             {webhook?.url}
           </Text>
@@ -54,15 +36,18 @@ export function DeliveriesDrawer({ webhook, onClose }: { webhook: Webhook | null
             <Text fontSize="sm" color="gray.600">
               {data ? `Latest ${list.length} attempts${failures ? `, ${failures} failed` : ""}` : ""}
             </Text>
-            <Button size="sm" leftIcon={<FiRefreshCw />} onClick={refetch} isLoading={loading && !!data}>
+            <Button size="xs" variant="subtle" onClick={refetch} loading={loading && !!data}>
+              <FiRefreshCw />
               Refresh
             </Button>
           </HStack>
           {error && (
-            <Alert status="error" borderRadius="md" mb={3}>
-              <AlertIcon />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
+            <Alert.Root role="alert" status="error" borderRadius="md" mb={3}>
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Description>{error}</Alert.Description>
+              </Alert.Content>
+            </Alert.Root>
           )}
           {loading && !data ? (
             <Stack>
@@ -75,51 +60,52 @@ export function DeliveriesDrawer({ webhook, onClose }: { webhook: Webhook | null
               Nothing delivered yet. Deliveries appear here when a matching event happens; use “Send test” to try the URL now.
             </Text>
           ) : data ? (
-            <TableContainer borderWidth="1px" borderRadius="lg" whiteSpace="normal">
-              <Table size="sm">
-                <Thead>
-                  <Tr>
-                    <Th>Time</Th>
-                    <Th>Event</Th>
-                    <Th>Collection</Th>
-                    <Th isNumeric>Item</Th>
-                    <Th isNumeric>Attempt</Th>
-                    <Th>Status</Th>
-                    <Th isNumeric>Duration</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
+            <Table.ScrollArea borderWidth="1px" borderRadius="lg" whiteSpace="normal">
+              <Table.Root size="sm">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader>Time</Table.ColumnHeader>
+                    <Table.ColumnHeader>Event</Table.ColumnHeader>
+                    <Table.ColumnHeader>Collection</Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="end">Item</Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="end">Attempt</Table.ColumnHeader>
+                    <Table.ColumnHeader>Status</Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="end">Duration</Table.ColumnHeader>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
                   {list.map((d) => {
                     const failed = deliveryFailed(d);
                     return (
-                      <Tr key={d.id} bg={failed ? "red.50" : undefined}>
-                        <Td whiteSpace="nowrap" title={formatTime(d.createdAt)}>
+                      <Table.Row key={d.id} bg={failed ? "red.50" : undefined}>
+                        <Table.Cell whiteSpace="nowrap" title={formatTime(d.createdAt)}>
                           {optTime(d.createdAt)}
-                        </Td>
-                        <Td whiteSpace="nowrap">{d.event}</Td>
-                        <Td>{d.collection || "–"}</Td>
-                        <Td isNumeric>{d.itemId || "–"}</Td>
-                        <Td isNumeric>{d.attempt}</Td>
-                        <Td>
-                          <Badge colorScheme={failed ? "red" : "green"}>{d.statusCode || "no response"}</Badge>
+                        </Table.Cell>
+                        <Table.Cell whiteSpace="nowrap">{d.event}</Table.Cell>
+                        <Table.Cell>{d.collection || "–"}</Table.Cell>
+                        <Table.Cell textAlign="end">{d.itemId || "–"}</Table.Cell>
+                        <Table.Cell textAlign="end">{d.attempt}</Table.Cell>
+                        <Table.Cell>
+                          <Badge colorPalette={failed ? "red" : "green"}>{d.statusCode || "no response"}</Badge>
                           {d.error && (
                             <Text fontSize="xs" color="red.600" mt={1} wordBreak="break-word">
                               {d.error}
                             </Text>
                           )}
-                        </Td>
-                        <Td isNumeric whiteSpace="nowrap">
+                        </Table.Cell>
+                        <Table.Cell textAlign="end" whiteSpace="nowrap">
                           {formatDuration(d.durationMs)}
-                        </Td>
-                      </Tr>
+                        </Table.Cell>
+                      </Table.Row>
                     );
                   })}
-                </Tbody>
-              </Table>
-            </TableContainer>
+                </Table.Body>
+              </Table.Root>
+            </Table.ScrollArea>
           ) : null}
         </DrawerBody>
+        <DrawerCloseTrigger />
       </DrawerContent>
-    </Drawer>
+    </DrawerRoot>
   );
 }

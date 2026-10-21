@@ -1,21 +1,6 @@
 import type { ReactNode } from "react";
-import {
-  Alert,
-  AlertDescription,
-  AlertIcon,
-  Button,
-  Code,
-  HStack,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
-  Text,
-  VStack,
-  useClipboard,
-} from "@chakra-ui/react";
+import { Alert, Button, Code, HStack, Text, VStack, useClipboard } from "@chakra-ui/react";
+import { DialogBody, DialogContent, DialogFooter, DialogHeader, DialogRoot, DialogTitle } from "@/components/ui/dialog";
 import { FiCheck, FiCopy } from "react-icons/fi";
 
 /**
@@ -35,19 +20,30 @@ export function SecretDialog({
   children?: ReactNode;
   onClose: () => void;
 }) {
-  const { hasCopied, onCopy } = useClipboard(secret ?? "");
+  const clip = useClipboard({ value: secret ?? "" });
   return (
-    <Modal isOpen={secret !== null} onClose={onClose} closeOnOverlayClick={false} closeOnEsc={false} size="xl">
-      <ModalOverlay />
-      <ModalContent>
-        <ModalHeader>{title}</ModalHeader>
-        <ModalBody>
-          <VStack align="stretch" spacing={4}>
-            <Alert status="warning" borderRadius="md">
-              <AlertIcon />
-              <AlertDescription>Copy it now and store it somewhere safe: it will not be shown again.</AlertDescription>
-            </Alert>
-            <VStack align="stretch" spacing={1}>
+    <DialogRoot
+      open={secret !== null}
+      onOpenChange={(e) => {
+        if (!e.open) onClose();
+      }}
+      closeOnInteractOutside={false}
+      closeOnEscape={false}
+      size="xl"
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <DialogBody>
+          <VStack align="stretch" gap={4}>
+            <Alert.Root role="alert" status="warning" borderRadius="md">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Description>Copy it now and store it somewhere safe: it will not be shown again.</Alert.Description>
+              </Alert.Content>
+            </Alert.Root>
+            <VStack align="stretch" gap={1}>
               <Text fontSize="sm" fontWeight="medium">
                 {label}
               </Text>
@@ -64,20 +60,21 @@ export function SecretDialog({
                 >
                   {secret}
                 </Code>
-                <Button leftIcon={hasCopied ? <FiCheck /> : <FiCopy />} onClick={onCopy} flexShrink={0}>
-                  {hasCopied ? "Copied" : "Copy"}
+                <Button variant="subtle" onClick={clip.copy} flexShrink={0}>
+                  {clip.copied ? <FiCheck /> : <FiCopy />}
+                  {clip.copied ? "Copied" : "Copy"}
                 </Button>
               </HStack>
             </VStack>
             {children}
           </VStack>
-        </ModalBody>
-        <ModalFooter>
-          <Button colorScheme="blue" onClick={onClose}>
+        </DialogBody>
+        <DialogFooter>
+          <Button colorPalette="blue" onClick={onClose}>
             I have stored it
           </Button>
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
+        </DialogFooter>
+      </DialogContent>
+    </DialogRoot>
   );
 }

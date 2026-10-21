@@ -1,6 +1,6 @@
 import { type FormEvent, useMemo, useState } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
-import { Alert, AlertDescription, AlertIcon, AlertTitle, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Alert, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { api } from "../../../services/api";
 import { useNotify } from "../../../shared/hooks/useNotify";
 import { errorMessage } from "../../../shared/utils/errors";
@@ -56,8 +56,8 @@ export function AgentForm({ initial, originalName, agentId, takenNames, catalog,
 
   const sectionProps = { draft, set, errors };
   return (
-    <Box as="form" onSubmit={submit} noValidate>
-      <VStack spacing={5} align="stretch">
+    <form onSubmit={submit} noValidate>
+      <VStack gap={5} align="stretch">
         <BasicsSection {...sectionProps} />
         <ModelSection {...sectionProps} />
         <TriggerSection {...sectionProps} collections={collections} collectionsError={collectionsError} agentId={agentId} />
@@ -74,17 +74,17 @@ export function AgentForm({ initial, originalName, agentId, takenNames, catalog,
         <MemorySection {...sectionProps} />
 
         {serverError && (
-          <Alert status="error" borderRadius="md">
-            <AlertIcon />
-            <Box>
-              <AlertTitle>The agent was not saved</AlertTitle>
-              <AlertDescription>{serverError}</AlertDescription>
-            </Box>
-          </Alert>
+          <Alert.Root role="alert" status="error" borderRadius="md" fontSize="md">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title fontWeight="bold">The agent was not saved</Alert.Title>
+              <Alert.Description>{serverError}</Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
         )}
         <HStack
           justify="flex-end"
-          spacing={3}
+          gap={3}
           position="sticky"
           bottom={0}
           bg="gray.100"
@@ -97,14 +97,14 @@ export function AgentForm({ initial, originalName, agentId, takenNames, catalog,
               Fix {errorCount} field{errorCount === 1 ? "" : "s"} above before saving.
             </Text>
           )}
-          <Button as={RouterLink} to={cancelTo} variant="ghost" isDisabled={saving}>
-            Cancel
+          <Button asChild variant="ghost" disabled={saving}>
+            <RouterLink to={cancelTo}>Cancel</RouterLink>
           </Button>
-          <Button type="submit" colorScheme="teal" isLoading={saving} loadingText="Saving">
+          <Button type="submit" colorPalette="teal" loading={saving} loadingText="Saving">
             {originalName ? "Save changes" : "Create agent"}
           </Button>
         </HStack>
       </VStack>
-    </Box>
+    </form>
   );
 }

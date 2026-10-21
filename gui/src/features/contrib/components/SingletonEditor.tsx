@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Alert, AlertIcon, Badge, Box, Button, Flex, Heading, HStack, Icon, Text } from "@chakra-ui/react";
+import { Alert, Badge, Box, Button, Flex, Heading, HStack, Icon, Text, chakra } from "@chakra-ui/react";
 import { FiClock, FiSave } from "react-icons/fi";
 import { api } from "../../../services/api";
 import { localeLabel, useLocales } from "../../../shared/hooks/useLocales";
@@ -44,8 +44,8 @@ export function SingletonEditor({ singleton }: { singleton: SingletonDef }) {
       <Flex justify="space-between" align="center" mb={6} gap={4} wrap="wrap">
         <Box>
           <HStack>
-            <Heading size="lg">{singleton.name}</Heading>
-            <Badge colorScheme="purple">Single type</Badge>
+            <Heading size="2xl" fontWeight="bold">{singleton.name}</Heading>
+            <Badge colorPalette="purple">Single type</Badge>
           </HStack>
           <Text color="gray.500">
             {singleton.description ||
@@ -65,7 +65,8 @@ export function SingletonEditor({ singleton }: { singleton: SingletonDef }) {
           {/* Also without content: deleted content can be restored from history. */}
           {/* History and restores need update on the single type. */}
           {canUpdate && (
-            <Button bg="white" variant="outline" size="sm" leftIcon={<Icon as={FiClock} />} onClick={() => setHistoryOpen(true)}>
+            <Button bg="white" variant="outline" size="xs" onClick={() => setHistoryOpen(true)}>
+              <Icon as={FiClock} />
               History
             </Button>
           )}
@@ -73,10 +74,10 @@ export function SingletonEditor({ singleton }: { singleton: SingletonDef }) {
       </Flex>
       {!ready && <PageLoader text="Fetching content..." />}
       {error && (
-        <Alert status="error" borderRadius="md">
-          <AlertIcon />
-          {error}
-        </Alert>
+        <Alert.Root role="alert" status="error" borderRadius="md">
+          <Alert.Indicator />
+          <Alert.Description>{error}</Alert.Description>
+        </Alert.Root>
       )}
       {ready && !error && active && defaultLocale && (
         <Box bg="white" borderWidth="1px" borderRadius="lg" p={6}>
@@ -162,24 +163,25 @@ function SingletonForm({ name, attributes, content, canUpdate, onSaved, onEdit }
   return (
     <Box bg="white" borderWidth="1px" borderRadius="lg" p={6}>
       {!content && (
-        <Alert status="info" borderRadius="md" mb={6}>
-          <AlertIcon />
-          {canUpdate ? "No content yet: fill in the fields and save to create it." : "No content yet."}
-        </Alert>
+        <Alert.Root role="alert" status="info" borderRadius="md" mb={6}>
+          <Alert.Indicator />
+          <Alert.Description>{canUpdate ? "No content yet: fill in the fields and save to create it." : "No content yet."}</Alert.Description>
+        </Alert.Root>
       )}
       {missing.length > 0 && (
-        <Alert status="warning" borderRadius="md" mb={6}>
-          <AlertIcon />
-          Required: {missing.join(", ")}
-        </Alert>
+        <Alert.Root role="alert" status="warning" borderRadius="md" mb={6}>
+          <Alert.Indicator />
+          <Alert.Description>Required: {missing.join(", ")}</Alert.Description>
+        </Alert.Root>
       )}
-      <Box as="fieldset" disabled={!canUpdate || saving} minW={0}>
+      <chakra.fieldset disabled={!canUpdate || saving} minW={0}>
         <EntryFields attributes={attributes} values={values} onChange={onChange} idPrefix={`single-${name}-`} />
-      </Box>
+      </chakra.fieldset>
       <Flex justify="flex-end" mt={6} gap={3} align="center">
         {!canUpdate && <Text fontSize="sm" color="gray.500">Your role can read this single type but not change it.</Text>}
         {canUpdate && (
-          <Button colorScheme="purple" leftIcon={<Icon as={FiSave} />} onClick={save} isLoading={saving}>
+          <Button colorPalette="purple" onClick={save} loading={saving}>
+            <Icon as={FiSave} />
             Save
           </Button>
         )}

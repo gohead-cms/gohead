@@ -1,26 +1,17 @@
-import { useCallback } from "react";
-import { useToast } from "@chakra-ui/react";
+import { useMemo } from "react";
+import { toaster } from "@/components/ui/toaster";
 import { errorMessage } from "../utils/errors";
 
 /** Toasts for the outcome of an action: success, info, warning (msg) and failure(err). */
 export function useNotify() {
-  const toast = useToast();
-  const success = useCallback(
-    (title: string, description?: string) => toast({ title, description, status: "success", duration: 3000, isClosable: true }),
-    [toast],
-  );
-  const info = useCallback(
-    (title: string, description?: string) => toast({ title, description, status: "info", duration: 4000, isClosable: true }),
-    [toast],
-  );
-  const warning = useCallback(
-    (title: string, description?: string) => toast({ title, description, status: "warning", duration: 7000, isClosable: true }),
-    [toast],
-  );
-  const failure = useCallback(
-    (err: unknown, title = "Something went wrong") =>
-      toast({ title, description: errorMessage(err), status: "error", duration: 7000, isClosable: true }),
-    [toast],
-  );
-  return { success, info, warning, failure };
+  return useMemo(() => {
+    const show = (type: "success" | "info" | "warning" | "error", duration: number, title: string, description?: string) =>
+      toaster.create({ type, title, description, duration, closable: true });
+    return {
+      success: (title: string, description?: string) => show("success", 3000, title, description),
+      info: (title: string, description?: string) => show("info", 4000, title, description),
+      warning: (title: string, description?: string) => show("warning", 7000, title, description),
+      failure: (err: unknown, title = "Something went wrong") => show("error", 7000, title, errorMessage(err)),
+    };
+  }, []);
 }

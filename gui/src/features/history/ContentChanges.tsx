@@ -1,23 +1,6 @@
 import { useState } from "react";
-import {
-  Alert,
-  AlertIcon,
-  Box,
-  Button,
-  HStack,
-  IconButton,
-  Select,
-  Spinner,
-  Table,
-  TableContainer,
-  Tbody,
-  Td,
-  Text,
-  Th,
-  Thead,
-  Tr,
-  useColorModeValue,
-} from "@chakra-ui/react";
+import { Alert, Box, Button, HStack, IconButton, NativeSelect, Spinner, Table, Text } from "@chakra-ui/react";
+import { useColorModeValue } from "@/components/ui/color-mode";
 import { FiRefreshCw } from "react-icons/fi";
 import { formatShortTime, formatTime } from "../agents/components/runFormat";
 import { type HistoryTarget, type Revision, revisionTarget } from "./history";
@@ -52,47 +35,51 @@ export function ContentChanges({ fixed, filters = false, pageSize = 25, emptyTex
 
   return (
     <Box>
-      <HStack mb={3} spacing={3} wrap="wrap">
+      <HStack mb={3} gap={3} wrap="wrap">
         {filters && (
           <>
-            <Select
-              size="sm"
-              maxW="170px"
-              aria-label="Filter by actor"
-              value={actorKind}
-              onChange={(e) => {
-                setActorKind(e.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="">All actors</option>
-              <option value="user">Users</option>
-              <option value="token">API tokens</option>
-              <option value="agent">Agents</option>
-              <option value="system">System</option>
-            </Select>
-            <Select
-              size="sm"
-              maxW="170px"
-              aria-label="Filter by action"
-              value={action}
-              onChange={(e) => {
-                setAction(e.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="">All actions</option>
-              <option value="create">Created</option>
-              <option value="update">Updated</option>
-              <option value="publish">Published</option>
-              <option value="unpublish">Unpublished</option>
-              <option value="delete">Deleted</option>
-              <option value="restore">Restored</option>
-              <option value="baseline">Before history (baseline)</option>
-            </Select>
+            <NativeSelect.Root size="xs" maxW="170px">
+              <NativeSelect.Field
+                aria-label="Filter by actor"
+                value={actorKind}
+                onChange={(e) => {
+                  setActorKind(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="">All actors</option>
+                <option value="user">Users</option>
+                <option value="token">API tokens</option>
+                <option value="agent">Agents</option>
+                <option value="system">System</option>
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
+            <NativeSelect.Root size="xs" maxW="170px">
+              <NativeSelect.Field
+                aria-label="Filter by action"
+                value={action}
+                onChange={(e) => {
+                  setAction(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="">All actions</option>
+                <option value="create">Created</option>
+                <option value="update">Updated</option>
+                <option value="publish">Published</option>
+                <option value="unpublish">Unpublished</option>
+                <option value="delete">Deleted</option>
+                <option value="restore">Restored</option>
+                <option value="baseline">Before history (baseline)</option>
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
           </>
         )}
-        <IconButton aria-label="Refresh content changes" size="sm" icon={<FiRefreshCw />} onClick={refetch} isLoading={loading} />
+        <IconButton aria-label="Refresh content changes" size="xs" variant="subtle" onClick={refetch} loading={loading}>
+          <FiRefreshCw />
+        </IconButton>
         {pagination && (
           <Text fontSize="sm" color="gray.500">
             {pagination.total} change{pagination.total === 1 ? "" : "s"}
@@ -101,10 +88,12 @@ export function ContentChanges({ fixed, filters = false, pageSize = 25, emptyTex
       </HStack>
 
       {error && (
-        <Alert status="error" mb={3} borderRadius="md">
-          <AlertIcon />
-          {error}
-        </Alert>
+        <Alert.Root role="alert" status="error" mb={3} borderRadius="md">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Description>{error}</Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
       )}
       {loading && revisions.length === 0 && <Spinner size="sm" color="purple.500" />}
       {!loading && !error && revisions.length === 0 && (
@@ -114,22 +103,22 @@ export function ContentChanges({ fixed, filters = false, pageSize = 25, emptyTex
       )}
 
       {revisions.length > 0 && (
-        <TableContainer borderWidth="1px" borderRadius="md">
-          <Table size="sm" sx={{ "th, td": { px: 3 } }}>
-            <Thead>
-              <Tr>
-                <Th>When</Th>
-                <Th>Entry</Th>
-                <Th>Action</Th>
-                <Th>Actor</Th>
-                <Th isNumeric>Version</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
+        <Table.ScrollArea whiteSpace="nowrap" borderWidth="1px" borderRadius="md">
+          <Table.Root size="sm" css={{ "& th, & td": { px: 3 } }}>
+            <Table.Header>
+              <Table.Row>
+                <Table.ColumnHeader>When</Table.ColumnHeader>
+                <Table.ColumnHeader>Entry</Table.ColumnHeader>
+                <Table.ColumnHeader>Action</Table.ColumnHeader>
+                <Table.ColumnHeader>Actor</Table.ColumnHeader>
+                <Table.ColumnHeader textAlign="end">Version</Table.ColumnHeader>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
               {revisions.map((r) => {
                 const entry = r.entityType === "singleton" ? r.typeName : `${r.typeName} #${r.entityId}`;
                 return (
-                  <Tr
+                  <Table.Row
                     key={r.id}
                     cursor="pointer"
                     _hover={{ bg: hover }}
@@ -140,10 +129,10 @@ export function ContentChanges({ fixed, filters = false, pageSize = 25, emptyTex
                       if (e.key === "Enter") openRow(r);
                     }}
                   >
-                    <Td whiteSpace="nowrap" title={formatTime(r.createdAt)}>
+                    <Table.Cell whiteSpace="nowrap" title={formatTime(r.createdAt)}>
                       {formatShortTime(r.createdAt)}
-                    </Td>
-                    <Td maxW="200px" overflow="hidden" textOverflow="ellipsis" title={entry}>
+                    </Table.Cell>
+                    <Table.Cell maxW="200px" overflow="hidden" textOverflow="ellipsis" title={entry}>
                       <Text as="span" fontWeight="medium">
                         {r.typeName}
                       </Text>
@@ -156,31 +145,31 @@ export function ContentChanges({ fixed, filters = false, pageSize = 25, emptyTex
                           #{r.entityId}
                         </Text>
                       )}
-                    </Td>
-                    <Td>
+                    </Table.Cell>
+                    <Table.Cell>
                       <ActionBadge action={r.action} />
-                    </Td>
-                    <Td maxW="260px">
+                    </Table.Cell>
+                    <Table.Cell maxW="260px">
                       <ActorTag revision={r} links={false} />
-                    </Td>
-                    <Td isNumeric>v{r.version}</Td>
-                  </Tr>
+                    </Table.Cell>
+                    <Table.Cell textAlign="end">v{r.version}</Table.Cell>
+                  </Table.Row>
                 );
               })}
-            </Tbody>
-          </Table>
-        </TableContainer>
+            </Table.Body>
+          </Table.Root>
+        </Table.ScrollArea>
       )}
 
       {pagination && pagination.pageCount > 1 && (
         <HStack mt={3} justify="flex-end">
-          <Button size="sm" onClick={() => setPage((p) => p - 1)} isDisabled={page <= 1}>
+          <Button size="xs" variant="subtle" onClick={() => setPage((p) => p - 1)} disabled={page <= 1}>
             Newer
           </Button>
           <Text fontSize="sm">
             {page} / {pagination.pageCount}
           </Text>
-          <Button size="sm" onClick={() => setPage((p) => p + 1)} isDisabled={page >= pagination.pageCount}>
+          <Button size="xs" variant="subtle" onClick={() => setPage((p) => p + 1)} disabled={page >= pagination.pageCount}>
             Older
           </Button>
         </HStack>

@@ -1,4 +1,5 @@
-import { Badge, Box, Code, HStack, Icon, Table, TableContainer, Tbody, Td, Text, Th, Thead, Tr, useColorModeValue } from "@chakra-ui/react";
+import { Badge, Box, Code, HStack, Icon, Table, Text } from "@chakra-ui/react";
+import { useColorModeValue } from "@/components/ui/color-mode";
 import { FiGlobe } from "react-icons/fi";
 import { type FieldChange, REDACTED, splitField } from "./history";
 import { type DiffPart, isLongText, wordDiff } from "./wordDiff";
@@ -68,30 +69,30 @@ function InlineDiff({ parts }: { parts: DiffPart[] }) {
 export function ChangesTable({ changes, beforeLabel, afterLabel }: { changes: FieldChange[]; beforeLabel: string; afterLabel: string }) {
   const headBg = useColorModeValue("gray.50", "gray.700");
   return (
-    <TableContainer borderWidth="1px" borderRadius="md" whiteSpace="normal">
-      <Table size="sm" sx={{ tableLayout: "fixed", "th, td": { px: 3, verticalAlign: "top" } }}>
-        <Thead bg={headBg}>
-          <Tr>
-            <Th w="26%">Field</Th>
-            <Th>{beforeLabel}</Th>
-            <Th>{afterLabel}</Th>
-          </Tr>
-        </Thead>
-        <Tbody>
+    <Table.ScrollArea borderWidth="1px" borderRadius="md" whiteSpace="normal">
+      <Table.Root size="sm" css={{ tableLayout: "fixed", "& th, & td": { px: 3, verticalAlign: "top" } }}>
+        <Table.Header>
+          <Table.Row bg={headBg}>
+            <Table.ColumnHeader w="26%">Field</Table.ColumnHeader>
+            <Table.ColumnHeader>{beforeLabel}</Table.ColumnHeader>
+            <Table.ColumnHeader>{afterLabel}</Table.ColumnHeader>
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
           {changes.map((c) => {
             const { name, locale } = splitField(c.field);
             // Long texts on both sides read better as one inline diff.
             const parts = c.change === "changed" && isLongText(c.before) && isLongText(c.after) ? wordDiff(c.before, c.after) : null;
             return (
-              <Tr key={c.field} data-testid={`change-${c.field}`}>
-                <Td>
-                  <HStack spacing={1.5} align="center" wrap="wrap">
+              <Table.Row key={c.field} data-testid={`change-${c.field}`}>
+                <Table.Cell>
+                  <HStack gap={1.5} align="center" wrap="wrap">
                     <Text fontWeight="medium" wordBreak="break-word">
                       {name}
                     </Text>
                     {locale && (
                       <Badge
-                        colorScheme="purple"
+                        colorPalette="purple"
                         variant="outline"
                         fontSize="2xs"
                         textTransform="none"
@@ -105,29 +106,29 @@ export function ChangesTable({ changes, beforeLabel, afterLabel }: { changes: Fi
                       </Badge>
                     )}
                   </HStack>
-                  <Badge mt={1} colorScheme={changeColor[c.change]} fontSize="2xs">
+                  <Badge mt={1} colorPalette={changeColor[c.change]} fontSize="2xs">
                     {c.change}
                   </Badge>
-                </Td>
+                </Table.Cell>
                 {parts ? (
-                  <Td colSpan={2}>
+                  <Table.Cell colSpan={2}>
                     <InlineDiff parts={parts} />
-                  </Td>
+                  </Table.Cell>
                 ) : (
                   <>
-                    <Td>
+                    <Table.Cell>
                       <Value value={c.before} />
-                    </Td>
-                    <Td>
+                    </Table.Cell>
+                    <Table.Cell>
                       <Value value={c.after} />
-                    </Td>
+                    </Table.Cell>
                   </>
                 )}
-              </Tr>
+              </Table.Row>
             );
           })}
-        </Tbody>
-      </Table>
-    </TableContainer>
+        </Table.Body>
+      </Table.Root>
+    </Table.ScrollArea>
   );
 }

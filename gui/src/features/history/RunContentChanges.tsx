@@ -1,16 +1,6 @@
 import { useState } from "react";
-import {
-  Badge,
-  Box,
-  Button,
-  Checkbox,
-  Flex,
-  HStack,
-  List,
-  ListItem,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, Flex, HStack, List, Text, VStack } from "@chakra-ui/react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { FiRotateCcw } from "react-icons/fi";
 import { api, ApiError } from "../../services/api";
 import { useNotify } from "../../shared/hooks/useNotify";
@@ -80,7 +70,7 @@ export function RunContentChanges({ agentName, runId }: { agentName: string; run
   };
 
   return (
-    <VStack align="stretch" spacing={3}>
+    <VStack align="stretch" gap={3}>
       <Flex justify="space-between" align="center" gap={3} wrap="wrap">
         <Text fontWeight="bold" fontSize="xs" textTransform="uppercase" color="gray.500">
           Content changes
@@ -88,13 +78,14 @@ export function RunContentChanges({ agentName, runId }: { agentName: string; run
         {isAdmin && (
           <ConfirmButton
             trigger={
-              <Button size="xs" variant="outline" colorScheme="red" leftIcon={<FiRotateCcw />}>
+              <Button size="2xs" variant="outline" colorPalette="red">
+                <FiRotateCcw />
                 Revert content changes
               </Button>
             }
             title={`Revert the content changes of run #${runId}?`}
             body={
-              <VStack align="stretch" spacing={3}>
+              <VStack align="stretch" gap={3}>
                 <Text>
                   Every entry this run changed is restored to its state before the run, and entries the run created are deleted.
                   Each revert is recorded as a new version, so it can be undone from the entry's history.
@@ -102,7 +93,7 @@ export function RunContentChanges({ agentName, runId }: { agentName: string; run
                 <Text fontSize="sm" color="gray.500">
                   Entries someone changed after the run are skipped, unless you check the box below.
                 </Text>
-                <Checkbox isChecked={force} onChange={(e) => setForce(e.target.checked)} colorScheme="red">
+                <Checkbox size="sm" checked={force} onCheckedChange={(e) => setForce(!!e.checked)} colorPalette="red">
                   Also revert entries changed by someone after the run
                 </Checkbox>
               </VStack>
@@ -125,11 +116,11 @@ export function RunContentChanges({ agentName, runId }: { agentName: string; run
               No entry to revert.
             </Text>
           ) : (
-            <List spacing={1.5}>
+            <List.Root variant="plain" gap={1.5}>
               {outcomes.map((o) => (
-                <ListItem key={`${o.entityType}-${o.entityId}`} fontSize="sm">
-                  <HStack spacing={2} align="start">
-                    <Badge colorScheme={resultColor[o.result] ?? "gray"}>{o.result}</Badge>
+                <List.Item key={`${o.entityType}-${o.entityId}`} fontSize="sm">
+                  <HStack gap={2} align="start">
+                    <Badge colorPalette={resultColor[o.result] ?? "gray"}>{o.result}</Badge>
                     <Text>
                       <Text as="span" fontWeight="medium">
                         {o.typeName}
@@ -149,9 +140,9 @@ export function RunContentChanges({ agentName, runId }: { agentName: string; run
                       )}
                     </Text>
                   </HStack>
-                </ListItem>
+                </List.Item>
               ))}
-            </List>
+            </List.Root>
           )}
         </Box>
       )}

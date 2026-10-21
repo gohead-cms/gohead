@@ -1,23 +1,6 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Checkbox,
-  HStack,
-  Menu,
-  MenuButton,
-  MenuDivider,
-  MenuItem,
-  MenuList,
-  Table,
-  TableContainer,
-  Tbody,
-  Td,
-  Text,
-  Th,
-  Thead,
-  Tr,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Table, Text } from "@chakra-ui/react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { MenuContent, MenuItem, MenuRoot, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { FiChevronDown } from "react-icons/fi";
 import {
   ANY_TYPE,
@@ -90,7 +73,11 @@ export function PermissionMatrix({
   const anyActions = explicitOnly ? [] : (value.content[ANY_TYPE] ?? []);
   const rows: Row[] = [
     ...collections.map((c): Row => ({ key: c, label: c, kind: "collection" })),
-    ...singletons.map((s): Row => ({ key: singletonResource(s), label: s, kind: "singleton" })),
+    ...singletons.map((s): Row => ({
+      key: singletonResource(s),
+      label: s,
+      kind: "singleton",
+    })),
   ];
 
   /** The actions a row has: its own, or those of "*" that apply to it. */
@@ -116,8 +103,8 @@ export function PermissionMatrix({
     const isInherited = inherited(row);
     const allowed = applicable(row.kind, columns);
     return (
-      <Tr key={row.key} data-testid={`perm-row-${row.key}`}>
-        <Td>
+      <Table.Row key={row.key} data-testid={`perm-row-${row.key}`}>
+        <Table.Cell>
           <Text fontWeight={row.kind === "any" ? "semibold" : "medium"}>
             {row.label}
             {row.kind === "any" && (
@@ -138,57 +125,67 @@ export function PermissionMatrix({
               </Text>
             )
           )}
-        </Td>
+        </Table.Cell>
         {columns.map((a) => (
-          <Td key={a} textAlign="center">
+          <Table.Cell key={a} textAlign="center">
             {allowed.includes(a) ? (
               <Checkbox
-                colorScheme="purple"
-                aria-label={`${ACTION_LABELS[a]} ${row.label}`}
-                isChecked={actions.includes(a)}
-                isReadOnly={isReadOnly}
+                size="sm"
+                colorPalette="purple"
+                inputProps={{
+                  "aria-label": `${ACTION_LABELS[a]} ${row.label}`,
+                }}
+                checked={actions.includes(a)}
+                readOnly={isReadOnly}
                 opacity={isInherited ? 0.55 : 1}
-                onChange={(e) => setRow(row.key, toggleAction(actions, a, e.target.checked))}
+                onCheckedChange={(e) => setRow(row.key, toggleAction(actions, a, e.checked === true))}
               />
             ) : (
               <Text color="gray.300" aria-hidden>
                 –
               </Text>
             )}
-          </Td>
+          </Table.Cell>
         ))}
         {!isReadOnly && (
-          <Td textAlign="right">
-            <Menu placement="bottom-end" isLazy>
-              <MenuButton as={Button} size="xs" variant="ghost" rightIcon={<FiChevronDown />} aria-label={`Presets for ${row.label}`}>
-                Preset
-              </MenuButton>
-              <MenuList fontSize="sm">
+          <Table.Cell textAlign="right">
+            <MenuRoot positioning={{ placement: "bottom-end" }} lazyMount>
+              <MenuTrigger asChild>
+                <Button size="2xs" variant="ghost" aria-label={`Presets for ${row.label}`}>
+                  Preset
+                  <FiChevronDown />
+                </Button>
+              </MenuTrigger>
+              <MenuContent fontSize="sm">
                 {presets.map((p) => (
-                  <MenuItem key={p.label} onClick={() => setRow(row.key, row.kind === "singleton" ? p.singleton : p.collection)}>
+                  <MenuItem
+                    key={p.label}
+                    value={`preset:${p.label}`}
+                    onClick={() => setRow(row.key, row.kind === "singleton" ? p.singleton : p.collection)}
+                  >
                     {p.label}
                   </MenuItem>
                 ))}
                 {row.kind !== "any" && (
                   <>
-                    <MenuDivider />
-                    <MenuItem isDisabled={isInherited || explicitOnly} onClick={() => setRow(row.key, undefined)}>
+                    <MenuSeparator />
+                    <MenuItem value="inherit" disabled={isInherited || explicitOnly} onClick={() => setRow(row.key, undefined)}>
                       Same as all other types
                     </MenuItem>
                   </>
                 )}
-              </MenuList>
-            </Menu>
-          </Td>
+              </MenuContent>
+            </MenuRoot>
+          </Table.Cell>
         )}
-      </Tr>
+      </Table.Row>
     );
   };
 
   const section = (title: string, hint?: string) => (
-    <Tr bg="gray.50">
-      <Td colSpan={columns.length + (isReadOnly ? 1 : 2)} py={2}>
-        <HStack spacing={2}>
+    <Table.Row bg="gray.50">
+      <Table.Cell colSpan={columns.length + (isReadOnly ? 1 : 2)} py={2}>
+        <HStack gap={2}>
           <Text fontSize="xs" fontWeight="bold" textTransform="uppercase" letterSpacing="wide" color="gray.600">
             {title}
           </Text>
@@ -198,8 +195,8 @@ export function PermissionMatrix({
             </Text>
           )}
         </HStack>
-      </Td>
-    </Tr>
+      </Table.Cell>
+    </Table.Row>
   );
 
   const collectionRows = rows.filter((r) => r.kind === "collection");
@@ -207,20 +204,20 @@ export function PermissionMatrix({
 
   return (
     <Box borderWidth="1px" borderRadius="lg" overflow="hidden" bg="white">
-      <TableContainer>
-        <Table size="sm">
-          <Thead>
-            <Tr>
-              <Th>Type</Th>
+      <Table.ScrollArea>
+        <Table.Root size="sm">
+          <Table.Header>
+            <Table.Row>
+              <Table.ColumnHeader>Type</Table.ColumnHeader>
               {columns.map((a) => (
-                <Th key={a} textAlign="center" px={2}>
+                <Table.ColumnHeader key={a} textAlign="center" px={2}>
                   {ACTION_LABELS[a]}
-                </Th>
+                </Table.ColumnHeader>
               ))}
-              {!isReadOnly && <Th />}
-            </Tr>
-          </Thead>
-          <Tbody>
+              {!isReadOnly && <Table.ColumnHeader />}
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
             {!explicitOnly && renderRow(anyRow)}
             {collectionRows.length > 0 && section("Collections")}
             {collectionRows.map(renderRow)}
@@ -228,56 +225,71 @@ export function PermissionMatrix({
             {singletonRows.map(renderRow)}
             {!explicitOnly && (
               <>
-            {section("Media library")}
-            <Tr data-testid="perm-row-media">
-              <Td>
-                <Text fontWeight="medium">Media</Text>
-                <Text fontSize="xs" color="gray.500">
-                  {mediaActions.length === MEDIA_ACTIONS.length ? "Browse, upload, edit and delete files" : "Browse files"}
-                </Text>
-              </Td>
-              {columns.map((a) => (
-                <Td key={a} textAlign="center">
-                  {mediaActions.includes(a) ? (
-                    <Checkbox
-                      colorScheme="purple"
-                      aria-label={`${ACTION_LABELS[a]} media`}
-                      isChecked={value.media.includes(a)}
-                      isReadOnly={isReadOnly}
-                      onChange={(e) => onChange({ ...value, media: sortActions(toggleAction(value.media, a, e.target.checked), MEDIA_ACTIONS) })}
-                    />
-                  ) : (
-                    <Text color="gray.300" aria-hidden>
-                      –
+                {section("Media library")}
+                <Table.Row data-testid="perm-row-media">
+                  <Table.Cell>
+                    <Text fontWeight="medium">Media</Text>
+                    <Text fontSize="xs" color="gray.500">
+                      {mediaActions.length === MEDIA_ACTIONS.length ? "Browse, upload, edit and delete files" : "Browse files"}
                     </Text>
+                  </Table.Cell>
+                  {columns.map((a) => (
+                    <Table.Cell key={a} textAlign="center">
+                      {mediaActions.includes(a) ? (
+                        <Checkbox
+                          size="sm"
+                          colorPalette="purple"
+                          inputProps={{
+                            "aria-label": `${ACTION_LABELS[a]} media`,
+                          }}
+                          checked={value.media.includes(a)}
+                          readOnly={isReadOnly}
+                          onCheckedChange={(e) =>
+                            onChange({
+                              ...value,
+                              media: sortActions(toggleAction(value.media, a, e.checked === true), MEDIA_ACTIONS),
+                            })
+                          }
+                        />
+                      ) : (
+                        <Text color="gray.300" aria-hidden>
+                          –
+                        </Text>
+                      )}
+                    </Table.Cell>
+                  ))}
+                  {!isReadOnly && (
+                    <Table.Cell textAlign="right">
+                      <MenuRoot positioning={{ placement: "bottom-end" }} lazyMount>
+                        <MenuTrigger asChild>
+                          <Button size="2xs" variant="ghost" aria-label="Presets for media">
+                            Preset
+                            <FiChevronDown />
+                          </Button>
+                        </MenuTrigger>
+                        <MenuContent fontSize="sm">
+                          {mediaPresets.map((p) => (
+                            <MenuItem
+                              key={p.label}
+                              value={`preset:${p.label}`}
+                              onClick={() => onChange({ ...value, media: [...p.actions] })}
+                            >
+                              {p.label}
+                            </MenuItem>
+                          ))}
+                        </MenuContent>
+                      </MenuRoot>
+                    </Table.Cell>
                   )}
-                </Td>
-              ))}
-              {!isReadOnly && (
-                <Td textAlign="right">
-                  <Menu placement="bottom-end" isLazy>
-                    <MenuButton as={Button} size="xs" variant="ghost" rightIcon={<FiChevronDown />} aria-label="Presets for media">
-                      Preset
-                    </MenuButton>
-                    <MenuList fontSize="sm">
-                      {mediaPresets.map((p) => (
-                        <MenuItem key={p.label} onClick={() => onChange({ ...value, media: [...p.actions] })}>
-                          {p.label}
-                        </MenuItem>
-                      ))}
-                    </MenuList>
-                  </Menu>
-                </Td>
-              )}
-            </Tr>
+                </Table.Row>
               </>
             )}
-          </Tbody>
-        </Table>
-      </TableContainer>
+          </Table.Body>
+        </Table.Root>
+      </Table.ScrollArea>
       {(collections.length > 0 || singletons.length > 0) && (
-        <HStack px={4} py={2} borderTopWidth="1px" spacing={2} flexWrap="wrap">
-          <Badge colorScheme="gray" variant="subtle">
+        <HStack px={4} py={2} borderTopWidth="1px" gap={2} flexWrap="wrap">
+          <Badge colorPalette="gray" variant="subtle">
             Tip
           </Badge>
           <Text fontSize="xs" color="gray.500">

@@ -6,7 +6,7 @@ import { type IconType } from "react-icons";
 export function EmptyState({ icon, title, children, action }: { icon?: IconType; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
     <Box borderWidth="1px" borderStyle="dashed" borderRadius="lg" py={12} px={6} textAlign="center" bg="white">
-      <VStack spacing={3}>
+      <VStack gap={3}>
         {icon && <Icon as={icon} boxSize={8} color="gray.400" />}
         <Text fontWeight="semibold">{title}</Text>
         {children && (

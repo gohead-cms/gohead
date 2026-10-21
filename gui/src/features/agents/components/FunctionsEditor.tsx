@@ -1,18 +1,13 @@
 import {
-  Alert,
-  AlertIcon,
   Box,
   Button,
-  Checkbox,
   CheckboxGroup,
-  FormControl,
-  FormErrorMessage,
-  FormHelperText,
-  FormLabel,
+  Field as ChakraField,
+  Fieldset,
   HStack,
   IconButton,
   Input,
-  Select,
+  NativeSelect,
   SimpleGrid,
   Text,
   Textarea,
@@ -20,11 +15,12 @@ import {
   Wrap,
   WrapItem,
 } from "@chakra-ui/react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { FiPlus, FiTrash2 } from "react-icons/fi";
 import { type AgentFunctionInfo } from "../../../shared/types";
 import { type CollectionChoice } from "../hook/useEditorData";
 import { type DraftErrors, type FunctionDraft, applyCatalog, emptyFunction, functionWarning } from "./agentForm";
-import { EditorSection, Field } from "./EditorParts";
+import { EditorSection, Field, Notice } from "./EditorParts";
 
 interface FunctionsEditorProps {
   functions: FunctionDraft[];
@@ -82,28 +78,33 @@ function FunctionCard({
             </Text>
           )}
         </Text>
-        <IconButton aria-label={`Remove ${label}`} size="sm" variant="ghost" colorScheme="red" icon={<FiTrash2 />} onClick={onRemove} />
+        <IconButton aria-label={`Remove ${label}`} size="xs" variant="ghost" colorPalette="red" onClick={onRemove}>
+          <FiTrash2 />
+        </IconButton>
       </HStack>
-      <VStack spacing={4} align="stretch">
-        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+      <VStack gap={4} align="stretch">
+        <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
           <Field label="Implementation" error={err("impl_key")} help={info?.description} isRequired>
-            <Select
-              bg="white"
-              placeholder="Choose a built-in function"
-              value={fn.impl_key}
-              onChange={(e) => onChange(applyCatalog(fn, catalog.find((c) => c.impl_key === e.target.value), info))}
-            >
-              {!known && <option value={fn.impl_key}>{fn.impl_key} (unknown)</option>}
-              {groupCatalog(catalog).map(([group, items]) => (
-                <optgroup key={group} label={group}>
-                  {items.map((c) => (
-                    <option key={c.impl_key} value={c.impl_key}>
-                      {c.impl_key}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </Select>
+            <NativeSelect.Root>
+              <NativeSelect.Field
+                bg="white"
+                placeholder="Choose a built-in function"
+                value={fn.impl_key}
+                onChange={(e) => onChange(applyCatalog(fn, catalog.find((c) => c.impl_key === e.target.value), info))}
+              >
+                {!known && <option value={fn.impl_key}>{fn.impl_key} (unknown)</option>}
+                {groupCatalog(catalog).map(([group, items]) => (
+                  <optgroup key={group} label={group}>
+                    {items.map((c) => (
+                      <option key={c.impl_key} value={c.impl_key}>
+                        {c.impl_key}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
           </Field>
           <Field label="Function name (seen by the model)" error={err("name")} isRequired>
             <Input bg="white" value={fn.name} onChange={(e) => onChange({ ...fn, name: e.target.value })} placeholder="save_summary" />
@@ -113,16 +114,14 @@ function FunctionCard({
           <Input bg="white" value={fn.description} onChange={(e) => onChange({ ...fn, description: e.target.value })} />
         </Field>
         {scoped && (
-          <FormControl as="fieldset">
-            <FormLabel as="legend" fontSize="sm" mb={1}>
-              Allowed collections
-            </FormLabel>
+          <Fieldset.Root size="sm">
+            <Fieldset.Legend fontSize="sm">Allowed collections</Fieldset.Legend>
             {scopeChoices.length > 0 ? (
-              <CheckboxGroup value={fn.collections} onChange={(v) => onChange({ ...fn, collections: v.map(String) })}>
-                <Wrap spacingX={5} spacingY={1}>
+              <CheckboxGroup value={fn.collections} onValueChange={(v) => onChange({ ...fn, collections: v.map(String) })}>
+                <Wrap columnGap={5} rowGap={1}>
                   {scopeChoices.map((name) => (
                     <WrapItem key={name}>
-                      <Checkbox value={name} bg="white">
+                      <Checkbox value={name} size="sm" bg="white">
                         {name}
                       </Checkbox>
                     </WrapItem>
@@ -134,24 +133,28 @@ function FunctionCard({
                 No collections yet.
               </Text>
             )}
-            <FormHelperText>None checked: the function may use every collection.</FormHelperText>
-          </FormControl>
+            <Fieldset.HelperText>None checked: the function may use every collection.</Fieldset.HelperText>
+          </Fieldset.Root>
         )}
         {warning && (
-          <Alert status="warning" borderRadius="md" fontSize="sm">
-            <AlertIcon />
+          <Notice status="warning" borderRadius="md" fontSize="sm">
             {warning}
-          </Alert>
+          </Notice>
         )}
-        <FormControl isInvalid={Boolean(err("parameters"))} isRequired>
-          <HStack justify="space-between" mb={1}>
-            <FormLabel fontSize="sm" mb={0}>
+        <ChakraField.Root invalid={Boolean(err("parameters"))} required gap={1}>
+          <HStack justify="space-between" w="full">
+            <ChakraField.Label fontSize="sm">
               Parameters (JSON schema)
-            </FormLabel>
+              <ChakraField.RequiredIndicator />
+            </ChakraField.Label>
             {info && (
               <Button
-                size="xs"
-                variant="link"
+                size="2xs"
+                variant="plain"
+                color="gray.500"
+                px={0}
+                h="auto"
+                _hover={{ textDecoration: "underline" }}
                 onClick={() => onChange({ ...fn, parameters: JSON.stringify(info.parameters ?? {}, null, 2) })}
               >
                 Reset to default
@@ -168,11 +171,11 @@ function FunctionCard({
             onChange={(e) => onChange({ ...fn, parameters: e.target.value })}
           />
           {err("parameters") ? (
-            <FormErrorMessage>{err("parameters")}</FormErrorMessage>
+            <ChakraField.ErrorText fontSize="sm">{err("parameters")}</ChakraField.ErrorText>
           ) : (
-            <FormHelperText>Property names must match the arguments the implementation reads.</FormHelperText>
+            <ChakraField.HelperText fontSize="sm">Property names must match the arguments the implementation reads.</ChakraField.HelperText>
           )}
-        </FormControl>
+        </ChakraField.Root>
       </VStack>
     </Box>
   );
@@ -186,26 +189,26 @@ export function FunctionsEditor({ functions, onChange, catalog, catalogError, co
       title={`Functions (${functions.length})`}
       description="Tools the model may call. Pick a built-in implementation; its description and parameters are filled in for you."
       actions={
-        <Button size="sm" leftIcon={<FiPlus />} onClick={add} flexShrink={0}>
+        <Button size="xs" variant="subtle" onClick={add} flexShrink={0}>
+          <FiPlus />
           Add function
         </Button>
       }
     >
       {catalogError && (
-        <Alert status="error" mb={4} borderRadius="md">
-          <AlertIcon />
+        <Notice status="error" mb={4} borderRadius="md">
           {catalogError}
-        </Alert>
+        </Notice>
       )}
       {functions.length === 0 ? (
         <Text fontSize="sm" color="gray.500">
           No functions: the agent can only answer with text.{" "}
-          <Button variant="link" size="sm" onClick={add}>
+          <Button variant="plain" size="xs" color="gray.500" px={0} h="auto" verticalAlign="baseline" _hover={{ textDecoration: "underline" }} onClick={add}>
             Add one
           </Button>
         </Text>
       ) : (
-        <VStack spacing={4} align="stretch">
+        <VStack gap={4} align="stretch">
           {functions.map((fn, i) => (
             <FunctionCard
               key={fn.uid}

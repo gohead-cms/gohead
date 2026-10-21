@@ -20,4 +20,13 @@ export default tseslint.config([
       globals: globals.browser,
     },
   },
+  {
+    // Chakra's v3 snippets, kept as published: they export hooks and helpers
+    // next to their components and declare empty extension interfaces.
+    files: ['src/components/ui/**/*.tsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+      '@typescript-eslint/no-empty-object-type': 'off',
+    },
+  },
 ])

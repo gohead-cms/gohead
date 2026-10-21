@@ -5,9 +5,9 @@ import { statusColor } from "./runFormat";
 /** A run's status, and "test run" for a dry run. */
 export function RunStatusBadge({ run }: { run: Pick<AgentRun, "status" | "error" | "dryRun"> }) {
   return (
-    <HStack spacing={1.5} display="inline-flex">
+    <HStack gap={1.5} display="inline-flex">
       <Badge
-        colorScheme={statusColor[run.status] ?? "gray"}
+        colorPalette={statusColor[run.status] ?? "gray"}
         variant={run.status === "queued" ? "outline" : "subtle"}
         title={run.error || (run.status === "queued" ? "Waiting for a worker" : undefined)}
       >
@@ -21,7 +21,7 @@ export function RunStatusBadge({ run }: { run: Pick<AgentRun, "status" | "error"
 /** Marks a test run: nothing it did was written. */
 export function DryRunBadge() {
   return (
-    <Badge colorScheme="purple" variant="outline" title="Test run: content changes were only simulated">
+    <Badge colorPalette="purple" variant="outline" title="Test run: content changes were only simulated">
       test run
     </Badge>
   );
