@@ -67,6 +67,17 @@ See [Build a website](https://gohead-cms.github.io/gohead/frontend/).
 
 ## 60-second start
 
+On macOS, with [Homebrew](https://brew.sh): one binary, SQLite, no Docker.
+
+```bash
+brew install gohead-cms/tap/gohead
+export ADMIN_PASSWORD=$(openssl rand -hex 12)
+GOHEAD_ADMIN_USERNAME=admin GOHEAD_ADMIN_EMAIL=admin@example.com \
+  GOHEAD_ADMIN_PASSWORD=$ADMIN_PASSWORD gohead standalone &   # API and admin UI on :8080, data in ./data
+```
+
+Or the full stack with Docker Compose:
+
 ```bash
 git clone https://github.com/gohead-cms/gohead.git && cd gohead
 printf 'GOHEAD_JWT_SECRET=%s\nGOHEAD_ADMIN_USERNAME=admin\nGOHEAD_ADMIN_PASSWORD=%s\n' \
@@ -75,7 +86,7 @@ docker compose up -d        # API :8080 · admin UI :3000 · Postgres · Redis �
 export ADMIN_PASSWORD=$(sed -n 's/^GOHEAD_ADMIN_PASSWORD=//p' .env)
 ```
 
-Log in as the admin (password in `.env`) and model a collection:
+Log in as the admin (password in `$ADMIN_PASSWORD`) and model a collection:
 
 ```bash
 export GOHEAD=http://localhost:8080 JSON='Content-Type: application/json'
@@ -153,6 +164,7 @@ flowchart LR
 
 | | |
 |---|---|
+| **Homebrew** (macOS) | `brew install gohead-cms/tap/gohead`, then `gohead standalone` |
 | **Docker Compose** | `docker compose up -d` (everything, as above) |
 | **Container** | `docker run -p 8080:8080 -e GOHEAD_JWT_SECRET=… ghcr.io/gohead-cms/gohead` |
 | **Helm** | `helm install gohead oci://ghcr.io/gohead-cms/charts/gohead --set database.url=postgres://…` |

@@ -5,7 +5,8 @@ query it with filters and GraphQL, and see where agents plug in. Every response 
 captured from a real server.
 
 !!! tip "Prerequisites"
-    A running API on `localhost:8080` ([installation](installation.md)), `curl`, and
+    A running API on `localhost:8080` ([installation](installation.md); on a Mac,
+    `brew install gohead-cms/tap/gohead` then `gohead standalone` is the quickest), `curl`, and
     optionally `jq`. Commands use these shell variables:
 
     ```bash
