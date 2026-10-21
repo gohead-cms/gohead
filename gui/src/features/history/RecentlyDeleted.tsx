@@ -77,7 +77,7 @@ function DeletedList({ collection, drafts, onRestored }: { collection: string; d
 
   if (error) {
     return (
-      <Alert.Root status="error" borderRadius="md">
+      <Alert.Root role="alert" status="error" borderRadius="md">
         <Alert.Indicator />
         <Alert.Content>
           <Alert.Description>{error}</Alert.Description>

@@ -36,7 +36,7 @@ export function AdminDashboard() {
         }
       />
       {error && (
-        <Alert.Root status="error" borderRadius="md" mb={6} alignItems="center">
+        <Alert.Root role="alert" status="error" borderRadius="md" mb={6} alignItems="center">
           <Alert.Indicator />
           <Alert.Description flex="1">{error}</Alert.Description>
           <Button size="xs" variant="subtle" onClick={refetch}>

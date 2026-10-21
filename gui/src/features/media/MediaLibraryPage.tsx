@@ -154,7 +154,7 @@ export function MediaLibraryPage() {
   let body;
   if (list.error) {
     body = (
-      <Alert.Root status="error" borderRadius="md" alignItems="center">
+      <Alert.Root role="alert" status="error" borderRadius="md" alignItems="center">
         <Alert.Indicator />
         <Box flex="1">{list.error}</Box>
         <Button size="xs" variant="subtle" onClick={list.refetch}>

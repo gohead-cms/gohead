@@ -115,7 +115,7 @@ export function RoleFormDrawer({
             <DrawerBody>
               <VStack gap={5} align="stretch" py={2}>
                 {serverError && (
-                  <Alert.Root status="error" borderRadius="md">
+                  <Alert.Root role="alert" status="error" borderRadius="md">
                     <Alert.Indicator />
                     <Alert.Content>
                       <Alert.Description>{serverError}</Alert.Description>
@@ -123,7 +123,7 @@ export function RoleFormDrawer({
                   </Alert.Root>
                 )}
                 {readOnly && (
-                  <Alert.Root status="info" borderRadius="md">
+                  <Alert.Root role="alert" status="info" borderRadius="md">
                     <Alert.Indicator />
                     <Alert.Content>
                       <Alert.Description fontSize="sm">
@@ -134,7 +134,7 @@ export function RoleFormDrawer({
                   </Alert.Root>
                 )}
                 {isPublic && (
-                  <Alert.Root status="warning" borderRadius="md">
+                  <Alert.Root role="alert" status="warning" borderRadius="md">
                     <Alert.Indicator />
                     <Alert.Content>
                       <Alert.Description fontSize="sm">
@@ -198,7 +198,7 @@ export function RoleFormDrawer({
                     )
                   )}
                   {types.error && (
-                    <Alert.Root status="warning" borderRadius="md" mb={3} alignItems="center">
+                    <Alert.Root role="alert" status="warning" borderRadius="md" mb={3} alignItems="center">
                       <Alert.Indicator />
                       <Alert.Content flex="1">
                         <Alert.Description fontSize="sm">
@@ -211,7 +211,7 @@ export function RoleFormDrawer({
                     </Alert.Root>
                   )}
                   {stale.length > 0 && !readOnly && (
-                    <Alert.Root status="warning" borderRadius="md" mb={3}>
+                    <Alert.Root role="alert" status="warning" borderRadius="md" mb={3}>
                       <Alert.Indicator />
                       <Alert.Content>
                         <Alert.Description fontSize="sm">

@@ -43,7 +43,7 @@ export function DeliveriesDrawer({ webhook, onClose }: { webhook: Webhook | null
             </Button>
           </HStack>
           {error && (
-            <Alert.Root status="error" borderRadius="md" mb={3}>
+            <Alert.Root role="alert" status="error" borderRadius="md" mb={3}>
               <Alert.Indicator />
               <Alert.Content>
                 <Alert.Description>{error}</Alert.Description>

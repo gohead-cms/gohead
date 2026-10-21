@@ -55,7 +55,7 @@ export function ContributionsPage() {
 
       <Box flex="1" minW={0} p={{ base: 4, lg: 8 }} overflowY="auto">
         {collectionsError && (
-          <Alert.Root status="error" borderRadius="md" mb={6}>
+          <Alert.Root role="alert" status="error" borderRadius="md" mb={6}>
             <Alert.Indicator />
             <Alert.Description>{collectionsError}</Alert.Description>
           </Alert.Root>
@@ -218,7 +218,7 @@ function CollectionContent({ collectionName, schema }: { collectionName: string;
         )}
       </Flex>
       {error && (
-        <Alert.Root status="error" borderRadius="md" mb={6}>
+        <Alert.Root role="alert" status="error" borderRadius="md" mb={6}>
           <Alert.Indicator />
           <Alert.Description>{error}</Alert.Description>
         </Alert.Root>

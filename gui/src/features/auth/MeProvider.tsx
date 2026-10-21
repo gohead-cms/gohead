@@ -10,7 +10,7 @@ export function MeProvider({ children }: { children: ReactNode }) {
   return (
     <MeContext.Provider value={value}>
       {error && (
-        <Alert.Root status="error" variant="subtle" borderStartWidth="4px" borderStartColor="colorPalette.solid" alignItems="center">
+        <Alert.Root role="alert" status="error" variant="subtle" borderStartWidth="4px" borderStartColor="colorPalette.solid" alignItems="center">
           <Alert.Indicator />
           <Alert.Description flex="1">
             Could not load your account ({error}). Menus and permissions may be incomplete.

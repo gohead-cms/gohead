@@ -103,13 +103,13 @@ export function TypeEditorForm({ kind, existingName, initial, collections, compo
       />
       <VStack align="stretch" gap={6}>
         {serverError && (
-          <Alert.Root status="error" borderRadius="md">
+          <Alert.Root role="alert" status="error" borderRadius="md">
             <Alert.Indicator />
             <Alert.Description>{serverError}</Alert.Description>
           </Alert.Root>
         )}
         {submitted && hasErrors(errors) && (
-          <Alert.Root status="warning" borderRadius="md">
+          <Alert.Root role="alert" status="warning" borderRadius="md">
             <Alert.Indicator />
             <Alert.Description>{errors.general ?? "Fix the highlighted fields before saving."}</Alert.Description>
           </Alert.Root>

@@ -37,7 +37,7 @@ export function SecretDialog({
         </DialogHeader>
         <DialogBody>
           <VStack align="stretch" gap={4}>
-            <Alert.Root status="warning" borderRadius="md">
+            <Alert.Root role="alert" status="warning" borderRadius="md">
               <Alert.Indicator />
               <Alert.Content>
                 <Alert.Description>Copy it now and store it somewhere safe: it will not be shown again.</Alert.Description>

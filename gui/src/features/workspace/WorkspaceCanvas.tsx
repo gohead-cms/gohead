@@ -30,7 +30,7 @@ export default function WorkspaceCanvas() {
   if (error) {
     content = (
       <Box p={8}>
-        <Alert.Root status="error" borderRadius="md" alignItems="center">
+        <Alert.Root role="alert" status="error" borderRadius="md" alignItems="center">
           <Alert.Indicator />
           <Alert.Description flex="1">{error}</Alert.Description>
           <Button size="xs" variant="subtle" onClick={refetch}>

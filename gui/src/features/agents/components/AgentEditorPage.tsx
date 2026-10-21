@@ -64,7 +64,7 @@ export function AgentEditorPage() {
       ) : (
         <>
           {!editing && (
-            <Alert.Root status="info" variant="subtle" borderStartWidth="4px" borderStartColor="colorPalette.solid" borderRadius="md" mb={5} alignItems="center">
+            <Alert.Root role="alert" status="info" variant="subtle" borderStartWidth="4px" borderStartColor="colorPalette.solid" borderRadius="md" mb={5} alignItems="center">
               <Alert.Indicator />
               <Alert.Description flex="1" fontSize="sm">
                 {start?.template

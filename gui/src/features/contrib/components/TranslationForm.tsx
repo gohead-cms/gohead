@@ -71,7 +71,7 @@ export function TranslationForm(props: TranslationFormProps) {
 
   if (error) {
     return layout(
-      <Alert.Root status="error" borderRadius="md" alignItems="center">
+      <Alert.Root role="alert" status="error" borderRadius="md" alignItems="center">
         <Alert.Indicator />
         <Alert.Description flex="1">{error}</Alert.Description>
         <Button size="xs" variant="subtle" onClick={refetch}>
@@ -221,7 +221,7 @@ function TranslationFields({
 
   const body = (
     <VStack align="stretch" gap={6}>
-      <Alert.Root status="info" borderRadius="md" alignItems="start">
+      <Alert.Root role="alert" status="info" borderRadius="md" alignItems="start">
         <Alert.Indicator />
         <Alert.Description fontSize="sm">
           <Text>

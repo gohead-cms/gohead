@@ -27,7 +27,7 @@ export function EditorSection({ title, description, actions, children }: { title
 /** A v2-style alert: an icon and a plain message (no bold title). */
 export function Notice({ children, ...rest }: Alert.RootProps) {
   return (
-    <Alert.Root fontSize="md" {...rest}>
+    <Alert.Root role="alert" fontSize="md" {...rest}>
       <Alert.Indicator />
       <Alert.Content>
         <Alert.Description>{children}</Alert.Description>

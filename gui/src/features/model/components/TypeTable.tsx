@@ -58,7 +58,7 @@ export function TypeTable({ kind }: { kind: ModelKind }) {
         {newButton}
       </Flex>
       {error ? (
-        <Alert.Root status="error" borderRadius="md" alignItems="center">
+        <Alert.Root role="alert" status="error" borderRadius="md" alignItems="center">
           <Alert.Indicator />
           <Alert.Description flex="1">{error}</Alert.Description>
           <Button size="xs" variant="subtle" onClick={refetch}>

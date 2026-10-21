@@ -74,7 +74,7 @@ export function SingletonEditor({ singleton }: { singleton: SingletonDef }) {
       </Flex>
       {!ready && <PageLoader text="Fetching content..." />}
       {error && (
-        <Alert.Root status="error" borderRadius="md">
+        <Alert.Root role="alert" status="error" borderRadius="md">
           <Alert.Indicator />
           <Alert.Description>{error}</Alert.Description>
         </Alert.Root>
@@ -163,13 +163,13 @@ function SingletonForm({ name, attributes, content, canUpdate, onSaved, onEdit }
   return (
     <Box bg="white" borderWidth="1px" borderRadius="lg" p={6}>
       {!content && (
-        <Alert.Root status="info" borderRadius="md" mb={6}>
+        <Alert.Root role="alert" status="info" borderRadius="md" mb={6}>
           <Alert.Indicator />
           <Alert.Description>{canUpdate ? "No content yet: fill in the fields and save to create it." : "No content yet."}</Alert.Description>
         </Alert.Root>
       )}
       {missing.length > 0 && (
-        <Alert.Root status="warning" borderRadius="md" mb={6}>
+        <Alert.Root role="alert" status="warning" borderRadius="md" mb={6}>
           <Alert.Indicator />
           <Alert.Description>Required: {missing.join(", ")}</Alert.Description>
         </Alert.Root>

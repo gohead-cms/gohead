@@ -74,7 +74,7 @@ export function AgentForm({ initial, originalName, agentId, takenNames, catalog,
         <MemorySection {...sectionProps} />
 
         {serverError && (
-          <Alert.Root status="error" borderRadius="md" fontSize="md">
+          <Alert.Root role="alert" status="error" borderRadius="md" fontSize="md">
             <Alert.Indicator />
             <Alert.Content>
               <Alert.Title fontWeight="bold">The agent was not saved</Alert.Title>

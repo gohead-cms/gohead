@@ -173,7 +173,7 @@ export function MediaDetailsDrawer({
         </DrawerHeader>
         <DrawerBody>
           {query.error && (
-            <Alert.Root status="error" borderRadius="md">
+            <Alert.Root role="alert" status="error" borderRadius="md">
               <Alert.Indicator />
               <Alert.Content>{query.error}</Alert.Content>
             </Alert.Root>
@@ -199,7 +199,7 @@ export function MediaDetailsDrawer({
                 }}
               />
               {deleteError?.id === item.id && (
-                <Alert.Root status="error" borderRadius="md" fontSize="sm">
+                <Alert.Root role="alert" status="error" borderRadius="md" fontSize="sm">
                   <Alert.Indicator />
                   <Alert.Content>{deleteError.message}</Alert.Content>
                 </Alert.Root>

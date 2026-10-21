@@ -30,7 +30,7 @@ export function TypeEditorPage() {
     return (
       <Page maxW="6xl">
         <PageHeader title={name ? `Edit ${singular} "${name}"` : `New ${singular}`} />
-        <Alert.Root status="error" borderRadius="md" alignItems="center">
+        <Alert.Root role="alert" status="error" borderRadius="md" alignItems="center">
           <Alert.Indicator />
           <Alert.Description flex="1">{error}</Alert.Description>
           <Button size="xs" variant="subtle" onClick={() => queries.forEach((q) => q.refetch())}>

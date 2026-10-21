@@ -182,7 +182,7 @@ function DefaultLocaleEntry(props: DefaultLocaleEntryProps) {
   if (error) {
     return (
       <DrawerBody>
-        <Alert.Root status="error" borderRadius="md">
+        <Alert.Root role="alert" status="error" borderRadius="md">
           <Alert.Indicator />
           <Alert.Description>{error}</Alert.Description>
         </Alert.Root>

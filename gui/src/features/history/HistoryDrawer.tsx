@@ -99,7 +99,7 @@ function HistoryContent({ target, onRestored }: { target: HistoryTarget; onResto
 
   if (error) {
     return (
-      <Alert.Root status="error" m={4} borderRadius="md" w="auto">
+      <Alert.Root role="alert" status="error" m={4} borderRadius="md" w="auto">
         <Alert.Indicator />
         <Alert.Content>
           <Alert.Description>{error}</Alert.Description>
@@ -333,7 +333,7 @@ function RevisionPanel({ target, revision: r, isLatest, latest, compare, onCompa
         </Flex>
         {loading && !detail && <Spinner size="sm" color="purple.500" />}
         {error && (
-          <Alert.Root status="error" borderRadius="md">
+          <Alert.Root role="alert" status="error" borderRadius="md">
             <Alert.Indicator />
             <Alert.Content>
               <Alert.Description>{error}</Alert.Description>

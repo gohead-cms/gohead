@@ -45,7 +45,7 @@ export function MediaDetailsForm({
     <form onSubmit={submit} noValidate>
       <Stack gap={3}>
         {error && (
-          <Alert.Root status="error" borderRadius="md" fontSize="sm">
+          <Alert.Root role="alert" status="error" borderRadius="md" fontSize="sm">
             <Alert.Indicator />
             <Alert.Content>{error}</Alert.Content>
           </Alert.Root>

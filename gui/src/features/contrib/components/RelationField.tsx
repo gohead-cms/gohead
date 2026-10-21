@@ -78,7 +78,7 @@ export function RelationField({ id, name, attr, value, onChange }: RelationField
   return (
     <VStack align="stretch" gap={2} role="group" aria-labelledby={`${id}-label`}>
       {!canRead && (
-        <Alert.Root status="warning" borderRadius="md" fontSize="sm">
+        <Alert.Root role="alert" status="warning" borderRadius="md" fontSize="sm">
           <Alert.Indicator />
           <Alert.Description>Your role cannot read {target}: this relation is not shown, and saving the entry clears it.</Alert.Description>
         </Alert.Root>

@@ -38,7 +38,7 @@ export function ContributionEditorPage() {
   if (!meLoading && collectionName && !can("create", collectionName)) {
     return (
       <Box p={8}>
-        <Alert.Root status="warning" borderRadius="md">
+        <Alert.Root role="alert" status="warning" borderRadius="md">
           <Alert.Indicator />
           <Alert.Description>Your role cannot create entries in “{collectionName}”.</Alert.Description>
         </Alert.Root>
@@ -48,7 +48,7 @@ export function ContributionEditorPage() {
   if (error) {
     return (
       <Box p={8}>
-        <Alert.Root status="error" borderRadius="md">
+        <Alert.Root role="alert" status="error" borderRadius="md">
           <Alert.Indicator />
           <Alert.Description>{error}</Alert.Description>
         </Alert.Root>
@@ -126,7 +126,7 @@ function ContributionEditor({ collectionName, schema }: { collectionName: string
       <Grid templateColumns={{ base: "1fr", lg: "minmax(0, 3fr) minmax(0, 1fr)" }} gap={8} maxW="1200px" mx="auto" p={8}>
         <GridItem display="flex" flexDirection="column" gap={6} alignItems="stretch">
           {missing.length > 0 && (
-            <Alert.Root status="warning" borderRadius="md">
+            <Alert.Root role="alert" status="warning" borderRadius="md">
               <Alert.Indicator />
               <Alert.Description>Required: {missing.join(", ")}</Alert.Description>
             </Alert.Root>

@@ -135,7 +135,7 @@ export function WebhookFormDrawer({
             <DrawerBody>
               <VStack gap={5} align="stretch" py={2}>
                 {serverError && (
-                  <Alert.Root status="error" borderRadius="md">
+                  <Alert.Root role="alert" status="error" borderRadius="md">
                     <Alert.Indicator />
                     <Alert.Content>
                       <Alert.Description>{serverError}</Alert.Description>

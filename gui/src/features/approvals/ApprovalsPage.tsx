@@ -151,7 +151,7 @@ export function ApprovalsPage() {
         </HStack>
 
         {error && (
-          <Alert.Root status="error" mb={3} borderRadius="md">
+          <Alert.Root role="alert" status="error" mb={3} borderRadius="md">
             <Alert.Indicator />
             <Alert.Content>
               <Alert.Description>{error}</Alert.Description>

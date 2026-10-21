@@ -81,7 +81,7 @@ export function TokenFormModal({
           <DialogBody>
             <VStack gap={4} align="stretch">
               {serverError && (
-                <Alert.Root status="error" borderRadius="md">
+                <Alert.Root role="alert" status="error" borderRadius="md">
                   <Alert.Indicator />
                   <Alert.Content>
                     <Alert.Description>{serverError}</Alert.Description>

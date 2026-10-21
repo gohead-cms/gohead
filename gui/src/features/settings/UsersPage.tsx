@@ -56,7 +56,7 @@ export function UsersPage() {
       />
 
       {error && (
-        <Alert.Root status="error" borderRadius="md" mb={4} alignItems="center">
+        <Alert.Root role="alert" status="error" borderRadius="md" mb={4} alignItems="center">
           <Alert.Indicator />
           <Alert.Content flex="1">
             <Alert.Description>{error}</Alert.Description>

@@ -12,7 +12,7 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
   function Alert(props, ref) {
     const { title, children, icon, startElement, endElement, ...rest } = props
     return (
-      <ChakraAlert.Root ref={ref} {...rest}>
+      <ChakraAlert.Root ref={ref} role="alert" {...rest}>
         {startElement || <ChakraAlert.Indicator>{icon}</ChakraAlert.Indicator>}
         {children ? (
           <ChakraAlert.Content>

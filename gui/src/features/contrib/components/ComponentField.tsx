@@ -61,7 +61,7 @@ export function ComponentField(props: ComponentFieldProps) {
   const { attributes, error } = useComponentAttributes(props.attr.component);
   if (error) {
     return (
-      <Alert.Root status="error" borderRadius="md">
+      <Alert.Root role="alert" status="error" borderRadius="md">
         <Alert.Indicator />
         <Alert.Description>{error}</Alert.Description>
       </Alert.Root>

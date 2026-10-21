@@ -106,7 +106,7 @@ export function ProposalDrawer({ proposalId, onClose }: ProposalDrawerProps) {
         )}
         {error && !detail && (
           <DrawerBody>
-            <Alert.Root status="error" mt={4} borderRadius="md">
+            <Alert.Root role="alert" status="error" mt={4} borderRadius="md">
               <Alert.Indicator />
               <Alert.Content>
                 <Alert.Description>{error}</Alert.Description>
@@ -297,7 +297,7 @@ function ProposalReview({ detail, reload, onClose }: { detail: ProposalDetail; r
           )}
 
           {!pending && (
-            <Alert.Root status={p.status === "approved" ? "success" : p.status === "failed" ? "error" : "info"} borderRadius="md" alignItems="start">
+            <Alert.Root role="alert" status={p.status === "approved" ? "success" : p.status === "failed" ? "error" : "info"} borderRadius="md" alignItems="start">
               <Alert.Indicator />
               <Alert.Content>
                 <Alert.Title textTransform="capitalize">{p.status === "applying" ? "Being applied" : p.status}</Alert.Title>
@@ -311,7 +311,7 @@ function ProposalReview({ detail, reload, onClose }: { detail: ProposalDetail; r
           )}
 
           {showStale && (
-            <Alert.Root status="warning" borderRadius="md" alignItems="start" data-testid="stale-warning">
+            <Alert.Root role="alert" status="warning" borderRadius="md" alignItems="start" data-testid="stale-warning">
               <Alert.Indicator />
               <Alert.Content flex="1">
                 <Alert.Title>The entry changed since the agent proposed this</Alert.Title>
@@ -384,7 +384,7 @@ function ProposalReview({ detail, reload, onClose }: { detail: ProposalDetail; r
           )}
 
           {actionError && (
-            <Alert.Root status="error" borderRadius="md">
+            <Alert.Root role="alert" status="error" borderRadius="md">
               <Alert.Indicator />
               <Alert.Content>
                 <Alert.Description>{actionError}</Alert.Description>

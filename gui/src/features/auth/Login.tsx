@@ -100,7 +100,7 @@ export function LoginPage() {
           </VStack>
         </form>
         {error && (
-          <Alert.Root status="error" mt={4} borderRadius="md">
+          <Alert.Root role="alert" status="error" mt={4} borderRadius="md">
             <Alert.Indicator />
             <Alert.Content>
               <Alert.Title>Error</Alert.Title>

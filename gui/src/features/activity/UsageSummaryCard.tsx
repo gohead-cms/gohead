@@ -55,7 +55,7 @@ export function UsageSummaryCard({ summary, loading, error }: { summary: UsageSu
         Per agent, against its limits. Rolling windows.
       </Text>
       {error && (
-        <Alert.Root status="error" borderRadius="md">
+        <Alert.Root role="alert" status="error" borderRadius="md">
           <Alert.Indicator />
           <Alert.Content>
             <Alert.Description>{error}</Alert.Description>
