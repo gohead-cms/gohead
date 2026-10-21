@@ -44,15 +44,6 @@ async function create(agent) {
 const llm = { provider: env.GOHEAD_LLM_PROVIDER || "openai" };
 const memory = { type: "in-memory", session_scope: "user" };
 
-/** A JSON-schema object of string properties, the shape functions describe their arguments with. */
-const args = (props, required = Object.keys(props)) => ({
-  type: "object",
-  properties: Object.fromEntries(
-    Object.entries(props).map(([k, v]) => [k, typeof v === "string" ? { type: "string", description: v } : v]),
-  ),
-  required,
-});
-
 // ---- From templates ----
 
 await fromTemplate("summarizer", "talk-summarizer", { collection: "talks", source: "abstract", target: "summary", words: 30 });
@@ -67,7 +58,10 @@ await fromTemplate("moderator", "question-moderator", { collection: "questions",
 // The translator proposes its translations: editors approve them in Approvals.
 await fromTemplate("translator", "post-translator", { collection: "posts", fields: ["title", "excerpt", "body"], locales: "fr" });
 
-// ---- proposal-triage: collection event, LLM helper functions, a scoped write, limits ----
+// ---- proposal-triage: collection event, AI helpers, a scoped write, limits ----
+//
+// Tools name what the agent may do ("use") and where ("on"); GoHead tells the
+// model what each one does and takes. "name" is the name the prompt uses.
 
 await create({
   name: "proposal-triage",
@@ -83,21 +77,10 @@ await create({
   memory,
   trigger: { type: "collection_event", event_trigger: { collection: "proposals", events: ["item:created"] } },
   limits: { max_runs_per_hour: 30, max_runs_per_day: 200, max_tokens_per_run: 20000 },
-  functions: [
-    {
-      name: "score_quality",
-      description: "Scores a text against criteria",
-      impl_key: "llm.score_quality",
-      parameters: args({ text: "The text to score", criteria: "What a good proposal has" }, ["text"]),
-    },
-    {
-      name: "save_review",
-      description: "Saves the committee notes on the proposal",
-      impl_key: "collections.patch_item",
-      // Enforced by GoHead, whatever the prompt says: this function can only touch proposals.
-      collections: ["proposals"],
-      parameters: args({ collection_name: "Always proposals", item_id: "The proposal's ID", data: { type: "object", description: "The fields to change" } }),
-    },
+  tools: [
+    { use: "ai.score" },
+    // Enforced by GoHead, whatever the prompt says: this tool can only touch proposals.
+    { use: "content.update", on: ["proposals"], name: "save_review", description: "Saves the committee notes on the proposal" },
   ],
 });
 
@@ -118,21 +101,10 @@ const desk = await create({
   memory,
   trigger: { type: "webhook", webhook_token: feedbackToken },
   limits: { max_runs_per_hour: 120 },
-  functions: [
-    { name: "sentiment", description: "Sentiment of a text", impl_key: "llm.analyze_sentiment", parameters: args({ text: "The text" }) },
-    {
-      name: "classify",
-      description: "Puts a text in one of the categories",
-      impl_key: "llm.classify_text",
-      parameters: args({ text: "The text", categories: { type: "array", items: { type: "string" } } }),
-    },
-    {
-      name: "save_feedback",
-      description: "Stores the sorted feedback",
-      impl_key: "collections.upsert_item",
-      collections: ["feedback"],
-      parameters: args({ collection_name: "Always feedback", data: { type: "object", description: "The feedback's fields" } }),
-    },
+  tools: [
+    { use: "ai.sentiment", name: "sentiment" },
+    { use: "ai.classify", name: "classify" },
+    { use: "content.save", on: ["feedback"], name: "save_feedback", description: "Stores the sorted feedback" },
   ],
 });
 if (desk) {
@@ -161,21 +133,9 @@ const digest = await create({
   // Standard cron, in UTC: 07:00 every Monday.
   trigger: { type: "cron", cron: "0 7 * * 1" },
   limits: { max_runs_per_day: 3 },
-  functions: [
-    {
-      name: "list_talks",
-      description: "A page of talks",
-      impl_key: "collections.list_items",
-      collections: ["talks"],
-      parameters: args({ collection_name: "Always talks", page: { type: "integer" }, pageSize: { type: "integer" } }, ["collection_name"]),
-    },
-    {
-      name: "save_post",
-      description: "Saves a news post (as a draft)",
-      impl_key: "collections.upsert_item",
-      collections: ["posts"],
-      parameters: args({ collection_name: "Always posts", data: { type: "object", description: "The post's fields" } }),
-    },
+  tools: [
+    { use: "content.list", on: ["talks"], name: "list_talks" },
+    { use: "content.save", on: ["posts"], name: "save_post", description: "Saves a news post (as a draft)" },
   ],
 });
 if (!digest) log("keep agent weekly-digest");

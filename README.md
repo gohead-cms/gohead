@@ -128,23 +128,20 @@ Summarize every new article into a `summaries` collection:
 POST /admin/agents
 {
   "name": "summarizer",
-  "system_prompt": "Summarize each new article in two sentences and store it with save_summary.",
+  "system_prompt": "Summarize each new article in two sentences and store it in summaries with save_item.",
   "max_turns": 3,
   "llm_config": { "provider": "openai", "model": "gpt-4o-mini" },
   "memory": { "type": "in-memory", "session_scope": "user" },
   "trigger": { "type": "collection_event",
                "event_trigger": { "collection": "articles", "events": ["item:created"] } },
-  "functions": [{ "name": "save_summary", "impl_key": "collections.upsert_item",
-                  "description": "Store a summary",
-                  "parameters": { "type": "object",
-                                  "properties": { "collection_name": { "type": "string" },
-                                                  "data": { "type": "object" } } } }]
+  "tools": [{ "use": "content.save", "on": ["summaries"] }]
 }
 ```
 
 Triggers: **collection events**, **webhooks** (`POST /agents/webhook/{id}`) and **cron**.
-Built-in functions cover content (`collections.*`) and text tasks (`llm.summarize_text`,
-`llm.classify_text`, `llm.extract_structured_data`…). [Read the agents guide →](https://gohead-cms.github.io/gohead/agents/)
+Built-in tools cover content (`content.save`, `content.update`, `content.list`…) and text
+tasks (`ai.summarize`, `ai.classify`, `ai.extract`…): name one with `use`, the catalog
+provides its description and arguments. [Read the agents guide →](https://gohead-cms.github.io/gohead/agents/)
 
 ## How it fits together
 

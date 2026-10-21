@@ -2,7 +2,7 @@
 
 An agent is an AI assistant that works on your content by itself: it summarizes new
 articles, picks tags, flags spam or translates entries into other languages. Each agent is a
-language model with instructions (its *system prompt*), the functions it may call to read
+language model with instructions (its *system prompt*), the tools it may use to read
 and write content, and a trigger that starts it, such as "an article was created". Only
 admins create and manage agents, under **AI → Agents**; editors review the changes of agents
 that need approval on the [Approvals](approvals.md) page.
@@ -16,7 +16,7 @@ that need approval on the [Approvals](approvals.md) page.
 
 The list of agents is on the left. Click one to open it. Its **Overview** tab shows what it
 does: the system prompt, the model, the trigger, whether it needs approval, its limits and
-its functions, with the collections each function may touch.
+its tools, with the collections each tool may touch.
 
 ![The translator agent's Overview tab](../assets/manual/agents-overview.png)
 
@@ -26,7 +26,7 @@ Deleting an agent also deletes its run history.
 
 ## Create an agent from a template
 
-Templates write the system prompt, trigger and functions for common tasks: **Summarizer**,
+Templates write the system prompt, trigger and tools for common tasks: **Summarizer**,
 **Tagger**, **Moderator** and **Translator**. You answer a few questions and review the
 result before anything is saved.
 
@@ -45,7 +45,7 @@ result before anything is saved.
 
 5. Review the prepared agent. The banner says which template it comes from; **Choose
    another template** starts again. Check in particular:
-    - the **System prompt**, which you can adapt (keep the function, collection and field
+    - the **System prompt**, which you can adapt (keep the tool, collection and field
       names exact);
     - the **Model** section: leave it empty to use your instance's default model, or set
       another one. Fill in the **Input price** and **Output price** if you want costs and a
@@ -63,8 +63,8 @@ Each template and its options: [Templates](../agents/templates.md).
 Choose **Start blank** in the gallery, then fill in each section of the form:
 
 - **Basics**: a unique **Name**, the **Max turns** (how many model calls a run may make; 3 to
-  5 is usual) and the **System prompt**. Be explicit: say which function to call, when, and
-  with which collection and field names.
+  5 is usual) and the **System prompt**. Be explicit: say which tool to use, when, and with
+  which collection and field names.
 - **Model**: the **Provider**, the **Model** and, if this agent has its own, an **API key**.
   Empty fields use the instance defaults.
 - **Trigger**: what starts a run. **Collection event** runs on events of one collection
@@ -74,13 +74,16 @@ Choose **Start blank** in the gallery, then fill in each section of the form:
 
     ![The Trigger section: Collection event on articles, Created and Updated checked](../assets/manual/agents-form-trigger.png)
 
-- **Functions**: click **Add function** and pick an **Implementation** (for example
-  `collections.patch_item` to change fields of an entry); its description and parameters are
-  filled in. Give it the **Function name** the system prompt uses. For functions that read or
-  write content, check the **Allowed collections**: with none checked, the function may use
-  every collection, which is rarely what you want for writes.
+- **Tools**: click **Add a tool** and pick what the agent may do, for example **Update fields
+  of an item** to change an entry, or **Summarize a text**. Each tool says what it does, and
+  the model is told the same. For tools that read or write content, check the collections
+  under **On collections**: with none checked, the tool may use every collection, which is
+  rarely what you want for writes. A tool added after choosing a collection-event trigger
+  starts with that collection checked. **Customize** changes the name the model sees (when
+  the system prompt refers to it), its description or its arguments; most agents don't need
+  it.
 
-    ![A save_summary function based on collections.patch_item, allowed on articles only](../assets/manual/agents-form-functions.png)
+    ![The Update fields of an item tool, on articles only](../assets/manual/agents-form-tools.png)
 
 - **Review**: turn on **Require approval** to have every create, update, translation and
   delete wait on the [Approvals](approvals.md) page instead of being applied.
@@ -94,7 +97,7 @@ Choose **Start blank** in the gallery, then fill in each section of the form:
 
 Click **Create agent**. If a field is wrong, the form says which ones to fix. Every field is
 explained in [Agent fields](../agents/index.md#agent-fields) and
-[Functions](../agents/functions.md).
+[Tools](../agents/functions.md).
 
 ![The new summarizer agent's page](../assets/manual/agents-created.png)
 
@@ -103,13 +106,13 @@ explained in [Agent fields](../agents/index.md#agent-fields) and
 Each time the agent works, it records a **run**. Open the **Runs** tab to see the agent's
 usage over the last hour and 24 hours against its limits, then its runs, newest first: when
 it started, its status (**succeeded**, **failed**, **limited**, **running** or **queued**),
-what triggered it, the number of model and function calls, the tokens, the cost and the
+what triggered it, the number of model and tool calls, the tokens, the cost and the
 duration. Filter them by status with the list above the table.
 
 ![The translator's Runs tab with one failed and one succeeded run](../assets/manual/agents-runs.png)
 
 Click a run to see what it did, step by step: each **model** call with its tokens, and each
-**function** call with the arguments the model chose and the result it got. A failed run
+**tool** call with the arguments the model chose and the result it got. A failed run
 shows its error at the top.
 
 ![Run #1 of the translator: trigger, input and the first steps](../assets/manual/agents-run-steps.png)
@@ -132,7 +135,7 @@ update…"): nothing is written and nothing is sent for approval.
 ![The Test translator dialog, on entry #13 "Writing for the web", event Created](../assets/manual/agents-test-run.png)
 
 The Runs tab opens with the new run, which fills in as it goes. Test runs are marked
-**test run**, and their function results say `"dry_run": true` and what they would have
+**test run**, and their tool results say `"dry_run": true` and what they would have
 done:
 
 ![A finished test run of the tagger, with the "Test run" notice](../assets/manual/agents-test-run-result.png)

@@ -7,7 +7,7 @@ A bilingual conference site, **GoHead Conf**, built with [Next.js](https://nextj
 - **Writes from visitors**: questions under talks, a call for papers with a PDF upload, newsletter sign-ups, through an API token limited to a custom role
 - **Draft mode**: editors preview unpublished talks and news on the real site
 - **Fresh pages**: a signed webhook expires exactly what changed
-- **Seven agents**: the four templates, a hand-written one with LLM helper functions, one started by a webhook, one on a schedule; translations wait for an editor's approval
+- **Seven agents**: the four templates, a hand-written one with AI helper tools, one started by a webhook, one on a schedule; translations wait for an editor's approval
 - **History**: every change is a revision, an agent's run can be undone
 
 Stack: Next.js 16 (App Router, Server Actions), React 19, TypeScript, Tailwind CSS 4, `@gohead-cms/client`.

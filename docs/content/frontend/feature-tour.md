@@ -42,7 +42,7 @@ Restart `npm run dev` after each setup script: they write tokens and secrets to 
 | Writes, uploads, validation | the four forms | [Visitor forms](#visitor-forms) |
 | Draft and publish | talks, posts, questions | [Drafts and preview](#drafts-and-preview) |
 | Outbound webhooks | revalidation, Slack | [Fresh pages](#fresh-pages) |
-| Agents: templates, triggers, functions, limits, approvals | seven agents | [Agents](#agents) |
+| Agents: templates, triggers, tools, limits, approvals | seven agents | [Agents](#agents) |
 | Content history, restore, revert a run | any entry | [History](#history) |
 
 ## Content model
@@ -238,7 +238,7 @@ families:
 | `talk-tagger` | `talks` created or updated | picks `tags` from a fixed list | [template](../agents/templates.md#tagger) |
 | `question-moderator` | `questions` created or updated | sets `flagged` and `flag_reason` on spam | [template](../agents/templates.md#moderator) |
 | `post-translator` | `posts` created | translates title, excerpt and body into French, **as proposals** | [template](../agents/templates.md#translator), [approvals](../agents/approvals.md) |
-| `proposal-triage` | `proposals` created | scores it with `llm.score_quality`, saves `review_score` and `review_notes` | [LLM helpers](../agents/functions.md#llm-helper-functions), [scopes](../agents/functions.md#limiting-functions-to-collections), [limits](../agents/runs-and-limits.md#limits) |
+| `proposal-triage` | `proposals` created | scores it with `ai.score`, saves `review_score` and `review_notes` | [LLM helpers](../agents/functions.md#ai-helpers), [scopes](../agents/functions.md#limiting-tools-to-collections), [limits](../agents/runs-and-limits.md#limits) |
 | `feedback-desk` | **webhook** from the site | `llm.analyze_sentiment`, `llm.classify_text`, then stores the message in `feedback` | [webhook trigger](../agents/triggers.md#webhook) |
 | `weekly-digest` | **cron** `0 7 * * 1` | lists talks, drafts a news post for an editor | [cron trigger](../agents/triggers.md#cron) |
 

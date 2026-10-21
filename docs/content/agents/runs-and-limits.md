@@ -30,7 +30,7 @@ A run records:
 Each **step** is one model call (`type: llm`, with its text or the functions it asked for) or
 one function call (`type: tool`, with its arguments, JSON result, `implKey` and duration).
 A function that returns `{"status": "error", …}`, such as a call refused by a
-[collection scope](functions.md#limiting-functions-to-collections), is shown as a failed step.
+[collection scope](functions.md#limiting-tools-to-collections), is shown as a failed step.
 
 Runs are saved as they progress, so a long run can be followed while it is still `running`.
 A run whose worker was killed stays `running`; the queue retries the job as a new run.
@@ -75,8 +75,8 @@ collection events (the run gets the event as if the item had just been created o
 updated). The run opens and fills in as it goes.
 
 In a test run, the model is called and functions run as usual, but content writes are
-**validated and not applied**: `collections.upsert_item`, `collections.patch_item` and
-`collections.delete_item` return what they would have done (`"dry_run": true`,
+**validated and not applied**: `content.save`, `content.update` and
+`content.delete` return what they would have done (`"dry_run": true`,
 `"action": "would_create"`, `would_update` (with `locale` for a translation) or `would_delete`) or the
 validation error a real run would hit. No proposal is created, the agent's conversation
 memory is not saved, and nothing appears in the content history. Test runs count towards
@@ -161,6 +161,6 @@ and count toward the run that made them.
 2. Open the run: the trigger shows exactly what the agent received, and each step what the
    model asked for and what came back.
 3. Typical findings: the model calls a function with a wrong `collection_name` or field
-   (fix the system prompt, or have it call `collections.get_schema` first); a function is
+   (fix the system prompt, or have it call `content.schema` first); a function is
    refused by its scope; the run hits `max_turns` because the model never gives a final
    answer.
