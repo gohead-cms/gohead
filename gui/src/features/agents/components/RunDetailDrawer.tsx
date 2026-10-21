@@ -100,6 +100,9 @@ export function RunDetailDrawer({ agentName, runId, onClose }: RunDetailDrawerPr
       onOpenChange={(e) => {
         if (!e.open) onClose();
       }}
+      // It opens as the test/run-now dialog closes and gives focus back to its
+      // button: that must not count as leaving the drawer (v2 ignored it too).
+      onFocusOutside={(e) => e.preventDefault()}
       size="lg"
       placement="end"
     >

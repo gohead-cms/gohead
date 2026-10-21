@@ -94,7 +94,8 @@ export function ApprovalsPage() {
       <Box bg="white" borderWidth="1px" borderRadius="lg" p={{ base: 4, md: 5 }}>
         <Tabs.Root
           value={filters.status}
-          onValueChange={(e) => update({ status: e.value === "pending" ? undefined : e.value })}
+          // v3 also calls this when the URL changes the tab: only a click resets the page.
+          onValueChange={(e) => e.value !== filters.status && update({ status: e.value === "pending" ? undefined : e.value })}
           colorPalette="purple"
           size="sm"
           mb={4}

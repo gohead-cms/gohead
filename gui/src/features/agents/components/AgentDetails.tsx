@@ -106,6 +106,9 @@ export function AgentDetails({ agent, onDelete, initialRun }: AgentDetailsProps)
         colorPalette="teal"
         value={tab}
         onValueChange={(e) => {
+          // v3 also calls this when `follow` sets the tab: only a tab the user
+          // picks drops the run to open.
+          if (e.value === tab) return;
           setTab(e.value);
           setStartRun(undefined);
         }}
