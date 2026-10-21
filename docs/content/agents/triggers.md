@@ -21,9 +21,11 @@
 Events: `item:created`, `item:updated`, `item:deleted`, and for
 [draft-and-publish](../guides/content-modeling.md#draft-and-publish) collections
 `item:published` and `item:unpublished` (when an item becomes visible to readers, or stops
-being visible). They are emitted for REST and GraphQL writes. Writes made by agents (in the worker) do **not** emit events, so agents cannot
-trigger each other in loops. The agent's first message contains the event type, the
-collection, the item ID and the item data.
+being visible). They are emitted for REST and GraphQL writes that change something: a save
+that changes nothing emits no event. Writes an agent makes while it runs do **not** emit
+events, with `gohead standalone` too, so agents cannot trigger each other in loops; an
+[approved proposal](approvals.md) does, except to the agent that proposed it. The agent's
+first message contains the event type, the collection, the item ID and the item data.
 
 ## Webhook
 

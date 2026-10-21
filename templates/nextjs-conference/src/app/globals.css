@@ -1,0 +1,181 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+/*
+ * Design tokens: a printed programme booklet. Warm paper, ink, and one
+ * signal orange; each track brings its own color from GoHead (`tracks.color`).
+ * Change the palette here; components only use these names.
+ */
+:root {
+  --paper: #f6f1e8;
+  --paper-raised: #fffcf6;
+  --ink: #181614;
+  --muted: #6b635a;
+  --rule: #ddd4c6;
+  --signal: #e2552a;
+  --on-signal: #fffcf6;
+  --link: #b23c14;
+  --footer: #181614;
+  --on-footer: #f6f1e8;
+  --ok: #2f7a4f;
+  --error: #b42318;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #151311;
+    --paper-raised: #1f1c19;
+    --ink: #f1ebe1;
+    --muted: #a69c8f;
+    --rule: #332e29;
+    --signal: #f06a3f;
+    --on-signal: #151311;
+    --link: #ff9b74;
+    --footer: #0e0d0c;
+    --on-footer: #f1ebe1;
+    --ok: #6fcf97;
+    --error: #ff8a80;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-raised: var(--paper-raised);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-rule: var(--rule);
+  --color-signal: var(--signal);
+  --color-on-signal: var(--on-signal);
+  --color-link: var(--link);
+  --color-footer: var(--footer);
+  --color-on-footer: var(--on-footer);
+  --color-ok: var(--ok);
+  --color-error: var(--error);
+
+  --font-sans: var(--font-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-literata), ui-serif, Georgia, serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
+}
+
+@layer base {
+  html {
+    background: var(--paper);
+    color: var(--ink);
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply font-sans antialiased;
+    font-feature-settings: "kern";
+  }
+
+  ::selection {
+    background: var(--signal);
+    color: var(--on-signal);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--signal);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* The page column. */
+  .wrap {
+    @apply mx-auto w-full max-w-[78rem] px-4 sm:px-8 lg:px-10;
+  }
+
+  /* Big page titles. */
+  .display {
+    @apply text-[clamp(2.6rem,7vw,5.75rem)] leading-[0.92] font-extrabold tracking-[-0.05em] text-balance;
+  }
+
+  /* Small uppercase labels: "Day 1", "Keynote"… */
+  .eyebrow {
+    @apply text-[0.78rem] font-bold tracking-[0.08em] uppercase;
+  }
+
+  /* Times and numbers line up. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .link {
+    @apply font-semibold text-link underline decoration-1 underline-offset-[0.18em] hover:decoration-2;
+  }
+
+  .button {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-ink px-5 py-2.5 font-semibold text-paper transition-colors hover:bg-signal hover:text-on-signal disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .button-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 font-semibold shadow-[inset_0_0_0_1.5px_var(--ink)] transition-colors hover:bg-ink hover:text-paper;
+  }
+
+  /* Form fields. */
+  .field {
+    @apply grid gap-1.5;
+  }
+  .field > label,
+  .field > .label {
+    @apply font-semibold;
+  }
+  .input {
+    @apply w-full rounded-md bg-paper-raised px-3.5 py-2.5 text-base shadow-[inset_0_0_0_1px_var(--rule)] placeholder:text-muted focus:shadow-[inset_0_0_0_2px_var(--ink)] focus:outline-none aria-[invalid=true]:shadow-[inset_0_0_0_2px_var(--error)];
+  }
+  .hint {
+    @apply text-sm text-muted;
+  }
+  .error-text {
+    @apply text-sm font-medium text-error;
+  }
+
+  /* Rich text from GoHead (Markdown). */
+  .prose-conf {
+    @apply prose prose-lg max-w-none font-serif;
+    --tw-prose-body: var(--ink);
+    --tw-prose-headings: var(--ink);
+    --tw-prose-lead: var(--muted);
+    --tw-prose-links: var(--link);
+    --tw-prose-bold: var(--ink);
+    --tw-prose-counters: var(--muted);
+    --tw-prose-bullets: var(--signal);
+    --tw-prose-hr: var(--rule);
+    --tw-prose-quotes: var(--ink);
+    --tw-prose-quote-borders: var(--signal);
+    --tw-prose-captions: var(--muted);
+    --tw-prose-code: var(--ink);
+    --tw-prose-pre-code: var(--ink);
+    --tw-prose-pre-bg: var(--paper-raised);
+    --tw-prose-th-borders: var(--rule);
+    --tw-prose-td-borders: var(--rule);
+    line-height: 1.7;
+  }
+  .prose-conf :where(h2, h3, h4) {
+    @apply font-sans font-bold tracking-tight;
+  }
+  .prose-conf :where(code):not(:where(pre code)) {
+    @apply rounded-[3px] bg-paper-raised px-[0.3em] py-[0.1em] font-normal;
+    box-shadow: inset 0 0 0 1px var(--rule);
+  }
+  .prose-conf :where(code):not(:where(pre code))::before,
+  .prose-conf :where(code):not(:where(pre code))::after {
+    content: none;
+  }
+  .prose-conf :where(img) {
+    @apply rounded-md;
+  }
+}

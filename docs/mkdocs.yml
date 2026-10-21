@@ -119,6 +119,7 @@ nav:
       - JavaScript client: frontend/sdk.md
       - Content models as code: frontend/model-as-code.md
       - Next.js starter: frontend/nextjs.md
+      - Feature tour: frontend/feature-tour.md
   - Agents:
       - Overview: agents/index.md
       - Triggers: agents/triggers.md

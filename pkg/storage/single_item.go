@@ -182,7 +182,7 @@ func singletonWithAttributes(name string) (*models.Singleton, error) {
 // (webhooks), with the content (nil when deleted). The event's collection
 // is "singleton:<name>".
 func publishSingletonEvent(actor Actor, eventType events.EventType, name string, item *models.SingleItem) {
-	if queueClient == nil {
+	if queueClient == nil || actor.InRun {
 		return
 	}
 	payload := events.CollectionEventPayload{

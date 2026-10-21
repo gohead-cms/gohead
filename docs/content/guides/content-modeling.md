@@ -50,6 +50,7 @@ relation pointing to it.
 | `bool` / `boolean` | `true` / `false` | |
 | `date` | `"YYYY-MM-DD"` | |
 | `datetime` | RFC 3339, e.g. `"2026-10-18T09:00:00Z"` | |
+| `time` | a time of day, `"HH:MM"` or `"HH:MM:SS"` | |
 | `enum` / `enumeration` | one of `options` | `options` (required) |
 | `json` | JSON object | |
 | `media` | an uploaded file's ID (see [media](media.md)) | `multiple`, `allowed_types`, `min`/`max` (with `multiple`) |

@@ -397,9 +397,42 @@ jobs:
           npm run typecheck
           npm run build
 
+      # Its own GoHead: the starters' models both have `site` and `homepage` singletons.
+      - name: Start GoHead for the conference starter
+        run: |
+          ./gohead start > conf-api.log 2>&1 &
+          for i in $(seq 1 60); do curl -fs http://localhost:8081/_health && exit 0; sleep 1; done
+          cat conf-api.log; exit 1
+        env:
+          GOHEAD_SERVER_PORT: "8081"
+          GOHEAD_DATABASE_URL: sqlite://conf.db
+          GOHEAD_JWT_SECRET: conf-only-secret-not-used-anywhere-else
+          GOHEAD_RATE_LIMIT_ENABLED: "false"
+          GOHEAD_MEDIA_LOCAL_PATH: ./conf-uploads
+          GOHEAD_ADMIN_USERNAME: admin
+          GOHEAD_ADMIN_EMAIL: admin@example.com
+          GOHEAD_ADMIN_PASSWORD: ci-admin-password-123
+
+      - name: Conference starter (setup, types up to date, lint, build)
+        working-directory: templates/nextjs-conference
+        env:
+          GOHEAD_URL: http://localhost:8081
+          GOHEAD_REVALIDATE_URL: https://example.com/api/revalidate
+        run: |
+          npm run gohead:setup
+          npm run gohead:agents
+          git diff --exit-code src/gohead.d.ts || { echo "::error::templates/nextjs-conference/src/gohead.d.ts is out of date: run npm run gohead:types"; exit 1; }
+          npm run gohead:setup   # a second run changes nothing and keeps the tokens
+          npm run lint
+          npm run typecheck
+          npm run build
+          rm -f .env.local
+
       - name: API log
         if: failure()
-        run: tail -100 api.log
+        run: |
+          tail -100 api.log
+          tail -100 conf-api.log || true
 
   helm:
     name: Helm chart

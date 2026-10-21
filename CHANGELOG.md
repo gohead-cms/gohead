@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+- **Conference starter**: `npm create @gohead-cms@latest -- --template nextjs-conference` creates a bilingual conference site that uses every GoHead feature (every attribute type, components, relations, draft preview, visitor forms through a scoped API token, GraphQL, signed webhooks, seven agents with all three triggers, approvals and content history). The [feature tour](https://gohead-cms.github.io/gohead/frontend/feature-tour/) walks through it.
+
+### Fixed
+- **Agents no longer trigger each other in `gohead standalone`**: changes an agent makes while it runs send no content events in any process, as documented (with `standalone` they did, so two agents on one collection, such as a summarizer and a tagger, could trigger each other until their run limits). Approved proposals still send events.
+- A save that changes nothing sends no `item:updated` event (webhooks, agents), as singletons and translations already did.
+- `time` attributes accept a time of day (`"08:30"`, `"08:30:00"`) instead of refusing every value that was not a date.
+
 ## [0.6.0] - 2026-10-20
 
 ### Breaking changes

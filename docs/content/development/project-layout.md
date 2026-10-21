@@ -26,7 +26,7 @@
 ├── sdk/
 │   ├── client/           # @gohead-cms/client: JavaScript client and gohead-client CLI
 │   └── create/           # @gohead-cms/create: npm create @gohead-cms
-├── templates/            # starter sites (nextjs-blog), copied by @gohead-cms/create
+├── templates/            # starter sites (nextjs-blog, nextjs-conference), copied by @gohead-cms/create
 ├── package.json          # npm workspaces of sdk/ and templates/
 ├── deploy/               # Kubernetes (kustomize) and Flux image automation
 ├── docs/                 # this handbook (MkDocs Material)
