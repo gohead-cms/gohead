@@ -6,21 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
-### Added
-- **Conference starter**: `npm create @gohead-cms@latest -- --template nextjs-conference` creates a bilingual conference site that uses every GoHead feature (every attribute type, components, relations, draft preview, visitor forms through a scoped API token, GraphQL, signed webhooks, seven agents with all three triggers, approvals and content history). The [feature tour](https://gohead-cms.github.io/gohead/frontend/feature-tour/) walks through it.
-
-### Fixed
-- **Agents no longer trigger each other in `gohead standalone`**: changes an agent makes while it runs send no content events in any process, as documented (with `standalone` they did, so two agents on one collection, such as a summarizer and a tagger, could trigger each other until their run limits). Approved proposals still send events.
-- A save that changes nothing sends no `item:updated` event (webhooks, agents), as singletons and translations already did.
-- `time` attributes accept a time of day (`"08:30"`, `"08:30:00"`) instead of refusing every value that was not a date.
-
-## [0.6.0] - 2026-10-20
+## [0.6.0] - 2026-10-21
 
 ### Breaking changes
 - `gohead start` serves the admin UI at `/`: `GET` requests outside the API paths return the UI instead of `404` (`ui.enabled: false` turns it off).
 - SQLite URL parameters of the former cgo driver (`_busy_timeout`, `_foreign_keys`, `_loc`…) are ignored; use `_pragma=…` parameters. See the [upgrade guide](https://gohead-cms.github.io/gohead/operations/upgrading/).
 
 ### Fixed
+- A save that changes nothing sends no `item:updated` event (webhooks, agents), as singletons and translations already did.
+- `time` attributes accept a time of day (`"08:30"`, `"08:30:00"`) instead of refusing every value that was not a date.
 - `docker compose` no longer depends on MinIO images, which MinIO stopped publishing: uploads are kept on local disk (the `gohead-data` volume) by default, and any S3-compatible bucket can be set with `GOHEAD_MEDIA_*` variables.
 
 ### Added
@@ -38,9 +32,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **Test runs**: `POST /admin/agents/{name}/test` and a **Test run** button run an agent with a message or a simulated collection event on an existing item; content writes are validated and reported (`would_update`…) but not applied. Runs started from the UI are recorded as `queued` right away and the response carries the run ID.
 - **Agent templates**: summarizer, tagger, moderator and translator, rendered from a few parameters checked against the content model (`/admin/agent-templates`), in the admin UI under **New agent**.
 - `collections.patch_item` agent function (changes some attributes, keeps the others) and a `reason` argument on content writes.
+- **Conference starter**: `npm create @gohead-cms@latest -- --template nextjs-conference` creates a bilingual conference site that uses every GoHead feature (every attribute type, components, relations, draft preview, visitor forms through a scoped API token, GraphQL, signed webhooks, seven agents with all three triggers, approvals and content history). The [feature tour](https://gohead-cms.github.io/gohead/frontend/feature-tour/) walks through it.
 
 ### Changed
-- An agent is no longer triggered by content events caused by its own changes.
+- Changes an agent makes while it runs send no content events (webhooks, other agents) in any process, `gohead standalone` included; changes from approved proposals do, but never trigger the agent that proposed them.
 - **SQLite is pure Go** (no cgo): release binaries can use SQLite, and the image is static. Existing databases keep working (same time format); they are switched to WAL mode on first open, with a busy timeout and transactions that wait for the write lock (no more `database is locked` errors under concurrent writes). Settings of the old driver in `sqlite://` URLs (`_busy_timeout`, `_foreign_keys`, `_loc`…) are ignored: use `_pragma=busy_timeout(5000)`-style parameters.
 - The container image is built without cgo on `distroless/static`, cross-compiled for each platform.
 
