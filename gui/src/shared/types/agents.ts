@@ -11,6 +11,8 @@ export interface AgentFunction {
   collections?: string[];
   /** JSON schema of the arguments, sent to the model. */
   parameters?: Record<string, unknown>;
+  /** Calls wait for an admin's approval (see AgentTool). */
+  approval?: boolean;
 }
 
 /**
@@ -24,6 +26,8 @@ export interface AgentTool {
   name?: string;
   description?: string;
   parameters?: Record<string, unknown>;
+  /** Calls wait for an admin's approval (true) or not (false); unset: the default (connected apps' tools that may change something wait). */
+  approval?: boolean;
 }
 
 /** A built-in tool from GET /admin/agent-functions. */
@@ -34,13 +38,16 @@ export interface AgentFunctionInfo {
   /** The name the model sees by default. */
   name: string;
   label: string;
-  group: "content" | "ai" | "system" | string;
+  group: "content" | "ai" | "system" | "apps" | string;
   description: string;
   parameters: Record<string, unknown>;
   /** The tool works on collections and accepts an "on" scope. */
   scoped: boolean;
-  /** The tool changes content. */
+  /** The tool changes content (or, for a connected app's tool, may change something there). */
   writes: boolean;
+  /** Connected apps' tools: the connection ("github") and its name for people. */
+  app?: string;
+  appLabel?: string;
 }
 
 export interface AgentLimits {

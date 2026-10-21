@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import {
   Badge,
   Box,
@@ -11,6 +12,7 @@ import {
   Icon,
   IconButton,
   Input,
+  Link,
   SimpleGrid,
   Text,
   Textarea,
@@ -19,21 +21,72 @@ import {
   WrapItem,
   chakra,
 } from "@chakra-ui/react";
-import { FiChevronDown, FiChevronRight, FiCpu, FiDatabase, FiPlus, FiTerminal, FiTrash2 } from "react-icons/fi";
+import { FiChevronDown, FiChevronRight, FiCpu, FiDatabase, FiLink2, FiPlus, FiSearch, FiTerminal, FiTrash2 } from "react-icons/fi";
 import { Checkbox } from "@/components/ui/checkbox";
+import { InputGroup } from "@/components/ui/input-group";
+import { Switch } from "@/components/ui/switch";
 import { DialogBody, DialogCloseTrigger, DialogContent, DialogHeader, DialogRoot, DialogTitle } from "@/components/ui/dialog";
 import { type AgentFunctionInfo } from "../../../shared/types";
 import { type CollectionChoice } from "../hook/useEditorData";
-import { type DraftErrors, type ToolDraft, newTool, toolInfo, toolName, toolWarning } from "./agentForm";
+import { type DraftErrors, type ToolDraft, newTool, toolInfo, toolName, toolWarning, waitsForApproval } from "./agentForm";
 import { EditorSection, Field, Notice } from "./EditorParts";
 
 const GROUPS: { id: string; title: string; help: string; icon: typeof FiDatabase }[] = [
   { id: "content", title: "Content", help: "Read and change items. Choose the collections each tool may use.", icon: FiDatabase },
   { id: "ai", title: "AI helpers", help: "Ask a model about a text: summary, tags, moderation… They use the instance's default model.", icon: FiCpu },
+  {
+    id: "apps",
+    title: "Connected apps",
+    help: "Tools of the services connected under AI → Connected apps. Calls that may change something wait for an admin's approval.",
+    icon: FiLink2,
+  },
   { id: "system", title: "System", help: "", icon: FiTerminal },
 ];
 
-const groupOf = (info: AgentFunctionInfo | undefined) => GROUPS.find((g) => g.id === info?.group) ?? GROUPS[2];
+const SYSTEM = GROUPS[3];
+const groupOf = (info: AgentFunctionInfo | undefined) => GROUPS.find((g) => g.id === info?.group) ?? SYSTEM;
+
+/** Whether a catalog entry matches a search. */
+function matches(info: AgentFunctionInfo, q: string): boolean {
+  if (!q) return true;
+  const hay = `${info.label} ${info.description} ${info.use} ${info.appLabel ?? ""}`.toLowerCase();
+  return q
+    .toLowerCase()
+    .split(/\s+/)
+    .every((w) => hay.includes(w));
+}
+
+function ToolButton({ info, onPick }: { info: AgentFunctionInfo; onPick: (info: AgentFunctionInfo) => void }) {
+  return (
+    <chakra.button
+      type="button"
+      textAlign="start"
+      borderWidth="1px"
+      borderRadius="md"
+      p={3}
+      bg="white"
+      _hover={{ borderColor: "purple.400", bg: "purple.50" }}
+      onClick={() => onPick(info)}
+    >
+      <HStack justify="space-between" align="start" gap={2}>
+        <Text fontWeight="semibold" fontSize="sm">
+          {info.label}
+        </Text>
+        {info.writes && (
+          <Badge colorPalette="orange" size="sm" flexShrink={0}>
+            Writes
+          </Badge>
+        )}
+      </HStack>
+      <Text fontSize="sm" color="fg.muted" mt={1} lineClamp={3}>
+        {info.description}
+      </Text>
+      <Code fontSize="xs" mt={2} bg="transparent" px={0} color="gray.500">
+        {info.use}
+      </Code>
+    </chakra.button>
+  );
+}
 
 /** The catalog, by group: click a tool to add it. */
 function ToolPicker({
@@ -47,6 +100,9 @@ function ToolPicker({
   catalog: AgentFunctionInfo[];
   onPick: (info: AgentFunctionInfo) => void;
 }) {
+  const [query, setQuery] = useState("");
+  const found = useMemo(() => catalog.filter((c) => matches(c, query.trim())), [catalog, query]);
+  const hasApps = catalog.some((c) => c.group === "apps");
   return (
     <DialogRoot open={open} onOpenChange={(e) => !e.open && onClose()} size="xl" scrollBehavior="inside">
       <DialogContent maxW="3xl">
@@ -54,10 +110,39 @@ function ToolPicker({
           <DialogTitle>Add a tool</DialogTitle>
         </DialogHeader>
         <DialogBody pb={6}>
+          <InputGroup startElement={<FiSearch />} width="full" mb={5}>
+            <Input aria-label="Search tools" placeholder="Search tools" value={query} onChange={(e) => setQuery(e.target.value)} />
+          </InputGroup>
           <VStack align="stretch" gap={6}>
             {GROUPS.map((g) => {
-              const items = catalog.filter((c) => groupOf(c).id === g.id);
+              const items = found.filter((c) => groupOf(c).id === g.id);
+              if (g.id === "apps" && !hasApps && !query) {
+                return (
+                  <Box key={g.id} as="section" aria-label={g.title}>
+                    <HStack gap={2} mb={1}>
+                      <Icon as={g.icon} color="purple.500" />
+                      <Text fontWeight="bold">{g.title}</Text>
+                    </HStack>
+                    <Text fontSize="sm" color="fg.muted">
+                      Give agents tools from GitHub, Gmail, Google Drive, Slack… or any MCP server:{" "}
+                      <Link asChild color="purple.600">
+                        <RouterLink to="/connections">connect an app</RouterLink>
+                      </Link>
+                      .
+                    </Text>
+                  </Box>
+                );
+              }
               if (items.length === 0) return null;
+              // Connected apps' tools, by app.
+              const sections =
+                g.id === "apps"
+                  ? [...new Set(items.map((i) => i.app ?? ""))].map((app) => ({
+                      app,
+                      label: items.find((i) => i.app === app)?.appLabel || app,
+                      items: items.filter((i) => (i.app ?? "") === app),
+                    }))
+                  : [{ app: "", label: "", items }];
               return (
                 <Box key={g.id} as="section" aria-label={g.title}>
                   <HStack gap={2} mb={1}>
@@ -69,41 +154,30 @@ function ToolPicker({
                       {g.help}
                     </Text>
                   )}
-                  <SimpleGrid columns={{ base: 1, md: 2 }} gap={2}>
-                    {items.map((info) => (
-                      <chakra.button
-                        key={info.impl_key}
-                        type="button"
-                        textAlign="start"
-                        borderWidth="1px"
-                        borderRadius="md"
-                        p={3}
-                        bg="white"
-                        _hover={{ borderColor: "purple.400", bg: "purple.50" }}
-                        onClick={() => onPick(info)}
-                      >
-                        <HStack justify="space-between" align="start" gap={2}>
-                          <Text fontWeight="semibold" fontSize="sm">
-                            {info.label}
+                  <VStack align="stretch" gap={4}>
+                    {sections.map((sec) => (
+                      <Box key={sec.app} aria-label={sec.label || undefined} role={sec.label ? "group" : undefined}>
+                        {sec.label && (
+                          <Text fontSize="sm" fontWeight="semibold" color="gray.600" mb={2}>
+                            {sec.label}
                           </Text>
-                          {info.writes && (
-                            <Badge colorPalette="orange" size="sm" flexShrink={0}>
-                              Writes
-                            </Badge>
-                          )}
-                        </HStack>
-                        <Text fontSize="sm" color="fg.muted" mt={1}>
-                          {info.description}
-                        </Text>
-                        <Code fontSize="xs" mt={2} bg="transparent" px={0} color="gray.500">
-                          {info.use}
-                        </Code>
-                      </chakra.button>
+                        )}
+                        <SimpleGrid columns={{ base: 1, md: 2 }} gap={2}>
+                          {sec.items.map((info) => (
+                            <ToolButton key={info.impl_key} info={info} onPick={onPick} />
+                          ))}
+                        </SimpleGrid>
+                      </Box>
                     ))}
-                  </SimpleGrid>
+                  </VStack>
                 </Box>
               );
             })}
+            {found.length === 0 && (
+              <Text fontSize="sm" color="gray.500">
+                No tool matches “{query.trim()}”.
+              </Text>
+            )}
           </VStack>
         </DialogBody>
         <DialogCloseTrigger />
@@ -138,6 +212,8 @@ function ToolCard({
   const scopeChoices = [...new Set([...collections.map((c) => c.name), ...tool.on])];
   // Without the catalog (it failed to load), content tools still get their scope.
   const scoped = info?.scoped ?? (tool.use.startsWith("content.") || tool.use.startsWith("collections."));
+  const isAppTool = info ? info.group === "apps" : isAppToolName(tool.use);
+  const waits = waitsForApproval(tool, info);
 
   return (
     <Box borderWidth="1px" borderRadius="md" p={4} bg="gray.50" data-testid={`tool-${tool.use}`}>
@@ -147,6 +223,11 @@ function ToolCard({
           <Box minW={0}>
             <HStack gap={2} wrap="wrap">
               <Text fontWeight="semibold">{label}</Text>
+              {info?.appLabel && (
+                <Badge colorPalette="purple" variant="outline" size="sm">
+                  {info.appLabel}
+                </Badge>
+              )}
               {info?.writes && (
                 <Badge colorPalette="orange" size="sm">
                   Writes
@@ -154,7 +235,7 @@ function ToolCard({
               )}
               {!info && (
                 <Badge colorPalette="red" size="sm">
-                  Not a built-in tool
+                  {isAppTool ? "No longer offered" : "Not a built-in tool"}
                 </Badge>
               )}
             </HStack>
@@ -197,6 +278,29 @@ function ToolCard({
             )}
             <Fieldset.HelperText>None checked: every collection.</Fieldset.HelperText>
           </Fieldset.Root>
+        )}
+        {isAppTool && (
+          <Box>
+            <Switch
+              size="sm"
+              checked={waits}
+              onCheckedChange={(e) => onChange({ ...tool, approval: e.checked === Boolean(info?.writes) ? null : e.checked })}
+            >
+              Wait for an admin's approval before each call
+            </Switch>
+            <Text fontSize="xs" color="gray.500" mt={1}>
+              {info?.writes
+                ? waits
+                  ? "This tool may change something in the app: calls go to Approvals first."
+                  : "Calls are made right away, without review."
+                : "This tool only reads, so it runs without approval by default."}
+            </Text>
+          </Box>
+        )}
+        {!info && isAppTool && (
+          <Notice status="error" borderRadius="md" fontSize="sm">
+            The connection doesn't offer this tool (anymore). Refresh its tools under AI → Connected apps, or remove it.
+          </Notice>
         )}
         {warning && (
           <Notice status="warning" borderRadius="md" fontSize="sm">
@@ -277,6 +381,13 @@ function ToolCard({
       </VStack>
     </Box>
   );
+}
+
+const BUILTIN_PREFIXES = ["content.", "ai.", "system.", "collections.", "llm."];
+
+/** "github.create_issue": a connected app's tool, by its name. */
+function isAppToolName(use: string): boolean {
+  return use.includes(".") && !BUILTIN_PREFIXES.some((p) => use.startsWith(p));
 }
 
 /** The agent's tools: picked from the catalog, scoped to collections, optionally customized. */

@@ -8,7 +8,7 @@ import { Page, PageHeader } from "../../shared/ui/PageHeader";
 import { formatShortTime, formatTime } from "../agents/components/runFormat";
 import { useCollectionsList } from "../contrib/hooks";
 import { ProposalBadges, ProposalDrawer } from "./ProposalDrawer";
-import { entryLink, type Proposal, type ProposalFilters, proposalStatusColor, STATUS_TABS } from "./proposals";
+import { entryLink, type Proposal, type ProposalFilters, proposalEntryLabel, proposalStatusColor, STATUS_TABS } from "./proposals";
 import { useProposals } from "./useProposals";
 
 /** The filters named in the URL: ?status=…&collection=…&agent=…&agentRun=… (pending by default). */
@@ -259,7 +259,12 @@ function ProposalRow({
         <ProposalBadges proposal={p} />
       </Table.Cell>
       <Table.Cell maxW="220px" overflow="hidden" textOverflow="ellipsis">
-        <HStack gap={1.5}>
+        {p.action === "call" ? (
+          <Text as="span" fontWeight="medium" fontFamily="mono" fontSize="xs" title="A call to a connected app's tool">
+            {proposalEntryLabel(p)}
+          </Text>
+        ) : (
+          <HStack gap={1.5}>
           <Text as="span" fontWeight="medium">
             {p.collection}
           </Text>
@@ -278,7 +283,8 @@ function ProposalRow({
               changed since
             </Badge>
           )}
-        </HStack>
+          </HStack>
+        )}
       </Table.Cell>
       <Table.Cell maxW="320px" overflow="hidden" textOverflow="ellipsis" title={p.reason || undefined} color={p.reason ? undefined : "gray.400"}>
         {p.reason || "–"}

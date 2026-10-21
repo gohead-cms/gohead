@@ -42,6 +42,8 @@ export interface ToolDraft {
   description: string;
   /** JSON text of a parameters schema ("" = the tool's own). */
   parameters: string;
+  /** Calls wait for an admin's approval: true, false, or null for the default. */
+  approval: boolean | null;
 }
 
 export interface AgentDraft {
@@ -91,7 +93,15 @@ const num = (n: number | undefined) => (n ? String(n) : "");
 
 /** A new tool from the catalog; content tools start on the trigger's collection, if any. */
 export function newTool(info: AgentFunctionInfo, collection = ""): ToolDraft {
-  return { uid: newUid(), use: info.use, on: info.scoped && collection ? [collection] : [], name: "", description: "", parameters: "" };
+  return {
+    uid: newUid(),
+    use: info.use,
+    on: info.scoped && collection ? [collection] : [],
+    name: "",
+    description: "",
+    parameters: "",
+    approval: null,
+  };
 }
 
 /** The tool's catalog entry, by use name or implementation key. */
@@ -112,12 +122,18 @@ function draftTool(t: AgentTool): ToolDraft {
     name: t.name ?? "",
     description: t.description ?? "",
     parameters: t.parameters && Object.keys(t.parameters).length > 0 ? JSON.stringify(t.parameters, null, 2) : "",
+    approval: typeof t.approval === "boolean" ? t.approval : null,
   };
+}
+
+/** Whether calls of a connected app's tool wait for approval: the setting, else the default. */
+export function waitsForApproval(t: ToolDraft, info: AgentFunctionInfo | undefined): boolean {
+  return t.approval ?? Boolean(info?.writes);
 }
 
 /** Long-form functions (older API responses, old definitions) as tools. */
 function toolOfFunction(f: AgentFunction): AgentTool {
-  return { use: f.impl_key ?? "", on: f.collections, name: f.name, description: f.description, parameters: f.parameters };
+  return { use: f.impl_key ?? "", on: f.collections, name: f.name, description: f.description, parameters: f.parameters, approval: f.approval };
 }
 
 /** The form state for an existing agent, or defaults for a new one. */
@@ -270,7 +286,8 @@ export function validateDraft(d: AgentDraft, takenNames: string[], catalog: Agen
 
 /** Warnings that do not block saving. */
 export function toolWarning(t: ToolDraft, catalog: AgentFunctionInfo[]): string | null {
-  if (toolInfo(catalog, t.use)?.writes && t.on.length === 0) {
+  const info = toolInfo(catalog, t.use);
+  if (info?.writes && info.scoped && t.on.length === 0) {
     return "This tool can change items in every collection. Choose the collections it needs.";
   }
   return null;
@@ -314,6 +331,7 @@ export function buildPayload(d: AgentDraft): Record<string, unknown> {
       if (t.description.trim()) tool.description = t.description.trim();
       const params = parseParameters(t.parameters).value;
       if (params) tool.parameters = params;
+      if (t.approval !== null) tool.approval = t.approval;
       return tool;
     }),
     limits,

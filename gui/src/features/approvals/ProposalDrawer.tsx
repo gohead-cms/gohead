@@ -11,6 +11,7 @@ import { formatTime } from "../agents/components/runFormat";
 import { useMe } from "../auth/me";
 import { ChangesTable } from "../history/ChangesTable";
 import { agentRunLink } from "../history/history";
+import { CallReview } from "./CallReview";
 import {
   approveProposal,
   entryLink,
@@ -114,7 +115,12 @@ export function ProposalDrawer({ proposalId, onClose }: ProposalDrawerProps) {
           </DrawerBody>
         )}
         {/* A new proposal starts the review from scratch. */}
-        {detail && <ProposalReview key={detail.proposal.id} detail={detail} reload={refetch} onClose={onClose} />}
+        {detail &&
+          (detail.proposal.action === "call" ? (
+            <CallReview key={detail.proposal.id} detail={detail} reload={refetch} onClose={onClose} />
+          ) : (
+            <ProposalReview key={detail.proposal.id} detail={detail} reload={refetch} onClose={onClose} />
+          ))}
         <DrawerCloseTrigger />
       </DrawerContent>
     </DrawerRoot>
