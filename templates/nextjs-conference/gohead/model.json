@@ -1,0 +1,241 @@
+{
+  "$schema": "https://gohead-cms.github.io/gohead/schemas/model.json",
+  "locales": [
+    { "code": "en", "name": "English", "default": true },
+    { "code": "fr", "name": "Français" }
+  ],
+  "components": {
+    "seo": {
+      "description": "Search and social sharing",
+      "attributes": {
+        "meta_title": { "type": "string" },
+        "meta_description": { "type": "text" },
+        "share_image": { "type": "media", "allowed_types": ["image/*"] }
+      }
+    },
+    "link": {
+      "description": "A labelled link",
+      "attributes": {
+        "label": { "type": "string", "required": true },
+        "url": { "type": "string", "required": true }
+      }
+    },
+    "cta": {
+      "description": "A title, a text and up to two buttons (components inside a component)",
+      "attributes": {
+        "title": { "type": "string", "required": true },
+        "text": { "type": "text" },
+        "primary": { "type": "component", "component": "link" },
+        "secondary": { "type": "component", "component": "link" }
+      }
+    },
+    "faq_item": {
+      "description": "A question and its answer",
+      "attributes": {
+        "question": { "type": "string", "required": true },
+        "answer": { "type": "text", "required": true }
+      }
+    },
+    "venue": {
+      "description": "Where the conference happens",
+      "attributes": {
+        "name": { "type": "string", "required": true },
+        "address": { "type": "text" },
+        "city": { "type": "string" },
+        "map_url": { "type": "string" },
+        "timezone": { "type": "string" },
+        "doors_open": { "type": "time" }
+      }
+    },
+    "ticket_tier": {
+      "description": "A kind of ticket",
+      "attributes": {
+        "name": { "type": "string", "required": true },
+        "price": { "type": "float", "required": true },
+        "currency": { "type": "enum", "options": ["EUR", "USD"] },
+        "perks": { "type": "json" },
+        "sale_ends": { "type": "datetime" },
+        "sold_out": { "type": "bool" },
+        "url": { "type": "string" }
+      }
+    }
+  },
+  "collections": {
+    "tracks": {
+      "description": "Themes the programme is organised in",
+      "attributes": {
+        "name": { "type": "string", "required": true, "localized": true },
+        "slug": { "type": "uid", "required": true, "unique": true },
+        "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "description": { "type": "text", "localized": true }
+      }
+    },
+    "speakers": {
+      "description": "People on stage",
+      "attributes": {
+        "name": { "type": "string", "required": true },
+        "slug": { "type": "uid", "required": true, "unique": true },
+        "headline": { "type": "string", "localized": true },
+        "bio": { "type": "richtext", "localized": true },
+        "photo": { "type": "media", "allowed_types": ["image/*"] },
+        "company": { "type": "string" },
+        "country": { "type": "string" },
+        "links": { "type": "component", "component": "link", "repeatable": true, "max": 5 },
+        "featured": { "type": "bool" }
+      }
+    },
+    "talks": {
+      "description": "Sessions of the programme",
+      "draftAndPublish": true,
+      "attributes": {
+        "title": { "type": "string", "required": true, "localized": true },
+        "slug": { "type": "uid", "required": true, "unique": true },
+        "abstract": { "type": "richtext", "localized": true },
+        "summary": { "type": "text", "localized": true },
+        "format": { "type": "enum", "required": true, "options": ["keynote", "talk", "workshop", "lightning", "panel"] },
+        "level": { "type": "enum", "options": ["beginner", "intermediate", "advanced"] },
+        "starts_at": { "type": "datetime", "required": true },
+        "duration_minutes": { "type": "int", "required": true, "min": 5, "max": 480 },
+        "room": { "type": "enum", "options": ["main_hall", "room_a", "room_b", "lab"] },
+        "track": { "type": "relation", "relation": "oneToOne", "target": "tracks" },
+        "speakers": { "type": "relation", "relation": "manyToMany", "target": "speakers" },
+        "slides": { "type": "media", "allowed_types": ["application/pdf"] },
+        "gallery": { "type": "media", "multiple": true, "max": 6, "allowed_types": ["image/*"] },
+        "tags": { "type": "json" },
+        "recording_url": { "type": "string" },
+        "seo": { "type": "component", "component": "seo" }
+      }
+    },
+    "posts": {
+      "description": "News",
+      "draftAndPublish": true,
+      "attributes": {
+        "title": { "type": "string", "required": true, "localized": true },
+        "slug": { "type": "uid", "required": true, "unique": true },
+        "kind": { "type": "enum", "options": ["announcement", "programme", "community"] },
+        "excerpt": { "type": "text", "localized": true },
+        "body": { "type": "richtext", "localized": true },
+        "cover": { "type": "media", "allowed_types": ["image/*"] },
+        "seo": { "type": "component", "component": "seo" }
+      }
+    },
+    "sponsors": {
+      "description": "Companies supporting the conference",
+      "attributes": {
+        "name": { "type": "string", "required": true },
+        "slug": { "type": "uid", "required": true, "unique": true },
+        "tier": { "type": "enum", "required": true, "options": ["platinum", "gold", "silver", "community"] },
+        "logo": { "type": "media", "allowed_types": ["image/*"] },
+        "website": { "type": "string" },
+        "blurb": { "type": "text", "localized": true },
+        "rank": { "type": "int", "min": 0 }
+      }
+    },
+    "pages": {
+      "description": "Standalone pages: code of conduct, practical information…",
+      "attributes": {
+        "title": { "type": "string", "required": true, "localized": true },
+        "slug": { "type": "uid", "required": true, "unique": true },
+        "body": { "type": "richtext", "localized": true },
+        "faq": { "type": "component", "component": "faq_item", "repeatable": true, "max": 20, "localized": true },
+        "seo": { "type": "component", "component": "seo" }
+      }
+    },
+    "questions": {
+      "description": "Questions visitors ask under a talk; published after moderation",
+      "draftAndPublish": true,
+      "attributes": {
+        "talk": { "type": "relation", "relation": "oneToOne", "target": "talks", "required": true },
+        "talk_slug": { "type": "string", "required": true },
+        "name": { "type": "string", "required": true },
+        "body": { "type": "text", "required": true },
+        "answer": { "type": "text" },
+        "flagged": { "type": "bool" },
+        "flag_reason": { "type": "text" }
+      }
+    },
+    "proposals": {
+      "description": "Talk proposals sent through the call for papers (private)",
+      "attributes": {
+        "title": { "type": "string", "required": true },
+        "abstract": { "type": "text", "required": true },
+        "format": { "type": "enum", "required": true, "options": ["talk", "workshop", "lightning"] },
+        "level": { "type": "enum", "options": ["beginner", "intermediate", "advanced"] },
+        "language": { "type": "enum", "options": ["en", "fr"] },
+        "speaker_name": { "type": "string", "required": true },
+        "speaker_email": { "type": "email", "required": true },
+        "speaker_bio": { "type": "text" },
+        "attachment": { "type": "media", "allowed_types": ["application/pdf"] },
+        "decision": { "type": "enum", "options": ["pending", "shortlisted", "accepted", "declined"] },
+        "review_score": { "type": "int", "min": 0, "max": 10 },
+        "review_notes": { "type": "text" }
+      }
+    },
+    "subscribers": {
+      "description": "Newsletter sign-ups (private)",
+      "attributes": {
+        "email": { "type": "email", "required": true, "unique": true },
+        "language": { "type": "enum", "options": ["en", "fr"] },
+        "source": { "type": "string" }
+      }
+    },
+    "feedback": {
+      "description": "Messages from the feedback form, sorted by the feedback-desk agent (private)",
+      "attributes": {
+        "message": { "type": "text", "required": true },
+        "email": { "type": "email" },
+        "sentiment": { "type": "enum", "options": ["positive", "neutral", "negative"] },
+        "topic": { "type": "enum", "options": ["venue", "talks", "food", "organisation", "other"] },
+        "summary": { "type": "text" }
+      }
+    }
+  },
+  "singletons": {
+    "site": {
+      "description": "Name, dates, venue and navigation shown on every page",
+      "attributes": {
+        "name": { "type": "string", "required": true },
+        "tagline": { "type": "string", "localized": true },
+        "description": { "type": "text", "localized": true },
+        "starts_on": { "type": "date" },
+        "ends_on": { "type": "date" },
+        "venue": { "type": "component", "component": "venue", "localized": true },
+        "nav": { "type": "component", "component": "link", "repeatable": true, "max": 8, "localized": true },
+        "footer": { "type": "text", "localized": true },
+        "social": { "type": "json" },
+        "seo": { "type": "component", "component": "seo" }
+      }
+    },
+    "homepage": {
+      "description": "The home page",
+      "attributes": {
+        "hero": { "type": "component", "component": "cta", "localized": true },
+        "featured_talks": { "type": "relation", "relation": "manyToMany", "target": "talks" },
+        "featured_speakers": { "type": "relation", "relation": "manyToMany", "target": "speakers" },
+        "faq": { "type": "component", "component": "faq_item", "repeatable": true, "max": 12, "localized": true }
+      }
+    },
+    "tickets": {
+      "description": "Ticket prices",
+      "attributes": {
+        "intro": { "type": "text", "localized": true },
+        "tiers": { "type": "component", "component": "ticket_tier", "repeatable": true, "min": 1, "max": 6, "localized": true },
+        "refund_policy": { "type": "richtext", "localized": true }
+      }
+    }
+  },
+  "public": {
+    "content": {
+      "tracks": ["read"],
+      "speakers": ["read"],
+      "talks": ["read"],
+      "posts": ["read"],
+      "sponsors": ["read"],
+      "pages": ["read"],
+      "questions": ["read"],
+      "singleton:site": ["read"],
+      "singleton:homepage": ["read"],
+      "singleton:tickets": ["read"]
+    }
+  }
+}

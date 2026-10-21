@@ -1,0 +1,638 @@
+{
+  "media": {
+    "amara": { "file": "media/speaker-amara.jpg", "alt": "Illustrated portrait of Amara Okafor" },
+    "lucas": { "file": "media/speaker-lucas.jpg", "alt": "Illustrated portrait of Lucas Moreau" },
+    "mei": { "file": "media/speaker-mei.jpg", "alt": "Illustrated portrait of Mei Tanaka" },
+    "sofia": { "file": "media/speaker-sofia.jpg", "alt": "Illustrated portrait of Sofia Lindqvist" },
+    "rafael": { "file": "media/speaker-rafael.jpg", "alt": "Illustrated portrait of Rafael Ortega" },
+    "priya": { "file": "media/speaker-priya.jpg", "alt": "Illustrated portrait of Priya Raman" },
+    "jonas": { "file": "media/speaker-jonas.jpg", "alt": "Illustrated portrait of Jonas Weber" },
+    "chloe": { "file": "media/speaker-chloe.jpg", "alt": "Illustrated portrait of Chloé Martin" },
+    "logo-northwind": { "file": "media/logo-northwind.png", "alt": "Northwind Cloud" },
+    "logo-paperplane": { "file": "media/logo-paperplane.png", "alt": "Paperplane" },
+    "logo-tidewater": { "file": "media/logo-tidewater.png", "alt": "Tidewater Labs" },
+    "logo-kestrel": { "file": "media/logo-kestrel.png", "alt": "Kestrel" },
+    "logo-brightloop": { "file": "media/logo-brightloop.png", "alt": "Brightloop" },
+    "logo-lyon-gophers": { "file": "media/logo-lyon-gophers.png", "alt": "Lyon Gophers" },
+    "cover-programme": { "file": "media/cover-programme.jpg", "alt": "Colored shapes with the words Programme 2027" },
+    "cover-cfp": { "file": "media/cover-cfp.jpg", "alt": "Colored shapes with the words Call for papers" },
+    "cover-volunteers": { "file": "media/cover-volunteers.jpg", "alt": "Colored shapes with the word Volunteers" },
+    "cover-tickets": { "file": "media/cover-tickets.jpg", "alt": "Colored shapes with the words Early bird" },
+    "cover-rooms": { "file": "media/cover-rooms.jpg", "alt": "Colored shapes with the word Workshops" },
+    "gallery-1": { "file": "media/gallery-1.jpg", "alt": "Abstract poster in the conference colors" },
+    "gallery-2": { "file": "media/gallery-2.jpg", "alt": "Abstract poster in the conference colors" },
+    "gallery-3": { "file": "media/gallery-3.jpg", "alt": "Abstract poster in the conference colors" },
+    "share": { "file": "media/share.jpg", "alt": "GoHead Conf, Lyon 2027" },
+    "slides-graph": { "file": "media/slides-content-graph.pdf", "alt": "Slides of Content is a graph, not a page" },
+    "proposal-outline": { "file": "media/proposal-outline.pdf", "alt": "Talk outline" }
+  },
+  "collections": {
+    "tracks": [
+      {
+        "$id": "platform",
+        "name": "Platform & Ops",
+        "slug": "platform",
+        "color": "#3E6FE0",
+        "description": "Running content infrastructure: databases, deployments, scaling and observability.",
+        "$translations": { "fr": { "name": "Plateforme & ops", "description": "Faire tourner l’infrastructure de contenu : bases de données, déploiements, montée en charge et observabilité." } }
+      },
+      {
+        "$id": "frontend",
+        "name": "Frontend",
+        "slug": "frontend",
+        "color": "#E0602F",
+        "description": "Sites and apps on top of a headless CMS: caching, previews, forms and accessibility.",
+        "$translations": { "fr": { "description": "Des sites et des applications sur un CMS headless : cache, prévisualisation, formulaires et accessibilité." } }
+      },
+      {
+        "$id": "ai",
+        "name": "AI & Automation",
+        "slug": "ai",
+        "color": "#7A5AF0",
+        "description": "Agents, models and the guardrails that keep them useful.",
+        "$translations": { "fr": { "name": "IA & automatisation", "description": "Agents, modèles et les garde-fous qui les rendent utiles." } }
+      },
+      {
+        "$id": "editorial",
+        "name": "Editorial",
+        "slug": "editorial",
+        "color": "#2F9461",
+        "description": "How editors, translators and reviewers work with content every day.",
+        "$translations": { "fr": { "name": "Éditorial", "description": "Comment les rédactions, les traducteurs et les relecteurs travaillent le contenu au quotidien." } }
+      }
+    ],
+    "speakers": [
+      {
+        "$id": "amara",
+        "name": "Amara Okafor",
+        "slug": "amara-okafor",
+        "headline": "Staff engineer, content platform",
+        "bio": "Amara leads the content platform of a European media group, where one content model feeds **forty websites**, four apps and a newsletter. She writes about information architecture and the boring infrastructure that makes it work.",
+        "photo": "@media:amara",
+        "company": "Northwind Media",
+        "country": "Germany",
+        "links": [
+          { "label": "Website", "url": "https://example.com/amara" },
+          { "label": "Mastodon", "url": "https://example.social/@amara" }
+        ],
+        "featured": true,
+        "$translations": { "fr": { "headline": "Ingénieure staff, plateforme de contenu", "bio": "Amara dirige la plateforme de contenu d’un groupe de médias européen, où un seul modèle de contenu alimente **quarante sites**, quatre applications et une newsletter. Elle écrit sur l’architecture de l’information et sur l’infrastructure discrète qui la fait tenir." } }
+      },
+      {
+        "$id": "lucas",
+        "name": "Lucas Moreau",
+        "slug": "lucas-moreau",
+        "headline": "Developer advocate",
+        "bio": "Lucas spends his days building demo sites and his nights reading changelogs. Based in Lyon, he co-organises the local Go meetup.",
+        "photo": "@media:lucas",
+        "company": "Paperplane",
+        "country": "France",
+        "links": [{ "label": "Blog", "url": "https://example.com/lucas" }],
+        "featured": true,
+        "$translations": { "fr": { "headline": "Developer advocate", "bio": "Lucas passe ses journées à construire des sites de démonstration et ses soirées à lire des changelogs. Installé à Lyon, il co-organise le meetup Go local." } }
+      },
+      {
+        "$id": "mei",
+        "name": "Mei Tanaka",
+        "slug": "mei-tanaka",
+        "headline": "Product designer",
+        "bio": "Mei designs editing tools for newsrooms. She believes an admin screen is a product, not an afterthought, and has the usability tests to prove it.",
+        "photo": "@media:mei",
+        "company": "Kestrel",
+        "country": "Japan",
+        "links": [{ "label": "Portfolio", "url": "https://example.com/mei" }],
+        "featured": true,
+        "$translations": { "fr": { "headline": "Designer produit", "bio": "Mei conçoit des outils d’édition pour les rédactions. Pour elle, un écran d’administration est un produit à part entière, et ses tests utilisateurs le prouvent." } }
+      },
+      {
+        "$id": "sofia",
+        "name": "Sofia Lindqvist",
+        "slug": "sofia-lindqvist",
+        "headline": "SRE lead",
+        "bio": "Sofia keeps the lights on for a streaming platform. She likes Postgres, dashboards that tell a story, and on-call rotations nobody dreads.",
+        "photo": "@media:sofia",
+        "company": "Tidewater Labs",
+        "country": "Sweden",
+        "links": [],
+        "featured": false,
+        "$translations": { "fr": { "headline": "Responsable SRE", "bio": "Sofia veille sur une plateforme de streaming. Elle aime Postgres, les tableaux de bord qui racontent une histoire et les astreintes que personne ne redoute." } }
+      },
+      {
+        "$id": "rafael",
+        "name": "Rafael Ortega",
+        "slug": "rafael-ortega",
+        "headline": "CTO of a small web agency",
+        "bio": "Rafael's agency ships thirty sites a year. He cares about previews that editors trust and pages that are fresh without rebuilding everything.",
+        "photo": "@media:rafael",
+        "company": "Brightloop",
+        "country": "Spain",
+        "links": [{ "label": "Agency", "url": "https://example.com/brightloop" }],
+        "featured": false,
+        "$translations": { "fr": { "headline": "CTO d’une petite agence web", "bio": "L’agence de Rafael livre trente sites par an. Il tient à des prévisualisations auxquelles les rédacteurs font confiance, et à des pages à jour sans tout reconstruire." } }
+      },
+      {
+        "$id": "priya",
+        "name": "Priya Raman",
+        "slug": "priya-raman",
+        "headline": "Machine learning engineer",
+        "bio": "Priya builds the agents that tag, summarise and translate content for a publishing house. Her rule: an agent proposes, a person decides.",
+        "photo": "@media:priya",
+        "company": "Northwind Cloud",
+        "country": "India",
+        "links": [{ "label": "Papers", "url": "https://example.com/priya" }],
+        "featured": true,
+        "$translations": { "fr": { "headline": "Ingénieure machine learning", "bio": "Priya construit les agents qui étiquettent, résument et traduisent le contenu d’une maison d’édition. Sa règle : l’agent propose, une personne décide." } }
+      },
+      {
+        "$id": "jonas",
+        "name": "Jonas Weber",
+        "slug": "jonas-weber",
+        "headline": "Go developer",
+        "bio": "Jonas has written Go since before modules. He maintains a handful of database drivers and runs his home lab on Raspberry Pis.",
+        "photo": "@media:jonas",
+        "company": "Independent",
+        "country": "Germany",
+        "links": [{ "label": "Code", "url": "https://example.com/jonas" }],
+        "featured": false,
+        "$translations": { "fr": { "headline": "Développeur Go", "bio": "Jonas écrit du Go depuis avant les modules. Il maintient quelques pilotes de bases de données et fait tourner son labo sur des Raspberry Pi." } }
+      },
+      {
+        "$id": "chloe",
+        "name": "Chloé Martin",
+        "slug": "chloe-martin",
+        "headline": "Editor-in-chief",
+        "bio": "Chloé runs a bilingual news site with twelve journalists and one very busy translation desk.",
+        "photo": "@media:chloe",
+        "company": "Le Quotidien Numérique",
+        "country": "France",
+        "links": [],
+        "featured": false,
+        "$translations": { "fr": { "headline": "Rédactrice en chef", "bio": "Chloé dirige un site d’information bilingue avec douze journalistes et un service de traduction très occupé." } }
+      }
+    ],
+    "talks": [
+      {
+        "$id": "opening",
+        "$status": "published",
+        "title": "Content is a graph, not a page",
+        "slug": "content-is-a-graph",
+        "abstract": "Most content models start from the pages of a website, and break the day a second front-end arrives. This keynote shows how to model **entries, relations and components** so that pages become queries over your content, not the other way round.\n\n- Where pages come from\n- Relations versus copies\n- Components as a vocabulary",
+        "format": "keynote",
+        "level": "beginner",
+        "starts_at": "2027-03-11T08:30:00Z",
+        "duration_minutes": 45,
+        "room": "main_hall",
+        "track": "@ref:tracks/platform",
+        "speakers": ["@ref:speakers/amara"],
+        "slides": "@media:slides-graph",
+        "gallery": ["@media:gallery-1", "@media:gallery-2", "@media:gallery-3"],
+        "tags": ["content modeling", "architecture"],
+        "recording_url": "https://example.com/recordings/content-is-a-graph",
+        "seo": { "meta_title": "Content is a graph, not a page · GoHead Conf", "meta_description": "Amara Okafor's opening keynote on content modeling." },
+        "$translations": { "fr": { "title": "Le contenu est un graphe, pas une page", "abstract": "La plupart des modèles de contenu partent des pages d’un site, et cassent le jour où un deuxième front-end arrive. Cette keynote montre comment modéliser **entrées, relations et composants** pour que les pages deviennent des requêtes sur le contenu, et non l’inverse.\n\n- D’où viennent les pages\n- Relations ou copies\n- Les composants comme vocabulaire" } }
+      },
+      {
+        "$id": "model-as-code",
+        "$status": "published",
+        "title": "Model-as-code: your content schema in Git",
+        "slug": "model-as-code",
+        "abstract": "Clicking a content model together is fast; reviewing it is not. Lucas shows how to keep the model in a JSON file, apply it from CI with a dry run, and generate TypeScript types so a renamed field breaks the build instead of the site.",
+        "format": "talk",
+        "level": "intermediate",
+        "starts_at": "2027-03-11T09:30:00Z",
+        "duration_minutes": 40,
+        "room": "room_a",
+        "track": "@ref:tracks/platform",
+        "speakers": ["@ref:speakers/lucas"],
+        "tags": ["ci", "typescript", "content modeling"],
+        "$translations": { "fr": { "title": "Le modèle de contenu dans Git", "abstract": "Construire un modèle de contenu à la souris est rapide ; le relire, beaucoup moins. Lucas montre comment garder le modèle dans un fichier JSON, l’appliquer depuis la CI avec un essai à blanc, et générer des types TypeScript pour qu’un champ renommé casse le build plutôt que le site." } }
+      },
+      {
+        "$id": "admin-design",
+        "$status": "published",
+        "title": "Designing an admin people actually like",
+        "slug": "designing-an-admin",
+        "abstract": "Editors spend their whole day in the admin. Mei shares what two years of usability tests taught her team about tables, drawers, autosave and error messages.",
+        "format": "talk",
+        "level": "beginner",
+        "starts_at": "2027-03-11T09:30:00Z",
+        "duration_minutes": 40,
+        "room": "room_b",
+        "track": "@ref:tracks/editorial",
+        "speakers": ["@ref:speakers/mei"],
+        "tags": ["design", "ux"],
+        "$translations": { "fr": { "title": "Concevoir une admin que l’on aime utiliser", "abstract": "Les rédacteurs passent leur journée dans l’admin. Mei partage ce que deux ans de tests utilisateurs ont appris à son équipe sur les tableaux, les panneaux latéraux, l’enregistrement automatique et les messages d’erreur." } }
+      },
+      {
+        "$id": "nextjs-workshop",
+        "$status": "published",
+        "title": "Workshop: a Next.js site on GoHead in 90 minutes",
+        "slug": "nextjs-workshop",
+        "abstract": "Bring a laptop with Node.js and Docker. We start from `npm create @gohead-cms`, model a small programme, render it with server components and wire publishing to on-demand revalidation.",
+        "format": "workshop",
+        "level": "beginner",
+        "starts_at": "2027-03-11T10:30:00Z",
+        "duration_minutes": 90,
+        "room": "lab",
+        "track": "@ref:tracks/frontend",
+        "speakers": ["@ref:speakers/lucas", "@ref:speakers/rafael"],
+        "tags": ["nextjs", "workshop"],
+        "$translations": { "fr": { "title": "Atelier : un site Next.js sur GoHead en 90 minutes", "abstract": "Venez avec un ordinateur équipé de Node.js et Docker. On part de `npm create @gohead-cms`, on modélise un petit programme, on l’affiche avec des server components et on relie la publication à la revalidation à la demande." } }
+      },
+      {
+        "$id": "kubernetes",
+        "$status": "published",
+        "title": "Running a CMS on Kubernetes without tears",
+        "slug": "cms-on-kubernetes",
+        "abstract": "API replicas, workers, a scheduler that must run exactly once, Postgres and Redis. Sofia walks through a production setup, its failure modes and the three alerts that actually matter.",
+        "format": "talk",
+        "level": "advanced",
+        "starts_at": "2027-03-11T10:30:00Z",
+        "duration_minutes": 40,
+        "room": "room_a",
+        "track": "@ref:tracks/platform",
+        "speakers": ["@ref:speakers/sofia"],
+        "tags": ["kubernetes", "postgres", "operations"],
+        "$translations": { "fr": { "title": "Un CMS sur Kubernetes, sans larmes", "abstract": "Des réplicas d’API, des workers, un planificateur qui doit tourner en un seul exemplaire, Postgres et Redis. Sofia détaille une installation de production, ses modes de défaillance et les trois alertes qui comptent vraiment." } }
+      },
+      {
+        "$id": "webhooks",
+        "$status": "published",
+        "title": "Five webhooks you should have",
+        "slug": "five-webhooks",
+        "abstract": "Rebuild the site, warm the CDN, tell Slack, archive deletions, feed search. Five webhooks in ten minutes, with signatures checked.",
+        "format": "lightning",
+        "level": "beginner",
+        "starts_at": "2027-03-11T12:30:00Z",
+        "duration_minutes": 10,
+        "room": "main_hall",
+        "track": "@ref:tracks/frontend",
+        "speakers": ["@ref:speakers/rafael"],
+        "tags": ["webhooks"],
+        "$translations": { "fr": { "title": "Cinq webhooks à avoir", "abstract": "Reconstruire le site, préchauffer le CDN, prévenir Slack, archiver les suppressions, alimenter la recherche. Cinq webhooks en dix minutes, signatures vérifiées." } }
+      },
+      {
+        "$id": "raspberry",
+        "$status": "published",
+        "title": "SQLite on a Raspberry Pi is enough",
+        "slug": "sqlite-on-a-pi",
+        "abstract": "A single process, one file of data, no Redis: how far a standalone CMS goes on a 15-euro computer.",
+        "format": "lightning",
+        "level": "beginner",
+        "starts_at": "2027-03-11T12:45:00Z",
+        "duration_minutes": 10,
+        "room": "main_hall",
+        "track": "@ref:tracks/platform",
+        "speakers": ["@ref:speakers/jonas"],
+        "tags": ["sqlite", "self-hosting"],
+        "$translations": { "fr": { "title": "SQLite sur un Raspberry Pi, ça suffit", "abstract": "Un seul processus, un seul fichier de données, pas de Redis : jusqu’où va un CMS autonome sur un ordinateur à 15 euros." } }
+      },
+      {
+        "$id": "agents-approval",
+        "$status": "published",
+        "title": "Agents that ask before they write",
+        "slug": "agents-that-ask",
+        "abstract": "Letting a model edit published content is a bold move. Priya shows how approvals, scoped functions, test runs and reverting a run let a team adopt agents **without** giving up control.",
+        "format": "talk",
+        "level": "intermediate",
+        "starts_at": "2027-03-11T13:30:00Z",
+        "duration_minutes": 40,
+        "room": "main_hall",
+        "track": "@ref:tracks/ai",
+        "speakers": ["@ref:speakers/priya"],
+        "tags": ["agents", "llm", "governance"],
+        "$translations": { "fr": { "title": "Des agents qui demandent avant d’écrire", "abstract": "Laisser un modèle modifier du contenu publié, c’est audacieux. Priya montre comment les validations, les fonctions limitées, les essais et l’annulation d’une exécution permettent d’adopter des agents **sans** perdre le contrôle." } }
+      },
+      {
+        "$id": "panel",
+        "$status": "published",
+        "title": "Panel: newsrooms and machines",
+        "slug": "newsrooms-and-machines",
+        "abstract": "An editor, an engineer and an ML specialist on what newsrooms should, and should never, hand to automation.",
+        "format": "panel",
+        "starts_at": "2027-03-11T14:30:00Z",
+        "duration_minutes": 50,
+        "room": "main_hall",
+        "track": "@ref:tracks/editorial",
+        "speakers": ["@ref:speakers/chloe", "@ref:speakers/priya", "@ref:speakers/amara"],
+        "tags": ["journalism", "ai"],
+        "$translations": { "fr": { "title": "Table ronde : rédactions et machines", "abstract": "Une rédactrice en chef, une ingénieure et une spécialiste du machine learning sur ce que les rédactions devraient, ou ne devraient jamais, confier à l’automatisation." } }
+      },
+      {
+        "$id": "translation",
+        "$status": "published",
+        "title": "Translating 10,000 articles without losing your voice",
+        "slug": "translating-10000-articles",
+        "abstract": "Field-by-field localization, fallbacks, and a translation agent whose every suggestion goes through an editor. What worked, and what Chloé's desk turned off after a week.",
+        "format": "talk",
+        "level": "intermediate",
+        "starts_at": "2027-03-11T15:30:00Z",
+        "duration_minutes": 40,
+        "room": "room_a",
+        "track": "@ref:tracks/ai",
+        "speakers": ["@ref:speakers/chloe"],
+        "tags": ["localization", "agents"],
+        "$translations": { "fr": { "title": "Traduire 10 000 articles sans perdre sa voix", "abstract": "Localisation champ par champ, valeurs de repli, et un agent de traduction dont chaque suggestion passe par un éditeur. Ce qui a marché, et ce que le service de Chloé a coupé au bout d’une semaine." } }
+      },
+      {
+        "$id": "boring-go",
+        "$status": "published",
+        "title": "The boring parts of Go that make a CMS fast",
+        "slug": "boring-go",
+        "abstract": "Prepared statements, careful JSON, bounded queues and context deadlines. Day two opens with the unglamorous code paths that keep latency flat.",
+        "format": "keynote",
+        "level": "intermediate",
+        "starts_at": "2027-03-12T08:30:00Z",
+        "duration_minutes": 45,
+        "room": "main_hall",
+        "track": "@ref:tracks/platform",
+        "speakers": ["@ref:speakers/jonas"],
+        "tags": ["go", "performance"],
+        "$translations": { "fr": { "title": "Les parties ennuyeuses de Go qui rendent un CMS rapide", "abstract": "Requêtes préparées, JSON maîtrisé, files bornées et délais de contexte. Le deuxième jour s’ouvre sur ces chemins de code sans éclat qui gardent la latence stable." } }
+      },
+      {
+        "$id": "cache-tags",
+        "$status": "published",
+        "title": "Fresh static pages, explained with cache tags",
+        "slug": "cache-tags",
+        "abstract": "Static pages are fast until they are wrong. Tag every read with the content types it returns, and let a signed webhook expire exactly what changed.",
+        "format": "talk",
+        "level": "intermediate",
+        "starts_at": "2027-03-12T09:30:00Z",
+        "duration_minutes": 40,
+        "room": "room_a",
+        "track": "@ref:tracks/frontend",
+        "speakers": ["@ref:speakers/rafael"],
+        "tags": ["nextjs", "caching", "webhooks"],
+        "$translations": { "fr": { "title": "Des pages statiques toujours à jour, grâce aux tags de cache", "abstract": "Les pages statiques sont rapides, jusqu’au jour où elles sont fausses. Étiquetez chaque lecture avec les types de contenu qu’elle renvoie, et laissez un webhook signé expirer exactement ce qui a changé." } }
+      },
+      {
+        "$id": "functions-workshop",
+        "$status": "published",
+        "title": "Workshop: write your first agent function",
+        "slug": "agent-function-workshop",
+        "abstract": "From a JSON schema to a Go implementation registered as an `impl_key`. You leave with a stock-checking agent and a test run that proves it does nothing it shouldn't.",
+        "format": "workshop",
+        "level": "advanced",
+        "starts_at": "2027-03-12T09:30:00Z",
+        "duration_minutes": 120,
+        "room": "lab",
+        "track": "@ref:tracks/ai",
+        "speakers": ["@ref:speakers/priya", "@ref:speakers/jonas"],
+        "tags": ["agents", "go", "workshop"],
+        "$translations": { "fr": { "title": "Atelier : votre première fonction d’agent", "abstract": "D’un schéma JSON à une implémentation Go enregistrée comme `impl_key`. Vous repartez avec un agent qui vérifie les stocks et un essai qui prouve qu’il ne fait rien d’interdit." } }
+      },
+      {
+        "$id": "observability",
+        "$status": "published",
+        "title": "Observability for content pipelines",
+        "slug": "observability",
+        "abstract": "Traces from the editor's click to the CDN edge. Which metrics tell you a webhook is failing before your editors do.",
+        "format": "talk",
+        "level": "intermediate",
+        "starts_at": "2027-03-12T11:00:00Z",
+        "duration_minutes": 40,
+        "room": "room_b",
+        "track": "@ref:tracks/platform",
+        "speakers": ["@ref:speakers/sofia"],
+        "tags": ["opentelemetry", "operations"],
+        "$translations": { "fr": { "title": "Observabilité des chaînes de publication", "abstract": "Des traces du clic de l’éditeur jusqu’au CDN. Les métriques qui vous disent qu’un webhook échoue avant que la rédaction ne s’en aperçoive." } }
+      },
+      {
+        "$id": "accessible-forms",
+        "$status": "published",
+        "title": "Accessible by default: forms that work",
+        "slug": "accessible-forms",
+        "abstract": "Labels, errors, focus and progressive enhancement. Mei rebuilds a call-for-papers form that works with a keyboard, a screen reader and JavaScript turned off.",
+        "format": "talk",
+        "level": "beginner",
+        "starts_at": "2027-03-12T13:30:00Z",
+        "duration_minutes": 40,
+        "room": "room_a",
+        "track": "@ref:tracks/frontend",
+        "speakers": ["@ref:speakers/mei"],
+        "tags": ["accessibility", "forms"],
+        "$translations": { "fr": { "title": "Accessible par défaut : des formulaires qui marchent", "abstract": "Étiquettes, erreurs, focus et amélioration progressive. Mei reconstruit un formulaire d’appel à propositions qui fonctionne au clavier, avec un lecteur d’écran et sans JavaScript." } }
+      },
+      {
+        "$id": "closing",
+        "$status": "published",
+        "title": "Closing: what we publish next",
+        "slug": "closing",
+        "abstract": "Two days in thirty minutes, and an honest look at what the next year of headless content will bring.",
+        "format": "keynote",
+        "starts_at": "2027-03-12T14:30:00Z",
+        "duration_minutes": 30,
+        "room": "main_hall",
+        "track": "@ref:tracks/editorial",
+        "speakers": ["@ref:speakers/amara", "@ref:speakers/chloe"],
+        "tags": ["community"],
+        "$translations": { "fr": { "title": "Clôture : ce que nous publierons demain", "abstract": "Deux jours en trente minutes, et un regard honnête sur ce que l’année à venir réserve au contenu headless." } }
+      },
+      {
+        "$id": "secret",
+        "$status": "draft",
+        "title": "Surprise act: live-coding a CMS in one hour",
+        "slug": "surprise-act",
+        "abstract": "Not announced yet. Visitors don't see this talk until it is published; preview it from the admin with the site's draft mode.",
+        "format": "talk",
+        "level": "advanced",
+        "starts_at": "2027-03-12T15:15:00Z",
+        "duration_minutes": 45,
+        "room": "main_hall",
+        "track": "@ref:tracks/platform",
+        "speakers": ["@ref:speakers/jonas"],
+        "tags": ["live coding"],
+        "$translations": { "fr": { "title": "Surprise : coder un CMS en direct en une heure", "abstract": "Pas encore annoncé. Les visiteurs ne voient pas cette session tant qu’elle n’est pas publiée ; prévisualisez-la depuis l’admin avec le mode brouillon du site." } }
+      }
+    ],
+    "posts": [
+      {
+        "$id": "programme",
+        "$status": "published",
+        "title": "The 2027 programme is out",
+        "slug": "programme-announced",
+        "kind": "programme",
+        "excerpt": "Sixteen sessions over two days, in four tracks, with two hands-on workshops.",
+        "body": "Sixteen sessions, two days, four tracks. Amara Okafor opens on **Thursday 11 March** with a keynote on content modeling, and day two starts with Jonas Weber on the boring parts of Go.\n\nBoth workshops have limited seats: bring a laptop with Node.js and Docker.\n\n[See the schedule](/en/schedule)",
+        "cover": "@media:cover-programme",
+        "$translations": { "fr": { "title": "Le programme 2027 est en ligne", "excerpt": "Seize sessions sur deux jours, quatre thématiques et deux ateliers pratiques.", "body": "Seize sessions, deux jours, quatre thématiques. Amara Okafor ouvre le **jeudi 11 mars** avec une keynote sur la modélisation du contenu, et le deuxième jour commence avec Jonas Weber et les parties ennuyeuses de Go.\n\nLes deux ateliers ont des places limitées : venez avec un ordinateur équipé de Node.js et Docker.\n\n[Voir le programme](/fr/schedule)" } }
+      },
+      {
+        "$id": "cfp",
+        "$status": "published",
+        "title": "Our call for papers is open",
+        "slug": "call-for-papers",
+        "kind": "announcement",
+        "excerpt": "Propose a talk, a workshop or a lightning talk until 15 January.",
+        "body": "We want to hear about the content systems you run, the sites you build on them and the editors who use them every day. First-time speakers are very welcome: we pair every new speaker with a mentor.\n\nProposals go straight into GoHead, where the programme committee reviews them.\n\n[Send a proposal](/en/cfp)",
+        "cover": "@media:cover-cfp",
+        "$translations": { "fr": { "title": "L’appel à propositions est ouvert", "excerpt": "Proposez une conférence, un atelier ou un lightning talk jusqu’au 15 janvier.", "body": "Nous voulons entendre parler des systèmes de contenu que vous faites tourner, des sites que vous construisez dessus et des rédacteurs qui s’en servent chaque jour. Les personnes qui n’ont jamais parlé en public sont les bienvenues : chacune est accompagnée par un mentor.\n\nLes propositions arrivent directement dans GoHead, où le comité de programme les étudie.\n\n[Envoyer une proposition](/fr/cfp)" } }
+      },
+      {
+        "$id": "volunteers",
+        "$status": "published",
+        "title": "Meet the volunteers",
+        "slug": "meet-the-volunteers",
+        "kind": "community",
+        "excerpt": "Twenty people make the conference happen. Here is what they do.",
+        "body": "From the registration desk to the captioning booth, twenty volunteers run the conference. They get a free ticket, a T-shirt and our eternal gratitude.\n\nWant to join them? Write to us through the feedback form.",
+        "cover": "@media:cover-volunteers",
+        "$translations": { "fr": { "title": "Les bénévoles", "excerpt": "Vingt personnes font vivre la conférence. Voici ce qu’elles font.", "body": "De l’accueil à la cabine de sous-titrage, vingt bénévoles font tourner la conférence. Elles et ils reçoivent un billet, un T-shirt et notre gratitude éternelle.\n\nEnvie de les rejoindre ? Écrivez-nous via le formulaire d’avis." } }
+      },
+      {
+        "$id": "early-bird",
+        "$status": "published",
+        "title": "Early bird tickets are sold out",
+        "slug": "early-bird-sold-out",
+        "kind": "announcement",
+        "excerpt": "Thank you! Regular and student tickets are still available.",
+        "body": "Early bird tickets went in nine days. Regular tickets stay on sale until the conference, and student tickets need a valid student card at the door.",
+        "cover": "@media:cover-tickets",
+        "$translations": { "fr": { "title": "Les billets early bird sont épuisés", "excerpt": "Merci ! Il reste des billets plein tarif et étudiants.", "body": "Les billets early bird sont partis en neuf jours. Les billets plein tarif restent en vente jusqu’à la conférence, et les billets étudiants demandent une carte d’étudiant valide à l’entrée." } }
+      },
+      {
+        "$id": "rooms",
+        "$status": "draft",
+        "title": "Workshops move to a bigger room",
+        "slug": "workshops-move",
+        "kind": "programme",
+        "excerpt": "A draft: preview it with the site's draft mode before publishing.",
+        "body": "Both workshops move to the Lab on level 2, with forty seats each. *This post is a draft: it is only visible in preview.*",
+        "cover": "@media:cover-rooms"
+      }
+    ],
+    "sponsors": [
+      { "name": "Northwind Cloud", "slug": "northwind-cloud", "tier": "platinum", "logo": "@media:logo-northwind", "website": "https://example.com/northwind", "blurb": "Managed Postgres and object storage in six European regions.", "rank": 1, "$translations": { "fr": { "blurb": "Postgres managé et stockage objet dans six régions européennes." } } },
+      { "name": "Paperplane", "slug": "paperplane", "tier": "gold", "logo": "@media:logo-paperplane", "website": "https://example.com/paperplane", "blurb": "Deploy previews for every pull request.", "rank": 1, "$translations": { "fr": { "blurb": "Un déploiement de prévisualisation pour chaque pull request." } } },
+      { "name": "Tidewater Labs", "slug": "tidewater-labs", "tier": "gold", "logo": "@media:logo-tidewater", "website": "https://example.com/tidewater", "blurb": "Observability for streaming platforms.", "rank": 2, "$translations": { "fr": { "blurb": "L’observabilité des plateformes de streaming." } } },
+      { "name": "Kestrel", "slug": "kestrel", "tier": "silver", "logo": "@media:logo-kestrel", "website": "https://example.com/kestrel", "blurb": "Design tools for editorial teams.", "rank": 1, "$translations": { "fr": { "blurb": "Des outils de design pour les rédactions." } } },
+      { "name": "Brightloop", "slug": "brightloop", "tier": "silver", "logo": "@media:logo-brightloop", "website": "https://example.com/brightloop", "blurb": "A web agency in Madrid and Lyon.", "rank": 2, "$translations": { "fr": { "blurb": "Une agence web à Madrid et à Lyon." } } },
+      { "name": "Lyon Gophers", "slug": "lyon-gophers", "tier": "community", "logo": "@media:logo-lyon-gophers", "website": "https://example.com/lyon-gophers", "blurb": "The Go meetup of Lyon, every second Tuesday.", "rank": 1, "$translations": { "fr": { "blurb": "Le meetup Go de Lyon, un mardi sur deux." } } }
+    ],
+    "pages": [
+      {
+        "title": "Code of conduct",
+        "slug": "code-of-conduct",
+        "body": "GoHead Conf is dedicated to a harassment-free experience for everyone. We do not tolerate harassment of participants in any form.\n\n## Need help?\n\nFind a volunteer in an orange T-shirt, or call the safety line printed on your badge. Every report is handled within the hour.",
+        "seo": { "meta_description": "The code of conduct of GoHead Conf." },
+        "$translations": { "fr": { "title": "Code de conduite", "body": "GoHead Conf s’engage à offrir à chacune et chacun une expérience sans harcèlement. Aucune forme de harcèlement n’est tolérée.\n\n## Besoin d’aide ?\n\nAdressez-vous à un bénévole en T-shirt orange, ou appelez la ligne de sécurité imprimée sur votre badge. Chaque signalement est traité dans l’heure." } }
+      },
+      {
+        "title": "Practical information",
+        "slug": "practical-information",
+        "body": "The conference takes place at **La Sucrière**, on the banks of the Saône in Lyon. Doors open at 8:30 both days.\n\nLunch, coffee and snacks are included in every ticket, with vegetarian and vegan options.",
+        "faq": [
+          { "question": "How do I get there?", "answer": "Tram T1, stop Hôtel de Région – Montrochet, then a five-minute walk." },
+          { "question": "Is the venue accessible?", "answer": "Yes: step-free access, lifts to every floor and live captions in the main hall." },
+          { "question": "Can I bring my children?", "answer": "A free creche is available on both days; book a place when you buy your ticket." }
+        ],
+        "$translations": { "fr": { "title": "Infos pratiques", "body": "La conférence a lieu à **La Sucrière**, au bord de la Saône à Lyon. Ouverture des portes à 8 h 30 les deux jours.\n\nLe déjeuner, le café et les en-cas sont inclus dans tous les billets, avec des options végétariennes et véganes.", "faq": [
+          { "question": "Comment venir ?", "answer": "Tram T1, arrêt Hôtel de Région – Montrochet, puis cinq minutes à pied." },
+          { "question": "Le lieu est-il accessible ?", "answer": "Oui : accès de plain-pied, ascenseurs à tous les étages et sous-titrage en direct dans la grande salle." },
+          { "question": "Puis-je venir avec mes enfants ?", "answer": "Une crèche gratuite est ouverte les deux jours ; réservez une place en achetant votre billet." }
+        ] } }
+      }
+    ],
+    "questions": [
+      { "$status": "published", "talk": "@ref:talks/opening", "talk_slug": "content-is-a-graph", "name": "Inès", "body": "How do you migrate an existing page-based model without a big bang?", "answer": "Start with one content type that two front-ends need, and model it as entries plus relations. Migrate page by page from there." },
+      { "$status": "published", "talk": "@ref:talks/agents-approval", "talk_slug": "agents-that-ask", "name": "Tom", "body": "Do approved changes trigger other agents?", "answer": "They emit content events and webhooks, but never trigger the agent that proposed them." },
+      { "$status": "published", "talk": "@ref:talks/agents-approval", "talk_slug": "agents-that-ask", "name": "Aiko", "body": "Can I see what an agent would change before turning it on?" },
+      { "$status": "draft", "talk": "@ref:talks/opening", "talk_slug": "content-is-a-graph", "name": "Spammy", "body": "BUY CHEAP FOLLOWERS NOW!!! visit my site", "flagged": true, "flag_reason": "Spam: advertising unrelated to the talk." }
+    ],
+    "proposals": [
+      { "title": "Static sites that never go stale", "abstract": "Cache tags, signed webhooks and a demo of a site that refreshes in under a second after publishing.", "format": "talk", "level": "intermediate", "language": "en", "speaker_name": "Noor Haddad", "speaker_email": "noor@example.com", "speaker_bio": "Frontend engineer, organiser of a static-site meetup.", "attachment": "@media:proposal-outline", "decision": "pending" },
+      { "title": "Mon premier CMS headless en entreprise", "abstract": "Retour d’expérience sur la migration d’un intranet vers un CMS headless en six mois.", "format": "talk", "level": "beginner", "language": "fr", "speaker_name": "Julien Petit", "speaker_email": "julien@example.com", "decision": "shortlisted", "review_score": 7, "review_notes": "Clear story; ask for more numbers." }
+    ]
+  },
+  "singletons": {
+    "site": {
+      "name": "GoHead Conf",
+      "tagline": "Two days about headless content, in Lyon",
+      "description": "GoHead Conf is a two-day conference about content platforms, the sites built on them and the people who edit them. 11–12 March 2027, Lyon.",
+      "starts_on": "2027-03-11",
+      "ends_on": "2027-03-12",
+      "venue": { "name": "La Sucrière", "address": "49-50 Quai Rambaud", "city": "Lyon", "map_url": "https://www.openstreetmap.org/search?query=La%20Sucri%C3%A8re%20Lyon", "timezone": "Europe/Paris", "doors_open": "08:30:00" },
+      "nav": [
+        { "label": "Schedule", "url": "/schedule" },
+        { "label": "Speakers", "url": "/speakers" },
+        { "label": "News", "url": "/news" },
+        { "label": "Sponsors", "url": "/sponsors" },
+        { "label": "Tickets", "url": "/tickets" },
+        { "label": "Call for papers", "url": "/cfp" }
+      ],
+      "footer": "GoHead Conf is a sample site of the GoHead conference starter. Everything here is made up.",
+      "social": [
+        { "label": "Mastodon", "url": "https://example.social/@goheadconf" },
+        { "label": "GitHub", "url": "https://github.com/gohead-cms/gohead" }
+      ],
+      "seo": { "meta_title": "GoHead Conf 2027 · Lyon", "meta_description": "Two days about headless content, 11–12 March 2027 in Lyon.", "share_image": "@media:share" },
+      "$translations": {
+        "fr": {
+          "tagline": "Deux jours sur le contenu headless, à Lyon",
+          "description": "GoHead Conf est une conférence de deux jours sur les plateformes de contenu, les sites construits dessus et les personnes qui les éditent. Les 11 et 12 mars 2027, à Lyon.",
+          "venue": { "name": "La Sucrière", "address": "49-50 quai Rambaud", "city": "Lyon", "map_url": "https://www.openstreetmap.org/search?query=La%20Sucri%C3%A8re%20Lyon", "timezone": "Europe/Paris", "doors_open": "08:30:00" },
+          "nav": [
+            { "label": "Programme", "url": "/schedule" },
+            { "label": "Intervenants", "url": "/speakers" },
+            { "label": "Actualités", "url": "/news" },
+            { "label": "Partenaires", "url": "/sponsors" },
+            { "label": "Billets", "url": "/tickets" },
+            { "label": "Appel à propositions", "url": "/cfp" }
+          ],
+          "footer": "GoHead Conf est un site d’exemple du starter conférence de GoHead. Tout y est inventé."
+        }
+      }
+    },
+    "homepage": {
+      "hero": {
+        "title": "Two days about headless content",
+        "text": "Content modeling, fast front-ends, agents that ask first, and the editors at the heart of it all. 11–12 March 2027, La Sucrière, Lyon.",
+        "primary": { "label": "See the schedule", "url": "/schedule" },
+        "secondary": { "label": "Get a ticket", "url": "/tickets" }
+      },
+      "featured_talks": ["@ref:talks/opening", "@ref:talks/agents-approval", "@ref:talks/nextjs-workshop"],
+      "featured_speakers": ["@ref:speakers/amara", "@ref:speakers/priya", "@ref:speakers/mei", "@ref:speakers/lucas"],
+      "faq": [
+        { "question": "Who is it for?", "answer": "Developers, operators, designers and editors who work with a headless CMS, or are thinking about one." },
+        { "question": "In which language are the talks?", "answer": "Mostly English, with French sessions marked in the schedule. The main hall has live captions in both." },
+        { "question": "Will talks be recorded?", "answer": "Yes. Recordings and slides are added to each talk page after the conference." }
+      ],
+      "$translations": {
+        "fr": {
+          "hero": {
+            "title": "Deux jours sur le contenu headless",
+            "text": "Modélisation du contenu, front-ends rapides, agents qui demandent avant d’agir, et les rédacteurs au cœur de tout ça. Les 11 et 12 mars 2027, à La Sucrière, Lyon.",
+            "primary": { "label": "Voir le programme", "url": "/schedule" },
+            "secondary": { "label": "Prendre un billet", "url": "/tickets" }
+          },
+          "faq": [
+            { "question": "À qui s’adresse la conférence ?", "answer": "Aux développeurs, opérateurs, designers et rédacteurs qui travaillent avec un CMS headless, ou qui y pensent." },
+            { "question": "Dans quelle langue sont les sessions ?", "answer": "Surtout en anglais, avec des sessions en français signalées dans le programme. La grande salle est sous-titrée dans les deux langues." },
+            { "question": "Les sessions seront-elles filmées ?", "answer": "Oui. Les vidéos et les supports sont ajoutés à chaque page de session après la conférence." }
+          ]
+        }
+      }
+    },
+    "tickets": {
+      "intro": "Every ticket includes both days, lunch, coffee and the evening party.",
+      "tiers": [
+        { "name": "Early bird", "price": 149, "currency": "EUR", "perks": ["Both days", "Lunch and coffee", "Evening party"], "sale_ends": "2026-12-01T23:00:00Z", "sold_out": true },
+        { "name": "Regular", "price": 249, "currency": "EUR", "perks": ["Both days", "Lunch and coffee", "Evening party", "Workshop seat (first come)"], "url": "https://example.com/tickets/regular" },
+        { "name": "Student", "price": 49, "currency": "EUR", "perks": ["Both days", "Lunch and coffee"], "url": "https://example.com/tickets/student" }
+      ],
+      "refund_policy": "Tickets are refundable until **1 February 2027**, and transferable to someone else at any time.",
+      "$translations": {
+        "fr": {
+          "intro": "Chaque billet comprend les deux jours, le déjeuner, le café et la soirée.",
+          "tiers": [
+            { "name": "Early bird", "price": 149, "currency": "EUR", "perks": ["Les deux jours", "Déjeuner et café", "Soirée"], "sale_ends": "2026-12-01T23:00:00Z", "sold_out": true },
+            { "name": "Plein tarif", "price": 249, "currency": "EUR", "perks": ["Les deux jours", "Déjeuner et café", "Soirée", "Place en atelier (premiers arrivés)"], "url": "https://example.com/tickets/regular" },
+            { "name": "Étudiant", "price": 49, "currency": "EUR", "perks": ["Les deux jours", "Déjeuner et café"], "url": "https://example.com/tickets/student" }
+          ],
+          "refund_policy": "Les billets sont remboursables jusqu’au **1er février 2027**, et cessibles à tout moment."
+        }
+      }
+    }
+  }
+}

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * npm create @gohead-cms@latest [directory] -- [--template nextjs-blog] [--url http://localhost:8080] [--no-install] [--yes]
+ * npm create @gohead-cms@latest [directory] -- [--template nextjs-blog|nextjs-conference] [--url http://localhost:8080] [--no-install] [--yes]
  */
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";

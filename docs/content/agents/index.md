@@ -113,8 +113,8 @@ Responses mask `llm_config.api_key`, `api_secret` and `trigger.webhook_token` as
 
 - Agents write through the same validation as the API: give them exact collection and field
   names in the system prompt, or let them call `collections.get_schema` first.
-- Writes made by agents do not emit events, so an agent can safely update the item that
-  triggered it.
+- Writes made by agents do not emit events (webhooks or other agents), so an agent can
+  safely update the item that triggered it.
 - Start with a small `max_turns` (3–5) and a cheap model, then tune.
 - Set [`limits`](runs-and-limits.md#limits) on event-driven agents before pointing them at a
   busy collection.

@@ -5,6 +5,8 @@ categories with drafts, English and French, a home page edited in GoHead, Markdo
 Open Graph metadata, a sitemap and RSS feeds, light and dark themes, and pages that refresh
 when you publish. Its source is in
 [`templates/nextjs-blog`](https://github.com/gohead-cms/gohead/tree/master/templates/nextjs-blog).
+To see every GoHead feature at work (forms, previews, GraphQL, agents), use the conference
+starter of the [feature tour](feature-tour.md) instead.
 
 ## Create it
 

@@ -44,7 +44,8 @@ includes drafts.
 
 Creates through `collections.upsert_item` are validated like API writes (required fields,
 types, unique values), and so are updates with `item_id`, which replace the item's data.
-Agent writes do not emit content events.
+Agent writes do not emit content events (no webhooks, no other agents): sites that show
+what agents write refresh on their own schedule, or when a person next edits the entry.
 
 For an agent that [requires approval](approvals.md), writes become proposals instead and
 return `{"status": "pending_approval", "proposal_id": …}`; `reason` is shown to the

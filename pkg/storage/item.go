@@ -115,13 +115,16 @@ func CreateItems(actor Actor, collection models.Collection, inputs []ItemInput) 
 // (nil leaves it unchanged). It returns ErrItemNotFound when the item is not
 // in the collection, an *ItemValidationError for invalid data, and publishes
 // item:updated (plus item:published / item:unpublished on a state change).
-// A change is recorded as a revision; a save that changes nothing is not.
+// A change is recorded as a revision; a save that changes nothing is not,
+// and sends no item:updated event (so agents reacting to each other's
+// writes stop once their content agrees).
 func UpdateItemContent(actor Actor, collection models.Collection, itemID uint, data models.JSONMap, publish *bool) (*models.Item, error) {
 	if publish != nil && !collection.DraftAndPublish {
 		return nil, ErrDraftAndPublishDisabled
 	}
 	var item models.Item
 	var transition events.EventType
+	changed := false
 	nested := &models.NestedCreated{}
 	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
 		if err := lockRow(tx).Where("id = ? AND collection_id = ?", itemID, collection.ID).First(&item).Error; err != nil {
@@ -153,7 +156,8 @@ func UpdateItemContent(actor Actor, collection models.Collection, itemID uint, d
 			return err
 		}
 		action := models.RevisionUpdate
-		if sameData(previous, item.Data) {
+		changed = !sameData(previous, item.Data)
+		if !changed {
 			switch transition {
 			case "":
 				return nil // nothing changed
@@ -173,7 +177,9 @@ func UpdateItemContent(actor Actor, collection models.Collection, itemID uint, d
 		return nil, txErr
 	}
 	publishNested(actor, nested)
-	publishEvent(database.DB, actor, events.EventTypeItemUpdated, &item)
+	if changed {
+		publishEvent(database.DB, actor, events.EventTypeItemUpdated, &item)
+	}
 	if transition != "" {
 		publishEvent(database.DB, actor, transition, &item)
 	}
@@ -249,6 +255,9 @@ func setPublishedTx(tx *gorm.DB, item *models.Item, publish bool) (events.EventT
 }
 
 func publishEvent(db *gorm.DB, actor Actor, eventType events.EventType, item *models.Item) {
+	if actor.InRun {
+		return
+	}
 	// 1. Safety Check: If the event system (Asynq) isn't configured, do nothing.
 	if queueClient == nil {
 		return

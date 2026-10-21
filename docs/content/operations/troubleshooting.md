@@ -59,7 +59,7 @@ ingress's IP for every user: set `GOHEAD_TRUSTED_PROXIES`.
    `llm_config.api_key` or `OPENAI_API_KEY`/`ANTHROPIC_API_KEY` on the worker.
 4. The event list must match exactly (`item:created`, not `created`), and the collection name
    too.
-5. Agent writes do not emit events, by design.
+5. Agent writes do not emit events, by design, and neither does a save that changes nothing.
 
 ## Uploads fail or files do not display
 

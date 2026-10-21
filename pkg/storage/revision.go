@@ -24,6 +24,13 @@ type Actor struct {
 	Name       string // username, token name or agent name
 	AgentRunID uint   // the agent run, for agents
 
+	// InRun marks changes made by an agent's functions while it runs. They
+	// send no content events, whichever process runs the agent (a worker,
+	// or `gohead standalone`), so agents can't trigger each other in loops.
+	// Approved proposals are applied by a reviewer's request and do send
+	// them (never to the agent that proposed the change).
+	InRun bool
+
 	// expectVersion, when set, makes the change fail with errChangedSince
 	// unless the entry's latest version is still this one (checked under
 	// the row lock, in the change's transaction).

@@ -27,6 +27,13 @@ TypeScript front-ends, GoHead ships:
     `npm create @gohead-cms@latest`: a Next.js blog with its content model, sample content,
     two languages and pages that update when you publish.
 
+-   :material-map-marker-path: **[Feature tour](feature-tour.md)**
+
+    ---
+
+    A conference site that uses every GoHead feature, from visitor forms and draft previews
+    to seven agents, with a guide to each one.
+
 </div>
 
 ## Ten minutes to a website

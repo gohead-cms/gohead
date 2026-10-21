@@ -349,8 +349,12 @@ func validateAttributeValue(attribute Attribute, value any) error {
 			return err
 		}
 
-	case "time", "date":
+	case "date":
 		if _, err := convertToType(value, "date"); err != nil {
+			return err
+		}
+	case "time":
+		if _, err := convertToType(value, "time"); err != nil {
 			return err
 		}
 	case "datetime":
@@ -448,6 +452,16 @@ func convertToType(value any, targetType string) (any, error) {
 			}
 		}
 		return nil, fmt.Errorf("invalid date format for value: %v", value)
+	case "time":
+		// A time of day: "HH:MM" or "HH:MM:SS", optionally with fractional seconds.
+		if str, ok := value.(string); ok {
+			for _, layout := range []string{"15:04", "15:04:05", "15:04:05.999999999"} {
+				if t, err := time.Parse(layout, str); err == nil {
+					return t, nil
+				}
+			}
+		}
+		return nil, fmt.Errorf("invalid time format for value: %v (expected HH:MM or HH:MM:SS)", value)
 	case "datetime":
 		if str, ok := value.(string); ok {
 			if dateTimeValue, err := time.Parse(time.RFC3339, str); err == nil {

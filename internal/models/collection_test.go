@@ -185,6 +185,9 @@ func TestValidateAttributeValue_AllScalarTypes(t *testing.T) {
 		{Attribute{Name: "a", Type: "boolean"}, false},
 		{Attribute{Name: "a", Type: "date"}, "2026-10-18"},
 		{Attribute{Name: "a", Type: "datetime"}, "2026-10-18T09:00:00Z"},
+		{Attribute{Name: "a", Type: "time"}, "08:30"},
+		{Attribute{Name: "a", Type: "time"}, "08:30:00"},
+		{Attribute{Name: "a", Type: "time"}, "23:59:59.5"},
 		{Attribute{Name: "a", Type: "enum", Options: []string{"x", "y"}}, "y"},
 		{Attribute{Name: "a", Type: "enumeration", Options: []string{"x"}}, "x"},
 		{Attribute{Name: "a", Type: "uid"}, "my-slug"},
@@ -195,5 +198,8 @@ func TestValidateAttributeValue_AllScalarTypes(t *testing.T) {
 	}
 
 	assert.Error(t, validateAttributeValue(Attribute{Name: "a", Type: "float"}, "abc"))
+	// A time is a time of day, not a date.
+	assert.Error(t, validateAttributeValue(Attribute{Name: "a", Type: "time"}, "2026-10-18"))
+	assert.Error(t, validateAttributeValue(Attribute{Name: "a", Type: "time"}, "25:00"))
 	assert.Error(t, validateAttributeValue(Attribute{Name: "a", Type: "enumeration", Options: []string{"x"}}, "z"))
 }
