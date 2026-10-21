@@ -18,6 +18,7 @@ import (
 	"github.com/gohead-cms/gohead/internal/agent/triggers"
 	"github.com/gohead-cms/gohead/internal/api/handlers"
 	"github.com/gohead-cms/gohead/internal/api/middleware"
+	"github.com/gohead-cms/gohead/internal/apps"
 	"github.com/gohead-cms/gohead/internal/graphql"
 	"github.com/gohead-cms/gohead/internal/webhooks"
 	"github.com/gohead-cms/gohead/internal/webui"
@@ -31,6 +32,7 @@ import (
 	"github.com/gohead-cms/gohead/pkg/migrations"
 	"github.com/gohead-cms/gohead/pkg/queue"
 	"github.com/gohead-cms/gohead/pkg/ratelimit"
+	"github.com/gohead-cms/gohead/pkg/secrets"
 	"github.com/gohead-cms/gohead/pkg/seed"
 	"github.com/gohead-cms/gohead/pkg/storage"
 	"github.com/gohead-cms/gohead/pkg/tracing"
@@ -158,6 +160,7 @@ func InitializeServer(cfgPath string, opts ServerOptions) (*Server, func(), erro
 		Timeout:              cfg.Webhooks.Timeout,
 		MaxRetries:           cfg.Webhooks.MaxRetries,
 	})
+	configureApps(cfg)
 
 	driver, err := queueDriver(cfg, opts.Standalone)
 	if err != nil {
@@ -205,7 +208,9 @@ func InitializeServer(cfgPath string, opts ServerOptions) (*Server, func(), erro
 		cleanup()
 		return nil, func() {}, err
 	}
-	auth.InitializeJWT(resolveJWTSecret(cfg.JWTSecret, jwtSecretFile))
+	jwtSecret := resolveJWTSecret(cfg.JWTSecret, jwtSecretFile)
+	auth.InitializeJWT(jwtSecret)
+	configureSecrets(cfg.JWTSecret, jwtSecret, jwtSecretFile)
 	metrics.InitMetrics()
 
 	// --- Job queue ---
@@ -441,6 +446,14 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, publicLimit midd
 		creds.POST("/roles", handlers.CreateRole)
 		creds.PUT("/roles/:name", handlers.UpdateRole)
 		creds.DELETE("/roles/:name", handlers.DeleteRole)
+		// Connected apps: their tokens are credentials too.
+		creds.GET("/connection-presets", handlers.ListConnectionPresets)
+		creds.GET("/connections", handlers.ListConnections)
+		creds.POST("/connections", handlers.CreateConnection)
+		creds.GET("/connections/:name", handlers.GetConnection)
+		creds.PUT("/connections/:name", handlers.UpdateConnection)
+		creds.DELETE("/connections/:name", handlers.DeleteConnection)
+		creds.POST("/connections/:name/refresh", handlers.RefreshConnection)
 
 		// Outbound webhooks
 		admin.POST("/locales", handlers.CreateLocale)
@@ -567,6 +580,35 @@ func resolveJWTSecret(configured, persistFile string) string {
 	logger.Log.Warn("jwt_secret is not set (or uses the sample default): using a random secret for this run. " +
 		"Tokens will not survive a restart; set jwt_secret (or GOHEAD_JWT_SECRET) to a long random value.")
 	return secret
+}
+
+// configureSecrets sets the key that encrypts the tokens of connected apps.
+// It derives from the JWT secret when that one is the same in every process
+// and across restarts: configured, or generated and saved (standalone).
+// Otherwise tokens are stored unencrypted, since a key nobody else knows
+// would lose them.
+func configureSecrets(configured, resolved, persistFile string) {
+	stable := !insecureJWTSecrets[configured]
+	if !stable && persistFile != "" {
+		if b, err := os.ReadFile(persistFile); err == nil && strings.TrimSpace(string(b)) == resolved {
+			stable = true
+		}
+	}
+	if !stable {
+		_ = secrets.SetKey("")
+		return
+	}
+	if err := secrets.SetKey(resolved); err != nil {
+		logger.Log.WithError(err).Warn("Could not set the key of stored tokens: they are stored unencrypted")
+	}
+}
+
+// configureApps sets how connected apps are reached.
+func configureApps(cfg config.Config) {
+	apps.Configure(apps.Config{
+		AllowPrivateNetworks: cfg.Connections.AllowPrivateNetworks,
+		Timeout:              cfg.Connections.Timeout,
+	})
 }
 
 // connectRedis returns a client for the configured Redis, or nil when it is

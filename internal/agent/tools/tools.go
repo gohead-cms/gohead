@@ -23,6 +23,7 @@ const (
 	GroupContent = "content" // read and write items
 	GroupAI      = "ai"      // ask a model about a text
 	GroupSystem  = "system"
+	GroupApps    = "apps" // tools of connected apps
 )
 
 // Info describes a built-in tool.
@@ -38,9 +39,21 @@ type Info struct {
 	Parameters  models.JSONMap `json:"parameters"`
 	// Scoped: the tool works on collections and accepts an "on" scope.
 	Scoped bool `json:"scoped"`
-	// Writes: the tool changes content (create, update, delete).
+	// Writes: the tool changes content (create, update, delete), or, for a
+	// connected app's tool, may change something in that app.
 	Writes bool `json:"writes"`
+	// App is the connection of a connected app's tool ("github"), and
+	// AppLabel its name for people.
+	App      string `json:"app,omitempty"`
+	AppLabel string `json:"appLabel,omitempty"`
 }
+
+// Apps resolves the tools of connected apps ("github.create_issue"): set
+// by the package that knows the connections. AppTools lists them all.
+var (
+	Apps     func(name string) (Info, bool)
+	AppTools func() []Info
+)
 
 func str(desc string) map[string]any { return map[string]any{"type": "string", "description": desc} }
 func num(desc string) map[string]any { return map[string]any{"type": "integer", "description": desc} }
@@ -158,8 +171,13 @@ func Lookup(name string) (Info, bool) {
 	if t, ok := byUse[name]; ok {
 		return t, true
 	}
-	t, ok := byImplKey[name]
-	return t, ok
+	if t, ok := byImplKey[name]; ok {
+		return t, true
+	}
+	if Apps != nil {
+		return Apps(name)
+	}
+	return Info{}, false
 }
 
 // ImplKey returns the implementation key a name refers to; names the
@@ -206,6 +224,9 @@ func Known(extra []string) []Info {
 		}
 	}
 	sort.SliceStable(out, func(i, j int) bool { return groupRank(out[i].Group) < groupRank(out[j].Group) })
+	if AppTools != nil {
+		out = append(out, AppTools()...)
+	}
 	return out
 }
 
@@ -215,8 +236,32 @@ func groupRank(g string) int {
 		return 0
 	case GroupAI:
 		return 1
+	case GroupApps:
+		return 3
 	}
 	return 2
+}
+
+// ModelName turns a name into one model APIs accept: letters, digits, _
+// and -, at most 64 characters.
+func ModelName(name string) string {
+	b := make([]byte, 0, len(name))
+	for i := 0; i < len(name); i++ {
+		c := name[i]
+		switch {
+		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9', c == '_', c == '-':
+			b = append(b, c)
+		default:
+			b = append(b, '_')
+		}
+	}
+	if len(b) > 64 {
+		b = b[:64]
+	}
+	if len(b) == 0 {
+		return "tool"
+	}
+	return string(b)
 }
 
 // EmptySchema reports whether a parameters schema says nothing: absent, or

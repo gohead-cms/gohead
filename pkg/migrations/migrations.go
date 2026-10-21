@@ -71,6 +71,12 @@ var All = []Migration{
 		Up:          jobsUp,
 		Down:        jobsDown,
 	},
+	{
+		ID:          "0007_connections",
+		Description: "Connected apps: remote MCP servers whose tools agents can use",
+		Up:          connectionsUp,
+		Down:        connectionsDown,
+	},
 }
 
 // baseline creates or updates every table from the models, as GoHead did at

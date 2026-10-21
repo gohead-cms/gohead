@@ -424,10 +424,11 @@ func revisionSchema(detail bool) obj {
 func proposalSchema() obj {
 	return obj{"type": "object", "properties": obj{
 		"id": obj{"type": "integer"}, "agentName": obj{"type": "string"}, "agentRunId": nullable(obj{"type": "integer"}),
-		"action":     obj{"type": "string", "enum": []string{models.ProposalCreate, models.ProposalUpdate, models.ProposalDelete}},
-		"collection": obj{"type": "string"}, "itemId": nullable(obj{"type": "integer"}),
+		"action": obj{"type": "string", "enum": []string{models.ProposalCreate, models.ProposalUpdate, models.ProposalDelete, models.ProposalCall},
+			"description": "call: a call to a connected app's tool (admins only)"},
+		"collection": obj{"type": "string", "description": "The collection, or app:<connection> for a call"}, "itemId": nullable(obj{"type": "integer"}),
 		"locale": obj{"type": "string", "description": "Set when the change is a translation"},
-		"data":   nullable(obj{"type": "object", "additionalProperties": true, "description": "The item's values after the change (null for a deletion)"}),
+		"data":   nullable(obj{"type": "object", "additionalProperties": true, "description": "The item's values after the change (null for a deletion); for a call, the tool and its arguments"}),
 		"reason": obj{"type": "string"}, "baseVersion": obj{"type": "integer"},
 		"status":     obj{"type": "string", "enum": []string{models.ProposalPending, "applying", models.ProposalApproved, models.ProposalRejected, models.ProposalFailed}},
 		"reviewedBy": obj{"type": "string"}, "reviewNote": obj{"type": "string"}, "error": obj{"type": "string"},

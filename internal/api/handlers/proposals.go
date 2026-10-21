@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/gohead-cms/gohead/internal/apps"
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/logger"
@@ -108,6 +109,8 @@ func ListProposals(c *gin.Context) {
 	if q.Page, q.PageSize, ok = pageParams(c); !ok {
 		return
 	}
+	// Calls to connected apps are reviewed by admins only.
+	q.NoCalls = role != auth.RoleAdmin
 	scope, err := reviewScope(role)
 	if err != nil {
 		c.Set("response", "Failed to list proposals")
@@ -152,6 +155,14 @@ func loadProposal(c *gin.Context) (*models.Proposal, *models.Collection, bool) {
 		c.Set("status", http.StatusNotFound)
 		return nil, nil, false
 	}
+	if p.Action == models.ProposalCall {
+		if c.GetString("role") != auth.RoleAdmin {
+			c.Set("response", "Proposal not found")
+			c.Set("status", http.StatusNotFound)
+			return nil, nil, false
+		}
+		return p, nil, true
+	}
 	if !can(c, proposalAction(p), p.Collection) {
 		c.Set("response", "Proposal not found")
 		c.Set("status", http.StatusNotFound)
@@ -170,6 +181,11 @@ func loadProposal(c *gin.Context) (*models.Proposal, *models.Collection, bool) {
 func GetProposal(c *gin.Context) {
 	p, ct, ok := loadProposal(c)
 	if !ok {
+		return
+	}
+	if p.Action == models.ProposalCall {
+		c.Set("response", callProposalJSON(p))
+		c.Set("status", http.StatusOK)
 		return
 	}
 	hidden := hiddenFields(ct)
@@ -213,6 +229,10 @@ func GetProposal(c *gin.Context) {
 func ApproveProposal(c *gin.Context) {
 	p, ct, ok := loadProposal(c)
 	if !ok {
+		return
+	}
+	if p.Action == models.ProposalCall {
+		approveCall(c, p)
 		return
 	}
 	if ct == nil {
@@ -320,4 +340,54 @@ func decidedMessage(p *models.Proposal) string {
 		return "This proposal is being decided by someone else"
 	}
 	return "This proposal was already " + p.Status
+}
+
+// callProposalJSON is a proposed call to a connected app's tool, with the
+// tool as the connection lists it now.
+func callProposalJSON(p *models.Proposal) gin.H {
+	connection, tool, args := apps.ProposedCall(p)
+	out := gin.H{"proposal": p, "stale": false, "call": gin.H{
+		"connection": connection, "tool": tool, "arguments": args,
+	}}
+	if conn, err := storage.GetConnection(connection); err == nil {
+		call := out["call"].(gin.H)
+		call["connectionLabel"] = conn.Label
+		if t, ok := conn.Tool(tool); ok {
+			call["title"], call["description"], call["readOnly"], call["destructive"] = t.Title, t.Description, t.ReadOnly, t.Destructive
+		}
+	} else {
+		out["missing"] = true
+	}
+	return out
+}
+
+// approveCall makes a proposed call. Body (optional): {"arguments": {…}}
+// to call the tool with edited arguments.
+func approveCall(c *gin.Context, p *models.Proposal) {
+	var body struct {
+		Arguments map[string]any `json:"arguments"`
+	}
+	if !bindOptional(c, &body) {
+		return
+	}
+	proposal, res, err := apps.ApproveCall(c.Request.Context(), p.ID, actorFrom(c).Name, body.Arguments)
+	if err != nil {
+		switch {
+		case errors.Is(err, storage.ErrProposalDecided):
+			c.Set("response", decidedMessage(proposal))
+			c.Set("details", gin.H{"code": "decided"})
+			c.Set("status", http.StatusConflict)
+		case errors.Is(err, apps.ErrCallFailed):
+			c.Set("response", "The call failed: "+proposal.Error)
+			c.Set("details", gin.H{"proposal": proposal})
+			c.Set("status", http.StatusUnprocessableEntity)
+		default:
+			logger.Log.WithError(err).WithField("proposal", p.ID).Error("Failed to make a proposed call")
+			c.Set("response", "Failed to make the call")
+			c.Set("status", http.StatusInternalServerError)
+		}
+		return
+	}
+	c.Set("response", gin.H{"proposal": proposal, "result": res.Text})
+	c.Set("status", http.StatusOK)
 }

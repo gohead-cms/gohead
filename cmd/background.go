@@ -149,6 +149,8 @@ func backgroundSetup(cfgPath string) (config.Config, string, *gorm.DB, error) {
 		Timeout:              cfg.Webhooks.Timeout,
 		MaxRetries:           cfg.Webhooks.MaxRetries,
 	})
+	configureApps(cfg)
+	configureSecrets(cfg.JWTSecret, cfg.JWTSecret, "")
 	llm.SetDefaultConfig(cfg.LLM)
 	storage.RevisionLimit = max(cfg.Content.RevisionsKept, 0)
 	driver, err := queueDriver(cfg, false)

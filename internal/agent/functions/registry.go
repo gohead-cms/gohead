@@ -73,6 +73,11 @@ func NewRegistry(agentFuncs agentModels.FunctionSpecs) *Registry {
 
 		// Get the function from the static registry using impl_key
 		toolFunc, exists := StaticFunctionMap[spec.ImplKey]
+		if !exists && isAppTool(spec.ImplKey) {
+			// A connected app's tool. One the connection no longer offers
+			// is still given to the model, and answers with an error.
+			toolFunc, exists = appTool(spec), true
+		}
 		if !exists {
 			logger.Log.WithFields(map[string]any{
 				"function_name": spec.Name,

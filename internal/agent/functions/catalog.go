@@ -6,6 +6,7 @@ import (
 
 	"github.com/gohead-cms/gohead/internal/agent/tools"
 	agentModels "github.com/gohead-cms/gohead/internal/models/agents"
+	"github.com/gohead-cms/gohead/pkg/storage"
 )
 
 // Info describes a built-in tool for people configuring agents (see
@@ -26,6 +27,15 @@ func Catalog() []Info {
 func CheckTools(specs agentModels.FunctionSpecs) error {
 	for _, s := range specs {
 		if _, ok := StaticFunctionMap[s.ImplKey]; !ok {
+			if isAppTool(s.ImplKey) {
+				if _, known := appToolInfo(s.ImplKey); known {
+					continue
+				}
+				conn, _, _ := splitAppTool(s.ImplKey)
+				if _, ok := storage.CachedConnection(conn); ok {
+					return fmt.Errorf("unknown tool '%s': connection '%s' has no such tool (refresh its tools in Settings → Connections)", s.ImplKey, conn)
+				}
+			}
 			uses := make([]string, 0, len(tools.All()))
 			for _, t := range tools.All() {
 				uses = append(uses, t.Use)
