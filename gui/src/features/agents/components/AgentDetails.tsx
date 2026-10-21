@@ -203,10 +203,10 @@ export function AgentDetails({ agent, onDelete, initialRun }: AgentDetailsProps)
               )}
             </Box>
             <Box>
-              <Label>Functions ({functions.length})</Label>
+              <Label>Tools ({functions.length})</Label>
               {functions.length === 0 && (
                 <Text fontSize="sm" color="gray.500">
-                  No functions: this agent can only answer with text.
+                  No tools: this agent can only answer with text.
                 </Text>
               )}
               <List.Root gap={2} mt={2} listStyleType="none">

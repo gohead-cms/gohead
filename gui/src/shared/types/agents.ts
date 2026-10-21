@@ -13,13 +13,34 @@ export interface AgentFunction {
   parameters?: Record<string, unknown>;
 }
 
-/** A built-in function from GET /admin/agent-functions. */
+/**
+ * A tool of an agent, in the short form the API reads and returns: which
+ * tool ("content.update"), on which collections. Name, description and
+ * parameters are overrides; left out, they come from the catalog.
+ */
+export interface AgentTool {
+  use: string;
+  on?: string[];
+  name?: string;
+  description?: string;
+  parameters?: Record<string, unknown>;
+}
+
+/** A built-in tool from GET /admin/agent-functions. */
 export interface AgentFunctionInfo {
   impl_key: string;
+  /** The short name agents use ("content.update"). */
+  use: string;
+  /** The name the model sees by default. */
+  name: string;
+  label: string;
+  group: "content" | "ai" | "system" | string;
   description: string;
   parameters: Record<string, unknown>;
-  /** The function accepts a "collections" scope (collections.*). */
+  /** The tool works on collections and accepts an "on" scope. */
   scoped: boolean;
+  /** The tool changes content. */
+  writes: boolean;
 }
 
 export interface AgentLimits {
@@ -102,7 +123,10 @@ export interface AgentNodeData {
   schema: {
     maxTurns?: number;
     memory?: { type: string; session_scope: string };
+    /** Every tool as the model gets it (names and schemas filled in). */
     functions: AgentFunction[];
+    /** The tools as written (short form). */
+    tools?: AgentTool[];
     llmConfig: {
       provider: string;
       model: string;
@@ -174,6 +198,7 @@ export interface AgentDefinition {
     event_trigger?: { collection: string; events: string[] };
   };
   functions?: (AgentFunction & { collections?: string[]; parameters?: Record<string, unknown> })[];
+  tools?: AgentTool[];
   llm_config?: AgentNodeData['schema']['llmConfig'];
   memory?: { type: string; session_scope: string };
   require_approval?: boolean;

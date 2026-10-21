@@ -80,7 +80,7 @@ export function TemplateGallery({ collections, onBlank, onRendered }: TemplateGa
           Start from a template
         </Heading>
         <Text fontSize="sm" color="gray.500" mt={1}>
-          A template writes the system prompt, trigger and functions for a common task. You review everything before the agent is created.
+          A template writes the system prompt, trigger and tools for a common task. You review everything before the agent is created.
         </Text>
       </Box>
       {error && (
@@ -92,7 +92,7 @@ export function TemplateGallery({ collections, onBlank, onRendered }: TemplateGa
         <GalleryCard
           icon={FiPlus}
           title="Blank agent"
-          description="Write the system prompt, choose the trigger and the functions yourself."
+          description="Write the system prompt, choose the trigger and the tools yourself."
           action="Start blank"
           onClick={onBlank}
         />

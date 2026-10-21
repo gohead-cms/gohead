@@ -98,7 +98,7 @@ var catalog = []Info{
 
 	// ---- AI helpers: they call the instance's default model themselves.
 	{ImplKey: "llm.summarize_text", Use: "ai.summarize", Name: "summarize_text", Group: GroupAI,
-		Label: "Summarize a text", Description: "Summarize a text",
+		Label: "Summarize a text", Description: "Summarize a text in at most max_length words, as a paragraph or bullet points",
 		Parameters: object(map[string]any{"text": textArg, "max_length": num("Maximum length in words"), "style": str("e.g. paragraph, bullet_points")}, "text")},
 	{ImplKey: "llm.generate_tags", Use: "ai.tags", Name: "generate_tags", Group: GroupAI,
 		Label: "Suggest tags", Description: "Suggest tags for a text",

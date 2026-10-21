@@ -126,11 +126,11 @@ export const AgentNode: React.FC<AgentNodeProps> = ({ data, selected, onEdit, on
 
           <Separator />
 
-          {/* Functions Section */}
+          {/* Tools section */}
           <Box p={3} bg="gray.50">
             <HStack gap={2} align="center" mb={2}>
               <Icon as={PiFunctionFill} color="green.500" boxSize={4} />
-              <Text fontWeight="semibold" fontSize="sm" color="gray.700">Functions</Text>
+              <Text fontWeight="semibold" fontSize="sm" color="gray.700">Tools</Text>
               <Badge colorPalette="green" size="sm" variant="outline">{functions.length}</Badge>
             </HStack>
             
@@ -146,7 +146,7 @@ export const AgentNode: React.FC<AgentNodeProps> = ({ data, selected, onEdit, on
                 )}
               </VStack>
             ) : (
-              <Text fontSize="xs" color="gray.500" fontStyle="italic">No functions configured</Text>
+              <Text fontSize="xs" color="gray.500" fontStyle="italic">No tools</Text>
             )}
           </Box>
         </VStack>

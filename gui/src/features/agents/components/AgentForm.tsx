@@ -8,7 +8,7 @@ import { type AgentFunctionInfo } from "../../../shared/types";
 import { type CollectionChoice } from "../hook/useEditorData";
 import { type AgentDraft, buildPayload, validateDraft } from "./agentForm";
 import { ApprovalSection, BasicsSection, LimitsSection, MemorySection, ModelSection, TriggerSection } from "./AgentFormSections";
-import { FunctionsEditor } from "./FunctionsEditor";
+import { ToolsEditor } from "./ToolsEditor";
 
 interface AgentFormProps {
   initial: AgentDraft;
@@ -30,7 +30,7 @@ export function AgentForm({ initial, originalName, agentId, takenNames, catalog,
   const navigate = useNavigate();
   const notify = useNotify();
 
-  const allErrors = useMemo(() => validateDraft(draft, takenNames), [draft, takenNames]);
+  const allErrors = useMemo(() => validateDraft(draft, takenNames, catalog), [draft, takenNames, catalog]);
   const errors = attempted ? allErrors : {};
   const errorCount = Object.keys(allErrors).length;
   const set = <K extends keyof AgentDraft>(key: K, value: AgentDraft[K]) => setDraft((d) => ({ ...d, [key]: value }));
@@ -61,12 +61,13 @@ export function AgentForm({ initial, originalName, agentId, takenNames, catalog,
         <BasicsSection {...sectionProps} />
         <ModelSection {...sectionProps} />
         <TriggerSection {...sectionProps} collections={collections} collectionsError={collectionsError} agentId={agentId} />
-        <FunctionsEditor
-          functions={draft.functions}
-          onChange={(fns) => set("functions", fns)}
+        <ToolsEditor
+          tools={draft.tools}
+          onChange={(tools) => set("tools", tools)}
           catalog={catalog}
           catalogError={catalogError}
           collections={collections}
+          triggerCollection={draft.trigger_type === "collection_event" ? draft.collection : ""}
           errors={errors}
         />
         <ApprovalSection {...sectionProps} />
