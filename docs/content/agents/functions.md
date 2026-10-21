@@ -146,8 +146,9 @@ func checkStock(ctx context.Context, args any) (string, error) {
 ```
 
 Then describe it in the catalog, `internal/agent/tools`: its `use` name, default name, label,
-description and arguments. Without a catalog entry, agents must give the tool's `name`,
-`description` and `parameters` themselves.
+description and arguments. Without a catalog entry, give the tool's `description` and
+`parameters` in each agent that uses it: otherwise the model only sees a name made from the
+key (`shop_check_stock`) and no arguments.
 
 Return errors the model can act on as JSON with a `nil` Go error; return a Go error only for
 failures the run should record.

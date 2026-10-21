@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/gohead-cms/gohead/internal/agent/tools"
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/robfig/cron"
 
@@ -238,7 +239,14 @@ func ParseAgentInput(input map[string]any) (Agent, error) {
 	if specs, ok, err := toolsInput(input); err != nil {
 		return agent, err
 	} else if ok {
+		if _, both := input["functions"]; both && !sameTools(specs, agent.Functions) {
+			return agent, errors.New("'tools' and 'functions' describe different tools: send one of them ('tools' is the short form)")
+		}
 		agent.Functions = specs
+	}
+	for i := range agent.Functions {
+		// The long form may name tools by their short name too.
+		agent.Functions[i].ImplKey = tools.ImplKey(strings.TrimSpace(agent.Functions[i].ImplKey))
 	}
 
 	if err := ValidateAgentSchema(agent); err != nil {
@@ -344,7 +352,7 @@ func validateFunctionSpecs(funcs []FunctionSpec) error {
 				return fmt.Errorf("tool '%s' has invalid parameters: %v", r.Name, err)
 			}
 		}
-		if len(f.Collections) > 0 && !strings.HasPrefix(r.ImplKey, "collections.") {
+		if _, known := tools.Lookup(r.ImplKey); known && len(f.Collections) > 0 && !tools.Scoped(r.ImplKey) {
 			return fmt.Errorf("tool '%s': 'on' (collections) only applies to content tools", r.Name)
 		}
 		for _, c := range f.Collections {

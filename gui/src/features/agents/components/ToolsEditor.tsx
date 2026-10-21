@@ -136,7 +136,8 @@ function ToolCard({
   const [open, setOpen] = useState(Boolean(err("name") || err("parameters")));
   // Collections that no longer exist stay listed so they can be unchecked.
   const scopeChoices = [...new Set([...collections.map((c) => c.name), ...tool.on])];
-  const scoped = info?.scoped ?? tool.use.startsWith("collections.");
+  // Without the catalog (it failed to load), content tools still get their scope.
+  const scoped = info?.scoped ?? (tool.use.startsWith("content.") || tool.use.startsWith("collections."));
 
   return (
     <Box borderWidth="1px" borderRadius="md" p={4} bg="gray.50" data-testid={`tool-${tool.use}`}>
@@ -202,11 +203,17 @@ function ToolCard({
             {warning}
           </Notice>
         )}
-        {err("name") && !open && (
+        {err("use") && (
           <Notice status="error" borderRadius="md" fontSize="sm">
-            {err("name")}
+            {err("use")}
           </Notice>
         )}
+        {!open &&
+          [err("name"), err("parameters")].filter(Boolean).map((m) => (
+            <Notice key={m} status="error" borderRadius="md" fontSize="sm">
+              {m} Open Customize to fix it.
+            </Notice>
+          ))}
 
         <Collapsible.Root open={open} onOpenChange={(e) => setOpen(e.open)}>
           <Collapsible.Trigger asChild>

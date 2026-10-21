@@ -441,12 +441,23 @@ func TestAgentToolsShortForm(t *testing.T) {
 		assert.NotEmpty(t, f["parameters"].(map[string]any)["properties"])
 	}
 
-	// Sending back what was read (tools and functions) keeps the short form.
+	// Sending back what was read (both forms) keeps the short form…
 	agent["functions"] = got.Data.Schema.Functions
+	rr = send(http.MethodPut, "/agents/tagger", agent)
+	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	assert.Contains(t, rr.Body.String(), `"tools":[{"use":"content.update","on":["articles"]},{"use":"ai.tags"}]`)
+	// …and an edit to one form only is refused, not silently dropped.
 	agent["tools"] = []any{map[string]any{"use": "content.update", "on": []any{"articles", "pages"}}}
+	rr = send(http.MethodPut, "/agents/tagger", agent)
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Contains(t, rr.Body.String(), "describe different tools")
+	delete(agent, "functions")
 	rr = send(http.MethodPut, "/agents/tagger", agent)
 	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	assert.Contains(t, rr.Body.String(), `"tools":[{"use":"content.update","on":["articles","pages"]}]`)
+	// The API returns descriptions without the scope note the model gets, so
+	// sending them back doesn't turn them into custom descriptions.
+	assert.NotContains(t, rr.Body.String(), "Only in:")
 
 	agent["tools"] = []any{map[string]any{"use": "gmail.send"}}
 	rr = send(http.MethodPut, "/agents/tagger", agent)

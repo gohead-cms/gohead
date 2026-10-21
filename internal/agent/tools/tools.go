@@ -197,6 +197,8 @@ func All() []Info {
 // with extra keys of functions registered without a catalog entry.
 func Known(extra []string) []Info {
 	out := All()
+	extra = append([]string(nil), extra...)
+	sort.Strings(extra)
 	for _, key := range extra {
 		if _, ok := byImplKey[key]; !ok {
 			out = append(out, Info{ImplKey: key, Use: key, Name: strings.ReplaceAll(key, ".", "_"),

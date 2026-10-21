@@ -82,9 +82,6 @@ func (f FunctionSpec) Resolved() FunctionSpec {
 	}
 	if out.Description == "" && known {
 		out.Description = info.Description
-		if len(out.Collections) > 0 {
-			out.Description += ". Only in: " + strings.Join(out.Collections, ", ")
-		}
 	}
 	if tools.EmptySchema(out.Parameters) {
 		if known {
@@ -92,6 +89,18 @@ func (f FunctionSpec) Resolved() FunctionSpec {
 		} else if out.Parameters == nil {
 			out.Parameters = models.JSONMap{"type": "object", "properties": map[string]any{}}
 		}
+	}
+	return out
+}
+
+// ForModel is the function as the model gets it: Resolved, and a default
+// description says which collections a scoped tool may use. (The scope
+// note stays out of Resolved, which the API returns: a client sending it
+// back would store it as a custom description.)
+func (f FunctionSpec) ForModel() FunctionSpec {
+	out := f.Resolved()
+	if f.Description == "" && len(f.Collections) > 0 && out.Description != "" {
+		out.Description += ". Only in: " + strings.Join(f.Collections, ", ")
 	}
 	return out
 }
@@ -136,6 +145,13 @@ func toolsInput(input map[string]any) (FunctionSpecs, bool, error) {
 		specs = append(specs, t.Spec())
 	}
 	return specs, true, nil
+}
+
+// sameTools reports whether two lists give the model the same tools.
+func sameTools(a, b FunctionSpecs) bool {
+	ja, err1 := json.Marshal(a.Resolved())
+	jb, err2 := json.Marshal(b.Resolved())
+	return err1 == nil && err2 == nil && string(ja) == string(jb)
 }
 
 // Model APIs accept tool names of letters, digits, _ and - only.

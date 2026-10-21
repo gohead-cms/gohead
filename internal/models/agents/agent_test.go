@@ -2,6 +2,7 @@ package models
 
 import (
 	"bytes"
+	"encoding/json"
 	"maps"
 	"testing"
 
@@ -292,7 +293,7 @@ func TestValidateLimitsAndScopes(t *testing.T) {
 	a = base()
 	a.Functions = FunctionSpecs{{Name: "rm", ImplKey: "collections.delete_item", Parameters: models.JSONMap{}, Collections: []string{"drafts"}}}
 	assert.NoError(t, ValidateAgentSchema(a))
-	a.Functions = FunctionSpecs{{Name: "sum", ImplKey: "llm.summarize", Parameters: models.JSONMap{}, Collections: []string{"drafts"}}}
+	a.Functions = FunctionSpecs{{Name: "sum", ImplKey: "llm.summarize_text", Parameters: models.JSONMap{}, Collections: []string{"drafts"}}}
 	assert.ErrorContains(t, ValidateAgentSchema(a), "only applies to content tools")
 	a.Functions = FunctionSpecs{{Name: "rm", ImplKey: "collections.delete_item", Parameters: models.JSONMap{}, Collections: []string{" "}}}
 	assert.Error(t, ValidateAgentSchema(a))
@@ -313,8 +314,6 @@ func TestToolsShortForm(t *testing.T) {
 		map[string]any{"use": "ai.summarize"},
 		map[string]any{"use": "collections.list_items", "name": "list_articles", "on": []any{"articles"}},
 	}
-	// "tools" wins over "functions", as when a client sends back what it read.
-	in["functions"] = []any{map[string]any{"name": "ignored", "impl_key": "system.log", "parameters": map[string]any{}}}
 	agent, err := ParseAgentInput(in)
 	require.NoError(t, err)
 	require.Len(t, agent.Functions, 3)
@@ -327,7 +326,8 @@ func TestToolsShortForm(t *testing.T) {
 	// Resolved for the model: the catalog's name, description and schema.
 	r := agent.Functions.Resolved()
 	assert.Equal(t, "update_item", r[0].Name)
-	assert.Equal(t, "Change some attributes of an item and keep the others, validated like API writes. Only in: articles", r[0].Description)
+	assert.Equal(t, "Change some attributes of an item and keep the others, validated like API writes", r[0].Description)
+	assert.Equal(t, r[0].Description+". Only in: articles", agent.Functions[0].ForModel().Description, "the model is told the scope")
 	assert.Equal(t, []any{"collection_name", "item_id", "data"}, toAny(r[0].Parameters["required"]))
 	assert.Equal(t, "summarize_text", r[1].Name)
 	assert.Equal(t, "list_articles", r[2].Name)
@@ -338,6 +338,23 @@ func TestToolsShortForm(t *testing.T) {
 		{Use: "ai.summarize"},
 		{Use: "content.list", On: []string{"articles"}, Name: "list_articles"},
 	}, agent.Functions.Tools())
+
+	// Both forms: fine when they agree (a client sending back what it read),
+	// refused when they don't.
+	both := maps.Clone(in)
+	both["functions"] = toAnyList(agent.Functions.Resolved())
+	_, err = ParseAgentInput(both)
+	assert.NoError(t, err)
+	both["functions"] = []any{map[string]any{"name": "other", "impl_key": "system.log"}}
+	_, err = ParseAgentInput(both)
+	assert.ErrorContains(t, err, "'tools' and 'functions' describe different tools")
+
+	// The long form may use short names too.
+	long := maps.Clone(base)
+	long["functions"] = []any{map[string]any{"impl_key": "content.update", "collections": []any{"articles"}}}
+	agent, err = ParseAgentInput(long)
+	require.NoError(t, err)
+	assert.Equal(t, "collections.patch_item", agent.Functions[0].ImplKey)
 
 	// Two tools with the same default name need their own.
 	in = maps.Clone(base)
@@ -381,4 +398,11 @@ func toAny(v any) []any {
 		return x
 	}
 	return nil
+}
+
+func toAnyList(specs FunctionSpecs) []any {
+	b, _ := json.Marshal(specs)
+	var out []any
+	_ = json.Unmarshal(b, &out)
+	return out
 }
