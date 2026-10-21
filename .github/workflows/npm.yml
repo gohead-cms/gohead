@@ -54,6 +54,15 @@ jobs:
             node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync(process.argv[1]));p.dependencies["@gohead-cms/client"]="^"+process.argv[2];fs.writeFileSync(process.argv[1],JSON.stringify(p,null,2)+"\n")' "$f" "${{ steps.version.outputs.version }}"
           done
       - run: npm test --workspace @gohead-cms/client --workspace @gohead-cms/create
+      # Build before publishing: npm checks `bin` against the files before it
+      # runs prepack, and drops a bin whose file doesn't exist yet (the
+      # gohead-client and create-gohead commands would be missing).
+      - name: Build
+        run: |
+          npm run build --workspace @gohead-cms/client --workspace @gohead-cms/create
+          for ws in sdk/client sdk/create; do
+            node -e 'const p=require("./"+process.argv[1]+"/package.json");for(const f of Object.values(p.bin)){require("fs").accessSync(process.argv[1]+"/"+f)}' "$ws"
+          done
 
       - name: Publish
         run: |
