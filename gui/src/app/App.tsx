@@ -1,5 +1,6 @@
-import { AppRouter }  from "./router";
-import { ChakraProvider } from "@chakra-ui/react"; // Example provider
+import { AppRouter } from "./router";
+import { Provider } from "@/components/ui/provider";
+import { Toaster } from "@/components/ui/toaster";
 
 /**
  * The root component of the application.
@@ -7,8 +8,10 @@ import { ChakraProvider } from "@chakra-ui/react"; // Example provider
  */
 export default function App() {
   return (
-    <ChakraProvider>
+    // Light only for now: the screens are designed and tested in light mode.
+    <Provider defaultTheme="light" enableSystem={false}>
       <AppRouter />
-    </ChakraProvider>
+      <Toaster />
+    </Provider>
   );
 }
