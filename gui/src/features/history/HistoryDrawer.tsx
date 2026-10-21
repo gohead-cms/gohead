@@ -52,7 +52,6 @@ export function HistoryDrawer({ target, onClose, onRestored }: HistoryDrawerProp
       size="xl"
     >
       <DrawerContent maxW={{ base: "100vw", lg: "5xl" }}>
-        <DrawerCloseTrigger />
         <DrawerHeader borderBottomWidth="1px">
           <DrawerTitle display="flex" alignItems="center" gap={2} fontSize="xl" fontWeight="semibold" minW={0}>
             <Icon as={FiClock} color="purple.500" />
@@ -65,6 +64,7 @@ export function HistoryDrawer({ target, onClose, onRestored }: HistoryDrawerProp
           </DrawerTitle>
         </DrawerHeader>
         <DrawerBody p={0}>{target && <HistoryContent key={targetKey(target)} target={target} onRestored={onRestored} />}</DrawerBody>
+        <DrawerCloseTrigger />
       </DrawerContent>
     </DrawerRoot>
   );

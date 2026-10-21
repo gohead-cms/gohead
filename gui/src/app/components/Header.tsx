@@ -7,6 +7,14 @@ import { useAuthStore } from "../../services/auth";
 import { API_BASE_URL } from "../../services/api";
 import { useMe } from "../../features/auth/me";
 
+// As in v2, the avatar gets a color picked from the name.
+const AVATAR_PALETTES = ["red", "orange", "green", "teal", "blue", "cyan", "purple", "pink"];
+function avatarPalette(name: string) {
+  let hash = 0;
+  for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
+  return AVATAR_PALETTES[Math.abs(hash) % AVATAR_PALETTES.length];
+}
+
 export function Header() {
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
@@ -43,7 +51,7 @@ export function Header() {
       <MenuRoot>
         <MenuTrigger asChild>
           <Button variant="ghost" px={2} py={1} borderRadius="full" aria-label="Account menu">
-            <Avatar size="xs" name={me?.username ?? "?"} />
+            <Avatar size="xs" variant="solid" colorPalette={avatarPalette(me?.username ?? "?")} name={me?.username ?? "?"} />
           </Button>
         </MenuTrigger>
         <MenuContent>

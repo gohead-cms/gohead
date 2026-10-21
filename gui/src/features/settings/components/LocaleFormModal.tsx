@@ -99,7 +99,6 @@ export function LocaleFormModal({
           <DialogHeader>
             <DialogTitle>{editing ? `Rename ${locale.code}` : "Add a locale"}</DialogTitle>
           </DialogHeader>
-          <DialogCloseTrigger disabled={saving} />
           <DialogBody>
             <VStack gap={4} align="stretch">
               {serverError && (
@@ -162,6 +161,7 @@ export function LocaleFormModal({
             </Button>
           </DialogFooter>
         </form>
+        <DialogCloseTrigger disabled={saving} />
       </DialogContent>
     </DialogRoot>
   );

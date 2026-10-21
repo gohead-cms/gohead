@@ -98,7 +98,6 @@ export function UserFormModal({
           <DialogHeader>
             <DialogTitle>{creating ? "New user" : `Edit ${user.username}`}</DialogTitle>
           </DialogHeader>
-          <DialogCloseTrigger disabled={saving} />
           <DialogBody>
             <VStack gap={4} align="stretch">
               {serverError && (
@@ -149,6 +148,7 @@ export function UserFormModal({
             </Button>
           </DialogFooter>
         </form>
+        <DialogCloseTrigger disabled={saving} />
       </DialogContent>
     </DialogRoot>
   );

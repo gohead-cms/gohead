@@ -85,7 +85,6 @@ export function EntryFormModal({
       size="lg"
     >
       <DrawerContent>
-        <DrawerCloseTrigger />
         <DrawerHeader borderBottomWidth="1px" pr={12}>
           <DrawerTitle asChild fontSize="xl" fontWeight="semibold">
             <Flex align="center" gap={3} wrap="wrap">
@@ -151,6 +150,7 @@ export function EntryFormModal({
           />
         )}
         {guard.dialog}
+        <DrawerCloseTrigger />
       </DrawerContent>
     </DrawerRoot>
   );

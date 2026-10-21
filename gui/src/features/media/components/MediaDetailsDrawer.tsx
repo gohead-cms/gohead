@@ -165,7 +165,6 @@ export function MediaDetailsDrawer({
       placement="end"
     >
       <DrawerContent>
-        <DrawerCloseTrigger />
         <DrawerHeader pr={12}>
           <DrawerTitle fontSize="xl" fontWeight="semibold" lineClamp={1} title={item?.name}>
             {item?.name ?? "File details"}
@@ -234,6 +233,7 @@ export function MediaDetailsDrawer({
             </Button>
           </DrawerFooter>
         )}
+        <DrawerCloseTrigger />
       </DrawerContent>
     </DrawerRoot>
   );

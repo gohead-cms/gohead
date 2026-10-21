@@ -77,7 +77,6 @@ export function TokenFormModal({
           <DialogHeader>
             <DialogTitle>New API token</DialogTitle>
           </DialogHeader>
-          <DialogCloseTrigger disabled={saving} />
           <DialogBody>
             <VStack gap={4} align="stretch">
               {serverError && (
@@ -125,6 +124,7 @@ export function TokenFormModal({
             </Button>
           </DialogFooter>
         </form>
+        <DialogCloseTrigger disabled={saving} />
       </DialogContent>
     </DialogRoot>
   );

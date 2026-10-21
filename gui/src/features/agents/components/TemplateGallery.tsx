@@ -369,7 +369,6 @@ function TemplateParamsModal({
           <DialogHeader>
             <DialogTitle>{template.name}</DialogTitle>
           </DialogHeader>
-          <DialogCloseTrigger />
           <DialogBody>
             <VStack align="stretch" gap={4}>
               <Text fontSize="sm" color="gray.600">
@@ -413,6 +412,7 @@ function TemplateParamsModal({
             </Button>
           </DialogFooter>
         </form>
+        <DialogCloseTrigger />
       </DialogContent>
     </DialogRoot>
   );

@@ -197,7 +197,6 @@ function RelationPicker({ target, title, many, field, selected, onClose, onPick 
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        <DialogCloseTrigger />
         <DialogBody>
           <InputGroup mb={3} w="full" startElement={<FiSearch />}>
             <Input
@@ -278,6 +277,7 @@ function RelationPicker({ target, title, many, field, selected, onClose, onPick 
             </Button>
           )}
         </DialogFooter>
+        <DialogCloseTrigger />
       </DialogContent>
     </DialogRoot>
   );

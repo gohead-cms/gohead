@@ -25,7 +25,6 @@ export function DeliveriesDrawer({ webhook, onClose }: { webhook: Webhook | null
       size="xl"
     >
       <DrawerContent>
-        <DrawerCloseTrigger />
         <DrawerHeader borderBottomWidth="1px" flexDirection="column" alignItems="stretch" gap={0}>
           <DrawerTitle>Deliveries: {webhook?.name}</DrawerTitle>
           <Text fontSize="sm" fontWeight="normal" color="gray.500" wordBreak="break-all">
@@ -105,6 +104,7 @@ export function DeliveriesDrawer({ webhook, onClose }: { webhook: Webhook | null
             </Table.ScrollArea>
           ) : null}
         </DrawerBody>
+        <DrawerCloseTrigger />
       </DrawerContent>
     </DrawerRoot>
   );

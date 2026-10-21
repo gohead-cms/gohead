@@ -44,8 +44,8 @@ export function RecentlyDeletedButton({
           <DialogHeader>
             <DialogTitle>Recently deleted</DialogTitle>
           </DialogHeader>
-          <DialogCloseTrigger />
           <DialogBody pb={6}>{open && <DeletedList collection={collection} drafts={drafts} onRestored={onRestored} />}</DialogBody>
+          <DialogCloseTrigger />
         </DialogContent>
       </DialogRoot>
     </>

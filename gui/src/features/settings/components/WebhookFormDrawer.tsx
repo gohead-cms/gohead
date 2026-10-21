@@ -128,7 +128,6 @@ export function WebhookFormDrawer({
       <DrawerContent>
         <Flex asChild direction="column" h="full">
           <form onSubmit={submit} noValidate>
-            <DrawerCloseTrigger disabled={saving} />
             <DrawerHeader borderBottomWidth="1px">
               <DrawerTitle>{creating ? "New webhook" : `Edit ${webhook.name}`}</DrawerTitle>
             </DrawerHeader>
@@ -278,6 +277,7 @@ export function WebhookFormDrawer({
             </DrawerFooter>
           </form>
         </Flex>
+        <DrawerCloseTrigger disabled={saving} />
       </DrawerContent>
     </DrawerRoot>
   );

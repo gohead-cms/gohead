@@ -104,7 +104,6 @@ export function RoleFormDrawer({
       <DrawerContent>
         <Flex asChild direction="column" h="full">
           <form onSubmit={submit} noValidate>
-            <DrawerCloseTrigger disabled={saving} />
             <DrawerHeader borderBottomWidth="1px">
               <HStack gap={3}>
                 <DrawerTitle flex="none">{title}</DrawerTitle>
@@ -259,6 +258,7 @@ export function RoleFormDrawer({
             </DrawerFooter>
           </form>
         </Flex>
+        <DrawerCloseTrigger disabled={saving} />
       </DrawerContent>
     </DrawerRoot>
   );

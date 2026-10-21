@@ -88,7 +88,6 @@ export function ProposalDrawer({ proposalId, onClose }: ProposalDrawerProps) {
       size="xl"
     >
       <DrawerContent maxW={{ base: "100vw", lg: "4xl" }}>
-        <DrawerCloseTrigger />
         <DrawerHeader borderBottomWidth="1px">
           <DrawerTitle display="flex" alignItems="center" gap={3} flexWrap="wrap" fontSize="xl" fontWeight="semibold">
             <Text as="span">Proposal #{proposalId}</Text>
@@ -116,6 +115,7 @@ export function ProposalDrawer({ proposalId, onClose }: ProposalDrawerProps) {
         )}
         {/* A new proposal starts the review from scratch. */}
         {detail && <ProposalReview key={detail.proposal.id} detail={detail} reload={refetch} onClose={onClose} />}
+        <DrawerCloseTrigger />
       </DrawerContent>
     </DrawerRoot>
   );

@@ -104,7 +104,6 @@ export function RunDetailDrawer({ agentName, runId, onClose }: RunDetailDrawerPr
       placement="end"
     >
       <DrawerContent>
-        <DrawerCloseTrigger />
         <DrawerHeader borderBottomWidth="1px" pb={4}>
           <DrawerTitle fontSize="xl" fontWeight="semibold" pe={8}>
             Run #{runId}
@@ -193,6 +192,7 @@ export function RunDetailDrawer({ agentName, runId, onClose }: RunDetailDrawerPr
             </VStack>
           )}
         </DrawerBody>
+        <DrawerCloseTrigger />
       </DrawerContent>
     </DrawerRoot>
   );

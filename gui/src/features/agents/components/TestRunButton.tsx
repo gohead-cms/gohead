@@ -96,7 +96,6 @@ export function TestRunButton({ agent, onQueued }: { agent: AgentNodeData; onQue
           <DialogHeader>
             <DialogTitle>Test {agent.name}</DialogTitle>
           </DialogHeader>
-          <DialogCloseTrigger />
           <DialogBody>
             <VStack align="stretch" gap={4}>
               <Text fontSize="sm" color="gray.600">
@@ -185,6 +184,7 @@ export function TestRunButton({ agent, onQueued }: { agent: AgentNodeData; onQue
               Start test run
             </Button>
           </DialogFooter>
+          <DialogCloseTrigger />
         </DialogContent>
       </DialogRoot>
     </>

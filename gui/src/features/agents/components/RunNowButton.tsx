@@ -54,7 +54,6 @@ export function RunNowButton({ agentName, onQueued }: { agentName: string; onQue
           <DialogHeader>
             <DialogTitle>Run {agentName} now</DialogTitle>
           </DialogHeader>
-          <DialogCloseTrigger />
           <DialogBody>
             <Field.Root gap={2}>
               <Field.Label fontSize="md">Input (optional)</Field.Label>
@@ -77,6 +76,7 @@ export function RunNowButton({ agentName, onQueued }: { agentName: string; onQue
               Queue run
             </Button>
           </DialogFooter>
+          <DialogCloseTrigger />
         </DialogContent>
       </DialogRoot>
     </>

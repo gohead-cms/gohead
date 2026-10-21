@@ -58,7 +58,6 @@ export function MediaLibraryPicker({ multiple, accept, selected, onClose, onPick
         <DialogHeader>
           <DialogTitle>{multiple ? "Add files from the library" : "Choose a file from the library"}</DialogTitle>
         </DialogHeader>
-        <DialogCloseTrigger />
         <DialogBody>
           <InputGroup mb={4} w="full" startElement={<FiSearch />}>
             <Input
@@ -140,6 +139,7 @@ export function MediaLibraryPicker({ multiple, accept, selected, onClose, onPick
             </Button>
           )}
         </DialogFooter>
+        <DialogCloseTrigger />
       </DialogContent>
     </DialogRoot>
   );
