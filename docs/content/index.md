@@ -53,6 +53,17 @@ Model your content, get REST and GraphQL APIs instantly, and let agents react to
 
 ## Five lines to a working API
 
+On a Mac, with [Homebrew](https://brew.sh): one binary, SQLite, no Docker.
+
+```bash
+brew install gohead-cms/tap/gohead
+GOHEAD_ADMIN_USERNAME=admin GOHEAD_ADMIN_EMAIL=you@example.com \
+GOHEAD_ADMIN_PASSWORD='choose-a-long-password' gohead standalone
+# open http://localhost:8080: the admin UI and the API share the address
+```
+
+Or the full stack with Docker Compose:
+
 ```bash
 printf 'GOHEAD_JWT_SECRET=%s\nGOHEAD_ADMIN_USERNAME=admin\nGOHEAD_ADMIN_PASSWORD=%s\n' \
   "$(openssl rand -hex 32)" "$(openssl rand -hex 12)" > .env

@@ -14,7 +14,7 @@ Stack: Next.js 16 (App Router, Server Actions), React 19, TypeScript, Tailwind C
 
 ## Quick start
 
-You need Node.js 20.9 or later, and Docker to run GoHead locally.
+You need Node.js 20.9 or later, and Docker to run GoHead locally (on a Mac, [Homebrew works too](#without-docker-on-a-mac)).
 
 ```bash
 npm create @gohead-cms@latest my-conf -- --template nextjs-conference
@@ -33,6 +33,27 @@ cp -r gohead/templates/nextjs-conference my-conf && cd my-conf
 cp .env.example .env.local
 npm install
 ```
+
+### Without Docker, on a Mac
+
+Instead of `docker compose up -d`, install GoHead with Homebrew and run it in a second terminal, from the site's folder:
+
+```bash
+brew install gohead-cms/tap/gohead
+GOHEAD_ADMIN_USERNAME=admin GOHEAD_ADMIN_EMAIL=admin@example.com \
+GOHEAD_ADMIN_PASSWORD=gohead-local-password GOHEAD_WEBHOOKS_ALLOW_PRIVATE_NETWORKS=true \
+  gohead standalone --data .gohead
+```
+
+`gohead standalone` runs the API, the admin UI (on <http://localhost:8080>, not 3001), webhooks, agents and cron triggers in one process on SQLite. The data stays in `.gohead/`, which git ignores. GoHead runs on your machine rather than in a container, so before `npm run gohead:setup`, set where the site is in `.env.local`:
+
+```bash
+GOHEAD_REVALIDATE_URL=http://localhost:3000/api/revalidate
+```
+
+Then `npm run gohead:setup` and `npm run dev` as above.
+
+For [agents](#agents), pass the `GOHEAD_LLM_*` variables to `gohead standalone` instead of writing a `.env` file.
 
 ### Agents
 

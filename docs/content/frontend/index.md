@@ -48,6 +48,22 @@ npm run dev                                 # http://localhost:3000
 
 Open the admin UI (`http://localhost:8080`), edit an article, and refresh the site.
 
+!!! tip "Without Docker, on a Mac"
+    Run GoHead with [Homebrew](../getting-started/installation.md#homebrew) instead of
+    `docker compose up -d`, in a second terminal from the site's folder:
+
+    ```bash
+    brew install gohead-cms/tap/gohead
+    GOHEAD_ADMIN_USERNAME=admin GOHEAD_ADMIN_EMAIL=admin@example.com \
+    GOHEAD_ADMIN_PASSWORD=gohead-local-password GOHEAD_WEBHOOKS_ALLOW_PRIVATE_NETWORKS=true \
+      gohead standalone --data .gohead
+    ```
+
+    The account is the one the starter's `.env.local` signs in with, and the data stays in
+    `.gohead/` (git-ignored). The admin UI is on `http://localhost:8080` too. Point the
+    revalidation webhook at `http://localhost:3000/api/revalidate`: GoHead runs on your
+    machine, not in a container, so `host.docker.internal` is not needed.
+
 ## Reading content: public access or a token
 
 | | Public access | API token |
