@@ -29,6 +29,8 @@ interface AgentDetailsProps {
   agent: AgentNodeData;
   /** Deletes the agent; omitted for read-only viewers. */
   onDelete?: () => Promise<void>;
+  /** Without onDelete (the demo account): only the Test run button. */
+  canTest?: boolean;
   /** A run to show when the details open (the Runs tab, with that run open). */
   initialRun?: number;
 }
@@ -49,7 +51,7 @@ const limitLabels: [keyof AgentLimits, string][] = [
   ["max_cost_per_day", "USD / day"],
 ];
 
-export function AgentDetails({ agent, onDelete, initialRun }: AgentDetailsProps) {
+export function AgentDetails({ agent, onDelete, canTest, initialRun }: AgentDetailsProps) {
   const { name, schema } = agent;
   const [tab, setTab] = useState(initialRun ? "runs" : "overview");
   // The run to open, until the user moves on (the Runs tab remounts lazily).
@@ -99,6 +101,7 @@ export function AgentDetails({ agent, onDelete, initialRun }: AgentDetailsProps)
             />
           </HStack>
         )}
+        {!onDelete && canTest && <TestRunButton agent={agent} onQueued={follow} />}
       </Flex>
       <Tabs.Root
         lazyMount

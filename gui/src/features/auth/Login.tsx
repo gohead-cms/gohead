@@ -12,6 +12,7 @@ import {
 import { useAuthStore } from "../../services/auth";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../../services/api";
+import { resetLabel, useDemoInfo } from "../demo/demo";
 
 export function LoginPage() {
   const setToken = useAuthStore((s) => s.setToken);
@@ -20,6 +21,7 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const demo = useDemoInfo();
 
   useEffect(() => {
     if (token) {
@@ -27,14 +29,13 @@ export function LoginPage() {
     }
   }, [token, navigate]);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const signIn = async (credentials: { username: string; password: string }) => {
     setError(null);
     try {
       const res = await apiFetch("/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify(credentials),
       });
       const json = await res.json();
 
@@ -49,6 +50,11 @@ export function LoginPage() {
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login failed");
     }
+  };
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    void signIn({ username, password });
   };
 
   return (
@@ -74,6 +80,20 @@ export function LoginPage() {
             Log in to your GoHead account
           </Text>
         </Flex>
+        {demo && (
+          <Box borderWidth="1px" borderColor="purple.200" bg="purple.50" borderRadius="md" p={4} mb={6} data-testid="demo-login">
+            <Text fontWeight="semibold" mb={1}>
+              Try the demo
+            </Text>
+            <Text fontSize="sm" color="gray.700" mb={3}>
+              Sign in as <code>{demo.username}</code> with the password <code>{demo.password}</code> to look around, edit drafts
+              and try agents.{demo.resetAt && ` Everything is reset every day at ${resetLabel(demo)}.`}
+            </Text>
+            <Button size="sm" colorPalette="purple" width="100%" onClick={() => void signIn({ username: demo.username, password: demo.password })}>
+              Sign in to the demo
+            </Button>
+          </Box>
+        )}
         <form onSubmit={handleLogin}>
           <VStack gap={4}>
             <Field.Root>

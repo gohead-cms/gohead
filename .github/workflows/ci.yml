@@ -261,6 +261,8 @@ jobs:
           GOHEAD_ADMIN_PASSWORD: e2e-password-123
           # The connected apps test runs its MCP server on 127.0.0.1.
           GOHEAD_CONNECTIONS_ALLOW_PRIVATE_NETWORKS: "true"
+          # The demo test signs in with the demo account.
+          GOHEAD_DEMO_ENABLED: "true"
 
       - name: Install
         working-directory: gui

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Flex, Box } from "@chakra-ui/react";
 import { Header } from "./components/Header";
+import { DemoBanner } from "../features/demo/DemoBanner";
 import { Sidebar, SidebarContext } from './components/sidebar'
 
 // Define sidebar widths for consistency
@@ -25,6 +26,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           mt="64px"
           transition="margin-left .2s ease-in-out"
         >
+          <DemoBanner />
           {children}
         </Box>
       </Flex>

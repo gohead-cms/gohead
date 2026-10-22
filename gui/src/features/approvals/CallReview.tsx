@@ -6,6 +6,7 @@ import { useColorModeValue } from "@/components/ui/color-mode";
 import { DrawerBody, DrawerFooter } from "@/components/ui/drawer";
 import { ApiError } from "../../services/api";
 import { useNotify } from "../../shared/hooks/useNotify";
+import { useMe } from "../auth/me";
 import { errorMessage } from "../../shared/utils/errors";
 import { formatTime } from "../agents/components/runFormat";
 import { agentRunLink } from "../history/history";
@@ -70,7 +71,9 @@ export function CallReview({ detail, reload, onClose }: { detail: ProposalDetail
   const [actionError, setActionError] = useState<string | null>(null);
   const quoteBg = useColorModeValue("gray.50", "gray.700");
 
-  const pending = p.status === "pending";
+  const { isDemo } = useMe();
+  // Visitors of a demo see calls; the demo's owner decides them.
+  const pending = p.status === "pending" && !isDemo;
   const parsed = mode === "edit" ? parseEditedData(edited) : null;
   const edits = mode === "edit" && parsed?.value && !sameJSON(parsed.value, args) ? parsed.value : undefined;
   const label = call?.title || target.tool;
@@ -194,7 +197,7 @@ export function CallReview({ detail, reload, onClose }: { detail: ProposalDetail
             >
               <Alert.Indicator />
               <Alert.Content>
-                <Alert.Title textTransform="capitalize">{p.status === "applying" ? "Being made" : p.status}</Alert.Title>
+                <Alert.Title textTransform={p.status === "pending" ? "none" : "capitalize"}>{p.status === "applying" ? "Being made" : p.status === "pending" ? "Waiting for the demo's owner to approve it" : p.status}</Alert.Title>
                 <Alert.Description fontSize="sm">
                   {[p.reviewedBy && `By ${p.reviewedBy}`, p.decidedAt && formatTime(p.decidedAt)].filter(Boolean).join(", ")}
                   {p.reviewNote && <Text mt={1}>“{p.reviewNote}”</Text>}
