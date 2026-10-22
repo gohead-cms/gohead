@@ -5,10 +5,10 @@
 # the uploads or the generated JWT secret to it. The image has no shell or
 # package manager, so root gives little to work with.
 #
-# 0.7 follows the 0.7.x releases ("edge": the latest commit of master, as the
+# 0.8 follows the 0.8.x releases ("edge": the latest commit of master, as the
 # demo uses). On Render, "Manual Deploy → Clear build
 # cache & deploy" picks up the latest one.
-ARG GOHEAD_VERSION=0.7
+ARG GOHEAD_VERSION=0.8
 FROM ghcr.io/gohead-cms/gohead:${GOHEAD_VERSION}
 USER 0:0
 CMD ["standalone"]

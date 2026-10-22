@@ -1,6 +1,6 @@
 {
   "name": "@gohead-cms/create",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Create a website on GoHead from a starter template: npm create @gohead-cms@latest",
   "license": "MIT",
   "type": "module",

@@ -21,7 +21,7 @@ services:
       sizeGB: 1
     envVars:
       # The latest commit of master: the demo shows the latest changes.
-      # Set a version ("0.7") to show a release instead.
+      # Set a version ("0.8") to show a release instead.
       - key: GOHEAD_VERSION
         value: edge
       - key: PORT

@@ -49,11 +49,11 @@ Render provides its TLS certificate.
 
 ## Updates
 
-The service runs the latest **0.7.x** release, and is not rebuilt when GoHead changes. To
+The service runs the latest **0.8.x** release, and is not rebuilt when GoHead changes. To
 update, open the service on Render and choose **Manual Deploy → Clear build cache & deploy**:
-Render pulls the latest 0.7.x image. Read the [upgrade notes](upgrading.md) first. A service
+Render pulls the latest 0.8.x image. Read the [upgrade notes](upgrading.md) first. A service
 deployed from your own copy of the repository keeps the version of its Dockerfile: set the
-environment variable `GOHEAD_VERSION` to `0.7` (Render passes it to the Docker build) and
+environment variable `GOHEAD_VERSION` to `0.8` (Render passes it to the Docker build) and
 deploy. `edge` runs the latest commit of `master`, as the
 [public demo](demo.md) does.
 
