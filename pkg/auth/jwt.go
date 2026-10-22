@@ -2,6 +2,8 @@
 package auth
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"time"
@@ -60,4 +62,13 @@ func ParseJWT(tokenStr string) (*Claims, error) {
 		return nil, ErrInvalidToken
 	}
 	return claims, nil
+}
+
+// DerivedKey returns a key for another use of the JWT secret (signing the
+// state of a sign-in with a provider): tokens signed with it are not valid
+// session tokens.
+func DerivedKey(purpose string) []byte {
+	mac := hmac.New(sha256.New, jwtKey)
+	mac.Write([]byte("gohead:" + purpose))
+	return mac.Sum(nil)
 }

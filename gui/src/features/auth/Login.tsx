@@ -13,21 +13,31 @@ import { useAuthStore } from "../../services/auth";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../../services/api";
 import { resetLabel, useDemoInfo } from "../demo/demo";
+import { startSSO, takeSSOResult, useSSOProviders } from "./sso";
 
 export function LoginPage() {
   const setToken = useAuthStore((s) => s.setToken);
   const token = useAuthStore((s) => s.token);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  // Back from a provider: the token or the reason, read once.
+  const [sso] = useState(takeSSOResult);
+  const [error, setError] = useState<string | null>(sso?.error ?? null);
   const navigate = useNavigate();
   const demo = useDemoInfo();
+  const providers = useSSOProviders();
 
   useEffect(() => {
-    if (token) {
-      navigate("/dashboard", { replace: true });
+    if (sso?.token) setToken(sso.token);
+  }, [sso, setToken]);
+
+  // Signed in: go on, unless a provider sign-in (or linking) failed, which
+  // stays on screen.
+  useEffect(() => {
+    if (token && !sso?.error) {
+      navigate(sso?.returnPath ?? "/dashboard", { replace: true });
     }
-  }, [token, navigate]);
+  }, [token, navigate, sso]);
 
   const signIn = async (credentials: { username: string; password: string }) => {
     setError(null);
@@ -119,6 +129,18 @@ export function LoginPage() {
             </Button>
           </VStack>
         </form>
+        {providers.length > 0 && (
+          <VStack gap={2} mt={4}>
+            <Text fontSize="sm" color="gray.500">
+              or
+            </Text>
+            {providers.map((p) => (
+              <Button key={p.id} variant="outline" width="100%" onClick={() => startSSO(p.id)}>
+                Sign in with {p.label}
+              </Button>
+            ))}
+          </VStack>
+        )}
         {error && (
           <Alert.Root role="alert" status="error" mt={4} borderRadius="md">
             <Alert.Indicator />
@@ -127,6 +149,11 @@ export function LoginPage() {
               <Alert.Description>{error}</Alert.Description>
             </Alert.Content>
           </Alert.Root>
+        )}
+        {token && sso?.error && (
+          <Button mt={3} variant="subtle" width="100%" onClick={() => navigate("/dashboard", { replace: true })}>
+            Back to GoHead
+          </Button>
         )}
       </Box>
     </Flex>

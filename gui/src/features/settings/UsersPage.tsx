@@ -99,6 +99,11 @@ export function UsersPage() {
                         <HStack gap={2}>
                           <Text>{u.username}</Text>
                           {self && <Badge colorPalette="green">you</Badge>}
+                          {u.ssoProvider && (
+                            <Badge variant="outline" textTransform="capitalize" title={`Signs in with ${u.ssoProvider}`}>
+                              {u.ssoProvider}
+                            </Badge>
+                          )}
                         </HStack>
                       </Table.Cell>
                       <Table.Cell>{u.email}</Table.Cell>

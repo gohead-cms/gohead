@@ -29,7 +29,7 @@ func TestBaselineAndStatus(t *testing.T) {
 
 	applied, err := Up(db)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"0001_baseline", "0002_revisions", "0003_i18n", "0004_agent_reviews", "0005_public_role", "0006_jobs", "0007_connections"}, applied)
+	assert.Equal(t, []string{"0001_baseline", "0002_revisions", "0003_i18n", "0004_agent_reviews", "0005_public_role", "0006_jobs", "0007_connections", "0008_user_sso"}, applied)
 	assert.True(t, db.Migrator().HasTable("jobs"))
 	assert.True(t, db.Migrator().HasTable(&models.Locale{}))
 	assert.True(t, db.Migrator().HasColumn(&models.Item{}, "Translations"))
@@ -47,9 +47,9 @@ func TestBaselineAndStatus(t *testing.T) {
 	assert.NotNil(t, states[0].AppliedAt)
 	assert.False(t, states[0].Reversible)
 
-	reverted, err := Down(db, 6)
+	reverted, err := Down(db, 7)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"0007_connections", "0006_jobs", "0005_public_role", "0004_agent_reviews", "0003_i18n", "0002_revisions"}, reverted)
+	assert.Equal(t, []string{"0008_user_sso", "0007_connections", "0006_jobs", "0005_public_role", "0004_agent_reviews", "0003_i18n", "0002_revisions"}, reverted)
 	assert.False(t, db.Migrator().HasTable(&models.Locale{}))
 	assert.False(t, db.Migrator().HasColumn(&models.Item{}, "Translations"))
 	assert.False(t, db.Migrator().HasTable(&models.Revision{}))

@@ -156,6 +156,67 @@ attempts for a username from one IP, that IP gets `429` with a `Retry-After` hea
 minutes; a successful login clears the count. Limits are
 [configurable](../getting-started/configuration.md#rate-limiting).
 
+## Sign in with Google
+
+People can sign in with their Google account, next to (not instead of) passwords: the login
+page shows **Sign in with Google**.
+
+- **Linking it yourself:** anyone signed in with a password links their Google account from the
+  account menu (**Sign in with Google too**), as long as the Google address is the account's
+  email. Administrators link their account this way: it is never linked automatically.
+- **Automatic link:** another existing account is linked on its first Google sign-in when its
+  email is the Google account's address and Google vouches for it, meaning a Google Workspace
+  account of that domain or a Gmail address. A personal Google account created with someone's
+  work address proves nothing, so it is refused. The account keeps its role. With
+  `auth.registration: open`, nothing is linked automatically: anyone could have registered an
+  account with that email.
+- **New accounts:** with `allowed_domains`, people of your Google Workspace domain
+  (`yourstudio.com`) get an account on their first sign-in, with `default_role` (`viewer`
+  unless set, never `admin`: promote people under **Settings → Users**). Google must vouch
+  for the domain: a personal account whose address happens to match is not enough.
+- **Anyone else** is told to ask an administrator for an account.
+
+Accounts created this way have no password: they sign in with Google, and an admin can set
+one. **Settings → Users** marks linked accounts with **google**; an admin unlinks one with
+`DELETE /admin/users/{id}/sso`, after which it signs in with its password.
+
+### Set it up
+
+1. In the [Google Cloud console](https://console.cloud.google.com/), open **APIs & Services →
+   OAuth consent screen** (or **Google Auth Platform**) and configure it: **Internal** if only
+   your Workspace domain signs in, **External** otherwise.
+2. Under **Credentials → Create credentials → OAuth client ID**, choose **Web application** and
+   add the **Authorized redirect URI** `https://cms.example.com/auth/sso/google/callback`
+   (GoHead's address, with `/auth/sso/google/callback`).
+3. Give GoHead the client:
+
+    ```bash
+    GOHEAD_AUTH_SSO_GOOGLE_CLIENT_ID=1234-abcd.apps.googleusercontent.com
+    GOHEAD_AUTH_SSO_GOOGLE_CLIENT_SECRET=GOCSPX-…
+    GOHEAD_AUTH_SSO_GOOGLE_ALLOWED_DOMAINS=yourstudio.com   # optional, comma-separated
+    GOHEAD_AUTH_SSO_GOOGLE_DEFAULT_ROLE=editor               # optional, default viewer
+    GOHEAD_AUTH_SSO_PUBLIC_URL=https://cms.example.com       # recommended in production
+    ```
+
+4. Restart GoHead. The login page now offers **Sign in with Google**.
+
+When the admin UI runs on another address than the API (the `gohead-admin` image), set
+`GOHEAD_AUTH_SSO_UI_URL` to it: GoHead sends people back there after signing in.
+
+### How it works
+
+The sign-in uses OpenID Connect's authorization code flow with PKCE. The login page keeps a random value
+for this sign-in in the browser's session storage and calls `GET /auth/sso/google/start`, which
+stores a signed, short-lived state (with that value) in an `HttpOnly` cookie and sends the
+browser to Google; Google sends it back to `/auth/sso/google/callback`, which checks the state,
+exchanges the code for the ID token directly with Google, checks its issuer, audience, expiry
+and nonce, and finds or creates the account. The browser then lands on the admin UI's login
+page with a GoHead token in the URL fragment (`#sso_token=…`), which the UI keeps and removes
+from the address bar; fragments are never sent to servers. The UI accepts the token only with
+the value it kept, so a crafted link cannot sign someone into another account. `GET /auth/sso`
+lists the enabled providers; `/auth/sso/google/start` and `/callback` count toward the
+[authentication rate limit](../getting-started/configuration.md#rate-limiting).
+
 ## Managing users (admin)
 
 | Method | Path | Body |

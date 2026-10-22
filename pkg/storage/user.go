@@ -121,3 +121,46 @@ func CountUsersWithRole(roleName string) (int64, error) {
 		Where("user_roles.name = ?", roleName).Count(&n).Error
 	return n, err
 }
+
+// ErrUserNotFound is returned by the lookups of sign-in with a provider.
+var ErrUserNotFound = errors.New("user not found")
+
+// GetUserBySSO returns the account linked to an identity provider's subject.
+func GetUserBySSO(provider, subject string) (*models.User, error) {
+	var user models.User
+	err := database.DB.Preload("Role").Where(&models.User{SSOProvider: provider, SSOSubject: subject}).First(&user).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrUserNotFound
+	}
+	return &user, err
+}
+
+// GetUserByEmail returns the account with an email address (any case).
+func GetUserByEmail(email string) (*models.User, error) {
+	var user models.User
+	err := database.DB.Preload("Role").Where("LOWER(email) = ?", strings.ToLower(email)).First(&user).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrUserNotFound
+	}
+	return &user, err
+}
+
+// LinkUserSSO links an account to an identity provider's subject.
+func LinkUserSSO(id uint, provider, subject string) error {
+	return database.DB.Model(&models.User{}).Where("id = ?", id).
+		Updates(models.User{SSOProvider: provider, SSOSubject: subject}).Error
+}
+
+// UsernameTaken reports whether a username or slug is used, by any
+// account, deleted ones included (their unique keys still hold).
+func UsernameTaken(username, slug string) (bool, error) {
+	var n int64
+	err := database.DB.Unscoped().Model(&models.User{}).Where("username = ? OR slug = ?", username, slug).Count(&n).Error
+	return n > 0, err
+}
+
+// UnlinkUserSSO removes an account's link to its identity provider.
+func UnlinkUserSSO(id uint) error {
+	return database.DB.Model(&models.User{}).Where("id = ?", id).
+		Select("SSOProvider", "SSOSubject").Updates(models.User{}).Error
+}

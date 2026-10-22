@@ -222,6 +222,31 @@ type AuthConfig struct {
 	// Registration is "disabled" (default: accounts are created by admins)
 	// or "open" (anyone can create a viewer account at /auth/register).
 	Registration string `mapstructure:"registration" yaml:"registration"`
+	// SSO is sign-in with an identity provider (Google), next to passwords.
+	SSO SSOConfig `mapstructure:"sso" yaml:"sso"`
+}
+
+// SSOConfig controls sign-in with identity providers.
+type SSOConfig struct {
+	// PublicURL is GoHead's address as browsers reach it, the base of the
+	// redirect URIs registered with providers (default: from the request).
+	PublicURL string `mapstructure:"public_url" yaml:"public_url"`
+	// UIURL is where the admin UI runs (default: PublicURL, the UI served
+	// by GoHead itself).
+	UIURL  string            `mapstructure:"ui_url" yaml:"ui_url"`
+	Google SSOProviderConfig `mapstructure:"google" yaml:"google"`
+}
+
+// SSOProviderConfig is an identity provider's OAuth client, and who may
+// sign in with it.
+type SSOProviderConfig struct {
+	ClientID     string `mapstructure:"client_id" yaml:"client_id"`
+	ClientSecret string `mapstructure:"client_secret" yaml:"client_secret"`
+	// AllowedDomains: people of these domains (Google Workspace) get an
+	// account on their first sign-in. Others must have one already.
+	AllowedDomains []string `mapstructure:"allowed_domains" yaml:"allowed_domains"`
+	// DefaultRole of the accounts created on sign-in (never admin).
+	DefaultRole string `mapstructure:"default_role" yaml:"default_role"`
 }
 
 // AdminConfig is the administrator created on an empty instance.
@@ -337,6 +362,12 @@ func LoadConfig(configPath string) (Config, error) {
 	viper.SetDefault("auto_migrate", true)
 	viper.SetDefault("auth.registration", "disabled")
 	viper.SetDefault("admin.username", "")
+	viper.SetDefault("auth.sso.public_url", "")
+	viper.SetDefault("auth.sso.ui_url", "")
+	viper.SetDefault("auth.sso.google.client_id", "")
+	viper.SetDefault("auth.sso.google.client_secret", "")
+	viper.SetDefault("auth.sso.google.allowed_domains", []string{})
+	viper.SetDefault("auth.sso.google.default_role", "viewer")
 	viper.SetDefault("admin.email", "")
 	viper.SetDefault("admin.password", "")
 

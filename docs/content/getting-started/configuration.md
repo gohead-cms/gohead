@@ -31,6 +31,12 @@ lives at the root of the repository.
 | `admin.email` | `GOHEAD_ADMIN_EMAIL` | *(empty)*, required with a username |
 | `admin.password` | `GOHEAD_ADMIN_PASSWORD` | *(empty)*, 12+ characters |
 | `auth.registration` | `GOHEAD_AUTH_REGISTRATION` | `disabled` (`open`: anyone can create a viewer account) |
+| `auth.sso.google.client_id` | `GOHEAD_AUTH_SSO_GOOGLE_CLIENT_ID` | *(empty)*: [sign in with Google](../guides/users-and-roles.md#sign-in-with-google) off |
+| `auth.sso.google.client_secret` | `GOHEAD_AUTH_SSO_GOOGLE_CLIENT_SECRET` | *(empty)* |
+| `auth.sso.google.allowed_domains` | `GOHEAD_AUTH_SSO_GOOGLE_ALLOWED_DOMAINS` | *(empty)*: only existing accounts |
+| `auth.sso.google.default_role` | `GOHEAD_AUTH_SSO_GOOGLE_DEFAULT_ROLE` | `viewer` |
+| `auth.sso.public_url` | `GOHEAD_AUTH_SSO_PUBLIC_URL` | *(empty)*: from the request |
+| `auth.sso.ui_url` | `GOHEAD_AUTH_SSO_UI_URL` | *(empty)*: the public URL |
 
 The `admin.*` account is created at startup only when the database has no users. See
 [users and roles](../guides/users-and-roles.md#registration-and-the-first-admin).
@@ -157,7 +163,7 @@ A [public demo](../operations/demo.md): a read-only account for visitors, and a 
 | `rate_limit.public_per_minute` | `GOHEAD_RATE_LIMIT_PUBLIC_PER_MINUTE` | `600` |
 | `trusted_proxies` | `GOHEAD_TRUSTED_PROXIES` | *(empty)* |
 
-- `auth_per_minute` caps requests to `/auth/login` and `/auth/register` per client IP.
+- `auth_per_minute` caps requests to `/auth/login`, `/auth/register` and the Google sign-in (`/auth/sso/…/start`, `/callback`, `/link`) per client IP.
 - `public_per_minute` caps anonymous `/api` requests (with [public access](../guides/users-and-roles.md#public-access) on) per client IP.
 - After `login_failures` failed logins for one username from one IP, further attempts from that
   IP are refused for `login_window` (other IPs, and a successful login, are unaffected). Set it

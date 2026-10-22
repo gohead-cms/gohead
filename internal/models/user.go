@@ -41,6 +41,10 @@ type User struct {
 	MetaDescription *string   `json:"meta_description"`                     // SEO meta description (optional)
 	URL             string    `json:"url"`                                  // Full URL to the user's profile
 	CreatedAt       time.Time `json:"created_at,omitempty"`                 // Auto-managed timestamp
+	// SSOProvider is the identity provider the account signs in with
+	// ("google"), and SSOSubject its ID there; empty for password accounts.
+	SSOProvider string `json:"ssoProvider,omitempty" gorm:"size:32;index:idx_users_sso,priority:1"`
+	SSOSubject  string `json:"-" gorm:"size:191;index:idx_users_sso,priority:2"`
 }
 
 // MinPasswordLength is the minimum accepted length for a plain-text password.

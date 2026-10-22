@@ -12,6 +12,8 @@ export interface Me {
   permissions?: Permissions;
   /** The account of a public demo: it sees the admin, read-only. */
   demo?: boolean;
+  /** The identity provider the account is linked to ("google"). */
+  ssoProvider?: string;
 }
 
 export interface MeState {

@@ -2,10 +2,12 @@ import { Badge, Box, Button, Flex, Icon, Text } from "@chakra-ui/react";
 import { Avatar } from "@/components/ui/avatar";
 import { MenuContent, MenuItem, MenuRoot, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { useNavigate } from "react-router-dom";
-import { FiBookOpen, FiCode, FiLogOut } from "react-icons/fi";
+import { FiBookOpen, FiCode, FiLink, FiLogOut } from "react-icons/fi";
 import { useAuthStore } from "../../services/auth";
 import { API_BASE_URL } from "../../services/api";
 import { useMe } from "../../features/auth/me";
+import { linkSSO, useSSOProviders } from "../../features/auth/sso";
+import { useNotify } from "../../shared/hooks/useNotify";
 
 // As in v2, the avatar gets a color picked from the name.
 const AVATAR_PALETTES = ["red", "orange", "green", "teal", "blue", "cyan", "purple", "pink"];
@@ -18,7 +20,11 @@ function avatarPalette(name: string) {
 export function Header() {
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
-  const { me } = useMe();
+  const { me, isDemo } = useMe();
+  const providers = useSSOProviders();
+  const notify = useNotify();
+  // Accounts with a password link a provider to sign in with it.
+  const linkable = me?.kind === "user" && !isDemo && !me.ssoProvider ? providers : [];
 
   const handleLogout = () => {
     logout();
@@ -76,6 +82,16 @@ export function Header() {
               Documentation
             </a>
           </MenuItem>
+          {linkable.map((p) => (
+            <MenuItem
+              key={p.id}
+              value={`link-${p.id}`}
+              onClick={() => linkSSO(p.id).catch((err) => notify.failure(err, `Could not link your ${p.label} account`))}
+            >
+              <Icon as={FiLink} />
+              Sign in with {p.label} too
+            </MenuItem>
+          ))}
           <MenuSeparator />
           <MenuItem value="sign-out" onClick={handleLogout}>
             <Icon as={FiLogOut} />
