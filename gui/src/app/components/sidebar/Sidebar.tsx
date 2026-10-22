@@ -27,6 +27,7 @@ import {
   FiGlobe,
   FiShield,
   FiCheckSquare,
+  FiLink2,
 } from 'react-icons/fi';
 import { type IconType } from 'react-icons';
 import { NavLink, useLocation } from "react-router-dom";
@@ -82,6 +83,7 @@ const LinkItems: Array<NavItemProps> = [
     adminOnly: true,
     children: [
       { name: 'Agents', icon: VscRobot, href: '/agents' },
+      { name: 'Connected apps', icon: FiLink2, href: '/connections' },
       { name: 'Activity', icon: FiActivity, href: '/activity' },
     ],
   },

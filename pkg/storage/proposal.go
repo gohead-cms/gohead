@@ -123,8 +123,10 @@ type ProposalQuery struct {
 	Scope      map[string][]string
 	AgentName  string
 	AgentRunID uint
-	Page       int
-	PageSize   int
+	// NoCalls leaves out calls to connected apps (reviewed by admins only).
+	NoCalls  bool
+	Page     int
+	PageSize int
 }
 
 // ListProposals lists proposals, newest first.
@@ -150,6 +152,9 @@ func ListProposals(q ProposalQuery) ([]models.Proposal, int, error) {
 			}
 		}
 		db = db.Where(cond)
+	}
+	if q.NoCalls {
+		db = db.Where("action <> ?", models.ProposalCall)
 	}
 	if q.AgentName != "" {
 		db = db.Where("agent_name = ?", q.AgentName)

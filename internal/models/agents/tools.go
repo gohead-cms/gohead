@@ -26,6 +26,9 @@ type Tool struct {
 	Name        string         `json:"name,omitempty"`
 	Description string         `json:"description,omitempty"`
 	Parameters  models.JSONMap `json:"parameters,omitempty"`
+	// Approval makes a connected app's tool wait for an admin's approval
+	// (true) or not (false). Default: tools that may change something wait.
+	Approval *bool `json:"approval,omitempty"`
 }
 
 // Spec is the tool as an agent stores it.
@@ -36,13 +39,14 @@ func (t Tool) Spec() FunctionSpec {
 		Parameters:  t.Parameters,
 		ImplKey:     tools.ImplKey(strings.TrimSpace(t.Use)),
 		Collections: t.On,
+		Approval:    t.Approval,
 	}
 }
 
 // ToolOf returns a stored function in the short form: only what differs
 // from the catalog.
 func ToolOf(f FunctionSpec) Tool {
-	t := Tool{Use: tools.Use(f.ImplKey), On: f.Collections}
+	t := Tool{Use: tools.Use(f.ImplKey), On: f.Collections, Approval: f.Approval}
 	info, known := tools.Lookup(f.ImplKey)
 	if f.Name != "" && !(known && f.Name == info.Name) {
 		t.Name = f.Name

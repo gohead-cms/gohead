@@ -16,6 +16,7 @@ import { ContentModelPage } from "../features/model/ContentModelPage";
 import { TypeEditorPage } from "../features/model/TypeEditorPage";
 import { MediaLibraryPage } from "../features/media/MediaLibraryPage";
 import { ActivityPage } from "../features/activity/ActivityPage";
+import { ConnectionsPage } from "../features/connections/ConnectionsPage";
 import { UsersPage } from "../features/settings/UsersPage";
 import { TokensPage } from "../features/settings/TokensPage";
 import { WebhooksPage } from "../features/settings/WebhooksPage";
@@ -93,6 +94,7 @@ export function AppRouter() {
         <Route path="/agents/new" element={<AdminOnly><AgentEditorPage /></AdminOnly>} />
         <Route path="/agents/:name/edit" element={<AdminOnly><AgentEditorPage /></AdminOnly>} />
         <Route path="/activity" element={<AdminOnly><ActivityPage /></AdminOnly>} />
+        <Route path="/connections" element={<AdminOnly><ConnectionsPage /></AdminOnly>} />
 
         {/* Settings */}
         <Route path="/settings/users" element={<AdminOnly><UsersPage /></AdminOnly>} />

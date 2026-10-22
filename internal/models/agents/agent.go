@@ -162,6 +162,10 @@ type FunctionSpec struct {
 	// Collections restricts the collections.* functions to these
 	// collections. Empty: every collection (not recommended for writes).
 	Collections []string `json:"collections,omitempty"`
+	// Approval: calls wait for an admin's approval (true) or not (false).
+	// Unset: the tools of connected apps that may change something wait,
+	// the others don't.
+	Approval *bool `json:"approval,omitempty"`
 }
 
 type FunctionSpecs []FunctionSpec

@@ -168,10 +168,12 @@
       "Proposal": {
         "properties": {
           "action": {
+            "description": "call: a call to a connected app's tool (admins only)",
             "enum": [
               "create",
               "update",
-              "delete"
+              "delete",
+              "call"
             ],
             "type": "string"
           },
@@ -192,6 +194,7 @@
             "type": "integer"
           },
           "collection": {
+            "description": "The collection, or app:<connection> for a call",
             "type": "string"
           },
           "createdAt": {
@@ -202,7 +205,7 @@
             "oneOf": [
               {
                 "additionalProperties": true,
-                "description": "The item's values after the change (null for a deletion)",
+                "description": "The item's values after the change (null for a deletion); for a call, the tool and its arguments",
                 "type": "object"
               },
               {

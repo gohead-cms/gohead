@@ -92,6 +92,15 @@ type WebhooksConfig struct {
 	MaxRetries           int           `mapstructure:"max_retries" yaml:"max_retries"`
 }
 
+// ConnectionsConfig controls connections to other services (connected
+// apps: remote MCP servers agents use).
+type ConnectionsConfig struct {
+	// AllowPrivateNetworks lets connections reach private and loopback
+	// addresses. Link-local (cloud metadata) addresses are always refused.
+	AllowPrivateNetworks bool          `mapstructure:"allow_private_networks" yaml:"allow_private_networks"`
+	Timeout              time.Duration `mapstructure:"timeout" yaml:"timeout"`
+}
+
 // OpenAPIConfig controls the generated API description.
 type OpenAPIConfig struct {
 	Enabled bool `mapstructure:"enabled" yaml:"enabled"`
@@ -165,6 +174,8 @@ type Config struct {
 
 	// Outbound webhooks
 	Webhooks WebhooksConfig `mapstructure:"webhooks" yaml:"webhooks"`
+	// Connected apps
+	Connections ConnectionsConfig `mapstructure:"connections" yaml:"connections"`
 
 	// OpenAPI description and Swagger UI
 	OpenAPI OpenAPIConfig `mapstructure:"openapi" yaml:"openapi"`
@@ -275,6 +286,8 @@ func LoadConfig(configPath string) (Config, error) {
 	viper.SetDefault("webhooks.allow_private_networks", false)
 	viper.SetDefault("webhooks.timeout", "10s")
 	viper.SetDefault("webhooks.max_retries", 8)
+	viper.SetDefault("connections.allow_private_networks", false)
+	viper.SetDefault("connections.timeout", "30s")
 	viper.SetDefault("openapi.enabled", true)
 	viper.SetDefault("openapi.public", false)
 

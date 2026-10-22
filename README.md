@@ -38,7 +38,7 @@ permissions as a human.
 | | |
 |---|---|
 | ⚡ **Schema in, API out** | Define collections over HTTP. REST endpoints and a GraphQL schema appear immediately, no codegen, no restart. |
-| 🤖 **Agents built in** | LLM agents triggered by content events, webhooks or cron, with OpenAI, Anthropic or Ollama, and typed functions to read and write content. |
+| 🤖 **Agents built in** | LLM agents triggered by content events, webhooks or cron, with OpenAI, Anthropic or Ollama, tools to read and write content, and **connected apps** (GitHub, Gmail, Drive, Slack… through MCP) with approval before they act. |
 | 📝 **Editorial workflow** | Draft and publish per collection, reusable (and repeatable) components, one flat JSON shape for every item. |
 | 🧑‍💻 **Front-end ready** | A typed [JavaScript client](sdk/client), generated TypeScript types, content models as code, public read access, and Next.js starters ([blog](templates/nextjs-blog), [conference](templates/nextjs-conference) with a [tour of every feature](https://gohead-cms.github.io/gohead/frontend/feature-tour/)): `npm create @gohead-cms@latest`. |
 | 🔌 **Integrations** | Long-lived scoped API tokens, an OpenAPI 3.1 spec with Swagger UI for typed clients, and signed outbound webhooks for Slack, Zapier or site rebuilds. |
@@ -141,7 +141,9 @@ POST /admin/agents
 Triggers: **collection events**, **webhooks** (`POST /agents/webhook/{id}`) and **cron**.
 Built-in tools cover content (`content.save`, `content.update`, `content.list`…) and text
 tasks (`ai.summarize`, `ai.classify`, `ai.extract`…): name one with `use`, the catalog
-provides its description and arguments. [Read the agents guide →](https://gohead-cms.github.io/gohead/agents/)
+provides its description and arguments. [Connected apps](https://gohead-cms.github.io/gohead/agents/connected-apps/)
+add other services' tools over MCP (`github.create_issue`, Gmail and Drive through Zapier),
+and calls that may change something wait for an admin's approval. [Read the agents guide →](https://gohead-cms.github.io/gohead/agents/)
 
 ## How it fits together
 
@@ -180,7 +182,7 @@ The **[GoHead Handbook](https://gohead-cms.github.io/gohead/)** covers everythin
 - [User manual](https://gohead-cms.github.io/gohead/manual/): the admin UI step by step, with screenshots
 - [Build a website](https://gohead-cms.github.io/gohead/frontend/) · [JavaScript client](https://gohead-cms.github.io/gohead/frontend/sdk/) · [Content models as code](https://gohead-cms.github.io/gohead/frontend/model-as-code/) · [Next.js starter](https://gohead-cms.github.io/gohead/frontend/nextjs/)
 - [Content modeling](https://gohead-cms.github.io/gohead/guides/content-modeling/) · [REST API](https://gohead-cms.github.io/gohead/guides/rest-api/) · [GraphQL](https://gohead-cms.github.io/gohead/guides/graphql/) · [Users & roles](https://gohead-cms.github.io/gohead/guides/users-and-roles/)
-- [Agents](https://gohead-cms.github.io/gohead/agents/) · [Triggers](https://gohead-cms.github.io/gohead/agents/triggers/) · [Functions](https://gohead-cms.github.io/gohead/agents/functions/) · [LLM providers](https://gohead-cms.github.io/gohead/agents/llm-providers/)
+- [Agents](https://gohead-cms.github.io/gohead/agents/) · [Triggers](https://gohead-cms.github.io/gohead/agents/triggers/) · [Tools](https://gohead-cms.github.io/gohead/agents/functions/) · [Connected apps](https://gohead-cms.github.io/gohead/agents/connected-apps/) · [LLM providers](https://gohead-cms.github.io/gohead/agents/llm-providers/)
 - [Deployment](https://gohead-cms.github.io/gohead/operations/deployment/) · [CI/CD & releases](https://gohead-cms.github.io/gohead/operations/ci-cd/) · [Security](https://gohead-cms.github.io/gohead/operations/security/) · [Troubleshooting](https://gohead-cms.github.io/gohead/operations/troubleshooting/)
 
 ## Status

@@ -40,10 +40,10 @@ jobs:
       - name: Check go.mod is tidy
         run: |
           go mod tidy
-          git diff --exit-code -- go.mod go.sum
+          scripts/annotate-failure.sh "go.mod is not tidy" git diff --exit-code -- go.mod go.sum
 
-      - run: go vet ./...
-      - run: go build ./...
+      - run: scripts/annotate-failure.sh "go vet" go vet ./...
+      - run: scripts/annotate-failure.sh "go build" go build ./...
 
       - name: Test (SQLite, race detector)
         run: go test -race -count=1 -coverprofile=coverage.out -covermode=atomic ./...
@@ -259,6 +259,8 @@ jobs:
           GOHEAD_ADMIN_USERNAME: e2e-admin
           GOHEAD_ADMIN_EMAIL: e2e-admin@example.com
           GOHEAD_ADMIN_PASSWORD: e2e-password-123
+          # The connected apps test runs its MCP server on 127.0.0.1.
+          GOHEAD_CONNECTIONS_ALLOW_PRIVATE_NETWORKS: "true"
 
       - name: Install
         working-directory: gui

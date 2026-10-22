@@ -122,6 +122,18 @@ Uploads and file storage (local disk or S3-compatible) are configured under `med
 Outbound webhooks (`webhooks.*`) and the OpenAPI document (`openapi.*`) are described in
 [Integrations](../guides/integrations.md).
 
+### Connected apps
+
+How agents reach [connected apps](../agents/connected-apps.md#security):
+
+| Key | Env | Default |
+|-----|-----|---------|
+| `connections.allow_private_networks` | `GOHEAD_CONNECTIONS_ALLOW_PRIVATE_NETWORKS` | `false` |
+| `connections.timeout` | `GOHEAD_CONNECTIONS_TIMEOUT` | `30s` |
+
+Their tokens are encrypted with a key derived from `jwt_secret`: set it, to the same value
+in every process.
+
 ### Rate limiting
 
 | Key | Env | Default |

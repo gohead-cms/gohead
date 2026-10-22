@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ### Added
 - **Agent tools in a short form**: `"tools": [{"use": "content.update", "on": ["articles"]}]`. The catalog provides each tool's name, description and arguments; `name`, `description` and `parameters` only override them. Readable names for every built-in tool (`content.save`, `content.update`, `ai.summarize`, `ai.tags`…), the implementation keys still work. The agent editor picks tools from the catalog, grouped and described, with collection scopes and the overrides folded under **Customize**.
 
+- **Connected apps**: agents use other services' tools over MCP (the Model Context Protocol). Connect GitHub, Zapier (Gmail, Google Drive, Sheets, Slack… through the actions you enable) or any MCP server under **AI → Connected apps**; their tools appear in the agent's tool picker as `github.create_issue`. Calls of tools that may change something in the app wait for an admin's approval on the Approvals page (`"action": "call"`), unless the agent sets `"approval": false`; test runs never make them. Tokens are write-only, encrypted with a key derived from `jwt_secret`, and only sent to the URL they were given for. New settings `connections.allow_private_networks` and `connections.timeout`; migration `0007_connections`.
+
 ### Changed
 - Agent responses return `tools` (as written) next to `functions` (every tool as the model gets it). Agents in the long `functions` form keep working; a function with an empty `parameters` schema now gets the tool's own, so the model knows its arguments. Unknown tools are refused when an agent is saved.
 

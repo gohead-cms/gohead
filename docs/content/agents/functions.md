@@ -1,7 +1,7 @@
 # Tools
 
 An agent's `tools` say what it may do: read or change content, ask a model about a text,
-write to the log. Name a tool with `use`, and limit content tools to collections with `on`:
+write to the log, or use another service through a [connected app](connected-apps.md). Name a tool with `use`, and limit content tools to collections with `on`:
 
 ```json
 "tools": [
@@ -21,6 +21,7 @@ editor lists the same catalog.
 | `name` | optional | The name the model sees. Default: the tool's (`update_item`). Set it when the system prompt refers to the tool by another name, or for two tools of the same kind |
 | `description` | optional | What the model is told about it. Default: the tool's description, plus the collections in `on` |
 | `parameters` | optional | A JSON schema of its arguments. Default: the tool's own. Property names must be arguments the tool reads |
+| `approval` | connected apps | `true`: each call waits for an admin's approval; `false`: calls are made right away. Default: tools that may change something in the app wait ([details](connected-apps.md#approvals)) |
 
 Every tool returns JSON; errors come back as `{"status": "error", "message": "…"}` so the
 model can correct itself. `GET /admin/agent-functions` returns the catalog: each tool's
@@ -122,6 +123,12 @@ Their implementation keys are the `llm.*` functions: `llm.summarize_text`, `llm.
 | `use` | Name | Arguments | Does |
 |-------|------|-----------|------|
 | `system.log` | `log` | `message`, optional `data` | Writes to the worker log |
+
+## Connected apps
+
+The tools of [connected apps](connected-apps.md) are named after their connection:
+`github.create_issue`, `zapier.gmail_send_email`. `GET /admin/agent-functions` lists them
+with `"group": "apps"`; the model sees them as `github_create_issue`.
 
 ## Adding your own
 

@@ -3,7 +3,8 @@ import { type FieldChange } from "../history/history";
 
 /** applying: being decided right now (only listed with status=all). */
 export type ProposalStatus = "pending" | "applying" | "approved" | "rejected" | "failed";
-export type ProposalAction = "create" | "update" | "delete";
+/** call: a call to a connected app's tool (admins review those). */
+export type ProposalAction = "create" | "update" | "delete" | "call";
 
 /**
  * A content change an agent with require_approval asked for (GET
@@ -51,6 +52,22 @@ export interface ProposalDetail {
   proposed?: Record<string, unknown>;
   /** Pending: current → proposed. */
   changes?: FieldChange[];
+  /** A call to a connected app's tool. */
+  call?: ProposedCall;
+  /** A call whose connection was deleted. */
+  missing?: boolean;
+}
+
+/** The call a "call" proposal asks for, with the tool as the connection lists it now. */
+export interface ProposedCall {
+  connection: string;
+  connectionLabel?: string;
+  tool: string;
+  title?: string;
+  description?: string;
+  arguments: Record<string, unknown> | null;
+  readOnly?: boolean;
+  destructive?: boolean;
 }
 
 export interface ProposalPagination {
@@ -88,6 +105,7 @@ export const proposalActionColor: Record<ProposalAction, string> = {
   create: "green",
   update: "blue",
   delete: "red",
+  call: "purple",
 };
 
 /** Badge text of an action: a translation is an update of one locale. */
@@ -96,8 +114,21 @@ export function proposalActionLabel(p: Pick<Proposal, "action" | "locale">): str
   return p.action;
 }
 
-/** "articles #12", or "articles (new entry)". */
-export function proposalEntryLabel(p: Pick<Proposal, "collection" | "itemId">): string {
+/** Prefix of the collection of call proposals ("app:github"). */
+const APP_PREFIX = "app:";
+
+/** The connection and tool of a call proposal ("github", "create_issue"). */
+export function callTarget(p: Pick<Proposal, "collection" | "data">): { connection: string; tool: string } {
+  const tool = typeof p.data?.tool === "string" ? p.data.tool : "";
+  return { connection: p.collection.startsWith(APP_PREFIX) ? p.collection.slice(APP_PREFIX.length) : p.collection, tool };
+}
+
+/** "articles #12", "articles (new entry)", or "github.create_issue" for a call. */
+export function proposalEntryLabel(p: Pick<Proposal, "action" | "collection" | "itemId" | "data">): string {
+  if (p.action === "call") {
+    const { connection, tool } = callTarget(p);
+    return `${connection}.${tool}`;
+  }
   return p.itemId ? `${p.collection} #${p.itemId}` : `${p.collection} (new entry)`;
 }
 
@@ -140,6 +171,17 @@ export interface ApproveResult {
 /** Applies a proposal: the agent's values, or edited ones; force applies it although the entry changed since. */
 export function approveProposal(id: number, body: { data?: Record<string, unknown>; force?: boolean }): Promise<Envelope<ApproveResult>> {
   return api<ApproveResult>("POST", `/api/proposals/${id}/approve`, body);
+}
+
+export interface CallResult {
+  proposal: Proposal;
+  /** What the tool returned. */
+  result: string;
+}
+
+/** Makes a proposed call: with the agent's arguments, or edited ones. */
+export function approveCall(id: number, args?: Record<string, unknown>): Promise<Envelope<CallResult>> {
+  return api<CallResult>("POST", `/api/proposals/${id}/approve`, args ? { arguments: args } : {});
 }
 
 export function rejectProposal(id: number, note: string): Promise<Envelope<{ proposal: Proposal }>> {
