@@ -31,6 +31,12 @@ lives at the root of the repository.
 | `admin.email` | `GOHEAD_ADMIN_EMAIL` | *(empty)*, required with a username |
 | `admin.password` | `GOHEAD_ADMIN_PASSWORD` | *(empty)*, 12+ characters |
 | `auth.registration` | `GOHEAD_AUTH_REGISTRATION` | `disabled` (`open`: anyone can create a viewer account) |
+| `auth.sso.google.client_id` | `GOHEAD_AUTH_SSO_GOOGLE_CLIENT_ID` | *(empty)*: [sign in with Google](../guides/users-and-roles.md#sign-in-with-google) off |
+| `auth.sso.google.client_secret` | `GOHEAD_AUTH_SSO_GOOGLE_CLIENT_SECRET` | *(empty)* |
+| `auth.sso.google.allowed_domains` | `GOHEAD_AUTH_SSO_GOOGLE_ALLOWED_DOMAINS` | *(empty)*: only existing accounts |
+| `auth.sso.google.default_role` | `GOHEAD_AUTH_SSO_GOOGLE_DEFAULT_ROLE` | `viewer` |
+| `auth.sso.public_url` | `GOHEAD_AUTH_SSO_PUBLIC_URL` | *(empty)*: from the request |
+| `auth.sso.ui_url` | `GOHEAD_AUTH_SSO_UI_URL` | *(empty)*: the public URL |
 
 The `admin.*` account is created at startup only when the database has no users. See
 [users and roles](../guides/users-and-roles.md#registration-and-the-first-admin).

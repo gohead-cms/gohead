@@ -6,6 +6,8 @@ export interface AdminUser {
   role?: { id?: number; name?: string } | null;
   created_at?: string;
   CreatedAt?: string;
+  /** The identity provider the account signs in with ("google"). */
+  ssoProvider?: string;
 }
 
 /** An API token (never its secret), GET /admin/tokens. */

@@ -156,6 +156,56 @@ attempts for a username from one IP, that IP gets `429` with a `Retry-After` hea
 minutes; a successful login clears the count. Limits are
 [configurable](../getting-started/configuration.md#rate-limiting).
 
+## Sign in with Google
+
+People can sign in with their Google account, next to (not instead of) passwords: the login
+page shows **Sign in with Google**.
+
+- An existing account signs in when its email is the Google account's **verified** address;
+  the two are then linked, and the account keeps its role.
+- With `allowed_domains`, people of your Google Workspace domain (`yourstudio.com`) get an
+  account on their first sign-in, with `default_role` (`viewer` unless set; never `admin`:
+  promote people under **Settings → Users**). Google must vouch for the domain: a personal
+  Gmail account whose address happens to match is not enough.
+- Anyone else is told to ask an administrator for an account.
+
+Accounts created this way have no password: they sign in with Google, and an admin can set
+one. **Settings → Users** marks linked accounts with **google**.
+
+### Set it up
+
+1. In the [Google Cloud console](https://console.cloud.google.com/), open **APIs & Services →
+   OAuth consent screen** (or **Google Auth Platform**) and configure it: **Internal** if only
+   your Workspace domain signs in, **External** otherwise.
+2. Under **Credentials → Create credentials → OAuth client ID**, choose **Web application** and
+   add the **Authorized redirect URI** `https://cms.example.com/auth/sso/google/callback`
+   (GoHead's address, with `/auth/sso/google/callback`).
+3. Give GoHead the client:
+
+    ```bash
+    GOHEAD_AUTH_SSO_GOOGLE_CLIENT_ID=1234-abcd.apps.googleusercontent.com
+    GOHEAD_AUTH_SSO_GOOGLE_CLIENT_SECRET=GOCSPX-…
+    GOHEAD_AUTH_SSO_GOOGLE_ALLOWED_DOMAINS=yourstudio.com   # optional, comma-separated
+    GOHEAD_AUTH_SSO_GOOGLE_DEFAULT_ROLE=editor               # optional, default viewer
+    GOHEAD_AUTH_SSO_PUBLIC_URL=https://cms.example.com       # recommended in production
+    ```
+
+4. Restart GoHead. The login page now offers **Sign in with Google**.
+
+When the admin UI runs on another address than the API (the `gohead-admin` image), set
+`GOHEAD_AUTH_SSO_UI_URL` to it: GoHead sends people back there after signing in.
+
+### How it works
+
+The sign-in uses OpenID Connect's authorization code flow with PKCE. `GET
+/auth/sso/google/start` stores a signed, short-lived state in an `HttpOnly` cookie and sends the
+browser to Google; Google sends it back to `/auth/sso/google/callback`, which checks the state,
+exchanges the code for the ID token directly with Google, checks its issuer, audience, expiry
+and nonce, and finds or creates the account. The browser then lands on the admin UI's login
+page with a GoHead token in the URL fragment (`#sso_token=…`), which the UI keeps and removes
+from the address bar; fragments are never sent to servers. `GET /auth/sso` lists the enabled
+providers.
+
 ## Managing users (admin)
 
 | Method | Path | Body |

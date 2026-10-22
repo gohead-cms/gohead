@@ -77,6 +77,12 @@ var All = []Migration{
 		Up:          connectionsUp,
 		Down:        connectionsDown,
 	},
+	{
+		ID:          "0008_user_sso",
+		Description: "Accounts linked to an identity provider (sign-in with Google)",
+		Up:          userSSOUp,
+		Down:        userSSODown,
+	},
 }
 
 // baseline creates or updates every table from the models, as GoHead did at

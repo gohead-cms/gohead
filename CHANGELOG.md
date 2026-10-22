@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ## [Unreleased]
 
 ### Added
+- **Sign in with Google** (`auth.sso.google.*`), next to passwords. Existing accounts sign in with their verified Google email; with `allowed_domains`, people of your Google Workspace domain get an account with `default_role` on their first sign-in. OpenID Connect authorization code flow with PKCE; migration `0008_user_sso` links accounts to their provider.
 - **Demo mode** (`demo.enabled`), to run a public demo: visitors sign in from the login page with a shared account that sees the whole admin read-only, edits drafts and tries agents with test runs, but cannot publish, upload, approve calls or change settings. Every day at `demo.reset_at`, GoHead restores the snapshot taken with `POST /admin/demo/snapshot` (SQLite). `deploy/demo/render.yaml` deploys GoHead in demo mode and the conference starter on Render; `deploy/demo/setup.mjs` sets up the content, an optional GitHub agent and the snapshot.
 
 ### Changed

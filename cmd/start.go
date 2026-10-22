@@ -21,6 +21,7 @@ import (
 	"github.com/gohead-cms/gohead/internal/apps"
 	"github.com/gohead-cms/gohead/internal/demo"
 	"github.com/gohead-cms/gohead/internal/graphql"
+	"github.com/gohead-cms/gohead/internal/sso"
 	"github.com/gohead-cms/gohead/internal/webhooks"
 	"github.com/gohead-cms/gohead/internal/webui"
 	"github.com/gohead-cms/gohead/pkg/auth"
@@ -210,6 +211,10 @@ func InitializeServer(cfgPath string, opts ServerOptions) (*Server, func(), erro
 	// --- Application Services ---
 	seed.SeedRoles()
 	if err := setupAccounts(cfg); err != nil {
+		cleanup()
+		return nil, func() {}, err
+	}
+	if err := setupSSO(cfg); err != nil {
 		cleanup()
 		return nil, func() {}, err
 	}
@@ -411,6 +416,10 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, publicLimit midd
 	{
 		authRoutes.POST("/register", handlers.Register)
 		authRoutes.POST("/login", handlers.Login)
+		// Sign-in with an identity provider (Google).
+		authRoutes.GET("/sso", handlers.ListSSOProviders)
+		authRoutes.GET("/sso/:provider/start", handlers.StartSSO)
+		authRoutes.GET("/sso/:provider/callback", handlers.SSOCallback)
 	}
 	// Not rate limited with login: the admin UI calls it on every page load.
 	router.GET("/auth/me", middleware.AuthMiddleware(), handlers.Me)
@@ -621,6 +630,33 @@ func configureSecrets(configured, resolved, persistFile string) {
 	if err := secrets.SetKey(resolved); err != nil {
 		logger.Log.WithError(err).Warn("Could not set the key of stored tokens: they are stored unencrypted")
 	}
+}
+
+// setupSSO enables sign-in with the configured identity providers.
+func setupSSO(cfg config.Config) error {
+	s := cfg.Auth.SSO
+	handlers.SSOSettings.PublicURL, handlers.SSOSettings.UIURL = s.PublicURL, s.UIURL
+	var list []*sso.Provider
+	if g := s.Google; g.ClientID != "" {
+		if g.ClientSecret == "" {
+			return fmt.Errorf("auth.sso.google.client_id is set: set auth.sso.google.client_secret too")
+		}
+		p := sso.Google(g.ClientID, g.ClientSecret)
+		p.AllowedDomains, p.DefaultRole = g.AllowedDomains, g.DefaultRole
+		if p.DefaultRole == "" {
+			p.DefaultRole = auth.RoleViewer
+		}
+		if p.DefaultRole == auth.RoleAdmin {
+			return fmt.Errorf("auth.sso.google.default_role cannot be admin: promote people by hand")
+		}
+		if _, err := storage.GetRoleByName(p.DefaultRole); err != nil {
+			return fmt.Errorf("auth.sso.google.default_role: no role %q", p.DefaultRole)
+		}
+		list = append(list, p)
+		logger.Log.WithField("allowed_domains", p.AllowedDomains).Info("Sign-in with Google is enabled")
+	}
+	sso.Configure(list...)
+	return nil
 }
 
 // setupDemo turns on demo mode: the demo account, and the snapshot file
