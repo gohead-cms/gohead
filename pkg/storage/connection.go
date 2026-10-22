@@ -162,3 +162,13 @@ func ReleaseProposal(id uint) { releaseProposal(id) }
 func FinishProposal(p *models.Proposal, status, reviewer, note, errText string) error {
 	return finishProposal(p, status, reviewer, note, errText)
 }
+
+// ForgetCaches drops every in-process cache of stored definitions (locales,
+// roles, components, connections), after the database changed under them:
+// a demo reset.
+func ForgetCaches() {
+	invalidateLocales()
+	invalidateRoles()
+	InvalidateComponentCache()
+	forgetConnections()
+}

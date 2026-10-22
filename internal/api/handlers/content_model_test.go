@@ -56,7 +56,7 @@ func newContentAPI(t *testing.T) *contentAPI {
 
 	// A real limiter, as in production (rate limiting is on by default), so
 	// the public-role tests go through it.
-	api := router.Group("/api", middleware.PublicOrAuth(middleware.RateLimitAllow(ratelimit.NewMemory(), "public", 10_000, time.Minute)))
+	api := router.Group("/api", middleware.PublicOrAuth(middleware.RateLimitAllow(ratelimit.NewMemory(), "public", 10_000, time.Minute)), middleware.DemoGuard())
 	signedIn := middleware.SignedInOnly()
 	api.Any("/collections/:collection", DynamicCollectionHandler)
 	api.Any("/collections/:collection/:id", DynamicCollectionHandler)

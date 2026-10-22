@@ -1,0 +1,91 @@
+# The public GoHead demo on Render: GoHead in demo mode, and the conference
+# starter site that reads from it. About $14 a month (two small instances
+# and a 1 GB disk).
+#
+# Create it in the Render dashboard: New → Blueprint, this repository, and
+# deploy/demo/render.yaml as the Blueprint path. Then set up the content
+# from your machine: https://gohead-cms.github.io/gohead/operations/demo/
+services:
+  # ---- GoHead: API, admin UI and agents, on SQLite, in demo mode.
+  - type: web
+    name: gohead-demo
+    runtime: docker
+    dockerfilePath: ./deploy/render/Dockerfile
+    dockerContext: ./deploy/render
+    autoDeployTrigger: "off"
+    plan: 0.5c-512mb
+    healthCheckPath: /_health
+    disk:
+      name: gohead-demo-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      # The latest commit of master: the demo shows the latest changes.
+      # Set a version ("0.7") to show a release instead.
+      - key: GOHEAD_VERSION
+        value: edge
+      - key: PORT
+        value: "8080"
+      # Your account (the demo's owner): it sets up the content and approves
+      # calls to connected apps. Not the visitors' account.
+      - key: GOHEAD_ADMIN_USERNAME
+        value: admin
+      - key: GOHEAD_ADMIN_EMAIL
+        sync: false
+      - key: GOHEAD_ADMIN_PASSWORD
+        sync: false
+      - key: GOHEAD_JWT_SECRET
+        generateValue: true
+      - key: GOHEAD_TRUSTED_PROXIES
+        value: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10
+      # Demo mode: visitors sign in as demo / try-gohead-demo (shown on the
+      # login page), and everything is reset to the snapshot at 03:00 UTC.
+      - key: GOHEAD_DEMO_ENABLED
+        value: "true"
+      - key: GOHEAD_DEMO_RESET_AT
+        value: "03:00"
+      # The model agents use. A small, cheap one: visitors start runs.
+      - key: GOHEAD_LLM_PROVIDER
+        value: openai
+      - key: GOHEAD_LLM_MODEL
+        value: gpt-4o-mini
+      - key: GOHEAD_LLM_API_KEY
+        sync: false
+
+  # ---- The conference site (templates/nextjs-conference).
+  - type: web
+    name: gohead-demo-site
+    runtime: node
+    plan: 0.5c-512mb
+    autoDeployTrigger: "off"
+    buildCommand: bash deploy/demo/site.sh build
+    startCommand: bash deploy/demo/site.sh start
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # GoHead over Render's private network (gohead-demo:8080)...
+      - key: GOHEAD_HOSTPORT
+        fromService:
+          name: gohead-demo
+          type: web
+          property: hostport
+      # ...and its public address, for links to uploaded files.
+      - key: GOHEAD_PUBLIC_HOST
+        fromService:
+          name: gohead-demo
+          type: web
+          envVarKey: RENDER_EXTERNAL_HOSTNAME
+      # Printed by the setup (deploy/demo/setup.mjs): paste them here, then
+      # deploy the site again.
+      - key: GOHEAD_FORMS_TOKEN
+        sync: false
+      - key: GOHEAD_PREVIEW_TOKEN
+        sync: false
+      - key: GOHEAD_PREVIEW_SECRET
+        sync: false
+      - key: GOHEAD_WEBHOOK_SECRET
+        sync: false
+      - key: GOHEAD_FEEDBACK_AGENT_ID
+        sync: false
+      - key: GOHEAD_FEEDBACK_AGENT_TOKEN
+        sync: false

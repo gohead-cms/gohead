@@ -9,6 +9,7 @@ import (
 
 	"github.com/gohead-cms/gohead/internal/api/middleware"
 	"github.com/gohead-cms/gohead/internal/apps"
+	"github.com/gohead-cms/gohead/internal/demo"
 	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/logger"
@@ -111,9 +112,9 @@ func ListProposals(c *gin.Context) {
 	if q.Page, q.PageSize, ok = pageParams(c); !ok {
 		return
 	}
-	// Calls to connected apps are reviewed by admins only.
-	_, isToken := c.Get(middleware.APITokenIDKey)
-	q.NoCalls = role != auth.RoleAdmin || isToken
+	// Calls to connected apps are reviewed by admins only (and shown to
+	// visitors of a demo).
+	q.NoCalls = !seesCalls(c)
 	scope, err := reviewScope(role)
 	if err != nil {
 		c.Set("response", "Failed to list proposals")
@@ -161,7 +162,7 @@ func loadProposal(c *gin.Context) (*models.Proposal, *models.Collection, bool) {
 	if p.Action == models.ProposalCall {
 		// Calls act with a connected app's token: like the connections
 		// themselves, only admins in a user session (not API tokens) see them.
-		if _, isToken := c.Get(middleware.APITokenIDKey); isToken || c.GetString("role") != auth.RoleAdmin {
+		if !seesCalls(c) {
 			c.Set("response", "Proposal not found")
 			c.Set("status", http.StatusNotFound)
 			return nil, nil, false
@@ -237,6 +238,9 @@ func ApproveProposal(c *gin.Context) {
 		return
 	}
 	if p.Action == models.ProposalCall {
+		if demoDenied(c) {
+			return
+		}
 		approveCall(c, p)
 		return
 	}
@@ -319,6 +323,9 @@ func RejectProposal(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if p.Action == models.ProposalCall && demoDenied(c) {
+		return
+	}
 	var body struct {
 		Note string `json:"note"`
 	}
@@ -397,4 +404,24 @@ func approveCall(c *gin.Context, p *models.Proposal) {
 	}
 	c.Set("response", gin.H{"proposal": proposal, "result": res.Text})
 	c.Set("status", http.StatusOK)
+}
+
+// seesCalls reports whether the caller sees calls to connected apps: admins
+// in a user session, and visitors of a demo (who cannot decide them).
+func seesCalls(c *gin.Context) bool {
+	if _, isToken := c.Get(middleware.APITokenIDKey); isToken {
+		return false
+	}
+	role := c.GetString("role")
+	return role == auth.RoleAdmin || demo.IsDemo(role)
+}
+
+// demoDenied refuses decisions on calls to visitors of a demo.
+func demoDenied(c *gin.Context) bool {
+	if !demo.IsDemo(c.GetString("role")) {
+		return false
+	}
+	c.Set("response", "This is a demo: calls to connected apps are approved by the demo's owner only")
+	c.Set("status", http.StatusForbidden)
+	return true
 }

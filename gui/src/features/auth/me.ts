@@ -10,6 +10,8 @@ export interface Me {
   role: "admin" | "editor" | "viewer" | string;
   /** What the role may do (built-in roles expanded). */
   permissions?: Permissions;
+  /** The account of a public demo: it sees the admin, read-only. */
+  demo?: boolean;
 }
 
 export interface MeState {
@@ -18,7 +20,10 @@ export interface MeState {
   /** Set when /auth/me failed (other than 401, which signs out). */
   error: string | null;
   retry: () => void;
+  /** Admins, and the demo account (which sees the admin pages read-only). */
   isAdmin: boolean;
+  /** The account of a public demo: settings are read-only. */
+  isDemo: boolean;
   /** The role can create or update at least one content type. */
   canWrite: boolean;
   /** The role can read at least one content type. */
@@ -39,6 +44,7 @@ export const MeContext = createContext<MeState>({
   error: null,
   retry: () => {},
   isAdmin: false,
+  isDemo: false,
   canWrite: false,
   canReadContent: false,
   canReview: false,
@@ -63,7 +69,8 @@ export function meState(me: Me | null, loading: boolean, error: string | null, r
     loading,
     error,
     retry,
-    isAdmin: me?.role === "admin",
+    isAdmin: me?.role === "admin" || me?.demo === true,
+    isDemo: me?.demo === true,
     canWrite: allowsAny(perms, "create") || allowsAny(perms, "update"),
     canReadContent: allowsAny(perms, "read"),
     canReview: allowsAny(perms, "create") || allowsAny(perms, "update") || allowsAny(perms, "delete"),

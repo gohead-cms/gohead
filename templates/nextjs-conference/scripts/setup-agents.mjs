@@ -100,7 +100,7 @@ const desk = await create({
   llm_config: llm,
   memory,
   trigger: { type: "webhook", webhook_token: feedbackToken },
-  limits: { max_runs_per_hour: 120 },
+  limits: { max_runs_per_hour: 120, max_tokens_per_run: 20000 },
   tools: [
     { use: "ai.sentiment", name: "sentiment" },
     { use: "ai.classify", name: "classify" },

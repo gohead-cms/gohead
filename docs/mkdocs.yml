@@ -135,6 +135,7 @@ nav:
       - Deployment: operations/deployment.md
       - Standalone & Raspberry Pi: operations/standalone.md
       - Deploy to Render: operations/render.md
+      - Public demo: operations/demo.md
       - Upgrading: operations/upgrading.md
       - CI/CD & releases: operations/ci-cd.md
       - Observability: operations/observability.md

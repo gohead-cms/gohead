@@ -16,7 +16,9 @@ export default function AgentsPage() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const notify = useNotify();
-  const { isAdmin } = useMe();
+  const { isAdmin, isDemo } = useMe();
+  // The demo account looks at agents and test-runs them, nothing more.
+  const canManage = isAdmin && !isDemo;
   const { agents, loading: listLoading, error: listError, refetch: refetchList } = useAgentsList();
   const selectedAgent = params.get("name") || agents[0]?.name || null;
   const { agentDetails, loading: detailsLoading, error: detailsError } = useAgentDetails(selectedAgent);
@@ -41,7 +43,7 @@ export default function AgentsPage() {
 
   return (
     <Flex h="100%" w="100%" minW={0}>
-      <AgentSidebar agents={agents} selectedAgent={selectedAgent} onSelectAgent={select} loading={listLoading} canCreate={isAdmin} />
+      <AgentSidebar agents={agents} selectedAgent={selectedAgent} onSelectAgent={select} loading={listLoading} canCreate={canManage} />
 
       <Box flex="1" minW={0} p={{ base: 4, md: 10 }} overflowY="auto">
         {error && (
@@ -54,7 +56,7 @@ export default function AgentsPage() {
             icon={FiCpu}
             title="No agents yet"
             action={
-              isAdmin && (
+              canManage && (
                 <Button asChild colorPalette="teal">
                   <RouterLink to="/agents/new">
                     <FiPlus />
@@ -74,7 +76,8 @@ export default function AgentsPage() {
             key={`${agentDetails.name}:${params.get("run") ?? ""}`}
             agent={agentDetails}
             initialRun={Number(params.get("run")) || undefined}
-            onDelete={isAdmin ? () => remove(agentDetails.name) : undefined}
+            onDelete={canManage ? () => remove(agentDetails.name) : undefined}
+            canTest={isAdmin}
           />
         ) : !listLoading && !error ? (
           <Text color="gray.400">Select an agent to view its details</Text>

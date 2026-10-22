@@ -19,6 +19,7 @@ import (
 	"github.com/gohead-cms/gohead/internal/api/handlers"
 	"github.com/gohead-cms/gohead/internal/api/middleware"
 	"github.com/gohead-cms/gohead/internal/apps"
+	"github.com/gohead-cms/gohead/internal/demo"
 	"github.com/gohead-cms/gohead/internal/graphql"
 	"github.com/gohead-cms/gohead/internal/webhooks"
 	"github.com/gohead-cms/gohead/internal/webui"
@@ -108,6 +109,10 @@ func runServer(configPath string, opts ServerOptions) {
 	var background sync.WaitGroup
 	if opts.Standalone {
 		startBackground(bgCtx, &background, app)
+	}
+	// Demo mode: back to the snapshot every night.
+	if demo.Enabled() {
+		go demo.Run(bgCtx, handlers.AfterDemoReset)
 	}
 
 	go func() {
@@ -205,6 +210,10 @@ func InitializeServer(cfgPath string, opts ServerOptions) (*Server, func(), erro
 	// --- Application Services ---
 	seed.SeedRoles()
 	if err := setupAccounts(cfg); err != nil {
+		cleanup()
+		return nil, func() {}, err
+	}
+	if err := setupDemo(cfg); err != nil {
 		cleanup()
 		return nil, func() {}, err
 	}
@@ -317,6 +326,12 @@ func InitializeServer(cfgPath string, opts ServerOptions) (*Server, func(), erro
 	if cfg.RateLimit.Enabled {
 		publicLimit = middleware.RateLimitAllow(authLimiter, "public", cfg.RateLimit.PublicPerMinute, time.Minute)
 	}
+	// The demo account is limited even with rate limits off.
+	if authLimiter != nil {
+		middleware.SetDemoLimiter(authLimiter)
+	} else {
+		middleware.SetDemoLimiter(ratelimit.New(rdb, "gohead:ratelimit:"))
+	}
 	handlers.APIVersion = version
 	setupRoutes(router, authLimit, publicLimit, localMedia, cfg.OpenAPI)
 	if cfg.UI.Enabled {
@@ -399,13 +414,15 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, publicLimit midd
 	}
 	// Not rate limited with login: the admin UI calls it on every page load.
 	router.GET("/auth/me", middleware.AuthMiddleware(), handlers.Me)
+	// How to sign in to a public demo (404 otherwise).
+	router.GET("/auth/demo", handlers.DemoInfo)
 
 	// Agent Webhook Trigger (Public, authenticates with a token)
 	router.POST("/agents/webhook/:id", handlers.HandleWebhook)
 
 	// ADMIN routes (schema/definition)
 	admin := router.Group("/admin")
-	admin.Use(middleware.AuthMiddleware(), middleware.AdminOnly())
+	admin.Use(middleware.AuthMiddleware(), middleware.AdminOnly(), middleware.DemoGuard())
 	{
 		// Collections
 		admin.POST("/collections", handlers.CreateCollection)
@@ -447,6 +464,9 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, publicLimit midd
 		creds.PUT("/roles/:name", handlers.UpdateRole)
 		creds.DELETE("/roles/:name", handlers.DeleteRole)
 		// Connected apps: their tokens are credentials too.
+		creds.GET("/demo", handlers.DemoStatus)
+		creds.POST("/demo/snapshot", handlers.TakeDemoSnapshot)
+		creds.POST("/demo/reset", handlers.ResetDemo)
 		creds.GET("/connection-presets", handlers.ListConnectionPresets)
 		creds.GET("/connections", handlers.ListConnections)
 		creds.POST("/connections", handlers.CreateConnection)
@@ -493,7 +513,7 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, publicLimit midd
 
 	// CONTENT routes (actual data/items)
 	content := router.Group("/api")
-	content.Use(middleware.PublicOrAuth(publicLimit))
+	content.Use(middleware.PublicOrAuth(publicLimit), middleware.DemoGuard())
 	signedIn := middleware.SignedInOnly()
 	{
 		content.POST("/graphql", handlers.GraphQLHandler)
@@ -601,6 +621,34 @@ func configureSecrets(configured, resolved, persistFile string) {
 	if err := secrets.SetKey(resolved); err != nil {
 		logger.Log.WithError(err).Warn("Could not set the key of stored tokens: they are stored unencrypted")
 	}
+}
+
+// setupDemo turns on demo mode: the demo account, and the snapshot file
+// next to the SQLite database.
+func setupDemo(cfg config.Config) error {
+	d := cfg.Demo
+	if d.Enabled && d.Snapshot == "" {
+		if file, ok := strings.CutPrefix(cfg.DatabaseURL, "sqlite://"); ok {
+			file, _, _ = strings.Cut(strings.TrimPrefix(file, "file:"), "?")
+			d.Snapshot = file + ".demo-snapshot"
+		}
+	}
+	if err := demo.Configure(demo.Config{
+		Enabled: d.Enabled, Username: d.Username, Password: d.Password, ResetAt: d.ResetAt, Snapshot: d.Snapshot,
+	}); err != nil {
+		return err
+	}
+	if !d.Enabled {
+		return nil
+	}
+	if !strings.HasPrefix(cfg.DatabaseURL, "sqlite://") {
+		return fmt.Errorf("demo mode needs SQLite (its nightly reset copies SQLite tables)")
+	}
+	if err := demo.EnsureAccount(); err != nil {
+		return err
+	}
+	logger.Log.WithField("username", d.Username).Warn("Demo mode: anyone can sign in with the demo account and edit drafts")
+	return nil
 }
 
 // configureApps sets how connected apps are reached.

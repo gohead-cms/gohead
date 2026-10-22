@@ -134,6 +134,18 @@ How agents reach [connected apps](../agents/connected-apps.md#security):
 Their tokens are encrypted with a key derived from `jwt_secret`: set it, to the same value
 in every process.
 
+### Demo mode
+
+A [public demo](../operations/demo.md): a read-only account for visitors, and a daily reset.
+
+| Key | Env | Default |
+|-----|-----|---------|
+| `demo.enabled` | `GOHEAD_DEMO_ENABLED` | `false` |
+| `demo.username` | `GOHEAD_DEMO_USERNAME` | `demo` |
+| `demo.password` | `GOHEAD_DEMO_PASSWORD` | `try-gohead-demo` |
+| `demo.reset_at` | `GOHEAD_DEMO_RESET_AT` | `03:00` (UTC; `off`: never) |
+| `demo.snapshot` | `GOHEAD_DEMO_SNAPSHOT` | next to the SQLite database |
+
 ### Rate limiting
 
 | Key | Env | Default |

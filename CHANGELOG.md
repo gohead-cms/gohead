@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+- **Demo mode** (`demo.enabled`), to run a public demo: visitors sign in from the login page with a shared account that sees the whole admin read-only, edits drafts and tries agents with test runs, but cannot publish, upload, approve calls or change settings. Every day at `demo.reset_at`, GoHead restores the snapshot taken with `POST /admin/demo/snapshot` (SQLite). `deploy/demo/render.yaml` deploys GoHead in demo mode and the conference starter on Render; `deploy/demo/setup.mjs` sets up the content, an optional GitHub agent and the snapshot.
+
+### Changed
+- The Render Dockerfile follows the 0.7.x releases; `GOHEAD_VERSION` (for example `edge`, the latest commit of master) picks another image.
+
 ## [0.7.0] - 2026-10-22
 
 ### Added
