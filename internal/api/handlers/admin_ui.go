@@ -11,6 +11,7 @@ import (
 
 	"github.com/gohead-cms/gohead/internal/agent/functions"
 	"github.com/gohead-cms/gohead/internal/agent/jobs"
+	"github.com/gohead-cms/gohead/internal/demo"
 	agents "github.com/gohead-cms/gohead/internal/models/agents"
 	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/logger"
@@ -37,6 +38,8 @@ func Me(c *gin.Context) {
 	c.Set("response", gin.H{
 		"kind": "user", "id": user.ID, "username": user.Username, "email": user.Email, "role": user.Role.Name,
 		"permissions": auth.PermissionsOf(user.Role.Name),
+		// The demo account sees the admin, read-only.
+		"demo": demo.IsDemo(user.Role.Name),
 	})
 	c.Set("status", http.StatusOK)
 }

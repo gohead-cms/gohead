@@ -151,6 +151,9 @@ func ListProposals(q ProposalQuery) ([]models.Proposal, int, error) {
 				cond = cond.Or("action = ? AND collection IN ?", action, cols)
 			}
 		}
+		if !q.NoCalls {
+			cond = cond.Or("action = ?", models.ProposalCall)
+		}
 		db = db.Where(cond)
 	}
 	if q.NoCalls {

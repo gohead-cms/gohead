@@ -92,6 +92,19 @@ type WebhooksConfig struct {
 	MaxRetries           int           `mapstructure:"max_retries" yaml:"max_retries"`
 }
 
+// DemoConfig turns an instance into a public demo: a read-only account
+// visitors sign in with, and a nightly reset to a snapshot.
+type DemoConfig struct {
+	Enabled  bool   `mapstructure:"enabled" yaml:"enabled"`
+	Username string `mapstructure:"username" yaml:"username"`
+	Password string `mapstructure:"password" yaml:"password"`
+	// ResetAt is the time of the daily reset, "HH:MM" in UTC ("" never).
+	ResetAt string `mapstructure:"reset_at" yaml:"reset_at"`
+	// Snapshot is the file the reset restores (default: next to the
+	// SQLite database).
+	Snapshot string `mapstructure:"snapshot" yaml:"snapshot"`
+}
+
 // ConnectionsConfig controls connections to other services (connected
 // apps: remote MCP servers agents use).
 type ConnectionsConfig struct {
@@ -176,6 +189,8 @@ type Config struct {
 	Webhooks WebhooksConfig `mapstructure:"webhooks" yaml:"webhooks"`
 	// Connected apps
 	Connections ConnectionsConfig `mapstructure:"connections" yaml:"connections"`
+	// Public demo mode
+	Demo DemoConfig `mapstructure:"demo" yaml:"demo"`
 
 	// OpenAPI description and Swagger UI
 	OpenAPI OpenAPIConfig `mapstructure:"openapi" yaml:"openapi"`
@@ -288,6 +303,11 @@ func LoadConfig(configPath string) (Config, error) {
 	viper.SetDefault("webhooks.max_retries", 8)
 	viper.SetDefault("connections.allow_private_networks", false)
 	viper.SetDefault("connections.timeout", "30s")
+	viper.SetDefault("demo.enabled", false)
+	viper.SetDefault("demo.username", "demo")
+	viper.SetDefault("demo.password", "try-gohead-demo")
+	viper.SetDefault("demo.reset_at", "03:00")
+	viper.SetDefault("demo.snapshot", "")
 	viper.SetDefault("openapi.enabled", true)
 	viper.SetDefault("openapi.public", false)
 
