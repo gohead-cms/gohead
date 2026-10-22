@@ -68,6 +68,19 @@ migrations are explicit, reviewed steps; contributors add them in `pkg/migration
 
 ## Version notes
 
+### 0.8.0
+
+- **Migration `0008_user_sso`** adds two columns to `users` (the identity provider an account
+  signs in with). It runs when the API starts; with `auto_migrate: false`, run
+  `gohead migrate` first.
+- **Sign in with Google** is off until you set `auth.sso.google.client_id` and
+  `client_secret`: see [Sign in with Google](../guides/users-and-roles.md#sign-in-with-google).
+  Set `auth.sso.public_url` in production.
+- **Demo mode** (`demo.enabled`) is off by default; nothing changes for other instances. See
+  [Public demo](demo.md).
+- **Render:** the Dockerfile now follows 0.8.x. A service deployed from your own copy of the
+  repository keeps its version: set `GOHEAD_VERSION=0.8` and deploy.
+
 ### 0.7.0
 
 - **Migration `0007_connections`** adds the table of [connected apps](../agents/connected-apps.md).
