@@ -163,7 +163,7 @@ A [public demo](../operations/demo.md): a read-only account for visitors, and a 
 | `rate_limit.public_per_minute` | `GOHEAD_RATE_LIMIT_PUBLIC_PER_MINUTE` | `600` |
 | `trusted_proxies` | `GOHEAD_TRUSTED_PROXIES` | *(empty)* |
 
-- `auth_per_minute` caps requests to `/auth/login` and `/auth/register` per client IP.
+- `auth_per_minute` caps requests to `/auth/login`, `/auth/register` and the Google sign-in (`/auth/sso/…/start`, `/callback`, `/link`) per client IP.
 - `public_per_minute` caps anonymous `/api` requests (with [public access](../guides/users-and-roles.md#public-access) on) per client IP.
 - After `login_failures` failed logins for one username from one IP, further attempts from that
   IP are refused for `login_window` (other IPs, and a successful login, are unaffected). Set it

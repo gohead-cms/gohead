@@ -150,3 +150,17 @@ func LinkUserSSO(id uint, provider, subject string) error {
 	return database.DB.Model(&models.User{}).Where("id = ?", id).
 		Updates(models.User{SSOProvider: provider, SSOSubject: subject}).Error
 }
+
+// UsernameTaken reports whether a username or slug is used, by any
+// account, deleted ones included (their unique keys still hold).
+func UsernameTaken(username, slug string) (bool, error) {
+	var n int64
+	err := database.DB.Unscoped().Model(&models.User{}).Where("username = ? OR slug = ?", username, slug).Count(&n).Error
+	return n > 0, err
+}
+
+// UnlinkUserSSO removes an account's link to its identity provider.
+func UnlinkUserSSO(id uint) error {
+	return database.DB.Model(&models.User{}).Where("id = ?", id).
+		Select("SSOProvider", "SSOSubject").Updates(models.User{}).Error
+}

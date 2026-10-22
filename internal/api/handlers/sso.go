@@ -8,9 +8,11 @@ import (
 	"time"
 
 	"github.com/gohead-cms/gohead/internal/accounts"
+	"github.com/gohead-cms/gohead/internal/models"
 	"github.com/gohead-cms/gohead/internal/sso"
 	"github.com/gohead-cms/gohead/pkg/auth"
 	"github.com/gohead-cms/gohead/pkg/logger"
+	"github.com/gohead-cms/gohead/pkg/storage"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -40,10 +42,24 @@ type ssoState struct {
 	Nonce    string `json:"n"`
 	Verifier string `json:"v"`
 	Return   string `json:"r"`
+	// Bind is a random value the admin UI kept for this sign-in: it
+	// accepts the result only with it, so nobody can sign a browser into
+	// their own account with a crafted link.
+	Bind string `json:"b"`
+	// Link is the signed-in account that links this identity, if any.
+	Link string `json:"l,omitempty"`
 	jwt.RegisteredClaims
 }
 
 func ssoKey() []byte { return auth.DerivedKey("sso-state") }
+
+func linkKey() []byte { return auth.DerivedKey("sso-link") }
+
+type linkTicket struct {
+	Username string `json:"u"`
+	Provider string `json:"p"`
+	jwt.RegisteredClaims
+}
 
 // publicURL is GoHead's address for redirect URIs.
 func publicURL(c *gin.Context) string {
@@ -51,7 +67,11 @@ func publicURL(c *gin.Context) string {
 		return strings.TrimRight(SSOSettings.PublicURL, "/")
 	}
 	scheme := "http"
-	if c.Request.TLS != nil || strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https") {
+	// X-Forwarded-Proto counts only from a trusted proxy (ClientIP then
+	// differs from the connection's address). Set auth.sso.public_url in
+	// production.
+	forwarded := c.ClientIP() != c.RemoteIP() && strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https")
+	if c.Request.TLS != nil || forwarded {
 		scheme = "https"
 	}
 	return scheme + "://" + c.Request.Host
@@ -83,8 +103,53 @@ func ListSSOProviders(c *gin.Context) {
 	c.Set("status", http.StatusOK)
 }
 
-// StartSSO sends the browser to the provider. Query: return, the admin UI
-// path to open after signing in.
+// LinkSSOStart starts linking the signed-in account to a provider: it
+// returns the URL to send the browser to (the start URL with a short-lived
+// ticket, since a browser navigation carries no Authorization header).
+func LinkSSOStart(c *gin.Context) {
+	p, ok := sso.Get(c.Param("provider"))
+	if !ok {
+		c.Set("response", "Unknown sign-in provider")
+		c.Set("status", http.StatusNotFound)
+		return
+	}
+	username := c.GetString("username")
+	ticket, err := jwt.NewWithClaims(jwt.SigningMethodHS256, linkTicket{
+		Username: username, Provider: p.ID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(2 * time.Minute)),
+			Audience:  jwt.ClaimStrings{"gohead-sso-link"},
+		},
+	}).SignedString(linkKey())
+	if err != nil {
+		c.Set("response", "Could not start linking")
+		c.Set("status", http.StatusInternalServerError)
+		return
+	}
+	q := url.Values{"link": {ticket}, "bind": {c.Query("bind")}, "return": {safeReturn(c.Query("return"))}}
+	c.Set("response", gin.H{"url": publicURL(c) + "/auth/sso/" + p.ID + "/start?" + q.Encode()})
+	c.Set("status", http.StatusOK)
+}
+
+// UnlinkUserSSO removes a user's link to their identity provider (admin):
+// they sign in with their password again.
+func UnlinkUserSSO(c *gin.Context) {
+	id, ok := uintParam(c, "id")
+	if !ok {
+		return
+	}
+	if err := storage.UnlinkUserSSO(id); err != nil {
+		c.Set("response", "Failed to unlink the account")
+		c.Set("status", http.StatusInternalServerError)
+		return
+	}
+	c.Set("response", gin.H{"unlinked": id})
+	c.Set("status", http.StatusOK)
+}
+
+// StartSSO sends the browser to the provider. Query: bind (a random value
+// the admin UI keeps, required), return (the admin UI path to open after
+// signing in), link (a ticket from LinkSSOStart).
 func StartSSO(c *gin.Context) {
 	p, ok := sso.Get(c.Param("provider"))
 	if !ok {
@@ -92,9 +157,27 @@ func StartSSO(c *gin.Context) {
 		c.Set("status", http.StatusNotFound)
 		return
 	}
+	bind := c.Query("bind")
+	if len(bind) < 16 || len(bind) > 128 {
+		c.Set("response", "Start the sign-in from GoHead's login page")
+		c.Set("status", http.StatusBadRequest)
+		return
+	}
+	var link string
+	if t := c.Query("link"); t != "" {
+		var lt linkTicket
+		_, err := jwt.ParseWithClaims(t, &lt, func(*jwt.Token) (any, error) { return linkKey(), nil },
+			jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}), jwt.WithExpirationRequired(), jwt.WithAudience("gohead-sso-link"))
+		if err != nil || lt.Provider != p.ID || lt.Username == "" {
+			c.Set("response", "The link expired: start again from GoHead")
+			c.Set("status", http.StatusBadRequest)
+			return
+		}
+		link = lt.Username
+	}
 	st := ssoState{
 		Provider: p.ID, State: sso.RandomString(24), Nonce: sso.RandomString(24), Verifier: sso.RandomString(48),
-		Return: safeReturn(c.Query("return")),
+		Return: safeReturn(c.Query("return")), Bind: bind, Link: link,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(ssoStateTTL)),
 			Audience:  jwt.ClaimStrings{"gohead-sso"},
@@ -128,14 +211,6 @@ func SSOCallback(c *gin.Context) {
 		fail("This sign-in provider is not enabled.")
 		return
 	}
-	if e := c.Query("error"); e != "" {
-		if e == "access_denied" {
-			fail("The sign-in was cancelled.")
-		} else {
-			fail(p.Label + " refused the sign-in: " + e)
-		}
-		return
-	}
 	cookie, err := c.Cookie(ssoCookie)
 	if err != nil {
 		fail("The sign-in expired or was started in another browser: try again.")
@@ -148,13 +223,34 @@ func SSOCallback(c *gin.Context) {
 		fail("The sign-in expired or was started in another browser: try again.")
 		return
 	}
+	// From here, results go back with the browser's bind value.
+	fail = func(msg string) {
+		http.SetCookie(c.Writer, &http.Cookie{Name: ssoCookie, Value: "", Path: "/auth/sso/", MaxAge: -1, HttpOnly: true})
+		c.Redirect(http.StatusFound, uiURL(c)+"/login#"+url.Values{"sso_error": {msg}, "bind": {st.Bind}}.Encode())
+		c.Abort()
+	}
+	if e := c.Query("error"); e != "" {
+		if e == "access_denied" {
+			fail("The sign-in was cancelled.")
+		} else {
+			fail(p.Label + " refused the sign-in.")
+		}
+		return
+	}
 	id, err := p.Exchange(c.Request.Context(), redirectURI(c, p.ID), c.Query("code"), st.Verifier, st.Nonce)
 	if err != nil {
 		logger.Log.WithError(err).WithField("provider", p.ID).Warn("Sign-in with a provider failed")
 		fail(strings.TrimPrefix(err.Error(), sso.ErrSignIn.Error()+": "))
 		return
 	}
-	user, created, err := accounts.SignInWith(p, *id)
+	var user *models.User
+	created := false
+	if st.Link != "" {
+		user, err = accounts.LinkSSO(st.Link, *id)
+	} else {
+		// When anyone can register, an account's email proves nothing.
+		user, created, err = accounts.SignInWith(p, *id, Registration != RegistrationOpen)
+	}
 	if err != nil {
 		if errors.Is(err, accounts.ErrNoAccount) {
 			logger.Log.WithFields(map[string]any{"provider": p.ID, "email": id.Email}).Warn("Sign-in with a provider: no account")
@@ -176,6 +272,6 @@ func SSOCallback(c *gin.Context) {
 	}
 	logger.Log.WithFields(map[string]any{"username": user.Username, "provider": p.ID, "created": created}).Info("Signed in with a provider")
 	http.SetCookie(c.Writer, &http.Cookie{Name: ssoCookie, Value: "", Path: "/auth/sso/", MaxAge: -1, HttpOnly: true})
-	c.Redirect(http.StatusFound, uiURL(c)+"/login#"+url.Values{"sso_token": {token}, "return": {st.Return}}.Encode())
+	c.Redirect(http.StatusFound, uiURL(c)+"/login#"+url.Values{"sso_token": {token}, "return": {st.Return}, "bind": {st.Bind}}.Encode())
 	c.Abort()
 }

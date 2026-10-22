@@ -417,12 +417,15 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, publicLimit midd
 		authRoutes.POST("/register", handlers.Register)
 		authRoutes.POST("/login", handlers.Login)
 		// Sign-in with an identity provider (Google).
-		authRoutes.GET("/sso", handlers.ListSSOProviders)
 		authRoutes.GET("/sso/:provider/start", handlers.StartSSO)
 		authRoutes.GET("/sso/:provider/callback", handlers.SSOCallback)
 	}
 	// Not rate limited with login: the admin UI calls it on every page load.
 	router.GET("/auth/me", middleware.AuthMiddleware(), handlers.Me)
+	// The login page lists the providers on every load: not rate limited
+	// with sign-ins.
+	router.GET("/auth/sso", handlers.ListSSOProviders)
+	router.POST("/auth/sso/:provider/link", authLimit, middleware.AuthMiddleware(), middleware.UserSessionOnly(), handlers.LinkSSOStart)
 	// How to sign in to a public demo (404 otherwise).
 	router.GET("/auth/demo", handlers.DemoInfo)
 
@@ -463,6 +466,7 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, publicLimit midd
 		creds.GET("/users/:id", handlers.GetUser)
 		creds.PUT("/users/:id", handlers.UpdateUser)
 		creds.DELETE("/users/:id", handlers.DeleteUser)
+		creds.DELETE("/users/:id/sso", handlers.UnlinkUserSSO)
 		creds.POST("/tokens", handlers.CreateAPIToken)
 		creds.GET("/tokens", handlers.ListAPITokens)
 		creds.GET("/tokens/:id", handlers.GetAPIToken)
@@ -646,7 +650,7 @@ func setupSSO(cfg config.Config) error {
 		if p.DefaultRole == "" {
 			p.DefaultRole = auth.RoleViewer
 		}
-		if p.DefaultRole == auth.RoleAdmin {
+		if strings.EqualFold(p.DefaultRole, auth.RoleAdmin) {
 			return fmt.Errorf("auth.sso.google.default_role cannot be admin: promote people by hand")
 		}
 		if _, err := storage.GetRoleByName(p.DefaultRole); err != nil {

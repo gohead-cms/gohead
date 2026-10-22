@@ -40,6 +40,8 @@ func Me(c *gin.Context) {
 		"permissions": auth.PermissionsOf(user.Role.Name),
 		// The demo account sees the admin, read-only.
 		"demo": demo.IsDemo(user.Role.Name),
+		// The identity provider the account is linked to, if any.
+		"ssoProvider": user.SSOProvider,
 	})
 	c.Set("status", http.StatusOK)
 }

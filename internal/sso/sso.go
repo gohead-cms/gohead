@@ -255,6 +255,22 @@ func (p *Provider) Exchange(ctx context.Context, redirectURI, code, verifier, no
 	}, nil
 }
 
+// OwnsEmail reports whether the provider vouches that the person holds
+// their email address now. For Google: a Workspace account of the
+// address's domain (hd), or a Gmail address. A consumer Google account
+// created with another address keeps it "verified" even after the address
+// changes hands, so it proves nothing about that address.
+func (p *Provider) OwnsEmail(id Identity) bool {
+	if !id.EmailVerified || id.Email == "" {
+		return false
+	}
+	if !p.HostedDomain {
+		return true
+	}
+	d := id.Domain()
+	return (id.HostedDomain != "" && id.HostedDomain == d) || d == "gmail.com" || d == "googlemail.com"
+}
+
 // DomainAllowed reports whether the identity belongs to an allowed domain:
 // its verified email's domain, and for Google, the Workspace domain Google
 // vouches for (a personal account with a matching email is not enough).

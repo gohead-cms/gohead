@@ -13,7 +13,7 @@ import { useAuthStore } from "../../services/auth";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../../services/api";
 import { resetLabel, useDemoInfo } from "../demo/demo";
-import { ssoStartURL, takeSSOResult, useSSOProviders } from "./sso";
+import { startSSO, takeSSOResult, useSSOProviders } from "./sso";
 
 export function LoginPage() {
   const setToken = useAuthStore((s) => s.setToken);
@@ -31,8 +31,10 @@ export function LoginPage() {
     if (sso?.token) setToken(sso.token);
   }, [sso, setToken]);
 
+  // Signed in: go on, unless a provider sign-in (or linking) failed, which
+  // stays on screen.
   useEffect(() => {
-    if (token) {
+    if (token && !sso?.error) {
       navigate(sso?.returnPath ?? "/dashboard", { replace: true });
     }
   }, [token, navigate, sso]);
@@ -133,8 +135,8 @@ export function LoginPage() {
               or
             </Text>
             {providers.map((p) => (
-              <Button key={p.id} asChild variant="outline" width="100%">
-                <a href={ssoStartURL(p.id)}>Sign in with {p.label}</a>
+              <Button key={p.id} variant="outline" width="100%" onClick={() => startSSO(p.id)}>
+                Sign in with {p.label}
               </Button>
             ))}
           </VStack>
@@ -147,6 +149,11 @@ export function LoginPage() {
               <Alert.Description>{error}</Alert.Description>
             </Alert.Content>
           </Alert.Root>
+        )}
+        {token && sso?.error && (
+          <Button mt={3} variant="subtle" width="100%" onClick={() => navigate("/dashboard", { replace: true })}>
+            Back to GoHead
+          </Button>
         )}
       </Box>
     </Flex>
