@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-22
+
 ### Added
 - **Agent tools in a short form**: `"tools": [{"use": "content.update", "on": ["articles"]}]`. The catalog provides each tool's name, description and arguments; `name`, `description` and `parameters` only override them. Readable names for every built-in tool (`content.save`, `content.update`, `ai.summarize`, `ai.tags`…), the implementation keys still work. The agent editor picks tools from the catalog, grouped and described, with collection scopes and the overrides folded under **Customize**.
 
