@@ -68,6 +68,22 @@ migrations are explicit, reviewed steps; contributors add them in `pkg/migration
 
 ## Version notes
 
+### 0.7.0
+
+- **Migration `0007_connections`** adds the table of [connected apps](../agents/connected-apps.md).
+  It runs when the API starts; with `auto_migrate: false`, run `gohead migrate` first.
+- **Connected apps' tokens are encrypted with a key derived from `jwt_secret`.** Set
+  `jwt_secret` (`GOHEAD_JWT_SECRET`) to the same value in every process (API, workers);
+  without it, tokens are stored unencrypted. Changing `jwt_secret` later means entering
+  the tokens again.
+- **Agents in the short `tools` form.** Agents saved with `functions` keep working, and
+  responses now return both `tools` and `functions`. Agents naming a tool that doesn't
+  exist are refused when saved.
+- **API:** proposals can have `"action": "call"` (a call to a connected app's tool,
+  `"collection": "app:<connection>"`). Only admins in a user session see them: clients
+  listing proposals with an editor's or an API token's credentials get none. Clients that
+  check `action` against a fixed list should accept `call`.
+
 ### 0.6.3
 
 No migration and nothing to change. Agents on Anthropic call their functions again: on

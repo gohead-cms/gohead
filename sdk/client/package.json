@@ -1,6 +1,6 @@
 {
   "name": "@gohead-cms/client",
-  "version": "0.6.3",
+  "version": "0.7.0",
   "description": "Typed JavaScript/TypeScript client for the GoHead headless CMS: content, singletons, media, locales, GraphQL, webhooks, plus a CLI for type generation and content models as code.",
   "license": "MIT",
   "type": "module",
