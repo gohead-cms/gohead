@@ -143,7 +143,7 @@ A [public demo](../operations/demo.md): a read-only account for visitors, and a 
 | `demo.enabled` | `GOHEAD_DEMO_ENABLED` | `false` |
 | `demo.username` | `GOHEAD_DEMO_USERNAME` | `demo` |
 | `demo.password` | `GOHEAD_DEMO_PASSWORD` | `try-gohead-demo` |
-| `demo.reset_at` | `GOHEAD_DEMO_RESET_AT` | `03:00` (UTC; empty: never) |
+| `demo.reset_at` | `GOHEAD_DEMO_RESET_AT` | `03:00` (UTC; `off`: never) |
 | `demo.snapshot` | `GOHEAD_DEMO_SNAPSHOT` | next to the SQLite database |
 
 ### Rate limiting
