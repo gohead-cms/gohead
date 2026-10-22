@@ -53,6 +53,9 @@ func newFakeIdP(t *testing.T) *fakeIdP {
 
 func TestSSO(t *testing.T) {
 	a := rolesFixture(t)
+	prev := Registration
+	Registration = RegistrationDisabled
+	t.Cleanup(func() { Registration = prev })
 	idp := newFakeIdP(t)
 	p := &sso.Provider{
 		ID: "google", Label: "Google", AuthURL: "https://idp.test/auth", TokenURL: idp.URL,
@@ -194,6 +197,7 @@ func TestSSO(t *testing.T) {
 	t.Run("open registration links nothing by email", func(t *testing.T) {
 		Registration = RegistrationOpen
 		defer func() { Registration = RegistrationDisabled }()
+		// (the account was linked in an earlier subtest)
 		require.NoError(t, storage.UnlinkUserSSO(ed.ID))
 		frag := signIn(t, "code-ed", nil)
 		assert.Empty(t, frag.Get("sso_token"))
