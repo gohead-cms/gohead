@@ -86,8 +86,8 @@ export function LoginPage() {
               Try the demo
             </Text>
             <Text fontSize="sm" color="gray.700" mb={3}>
-              Sign in as <code>{demo.username}</code> with the password <code>{demo.password}</code> to look around, edit drafts
-              and try agents.{demo.resetAt && ` Everything is reset every day at ${resetLabel(demo)}.`}
+              Sign in as <code>{demo.username}</code> with the password <code>{demo.password}</code> to look around, write drafts
+              and try agents.{demo.resetAt && ` Content is reset every day at ${resetLabel(demo)}.`}
             </Text>
             <Button size="sm" colorPalette="purple" width="100%" onClick={() => void signIn({ username: demo.username, password: demo.password })}>
               Sign in to the demo

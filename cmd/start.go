@@ -326,6 +326,12 @@ func InitializeServer(cfgPath string, opts ServerOptions) (*Server, func(), erro
 	if cfg.RateLimit.Enabled {
 		publicLimit = middleware.RateLimitAllow(authLimiter, "public", cfg.RateLimit.PublicPerMinute, time.Minute)
 	}
+	// The demo account is limited even with rate limits off.
+	if authLimiter != nil {
+		middleware.SetDemoLimiter(authLimiter)
+	} else {
+		middleware.SetDemoLimiter(ratelimit.New(rdb, "gohead:ratelimit:"))
+	}
 	handlers.APIVersion = version
 	setupRoutes(router, authLimit, publicLimit, localMedia, cfg.OpenAPI)
 	if cfg.UI.Enabled {
@@ -416,7 +422,7 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, publicLimit midd
 
 	// ADMIN routes (schema/definition)
 	admin := router.Group("/admin")
-	admin.Use(middleware.AuthMiddleware(), middleware.AdminOnly())
+	admin.Use(middleware.AuthMiddleware(), middleware.AdminOnly(), middleware.DemoGuard())
 	{
 		// Collections
 		admin.POST("/collections", handlers.CreateCollection)
@@ -507,7 +513,7 @@ func setupRoutes(router *gin.Engine, authLimit gin.HandlerFunc, publicLimit midd
 
 	// CONTENT routes (actual data/items)
 	content := router.Group("/api")
-	content.Use(middleware.PublicOrAuth(publicLimit))
+	content.Use(middleware.PublicOrAuth(publicLimit), middleware.DemoGuard())
 	signedIn := middleware.SignedInOnly()
 	{
 		content.POST("/graphql", handlers.GraphQLHandler)

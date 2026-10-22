@@ -11,7 +11,7 @@ demo:
   enabled: true            # GOHEAD_DEMO_ENABLED
   username: demo           # GOHEAD_DEMO_USERNAME
   password: try-gohead-demo  # GOHEAD_DEMO_PASSWORD
-  reset_at: "03:00"        # GOHEAD_DEMO_RESET_AT: daily, UTC ("" never)
+  reset_at: "03:00"        # GOHEAD_DEMO_RESET_AT: daily, UTC ("off": never)
   snapshot: ""             # GOHEAD_DEMO_SNAPSHOT: default <database file>.demo-snapshot
 ```
 
@@ -19,21 +19,30 @@ At start, GoHead creates the visitors' account with the `demo` role, and the log
 offers **Sign in to the demo**. Visitors:
 
 - see the whole admin: content, the content model, agents and their runs, connected apps,
-  approvals (including calls to connected apps), webhooks, users and API tokens (never their
-  secrets);
-- create and edit entries: drafts in draft-and-publish collections, since they cannot
-  publish, and nothing they can delete;
-- try agents with **Test run**: runs read content and call the model, and report the
-  changes they would make;
+  approvals (including calls to connected apps), webhooks, users and API tokens. Never a
+  secret, and never an **email address**: GoHead replaces them in everything the demo account
+  reads, since your public site's forms collect some. Webhook and connection URLs show their
+  host only;
+- create and edit **drafts** in draft-and-publish collections. They cannot publish, delete,
+  or change single types and collections without drafts, which the public site shows at
+  once;
+- try agents with **Test run**: runs read content and call the model, and report the changes
+  they would make. They call no connected app, not even read-only tools;
 - cannot change anything else: settings, the content model, agents, users, tokens,
   connections, webhooks; they cannot upload files, and calls to connected apps waiting for
   approval are yours to approve.
 
-A banner tells them, and the server refuses the rest with `403`.
+A banner tells them, and the server refuses the rest with `403`. Each visitor (by IP) may
+make 60 changes and 10 test runs an hour, with requests of 16 KB at most (8 KB for a test
+run).
 
-Every day at `reset_at`, GoHead puts every table back as it was in the **snapshot**, in one
-transaction: content, agents and their runs, proposals, users. Take the snapshot once your
-demo is set up, as an admin:
+Other than email addresses, visitors read what your site's forms collect: names, talk
+proposals, feedback. Say so on the forms of a public demo.
+
+Every day at `reset_at`, GoHead puts back what visitors change as it was in the
+**snapshot**, in one transaction: entries and their history, proposals, agent runs. What only
+you change is kept: accounts, API tokens, roles, webhooks, connections, agents and the content
+model. Take the snapshot once your demo is set up, as an admin:
 
 ```bash
 curl -X POST $GOHEAD/admin/demo/snapshot -H "$AUTH"   # save the database as it is now
@@ -42,7 +51,10 @@ curl $GOHEAD/admin/demo -H "$AUTH"                    # settings, snapshot time,
 ```
 
 Demo mode needs SQLite (`gohead standalone`): the reset copies SQLite tables. Uploaded files
-are not part of the snapshot, which is fine since visitors cannot upload.
+are not part of the snapshot, which is fine since visitors cannot upload. After an upgrade
+that adds a migration, the reset refuses to run until you take a new snapshot (the log says
+so). Taking a snapshot also gives the demo role write access to the draft-and-publish
+collections you added since GoHead started.
 
 !!! warning "Visitors use your model"
     Agents run on your LLM key whenever visitors create entries or start test runs. Use a

@@ -29,7 +29,7 @@ func TestDemoMode(t *testing.T) {
 
 	a.router.GET("/auth/me", middleware.AuthMiddleware(), Me)
 	a.router.GET("/auth/demo", DemoInfo)
-	admin := a.router.Group("/admin", middleware.AuthMiddleware(), middleware.AdminOnly())
+	admin := a.router.Group("/admin", middleware.AuthMiddleware(), middleware.AdminOnly(), middleware.DemoGuard())
 	admin.GET("/collections", GetCollections)
 	admin.GET("/demo", DemoStatus)
 	admin.POST("/demo/snapshot", TakeDemoSnapshot)
@@ -56,12 +56,24 @@ func TestDemoMode(t *testing.T) {
 	})
 
 	t.Run("drafts only", func(t *testing.T) {
+		code, _ := a.do("demo", "POST", "/api/collections/pages", map[string]any{"data": map[string]any{"title": "Live at once"}})
+		assert.Equal(t, http.StatusForbidden, code, "pages has no drafts: read-only")
 		art := a.ok("demo", "POST", "/api/collections/articles", map[string]any{"data": map[string]any{"title": "From a visitor"}}).(map[string]any)
 		id := int(art["id"].(float64))
-		code, _ := a.do("demo", "POST", fmt.Sprintf("/api/collections/articles/%d/publish", id), nil)
+		code, _ = a.do("demo", "POST", fmt.Sprintf("/api/collections/articles/%d/publish", id), nil)
 		assert.Equal(t, http.StatusForbidden, code, "no publishing")
 		code, _ = a.do("demo", "DELETE", fmt.Sprintf("/api/collections/articles/%d", id), nil)
 		assert.Equal(t, http.StatusForbidden, code, "no deleting")
+	})
+
+	t.Run("no email address", func(t *testing.T) {
+		a.ok("admin", "POST", "/api/collections/articles", map[string]any{"data": map[string]any{"title": "Write to jane@example.org"}})
+		list := a.ok("demo", "GET", "/api/collections/articles?status=all", nil).([]any)
+		for _, item := range list {
+			assert.NotContains(t, field(item, "title"), "jane@example.org")
+		}
+		me := a.ok("demo", "GET", "/auth/me", nil).(map[string]any)
+		assert.NotNil(t, me)
 	})
 
 	t.Run("calls are shown, not decided", func(t *testing.T) {
@@ -88,16 +100,18 @@ func TestDemoMode(t *testing.T) {
 		a.ok("admin", "POST", "/api/collections/pages", map[string]any{"data": map[string]any{"title": "Kept"}})
 		snap := a.ok("admin", "POST", "/admin/demo/snapshot", nil).(map[string]any)
 		assert.NotEmpty(t, snap["snapshotAt"])
-		a.ok("demo", "POST", "/api/collections/pages", map[string]any{"data": map[string]any{"title": "Gone after the reset"}})
+		a.ok("demo", "POST", "/api/collections/articles", map[string]any{"data": map[string]any{"title": "Gone after the reset"}})
 		require.NoError(t, demo.Reset(context.Background(), AfterDemoReset))
 
-		pages := a.ok("admin", "GET", "/api/collections/pages", nil).([]any)
-		var titles []any
-		for _, p := range pages {
-			titles = append(titles, field(p, "title"))
+		titles := func(collection string) []any {
+			var out []any
+			for _, p := range a.ok("admin", "GET", "/api/collections/"+collection+"?status=all", nil).([]any) {
+				out = append(out, field(p, "title"))
+			}
+			return out
 		}
-		assert.Contains(t, titles, "Kept")
-		assert.NotContains(t, titles, "Gone after the reset")
+		assert.Contains(t, titles("pages"), "Kept")
+		assert.NotContains(t, titles("articles"), "Gone after the reset")
 		// The demo account still signs in.
 		a.ok("demo", "GET", "/auth/me", nil)
 	})

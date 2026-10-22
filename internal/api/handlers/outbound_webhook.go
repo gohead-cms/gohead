@@ -132,7 +132,7 @@ func ListWebhooks(c *gin.Context) {
 	}
 	out := make([]map[string]any, 0, len(list))
 	for _, w := range list {
-		out = append(out, webhookJSON(w, false))
+		out = append(out, demoURL(c, webhookJSON(w, false)))
 	}
 	c.Set("response", out)
 	c.Set("meta", gin.H{"total": len(out)})
@@ -162,7 +162,7 @@ func loadWebhook(c *gin.Context) (*models.Webhook, bool) {
 // GetWebhook returns one webhook.
 func GetWebhook(c *gin.Context) {
 	if w, ok := loadWebhook(c); ok {
-		c.Set("response", webhookJSON(*w, false))
+		c.Set("response", demoURL(c, webhookJSON(*w, false)))
 		c.Set("status", http.StatusOK)
 	}
 }

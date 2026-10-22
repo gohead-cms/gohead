@@ -11,8 +11,8 @@ export function DemoBanner() {
   return (
     <Box role="status" bg="purple.600" color="white" px={{ base: 4, md: 8 }} py={2} fontSize="sm">
       <Text>
-        <strong>GoHead demo.</strong> Look around, edit drafts and try agents with <em>Test run</em>; settings, publishing and
-        connected apps are read-only.{reset && ` Everything is reset at ${reset}.`}
+        <strong>GoHead demo.</strong> Look around, write drafts and try agents with <em>Test run</em>. Published content,
+        settings and connected apps are read-only, and email addresses are hidden.{reset && ` Content is reset at ${reset}.`}
       </Text>
     </Box>
   );

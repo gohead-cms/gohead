@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/gohead-cms/gohead/internal/demo"
@@ -47,6 +48,12 @@ func TakeDemoSnapshot(c *gin.Context) {
 		c.Set("status", http.StatusNotFound)
 		return
 	}
+	// The demo role writes the draft-and-publish collections of the
+	// content model as it is now.
+	if err := demo.EnsureAccount(); err != nil {
+		demoError(c, err)
+		return
+	}
 	at, err := demo.Snapshot(c.Request.Context())
 	if err != nil {
 		demoError(c, err)
@@ -80,7 +87,7 @@ func AfterDemoReset() {
 
 func demoError(c *gin.Context, err error) {
 	switch {
-	case errors.Is(err, demo.ErrNotSQLite), errors.Is(err, demo.ErrNoSnapshot):
+	case errors.Is(err, demo.ErrNotSQLite), errors.Is(err, demo.ErrNoSnapshot), errors.Is(err, demo.ErrSnapshotOutdated):
 		c.Set("response", err.Error())
 		c.Set("status", http.StatusConflict)
 	default:
@@ -88,4 +95,21 @@ func demoError(c *gin.Context, err error) {
 		c.Set("response", "Failed: "+err.Error())
 		c.Set("status", http.StatusInternalServerError)
 	}
+}
+
+// demoURL shows the demo account only the scheme and host of a webhook's
+// or connection's URL: paths and query strings can hold secrets (Slack
+// webhook URLs do).
+func demoURL[M ~map[string]any](c *gin.Context, m M) M {
+	if !demo.IsDemo(c.GetString("role")) {
+		return m
+	}
+	if raw, ok := m["url"].(string); ok {
+		if u, err := url.Parse(raw); err == nil && u.Host != "" {
+			m["url"] = u.Scheme + "://" + u.Host + "/…"
+		} else {
+			m["url"] = "hidden"
+		}
+	}
+	return m
 }

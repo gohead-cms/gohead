@@ -7,6 +7,7 @@ import (
 
 	"github.com/gohead-cms/gohead/internal/agent/tools"
 	"github.com/gohead-cms/gohead/internal/apps"
+	"github.com/gohead-cms/gohead/internal/demo"
 	"github.com/gohead-cms/gohead/internal/models"
 	agentModels "github.com/gohead-cms/gohead/internal/models/agents"
 	"github.com/gohead-cms/gohead/pkg/storage"
@@ -130,7 +131,9 @@ func appTool(spec agentModels.FunctionSpec) ToolFunc {
 		}
 		mode := writeModeOf(ctx)
 		approval := needsApproval(spec, info, mode)
-		if mode == WriteDryRun && (approval || info.Writes) {
+		// On a public demo, test runs (which visitors start) call no app at
+		// all: a read-only tool still acts with the owner's token.
+		if mode == WriteDryRun && (approval || info.Writes || demo.Enabled()) {
 			b, _ := json.Marshal(map[string]any{
 				"status": "success", "dry_run": true, "action": "would_call", "tool": spec.ImplKey,
 				"arguments": argMap,

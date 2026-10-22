@@ -121,7 +121,7 @@ func ListConnections(c *gin.Context) {
 	}
 	out := make([]gin.H, 0, len(list))
 	for _, conn := range list {
-		out = append(out, connectionJSON(conn))
+		out = append(out, demoURL(c, connectionJSON(conn)))
 	}
 	c.Set("response", out)
 	c.Set("meta", gin.H{"total": len(out), "encrypted": secrets.Enabled()})
@@ -149,7 +149,7 @@ func GetConnection(c *gin.Context) {
 	if !ok {
 		return
 	}
-	c.Set("response", connectionJSON(*conn))
+	c.Set("response", demoURL(c, connectionJSON(*conn)))
 	c.Set("status", http.StatusOK)
 }
 

@@ -7,9 +7,11 @@ package demo
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -46,10 +48,10 @@ func Configure(c Config) error {
 		if c.Username == "" || c.Password == "" {
 			return errors.New("demo.username and demo.password are required in demo mode")
 		}
-		if c.ResetAt != "" {
-			if _, _, err := parseClock(c.ResetAt); err != nil {
-				return err
-			}
+		if off(c.ResetAt) {
+			c.ResetAt = ""
+		} else if _, _, err := parseClock(c.ResetAt); err != nil {
+			return err
 		}
 	}
 	mu.Lock()
@@ -92,11 +94,11 @@ func PublicInfo(now time.Time) Info {
 // read, create and update everywhere (no publish, no delete), media read.
 func EnsureAccount() error {
 	c := current()
-	perms := auth.Permissions{
-		Content: map[string][]string{auth.AnyType: {auth.ActionRead, auth.ActionCreate, auth.ActionUpdate}},
-		Media:   []string{auth.ActionRead},
+	perms, err := rolePermissions()
+	if err != nil {
+		return err
 	}
-	const desc = "Visitors of the public demo: read everything, edit drafts"
+	const desc = "Visitors of the public demo: read everything, write drafts of draft-and-publish collections"
 	if _, err := storage.CreateCustomRole(Role, desc, perms); err != nil {
 		if !errors.Is(err, storage.ErrRoleExists) {
 			return fmt.Errorf("demo role: %w", err)
@@ -121,6 +123,42 @@ func EnsureAccount() error {
 		return fmt.Errorf("demo account: %w", err)
 	}
 	return storage.CreateUser(u)
+}
+
+// rolePermissions are the demo role's: read everything, and write only
+// where a write is a draft (draft-and-publish collections, without
+// publish). Single types and other collections change the public site at
+// once: read-only.
+func rolePermissions() (auth.Permissions, error) {
+	content := map[string][]string{auth.AnyType: {auth.ActionRead}}
+	cols, _, err := storage.GetAllCollections(nil, nil, nil)
+	if err != nil {
+		return auth.Permissions{}, err
+	}
+	for _, ct := range cols {
+		if ct.DraftAndPublish {
+			content[ct.Name] = []string{auth.ActionRead, auth.ActionCreate, auth.ActionUpdate}
+		}
+	}
+	return auth.Permissions{Content: content, Media: []string{auth.ActionRead}}, nil
+}
+
+// emailPattern matches email addresses.
+var emailPattern = regexp.MustCompile(`[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}`)
+
+// RedactEmails returns a response with every email address replaced: the
+// demo account reads what the public site's forms collect, and the users'
+// addresses.
+func RedactEmails(v any) any {
+	b, err := json.Marshal(v)
+	if err != nil || !emailPattern.Match(b) {
+		return v
+	}
+	var out any
+	if err := json.Unmarshal(emailPattern.ReplaceAll(b, []byte("hidden@example.com")), &out); err != nil {
+		return v
+	}
+	return out
 }
 
 // ---- Snapshot and reset (SQLite)
@@ -178,9 +216,17 @@ func SnapshotTime() (time.Time, bool) {
 	return info.ModTime(), true
 }
 
-// kept are the tables a reset leaves alone: the job queue (jobs in flight)
-// and the migrations applied.
-var kept = map[string]bool{"jobs": true, "schema_migrations": true}
+// resetTables are the tables visitors change: content, its history,
+// proposals, and agent runs. The rest (accounts, tokens, settings,
+// connections, agents) only the owner changes, and a reset keeps the
+// owner's changes, such as a revoked token or a new password.
+var resetTables = []string{
+	"items", "single_items", "revisions", "proposals",
+	"agent_runs", "agent_run_steps", "agent_messages", "webhook_deliveries",
+}
+
+// ErrSnapshotOutdated is returned when migrations ran since the snapshot.
+var ErrSnapshotOutdated = errors.New("the database was migrated since the demo snapshot: take a new snapshot")
 
 // Restore puts every table back as in the snapshot, in one transaction.
 // Columns added since the snapshot keep their defaults.
@@ -214,13 +260,18 @@ func Restore(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if same, err := sameMigrations(ctx, conn); err != nil {
+		return err
+	} else if !same {
+		return ErrSnapshotOutdated
+	}
 	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
 	for _, t := range tables {
-		if kept[t] || !contains(existing, t) {
+		if !contains(resetTables, t) || !contains(existing, t) {
 			continue
 		}
 		cols, err := commonColumns(ctx, tx, t)
@@ -240,6 +291,25 @@ func Restore(ctx context.Context) error {
 		}
 	}
 	return tx.Commit()
+}
+
+// sameMigrations reports whether the snapshot was taken with the
+// migrations the database has now.
+func sameMigrations(ctx context.Context, conn *sql.Conn) (bool, error) {
+	list := func(schema string) (string, error) {
+		var ids sql.NullString
+		err := conn.QueryRowContext(ctx, "SELECT group_concat(id, ',') FROM (SELECT id FROM "+schema+".schema_migrations ORDER BY id)").Scan(&ids)
+		return ids.String, err
+	}
+	a, err := list("snap")
+	if err != nil {
+		return false, err
+	}
+	b, err := list("main")
+	if err != nil {
+		return false, err
+	}
+	return a == b, nil
 }
 
 // tableNames lists the tables of an attached schema ("main", "snap").
@@ -310,6 +380,16 @@ func contains(list []string, s string) bool {
 func quoteIdent(s string) string { return `"` + strings.ReplaceAll(s, `"`, `""`) + `"` }
 
 // ---- Daily reset
+
+// off reports whether a reset_at value turns the reset off (an empty
+// environment variable falls back to the default, so "off" is accepted).
+func off(s string) bool {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "", "off", "never", "none", "false":
+		return true
+	}
+	return false
+}
 
 func parseClock(s string) (int, int, error) {
 	t, err := time.Parse("15:04", s)
