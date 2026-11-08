@@ -473,7 +473,7 @@ jobs:
           grep -q "set database.url" <<<"$out"
 
       # Install the branch's images on a real cluster, then run `helm test`.
-      - uses: helm/kind-action@v1.15.1
+      - uses: helm/kind-action@v1.15.2
       - name: Build and load the images
         run: |
           docker build -t gohead:ci .
